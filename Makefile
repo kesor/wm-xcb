@@ -19,7 +19,7 @@ else
 	LDFLAGS += -Os
 endif
 
-SRC = $(NAME).c
+SRC = $(NAME)-log.c $(NAME)-signals.c $(NAME)-running.c $(NAME).c
 OBJ = ${SRC:.c=.o}
 
 all: $(NAME)
