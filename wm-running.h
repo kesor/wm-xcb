@@ -1,7 +1,9 @@
 #ifndef _WM_RUNNING_
 #define _WM_RUNNING_
 
+#include <signal.h>
+
 /* indicator that the event loop is running (or not) */
-extern int running;
+extern sig_atomic_t running;
 
 #endif

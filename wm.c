@@ -6,10 +6,18 @@
 #include "wm-signals.h"
 #include "wm-running.h"
 
+#include "wm-xcb.h"
+#include "wm-xcb-ewmh.h"
+
 int main(int argc, char** argv) {
 	setup_signals();
+	setup_xcb();
+	setup_ewmh();
 	while (running) {
+		handle_xcb_events();
 		usleep(100000); // 100ms
 	}
+	destruct_ewmh();
+	destruct_xcb();
 	return 0;
 }

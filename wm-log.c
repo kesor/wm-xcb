@@ -18,6 +18,4 @@ void logger(FILE* io, const char* fmt, ...) {
 	}
 	else
 		fputc('\n', io);
-
-	exit(1);
 }

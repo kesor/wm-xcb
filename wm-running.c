@@ -1,4 +1,5 @@
+#include <signal.h>
 #include "wm-running.h"
 
 /* initialize the running flag */
-int running = 1;
+sig_atomic_t running = 1;

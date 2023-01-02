@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "wm-running.h"
+
 void logger(FILE* io, const char* fmt, ...);
 
 #ifdef DEBUG
@@ -13,6 +15,6 @@ void logger(FILE* io, const char* fmt, ...);
 #endif
 
 #define LOG_ERROR(pFormat, ...) { logger(stderr, pFormat, ##__VA_ARGS__); }
-#define LOG_FATAL(pFormat, ...) { logger(stderr, pFormat, ##__VA_ARGS__); exit(1); }
+#define LOG_FATAL(pFormat, ...) { logger(stderr, pFormat, ##__VA_ARGS__); running = 0; }
 
 #endif

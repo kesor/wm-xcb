@@ -5,7 +5,7 @@ DEBUG = 0
 
 CC = gcc
 
-PKGLIST = xcb
+PKGLIST = xcb xcb-ewmh
 
 CPPFLAGS = -DVERSION=\"${VERSION}\"
 CFLAGS = $(shell pkg-config --cflags ${PKGLIST}) -Ivendor/libxcb-errors/include ${CPPFLAGS}
@@ -19,7 +19,16 @@ else
 	LDFLAGS += -Os
 endif
 
-SRC = $(NAME)-log.c $(NAME)-signals.c $(NAME)-running.c $(NAME).c
+SRC = \
+	$(NAME)-log.c \
+	$(NAME)-signals.c \
+	$(NAME)-running.c \
+	$(NAME)-window-list.c \
+	$(NAME)-xcb-ewmh.c \
+	$(NAME)-xcb-events.c \
+	$(NAME)-xcb.c \
+	$(NAME).c
+
 OBJ = ${SRC:.c=.o}
 
 all: $(NAME)
