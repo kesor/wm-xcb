@@ -2,8 +2,8 @@
 #include <xcb/xcb.h>
 
 /*
- * The window manage holds only a small number of windows at any one time,
- * usually less than a hundred. Thus it is a good idea to optimize for
+ * The window manager holds only a small number of windows at any one time,
+ * usually less than about a hundred. Thus it is a good idea to optimize for
  * adding and removing windows as quickly as possible.
  *
  * Finding windows should also be fast to react to events that the X server
@@ -11,9 +11,10 @@
  *
  **/
 
+#include "wm-log.h"
 #include "wm-window-list.h"
 
-wnd_node_t sentinel;
+static wnd_node_t sentinel;
 
 void window_properties_init(struct wnd_node_t* wnd) {
 	wnd->title = NULL;
@@ -27,7 +28,13 @@ void window_properties_init(struct wnd_node_t* wnd) {
 	wnd->stack_mode = XCB_STACK_MODE_ABOVE;
 }
 
+wnd_node_t* get_wnd_list_sentinel() {
+	return &sentinel;
+}
+
 void free_wnd_node(wnd_node_t* wnd) {
+	if (wnd == NULL || wnd == &sentinel)
+		return;
 	free(wnd);
 }
 
@@ -38,18 +45,29 @@ wnd_node_t* allocate_wnd_node(xcb_window_t window) {
 	return new_node;
 }
 
-void window_insert(xcb_window_t window) {
+wnd_node_t* window_insert(xcb_window_t window) {
+	if (window == XCB_NONE)
+		return XCB_NONE;
+
+	/* avoid duplicates */
+	wnd_node_t* node = window_find(window);
+	if (node != NULL)
+		return node;
+
 	wnd_node_t* new_node = allocate_wnd_node(window);
 	new_node->next = sentinel.next;
 	new_node->prev = &sentinel;
 	sentinel.next->prev = new_node;
 	sentinel.next = new_node;
+	return new_node;
 }
 
 void window_remove(xcb_window_t window) {
-	wnd_node_t* curr = &sentinel;
-	while (curr->window != window)
+	wnd_node_t* curr = sentinel.next;
+	while (curr->window != window && curr != &sentinel)
 		curr = curr->next;
+	if (curr == &sentinel)
+		return;
 	curr->prev->next = curr->next;
 	curr->next->prev = curr->prev;
 	free_wnd_node(curr);
@@ -78,10 +96,11 @@ wnd_node_t* window_list_end() {
 }
 
 void window_foreach(void (*callback)(wnd_node_t*)) {
-	wnd_node_t* curr = &sentinel;
+	wnd_node_t* curr = sentinel.next;
 	while (curr != &sentinel) {
+		wnd_node_t* next = curr->next; // for those times when callback = free()
 		callback(curr);
-		curr = curr->next;
+		curr = next;
 	}
 }
 

@@ -27,21 +27,29 @@ SRC = \
 	$(NAME)-xcb-ewmh.c \
 	$(NAME)-xcb-events.c \
 	$(NAME)-states.c \
-	$(NAME)-xcb.c \
-	$(NAME).c
+	$(NAME)-xcb.c
 
 OBJ = ${SRC:.c=.o}
+
+TEST_SRC = \
+	test-$(NAME)-window-list.c
+
+TEST_OBJ = ${TEST_SRC:.c=.o}
 
 all: $(NAME)
 
 .c.o:
 	${CC} -c ${CFLAGS} $<
 
-$(NAME): ${OBJ}
-	${CC} -o $@ ${OBJ} ${LDFLAGS}
+$(NAME): ${OBJ} $(NAME).o
+	${CC} -o $@ ${OBJ} $(NAME).o ${LDFLAGS}
+
+test: ${TEST_OBJ} ${OBJ}
+	${CC} -o $@ ${TEST_OBJ} ${OBJ} ${LDFLAGS} \
+	&& ./test
 
 clean:
-	rm -f $(NAME) ${OBJ}
+	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test
 
 container-start:
 	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc

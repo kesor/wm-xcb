@@ -17,4 +17,6 @@ void logger(FILE* io, const char* fmt, ...);
 #define LOG_ERROR(pFormat, ...) { logger(stderr, "ERROR: "pFormat, ##__VA_ARGS__); }
 #define LOG_FATAL(pFormat, ...) { logger(stderr, "FATAL: "pFormat, ##__VA_ARGS__); running = 0; }
 
+#define LOG_CLEAN(pFormat, ...) { logger(stdout, pFormat, ##__VA_ARGS__); }
+
 #endif

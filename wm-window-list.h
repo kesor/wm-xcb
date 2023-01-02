@@ -22,12 +22,13 @@ typedef struct wnd_node_t {
 void setup_window_list();
 void destruct_window_list();
 void free_wnd_node(wnd_node_t* wnd);
-void window_insert(xcb_window_t window);
 void window_remove(xcb_window_t window);
+wnd_node_t* window_insert(xcb_window_t window);
 wnd_node_t* window_find(xcb_window_t window);
 wnd_node_t* window_get_next(wnd_node_t* wnd);
 wnd_node_t* window_get_prev(wnd_node_t* wnd);
 wnd_node_t* window_list_end();
 void window_foreach(void (*callback)(wnd_node_t*));
+wnd_node_t* get_wnd_list_sentinel();
 
 #endif
