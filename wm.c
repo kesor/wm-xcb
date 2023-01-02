@@ -10,6 +10,8 @@
 #include "wm-xcb-ewmh.h"
 #include "wm-states.h"
 
+#include "wm.h"
+
 int main(int argc, char** argv) {
 	setup_signals();
 	setup_xcb();
