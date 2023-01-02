@@ -26,6 +26,7 @@ SRC = \
 	$(NAME)-window-list.c \
 	$(NAME)-xcb-ewmh.c \
 	$(NAME)-xcb-events.c \
+	$(NAME)-states.c \
 	$(NAME)-xcb.c \
 	$(NAME).c
 
