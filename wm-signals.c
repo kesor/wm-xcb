@@ -21,10 +21,10 @@ void sigint(int unused) {
 	LOG_DEBUG("received interrupt signal.");
 
 	/* when XCB is blocking-waitfor events, changing running to 0 doesn't exit. */
-	xcb_generic_event_t event;
-	event.response_type = XCB_CLIENT_MESSAGE;
-	xcb_send_event(dpy, false, root, XCB_EVENT_MASK_NO_EVENT, (char*)&event);
-	xcb_flush(dpy);
+	// xcb_generic_event_t event;
+	// event.response_type = XCB_CLIENT_MESSAGE;
+	// xcb_send_event(dpy, false, root, XCB_EVENT_MASK_NO_EVENT, (char*)&event);
+	// xcb_flush(dpy);
 }
 
 void setup_signals() {

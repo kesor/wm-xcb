@@ -16,11 +16,23 @@ void check_request(
 ) {
 	xcb_generic_error_t* error = xcb_request_check(dpy, cookie);
 	if (error) {
-		LOG_ERROR("Error executing %s request: %d", request_name, error->error_code);
+		LOG_ERROR("Error executing '%s' request: %d", request_name, error->error_code);
+		xcb_errors_context_t* err_ctx;
+		xcb_errors_context_new(dpy, &err_ctx);
+		const char* major, * minor, * extension, * error_name;
+		major = xcb_errors_get_name_for_major_code(err_ctx, error->major_code);
+		minor = xcb_errors_get_name_for_minor_code(err_ctx, error->major_code, error->minor_code);
+		error_name = xcb_errors_get_name_for_error(err_ctx, error->error_code, &extension);
+		LOG_ERROR("XCB: %s:%s, %s:%s, resource %u sequence %u",
+			error_name, extension ? extension : "no_extension",
+			major, minor ? minor : "no_minor",
+			(unsigned int)error->resource_id,
+			(unsigned int)error->sequence);
+		xcb_errors_context_free(err_ctx);
 		free(error);
 		return;
 	}
-	LOG_DEBUG("xcb request check returned no error for cookie %d", cookie.sequence);
+	LOG_DEBUG("xcb request check for '%s' returned no error for cookie %d", request_name, cookie.sequence);
 }
 
 static void connect_to_x_display(xcb_connection_t** dpy) {
@@ -52,12 +64,36 @@ void setup_xcb() {
 	connect_to_x_display(&dpy);
 	get_root_window(dpy, &root);
 
-	values[0] = XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+	values[0] = XCB_EVENT_MASK_KEY_PRESS
+		| XCB_EVENT_MASK_KEY_RELEASE
+		| XCB_EVENT_MASK_BUTTON_PRESS
+		| XCB_EVENT_MASK_BUTTON_RELEASE
+		| XCB_EVENT_MASK_ENTER_WINDOW
+		| XCB_EVENT_MASK_LEAVE_WINDOW
+		| XCB_EVENT_MASK_POINTER_MOTION
+		| XCB_EVENT_MASK_POINTER_MOTION_HINT
+		| XCB_EVENT_MASK_BUTTON_1_MOTION
+		| XCB_EVENT_MASK_BUTTON_2_MOTION
+		| XCB_EVENT_MASK_BUTTON_3_MOTION
+		| XCB_EVENT_MASK_BUTTON_4_MOTION
+		| XCB_EVENT_MASK_BUTTON_5_MOTION
+		| XCB_EVENT_MASK_BUTTON_MOTION
+		| XCB_EVENT_MASK_KEYMAP_STATE
+		| XCB_EVENT_MASK_EXPOSURE
+		| XCB_EVENT_MASK_VISIBILITY_CHANGE
 		| XCB_EVENT_MASK_STRUCTURE_NOTIFY
+		| XCB_EVENT_MASK_RESIZE_REDIRECT
 		| XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
-		| XCB_EVENT_MASK_PROPERTY_CHANGE;
+		| XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+		| XCB_EVENT_MASK_FOCUS_CHANGE
+		| XCB_EVENT_MASK_PROPERTY_CHANGE
+		| XCB_EVENT_MASK_COLOR_MAP_CHANGE
+		| XCB_EVENT_MASK_OWNER_GRAB_BUTTON
+		;
 
-	xcb_change_window_attributes_checked(dpy, root, XCB_CW_EVENT_MASK, values);
+	const static uint32_t mask = XCB_CW_EVENT_MASK;
+	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(dpy, root, mask, values);
+	check_request(dpy, cookie, "root window attributes change");
 
 	if (xcb_flush(dpy) <= 0)
 		LOG_FATAL("failed to flush.");
@@ -70,13 +106,17 @@ void destruct_xcb() {
 }
 
 void handle_xcb_events() {
-	LOG_DEBUG("waiting for xcb events, running is: %d", running);
-	xcb_generic_event_t* event = xcb_wait_for_event(dpy);
-
-	LOG_DEBUG("received an event! %d", (int)event->response_type);
-
+	// -- non-blocking event waiting
+	xcb_generic_event_t* event = xcb_poll_for_event(dpy);
 	if (event == NULL)
-		LOG_FATAL("error waiting for event");
+		return;
+
+	// -- blocking way for waiting for events
+	// LOG_DEBUG("waiting for xcb events, running is: %d", running);
+	// xcb_generic_event_t* event = xcb_wait_for_event(dpy);
+	// LOG_DEBUG("received an event! %d", (int)event->response_type);
+	// if (event == NULL)
+	// 	LOG_FATAL("error waiting for event");
 
 	switch (event->response_type) {
 	case 0: {
@@ -96,13 +136,13 @@ void handle_xcb_events() {
 		break;
 	}
 
-	case XCB_KEY_PRESS: LOG_DEBUG("event: key press"); break;
-	case XCB_KEY_RELEASE: LOG_DEBUG("event: key release"); break;
-	case XCB_BUTTON_PRESS: LOG_DEBUG("event: button press"); break;
-	case XCB_BUTTON_RELEASE: LOG_DEBUG("event: button release"); break;
+	case XCB_KEY_PRESS: handle_key_press_release((xcb_key_press_event_t*)event); break;
+	case XCB_KEY_RELEASE: handle_key_press_release((xcb_key_release_event_t*)event); break;
+	case XCB_BUTTON_PRESS: handle_button_press_release((xcb_button_press_event_t*)event); break;
+	case XCB_BUTTON_RELEASE: handle_button_press_release((xcb_button_release_event_t*)event); break;
 	case XCB_MOTION_NOTIFY: LOG_DEBUG("event: motion notify"); break;
-	case XCB_ENTER_NOTIFY: LOG_DEBUG("event: enter notify"); break;
-	case XCB_LEAVE_NOTIFY: LOG_DEBUG("event: leave notify"); break;
+	case XCB_ENTER_NOTIFY: handle_enter_notify((xcb_enter_notify_event_t*)event); break;
+	case XCB_LEAVE_NOTIFY: handle_leave_notify((xcb_leave_notify_event_t*)event); break;
 	case XCB_FOCUS_IN: LOG_DEBUG("event: focus in"); break;
 	case XCB_FOCUS_OUT: LOG_DEBUG("event: focus out"); break;
 	case XCB_KEYMAP_NOTIFY: LOG_DEBUG("event: keymap notify"); break;

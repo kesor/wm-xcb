@@ -15,7 +15,8 @@ int main(int argc, char** argv) {
 	setup_ewmh();
 	while (running) {
 		handle_xcb_events();
-		usleep(100000); // 100ms
+		// usleep(100000); // 100ms
+		usleep(100); // 100ns
 	}
 	destruct_ewmh();
 	destruct_xcb();
