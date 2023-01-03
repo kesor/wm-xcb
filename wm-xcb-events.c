@@ -63,7 +63,7 @@ void handle_button_press_release(xcb_button_press_event_t* event) {
 		event->state,
 		event->same_screen
 	);
-	ctx.mouse_buttons |= event->state;
+	ctx.modkey_mask |= event->state;
 }
 
 void handle_key_press_release(xcb_key_press_event_t* event) {

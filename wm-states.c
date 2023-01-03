@@ -4,16 +4,14 @@
 #include "wm-states.h"
 #include "config.def.h"
 
-
 void state_idle(struct Context* ctx);
 void state_window_move(struct Context* ctx);
 void state_window_resize(struct Context* ctx);
 
 struct Context ctx = {
 	.state = STATE_IDLE,
-	.hover_window = XCB_NONE,
-	.mouse_buttons = 0,
-	.keyboard_keys = 0,
+	.window_target_type = WndTypeNone,
+	.modkey_mask = KeyNone,
 	.state_funcs = {
 		state_idle,
 		state_window_move,
@@ -47,28 +45,19 @@ void handle_event(xcb_generic_event_t* event) {
 		break;
 	}
 
-	// for (int i = 0; i < NUM_TRANSITIONS; i++) {
-	// 	const struct StateTransition* t = &transitions[i];
-	// 	if (t->event_type == event.type) {
-	// 		bool match = false;
-	// 		switch (event.type) {
-	// 		case KEY_PRESSED:
-	// 			match = t->key == event.key;
-	// 			break;
-	// 		case MOUSE_BUTTON_PRESSED:
-	// 			match = t->mouse_button == event.mouse_button;
-	// 			break;
-	// 		case HOVER:
-	// 			match = t->hover_target == event.hover_target;
-	// 			break;
-	// 			// other event types
-	// 		}
-	// 		if (match) {
-	// 			set_state(ctx, t->new_state);
-	// 			break;
-	// 		}
-	// 	}
-	// }
+	for (int i = 0; i < sizeof(transitions) / sizeof(transitions[0]); i++) {
+		const struct StateTransition* t = &transitions[i];
+		if (t->window_target_type == ctx.window_target_type &&
+			t->modkey_mask == ctx.modkey_mask &&
+			t->event_type == event->response_type &&
+			t->prev_state == ctx.state) {
+			set_state(&ctx, t->next_state);
+			break;
+		}
+	}
+
+	ctx.state_funcs[ctx.state](&ctx);
+
 }
 
 void state_idle(struct Context* ctx) {

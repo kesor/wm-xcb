@@ -126,7 +126,6 @@ void test_window_insert_returns_node() {
 	destruct_window_list();
 }
 
-
 int main() {
 	test_add_remove();
 	test_iteration();
