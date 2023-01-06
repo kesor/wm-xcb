@@ -116,6 +116,8 @@ void setup_xcb() {
 
 	xcb_map_window(dpy, root);
 
+	window_insert(root);
+
 	wm_manage_all_clients();
 
 	if (xcb_flush(dpy) <= 0)
@@ -133,25 +135,58 @@ void wm_manage_all_clients() {
 	static uint32_t values[3];
 
 	// events we want to "hijack" from child windows
-	values[0] = XCB_EVENT_MASK_ENTER_WINDOW
+	values[0] = 0
+		| XCB_EVENT_MASK_ENTER_WINDOW
 		| XCB_EVENT_MASK_LEAVE_WINDOW
 		;
 
+	// 1. query all the window descendants of the root window
 	xcb_query_tree_cookie_t tree_cookie = xcb_query_tree_unchecked(dpy, root);
 	xcb_query_tree_reply_t* reply = xcb_query_tree_reply(dpy, tree_cookie, NULL);
 
 	if (!reply)
 		return;
 
+	// ALL the windows, includeing children of children.
 	xcb_window_t* children = xcb_query_tree_children(reply);
-	for (int i = 0; i < xcb_query_tree_children_length(reply); i++) {
-		xcb_window_t child = children[i];
-		xcb_reparent_window(dpy, child, root, 0, 0);
-		xcb_change_window_attributes(dpy, child, XCB_CW_EVENT_MASK, values);
-		xcb_map_window(dpy, child);
+	uint16_t children_length = xcb_query_tree_children_length(reply);
+	free(reply);
+
+	// 2. create a data structure to store the cookies for each xcb_query_tree call of child windows
+	xcb_query_tree_cookie_t* cookies = malloc(children_length * sizeof(xcb_query_tree_cookie_t));
+	if (!cookies) {
+		LOG_FATAL("could not allocate memory to store children cookies.");
+		return;
 	}
 
-	free(reply);
+	// 3. query each child window for its own descendants & store the cookie
+	for (uint16_t i = 0; i < children_length; i++) {
+		xcb_window_t child = children[i];
+		cookies[i] = xcb_query_tree_unchecked(dpy, child);
+	}
+
+	// 4. check the reply for each such cookie to find the parent of this window
+	for (uint16_t i = 0; i < children_length; i++) {
+		xcb_window_t child = children[i];
+
+		// 5. get the reply for this child window
+		xcb_query_tree_reply_t* reply = xcb_query_tree_reply(dpy, cookies[i], NULL);
+		if (!reply)
+			continue;
+
+		// 6. check if the child window is a direct descendant of the root window
+		if (reply->parent == root) {
+			xcb_reparent_window(dpy, child, root, 0, 0);
+			xcb_change_window_attributes(dpy, child, XCB_CW_EVENT_MASK, values);
+			xcb_map_window(dpy, child);
+		}
+
+		// 7. free the reply for this child window
+		free(reply);
+	}
+
+	// 8. free the data structure that stores the cookies
+	free(cookies);
 
 	xcb_flush(dpy);
 }
