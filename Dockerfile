@@ -5,6 +5,10 @@ RUN apk add --no-cache \
       gcompat \
       libstdc++ \
       x11vnc \
+      xcb-util-wm \
+      xclock \
+      xeyes \
+      xprop \
       xvfb
 
 RUN mkdir ~/.vnc \
