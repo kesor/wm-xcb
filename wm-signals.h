@@ -1,5 +1,5 @@
-#ifndef _WM_SIGNALS_
-#define _WM_SIGNALS_
+#ifndef _WM_SIGNALS_H_
+#define _WM_SIGNALS_H_
 
 void sigchld(int unused);
 void sigint(int unused);

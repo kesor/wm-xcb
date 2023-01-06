@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <xcb/xcb.h>
+#include <xcb/xcb_atom.h>
 #include <xcb/xcb_ewmh.h>
 
 #include "wm-log.h"

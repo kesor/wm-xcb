@@ -5,7 +5,7 @@ DEBUG = 0
 
 CC = gcc
 
-PKGLIST = xcb xcb-ewmh
+PKGLIST = xcb xcb-atom xcb-ewmh xcb-xinput
 
 CPPFLAGS = -DVERSION=\"${VERSION}\"
 CFLAGS = $(shell pkg-config --cflags ${PKGLIST}) -Ivendor/libxcb-errors/include ${CPPFLAGS}
@@ -24,10 +24,12 @@ SRC = \
 	$(NAME)-signals.c \
 	$(NAME)-running.c \
 	$(NAME)-window-list.c \
+	$(NAME)-clients.c \
 	$(NAME)-xcb-ewmh.c \
 	$(NAME)-xcb-events.c \
 	$(NAME)-states.c \
-	$(NAME)-xcb.c
+	$(NAME)-xcb.c \
+	$(NAME).c
 
 OBJ = ${SRC:.c=.o}
 
@@ -38,14 +40,14 @@ TEST_OBJ = ${TEST_SRC:.c=.o}
 
 all: $(NAME)
 
-.c.o:
+%.o: %.c %.h $(wildcard *.h)
 	${CC} -c ${CFLAGS} $<
 
 $(NAME): ${OBJ} $(NAME).o
-	${CC} -o $@ ${OBJ} $(NAME).o ${LDFLAGS}
+	${CC} -o $@ ${OBJ} ${LDFLAGS}
 
 test: ${TEST_OBJ} ${OBJ}
-	${CC} -o $@ ${TEST_OBJ} ${OBJ} ${LDFLAGS} \
+	${CC} -o $@ ${TEST_OBJ} $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS} \
 	&& ./test
 
 clean:

@@ -24,8 +24,8 @@ void window_properties_init(struct wnd_node_t* wnd) {
 	wnd->width = 0;
 	wnd->height = 0;
 	wnd->border_width = 0;
-	wnd->override_redirect = 0;
 	wnd->stack_mode = XCB_STACK_MODE_ABOVE;
+	wnd->mapped = 0;
 }
 
 wnd_node_t* get_wnd_list_sentinel() {

@@ -1,5 +1,5 @@
-#ifndef _WM_XCB_EVENTS_
-#define _WM_XCB_EVENTS_
+#ifndef _WM_XCB_EVENTS_H_
+#define _WM_XCB_EVENTS_H_
 
 #include <xcb/xcb.h>
 

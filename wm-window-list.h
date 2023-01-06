@@ -1,5 +1,5 @@
-#ifndef _WM_WINDOW_LIST_
-#define _WM_WINDOW_LIST_
+#ifndef _WM_WINDOW_LIST_H_
+#define _WM_WINDOW_LIST_H_
 
 #include <xcb/xcb.h>
 
@@ -15,8 +15,9 @@ typedef struct wnd_node_t {
 	uint16_t     width;
 	uint16_t     height;
 	uint16_t     border_width;
-	uint8_t      override_redirect;
-	uint8_t      stack_mode;
+	enum xcb_stack_mode_t stack_mode;
+
+	uint8_t      mapped;
 } wnd_node_t;
 
 void setup_window_list();

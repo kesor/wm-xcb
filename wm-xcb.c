@@ -1,10 +1,12 @@
 #include <xcb/xcb.h>
 #include <xcb/errors.h>
+#include <xcb/xinput.h>
 
 #include "wm-running.h"
 #include "wm-log.h"
 #include "wm-xcb.h"
 #include "wm-xcb-events.h"
+#include "wm-states.h"
 #include "wm-window-list.h"
 
 xcb_connection_t* dpy;
@@ -25,20 +27,6 @@ void error_details(xcb_generic_error_t* error) {
 		(unsigned int)error->resource_id,
 		(unsigned int)error->sequence);
 	xcb_errors_context_free(err_ctx);
-}
-
-void check_request(
-	xcb_void_cookie_t cookie,
-	const char* request_name
-) {
-	xcb_generic_error_t* error = xcb_request_check(dpy, cookie);
-	if (error) {
-		LOG_ERROR("Error executing '%s' request: %d", request_name, error->error_code);
-		error_details(error);
-		free(error);
-		return;
-	}
-	LOG_DEBUG("xcb request check for '%s' returned no error for cookie %d", request_name, cookie.sequence);
 }
 
 static void connect_to_x_display(xcb_connection_t** dpy) {
@@ -64,19 +52,70 @@ void get_root_window(xcb_connection_t* dpy, xcb_window_t* root) {
 	*root = screen->root;
 }
 
+void setup_xinput_initialize() {
+	xcb_input_xi_query_version_cookie_t xi_cookie = xcb_input_xi_query_version_unchecked(dpy, XCB_INPUT_MAJOR_VERSION, XCB_INPUT_MINOR_VERSION);
+	xcb_input_xi_query_version_reply_t* xi_reply = xcb_input_xi_query_version_reply(dpy, xi_cookie, NULL);
+	LOG_DEBUG("XInput version: %d.%d", xi_reply->major_version, xi_reply->minor_version);
+	free(xi_reply);
+}
+
+void setup_xinput_events() {
+	xcb_input_event_mask_t xinput_mask[] = {
+		{
+			.deviceid = XCB_INPUT_DEVICE_ALL_MASTER,
+			.mask_len = 0
+				| XCB_INPUT_XI_EVENT_MASK_BUTTON_PRESS
+				| XCB_INPUT_XI_EVENT_MASK_BUTTON_RELEASE
+				| XCB_INPUT_XI_EVENT_MASK_DEVICE_CHANGED
+				| XCB_INPUT_XI_EVENT_MASK_HIERARCHY
+				| XCB_INPUT_XI_EVENT_MASK_KEY_PRESS
+				| XCB_INPUT_XI_EVENT_MASK_KEY_RELEASE
+				| XCB_INPUT_XI_EVENT_MASK_PROPERTY
+		}
+	};
+	xcb_input_xi_select_events(dpy, root, 1, xinput_mask);
+	xcb_input_xi_get_selected_events_cookie_t xi_events_cookie = xcb_input_xi_get_selected_events_unchecked(dpy, root);
+	xcb_input_xi_get_selected_events_reply_t* xi_events_reply = xcb_input_xi_get_selected_events_reply(dpy, xi_events_cookie, NULL);
+	if (xi_events_reply) {
+		LOG_DEBUG("Got the XInput selected events reply! length: %d  masks: %d",
+			xi_events_reply->length, xi_events_reply->num_masks);
+		free(xi_events_reply);
+	}
+
+}
+
+void check_no_running_wm() {
+	xcb_void_cookie_t wm_cookie = xcb_change_window_attributes_checked(dpy, root, XCB_CW_EVENT_MASK, (uint32_t[]) { XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT });
+	xcb_generic_error_t* err = xcb_request_check(dpy, wm_cookie);
+	if (err) {
+		error_details(err);
+		free(err);
+		LOG_FATAL("Another window manager is already running");
+	}
+}
+
 void setup_xcb() {
 	static uint32_t values[3];
 
 	connect_to_x_display(&dpy);
 	get_root_window(dpy, &root);
 
+	setup_window_list();
+
+	check_no_running_wm();
+	if (!running)
+		return;
+
+	// setup_xinput_initialize();
+	// setup_xinput_events();
+
 	values[0] = 0x00ffffff; // "any" event (first 24 bits flipped on)
 
 	const static uint32_t mask = XCB_CW_EVENT_MASK;
-	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(dpy, root, mask, values);
-	check_request(cookie, "root window attributes change");
+	xcb_change_window_attributes(dpy, root, mask, values);
 
-	setup_window_list();
+	xcb_map_window(dpy, root);
+
 	wm_manage_all_clients();
 
 	if (xcb_flush(dpy) <= 0)
@@ -91,8 +130,6 @@ void destruct_xcb() {
 }
 
 void wm_manage_all_clients() {
-	xcb_generic_error_t* error;
-	xcb_void_cookie_t cookie;
 	static uint32_t values[3];
 
 	// events we want to "hijack" from child windows
@@ -100,14 +137,8 @@ void wm_manage_all_clients() {
 		| XCB_EVENT_MASK_LEAVE_WINDOW
 		;
 
-	xcb_query_tree_cookie_t tree_cookie = xcb_query_tree(dpy, root);
-	xcb_query_tree_reply_t* reply = xcb_query_tree_reply(dpy, tree_cookie, &error);
-
-	if (error) {
-		LOG_ERROR("Error querying tree: %d", error->error_code);
-		error_details(error);
-		free(error);
-	}
+	xcb_query_tree_cookie_t tree_cookie = xcb_query_tree_unchecked(dpy, root);
+	xcb_query_tree_reply_t* reply = xcb_query_tree_reply(dpy, tree_cookie, NULL);
 
 	if (!reply)
 		return;
@@ -115,12 +146,9 @@ void wm_manage_all_clients() {
 	xcb_window_t* children = xcb_query_tree_children(reply);
 	for (int i = 0; i < xcb_query_tree_children_length(reply); i++) {
 		xcb_window_t child = children[i];
-		cookie = xcb_reparent_window_checked(dpy, child, root, 0, 0);
-		check_request(cookie, "reparent window");
-		cookie = xcb_change_window_attributes_checked(dpy, child, XCB_CW_EVENT_MASK, values);
-		check_request(cookie, "change window attributes: grab events");
-		cookie = xcb_map_window_checked(dpy, child);
-		check_request(cookie, "map window");
+		xcb_reparent_window(dpy, child, root, 0, 0);
+		xcb_change_window_attributes(dpy, child, XCB_CW_EVENT_MASK, values);
+		xcb_map_window(dpy, child);
 	}
 
 	free(reply);
@@ -142,22 +170,9 @@ void handle_xcb_events() {
 	// 	LOG_FATAL("error waiting for event");
 
 	switch (event->response_type) {
-	case 0: {
-		xcb_generic_error_t* err = (xcb_generic_error_t*)event;
-		xcb_errors_context_t* err_ctx;
-		xcb_errors_context_new(dpy, &err_ctx);
-		const char* major, * minor, * extension, * error;
-		major = xcb_errors_get_name_for_major_code(err_ctx, err->major_code);
-		minor = xcb_errors_get_name_for_minor_code(err_ctx, err->major_code, err->minor_code);
-		error = xcb_errors_get_name_for_error(err_ctx, err->error_code, &extension);
-		LOG_DEBUG("XCB Error: %s:%s, %s:%s, resource %u sequence %u\n",
-			error, extension ? extension : "no_extension",
-			major, minor ? minor : "no_minor",
-			(unsigned int)err->resource_id,
-			(unsigned int)err->sequence);
-		xcb_errors_context_free(err_ctx);
+	case 0:
+		error_details((xcb_generic_error_t*)event);
 		break;
-	}
 
 	case XCB_KEY_PRESS: handle_key_press_release((xcb_key_press_event_t*)event); break;
 	case XCB_KEY_RELEASE: handle_key_press_release((xcb_key_release_event_t*)event); break;
@@ -194,10 +209,15 @@ void handle_xcb_events() {
 	case XCB_MAPPING_NOTIFY: LOG_DEBUG("event: mapping notify"); break;
 	case XCB_GE_GENERIC: LOG_DEBUG("event: ge generic"); break;
 	case XCB_REQUEST: LOG_DEBUG("event: xcb request"); break;
+		// --- XINPUT events
+	// case XCB_INPUT_KEY_PRESS: LOG_DEBUG("event: xcb input key press"); break;
+	// case XCB_INPUT_KEY_RELEASE: LOG_DEBUG("event: xcb input key press"); break;
 
 	default:
 		printf("Event: XCB Unknown Event\n");
 	}
+
+	handle_state_event(event);
 
 	free(event);
 }

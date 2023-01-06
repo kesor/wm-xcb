@@ -1,5 +1,5 @@
-#ifndef _TEST_WM_
-#define _TEST_WM_
+#ifndef _TEST_WM_H_
+#define _TEST_WM_H_
 
 #include <stdlib.h>
 #include "wm-log.h"

@@ -1,5 +1,5 @@
-#ifndef _WM_LOG_
-#define _WM_LOG_
+#ifndef _WM_LOG_H_
+#define _WM_LOG_H_
 
 #include <stdio.h>
 #include <stdlib.h>
