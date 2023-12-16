@@ -1,4 +1,5 @@
 #include <xcb/xcb.h>
+#include <xcb/xinput.h>
 
 #include "wm-log.h"
 #include "wm-xcb.h"
@@ -82,6 +83,78 @@ void handle_key_press_release(xcb_key_press_event_t* event) {
 		event->state,
 		event->same_screen
 	);
+}
+
+const char* xinput_event_type_name(uint16_t event_type) {
+	const char* input_event_type_names[XCB_INPUT_SEND_EXTENSION_EVENT + 1] = {
+	"XCB_INPUT_DEVICE_CHANGED",
+	"XCB_INPUT_KEY_PRESS",
+	"XCB_INPUT_KEY_RELEASE",
+	"XCB_INPUT_BUTTON_PRESS",
+	"XCB_INPUT_BUTTON_RELEASE",
+	"XCB_INPUT_MOTION",
+	"XCB_INPUT_ENTER",
+	"XCB_INPUT_LEAVE",
+	"XCB_INPUT_FOCUS_IN",
+	"XCB_INPUT_FOCUS_OUT",
+	"XCB_INPUT_HIERARCHY",
+	"XCB_INPUT_PROPERTY",
+	"XCB_INPUT_RAW_KEY_PRESS",
+	"XCB_INPUT_RAW_KEY_RELEASE",
+	"XCB_INPUT_RAW_BUTTON_PRESS",
+	"XCB_INPUT_RAW_BUTTON_RELEASE",
+	"XCB_INPUT_RAW_MOTION",
+	"XCB_INPUT_TOUCH_BEGIN",
+	"XCB_INPUT_TOUCH_UPDATE",
+	"XCB_INPUT_TOUCH_END",
+	"XCB_INPUT_TOUCH_OWNERSHIP",
+	"XCB_INPUT_RAW_TOUCH_BEGIN",
+	"XCB_INPUT_RAW_TOUCH_UPDATE",
+	"XCB_INPUT_RAW_TOUCH_END",
+	"XCB_INPUT_BARRIER_HIT",
+	"XCB_INPUT_BARRIER_LEAVE",
+	"XCB_INPUT_SEND_EXTENSION_EVENT",
+	};
+	if (event_type <= sizeof(input_event_type_names) / sizeof(input_event_type_names[0]))
+		return input_event_type_names[event_type];
+	return "INVALID";
+}
+
+void handle_xinput_event(xcb_ge_generic_event_t* event) {
+	xcb_input_key_press_event_t* xi_event = (xcb_input_key_press_event_t*)event;
+	LOG_DEBUG("Received '%s' event with the following:\n\tdeviceid: %d\n\ttime: %d\n\tdetail: %d\n\troot wnd: %d\n\tevent wnd: %d\n\tchild wnd: %d\n\tfull_sequence: %d\n\troot_x: %d.%d\n\troot_y: %d.%d\n\tevent_x: %d.%d\n\tevent_y: %d.%d\n\tbuttons_len: %d\n\tvaluators_len: %d\n\tsourceid: %d\n\tflags: %d\n\tmods: %d\n\tgroup: %d",
+		xinput_event_type_name(xi_event->event_type),
+		xi_event->deviceid,
+		xi_event->time,
+		xi_event->detail,
+		xi_event->root,
+		xi_event->event,
+		xi_event->child,
+		xi_event->full_sequence,
+		xi_event->root_x >> 16, xi_event->root_x & 0x0000FFFF,
+		xi_event->root_y >> 16, xi_event->root_y & 0x0000FFFF,
+		xi_event->event_x >> 16, xi_event->event_x & 0x0000FFFF,
+		xi_event->event_y >> 16, xi_event->event_y & 0x0000FFFF,
+		xi_event->buttons_len,
+		xi_event->valuators_len,
+		xi_event->sourceid, // actual device used to trigger event, unlike deviceid which is the "master" device.
+		xi_event->flags,
+		xi_event->mods,
+		xi_event->group
+	);
+}
+
+void handle_xinput_raw_event(xcb_ge_generic_event_t* event) {
+	xcb_input_raw_button_press_event_t* xi_event = (xcb_input_raw_button_press_event_t*)event;
+	LOG_DEBUG("Received '%s' event with the following:\n\tdeviceid: %d\n\ttime: %d\n\tdetail: %d\n\tsourceid: %d\n\tvaluators_len: %d\n\tflags: %d\n\tfull_sequence: %d",
+		xinput_event_type_name(xi_event->event_type),
+		xi_event->deviceid,
+		xi_event->time,
+		xi_event->detail,
+		xi_event->sourceid, // actual device used to trigger event, unlike deviceid which is the "master" device.
+		xi_event->valuators_len,
+		xi_event->flags,
+		xi_event->full_sequence);
 }
 
 void handle_enter_notify(xcb_enter_notify_event_t* event) {
@@ -186,5 +259,15 @@ void handle_expose(xcb_expose_event_t* event) {
 		event->width,
 		event->height,
 		event->count
+	);
+}
+
+void handle_ge_generic(xcb_ge_generic_event_t* event) {
+	PRINT_EVENT("Received a 'ge generic' event with the following:\n\tsequence: %d\n\textension: %d\n\tlength: %d\n\tevent_type: %d\n\tfull_sequence: %d",
+		event->sequence,
+		event->extension,
+		event->length,
+		event->event_type,
+		event->full_sequence
 	);
 }

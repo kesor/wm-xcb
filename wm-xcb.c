@@ -60,28 +60,40 @@ void setup_xinput_initialize() {
 }
 
 void setup_xinput_events() {
-	xcb_input_event_mask_t xinput_mask[] = {
-		{
-			.deviceid = XCB_INPUT_DEVICE_ALL_MASTER,
-			.mask_len = 0
-				| XCB_INPUT_XI_EVENT_MASK_BUTTON_PRESS
-				| XCB_INPUT_XI_EVENT_MASK_BUTTON_RELEASE
-				| XCB_INPUT_XI_EVENT_MASK_DEVICE_CHANGED
-				| XCB_INPUT_XI_EVENT_MASK_HIERARCHY
-				| XCB_INPUT_XI_EVENT_MASK_KEY_PRESS
-				| XCB_INPUT_XI_EVENT_MASK_KEY_RELEASE
-				| XCB_INPUT_XI_EVENT_MASK_PROPERTY
-		}
-	};
-	xcb_input_xi_select_events(dpy, root, 1, xinput_mask);
-	xcb_input_xi_get_selected_events_cookie_t xi_events_cookie = xcb_input_xi_get_selected_events_unchecked(dpy, root);
-	xcb_input_xi_get_selected_events_reply_t* xi_events_reply = xcb_input_xi_get_selected_events_reply(dpy, xi_events_cookie, NULL);
-	if (xi_events_reply) {
-		LOG_DEBUG("Got the XInput selected events reply! length: %d  masks: %d",
-			xi_events_reply->length, xi_events_reply->num_masks);
-		free(xi_events_reply);
-	}
+	struct {
+		xcb_input_event_mask_t head;
+		xcb_input_xi_event_mask_t mask;
+	} mask;
+	mask.head.deviceid = XCB_INPUT_DEVICE_ALL;
+	mask.head.mask_len = sizeof(mask.mask) / sizeof(uint32_t);
+	mask.mask = 0
+		| XCB_INPUT_XI_EVENT_MASK_BUTTON_PRESS
+		| XCB_INPUT_XI_EVENT_MASK_BUTTON_RELEASE
+		| XCB_INPUT_XI_EVENT_MASK_DEVICE_CHANGED
+		| XCB_INPUT_XI_EVENT_MASK_HIERARCHY
+		| XCB_INPUT_XI_EVENT_MASK_KEY_PRESS
+		| XCB_INPUT_XI_EVENT_MASK_KEY_RELEASE
+		| XCB_INPUT_XI_EVENT_MASK_PROPERTY
+		| XCB_INPUT_MOTION
+		| XCB_INPUT_ENTER
+		| XCB_INPUT_LEAVE
+		| XCB_INPUT_FOCUS_IN
+		| XCB_INPUT_FOCUS_OUT
+		| XCB_INPUT_RAW_KEY_PRESS
+		| XCB_INPUT_RAW_KEY_RELEASE
+		| XCB_INPUT_RAW_BUTTON_PRESS
+		| XCB_INPUT_RAW_BUTTON_RELEASE
+		| XCB_INPUT_RAW_MOTION
+		| XCB_INPUT_TOUCH_BEGIN
+		| XCB_INPUT_TOUCH_UPDATE
+		| XCB_INPUT_TOUCH_END
+		| XCB_INPUT_TOUCH_OWNERSHIP
+		| XCB_INPUT_RAW_TOUCH_BEGIN
+		| XCB_INPUT_RAW_TOUCH_UPDATE
+		| XCB_INPUT_RAW_TOUCH_END
+		;
 
+	xcb_input_xi_select_events(dpy, root, 1, &mask.head);
 }
 
 void check_no_running_wm() {
@@ -106,8 +118,8 @@ void setup_xcb() {
 	if (!running)
 		return;
 
-	// setup_xinput_initialize();
-	// setup_xinput_events();
+	setup_xinput_initialize();
+	setup_xinput_events();
 
 	values[0] = 0x00ffffff; // "any" event (first 24 bits flipped on)
 
@@ -193,6 +205,8 @@ void wm_manage_all_clients() {
 
 void handle_xcb_events() {
 	// -- non-blocking event waiting
+	xcb_ge_generic_event_t* generic_event;
+
 	xcb_generic_event_t* event = xcb_poll_for_event(dpy);
 	if (event == NULL)
 		return;
@@ -242,12 +256,40 @@ void handle_xcb_events() {
 	case XCB_COLORMAP_NOTIFY: LOG_DEBUG("event: colormap notify"); break;
 	case XCB_CLIENT_MESSAGE: LOG_DEBUG("event: client message"); break;
 	case XCB_MAPPING_NOTIFY: LOG_DEBUG("event: mapping notify"); break;
-	case XCB_GE_GENERIC: LOG_DEBUG("event: ge generic"); break;
+	case XCB_GE_GENERIC:
+		generic_event = (xcb_ge_generic_event_t*)event;
+		handle_ge_generic(generic_event);
+		switch (generic_event->event_type) {
+		case XCB_INPUT_DEVICE_CHANGED: LOG_DEBUG("event: xi device changed"); break;
+		case XCB_INPUT_KEY_PRESS: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_KEY_RELEASE: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_BUTTON_PRESS: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_BUTTON_RELEASE: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_MOTION: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_ENTER: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_LEAVE: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_FOCUS_IN: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_FOCUS_OUT: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_HIERARCHY: LOG_DEBUG("event: hierarchy"); break;
+		case XCB_INPUT_PROPERTY: LOG_DEBUG("event: property"); break;
+		case XCB_INPUT_RAW_KEY_PRESS: handle_xinput_raw_event(generic_event); break;
+		case XCB_INPUT_RAW_KEY_RELEASE: handle_xinput_raw_event(generic_event); break;
+		case XCB_INPUT_RAW_BUTTON_PRESS: handle_xinput_raw_event(generic_event); break;
+		case XCB_INPUT_RAW_BUTTON_RELEASE: handle_xinput_raw_event(generic_event); break;
+		case XCB_INPUT_RAW_MOTION: handle_xinput_raw_event(generic_event); break;
+		case XCB_INPUT_TOUCH_BEGIN: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_TOUCH_UPDATE: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_TOUCH_END: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_TOUCH_OWNERSHIP: handle_xinput_event(generic_event); break;
+		case XCB_INPUT_RAW_TOUCH_BEGIN: handle_xinput_raw_event(generic_event); break;
+		case XCB_INPUT_RAW_TOUCH_UPDATE: handle_xinput_raw_event(generic_event); break;
+		case XCB_INPUT_RAW_TOUCH_END: handle_xinput_raw_event(generic_event); break;
+		case XCB_INPUT_BARRIER_HIT: LOG_DEBUG("event: barrier hit"); break;
+		case XCB_INPUT_BARRIER_LEAVE: LOG_DEBUG("event: barrier leave"); break;
+		case XCB_INPUT_SEND_EXTENSION_EVENT: LOG_DEBUG("event: send extension event"); break;
+		}
+		break;
 	case XCB_REQUEST: LOG_DEBUG("event: xcb request"); break;
-		// --- XINPUT events
-	// case XCB_INPUT_KEY_PRESS: LOG_DEBUG("event: xcb input key press"); break;
-	// case XCB_INPUT_KEY_RELEASE: LOG_DEBUG("event: xcb input key press"); break;
-
 	default:
 		printf("Event: XCB Unknown Event\n");
 	}

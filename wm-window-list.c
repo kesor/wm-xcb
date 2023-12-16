@@ -49,6 +49,8 @@ wnd_node_t* window_insert(xcb_window_t window) {
 	if (window == XCB_NONE)
 		return XCB_NONE;
 
+	LOG_DEBUG("Inserting a wnd to list: %d", window);
+
 	/* avoid duplicates */
 	wnd_node_t* node = window_find(window);
 	if (node != NULL)
