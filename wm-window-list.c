@@ -114,3 +114,12 @@ void setup_window_list() {
 void destruct_window_list() {
 	window_foreach(free_wnd_node);
 }
+
+void window_focus_set(xcb_window_t window) {
+	if (window == XCB_NONE)
+	  return;
+	dpy->test;
+}
+
+void window_focus_clear(xcb_window_t window) {
+}

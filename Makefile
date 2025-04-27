@@ -12,10 +12,10 @@ CFLAGS = $(shell pkg-config --cflags ${PKGLIST}) -Ivendor/libxcb-errors/include 
 LDFLAGS = $(shell pkg-config --libs ${PKGLIST}) -Lvendor/libxcb-errors/lib -lxcb-errors -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
-	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG
+	CFLAGS += -g3 -nostdinc -pedantic -Wall -O0 -DDEBUG
 	LDFLAGS += -g
 else
-	CFLAGS += -Os -flto -fuse-linker-plugin
+	CFLAGS += -Os -nostdinc -flto -fuse-linker-plugin
 	LDFLAGS += -Os
 endif
 
@@ -39,6 +39,9 @@ TEST_SRC = \
 TEST_OBJ = ${TEST_SRC:.c=.o}
 
 all: $(NAME)
+
+compile_flags.txt:
+	@echo "${CFLAGS}" > compile_flags.txt
 
 %.o: %.c %.h $(wildcard *.h)
 	${CC} -c ${CFLAGS} $<

@@ -33,6 +33,7 @@ void handle_create_notify(xcb_create_notify_event_t* event) {
 		event->border_width,
 		event->override_redirect
 	);
+	window_insert(event->window);
 }
 
 void handle_destroy_notify(xcb_destroy_notify_event_t* event) {
@@ -41,6 +42,7 @@ void handle_destroy_notify(xcb_destroy_notify_event_t* event) {
 		event->event,
 		event->window
 	);
+	window_remove(event->window);
 }
 
 void handle_map_request(xcb_map_request_event_t* event) {
