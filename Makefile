@@ -5,33 +5,26 @@ DEBUG = 0
 
 CC = gcc
 
-# Core pkg-config packages
-PKGLIST_BASE = xcb xcb-util xcb-randr xcb-errors xcb-xinput
+# Core pkg-config packages (always required)
+PKGLIST_CORE = xcb xcb-util xcb-randr xcb-errors
 
-# Additional packages (may not be available)
-PKGLIST_EXTRA = xcb-ewmh
+# Optional packages (detected at build time)
+PKGLIST_EXTRA = xcb-ewmh xcb-xinput
 
-# Find available packages
-PKG_AVAILABLE := $(shell pkg-config --exists $(PKGLIST_BASE) $(PKGLIST_EXTRA) 2>/dev/null && echo yes || echo no)
+# Build pkg-config flags - core packages are required
+PKG_CFLAGS_CORE := $(shell pkg-config --cflags $(PKGLIST_CORE))
+PKG_LDFLAGS_CORE := $(shell pkg-config --libs $(PKGLIST_CORE))
 
-# Build pkg-config flags
-PKG_CFLAGS_BASE := $(shell pkg-config --cflags $(PKGLIST_BASE) 2>/dev/null)
-PKG_LDFLAGS_BASE := $(shell pkg-config --libs $(PKGLIST_BASE) 2>/dev/null)
-
-# Add extra packages if available
+# Add optional packages if available (pkg-config fails if not installed)
 PKG_CFLAGS_EXTRA := $(shell pkg-config --cflags $(PKGLIST_EXTRA) 2>/dev/null)
 PKG_LDFLAGS_EXTRA := $(shell pkg-config --libs $(PKGLIST_EXTRA) 2>/dev/null)
-
-# Add xcb-ewmh and xcb-errors include paths directly if pkg-config doesn't find them
-XCB_EWMH_INCLUDE := $(shell pkg-config --variable=includedir xcb-ewmh 2>/dev/null || echo "/nix/store/qhr2rq3z42ikdwhvca50abffm1sm0a20-libxcb-wm-0.4.2-dev/include")
-XCB_EWMH_LIB := /nix/store/l8cnjnd5143cfrad9a55g598wfxs3w32-libxcb-wm-0.4.2/lib
 
 # Vendor dependencies - symlink external headers for portable builds
 VENDOR_INCLUDES = -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
 CPPFLAGS = -DVERSION=\"${VERSION}\"
-CFLAGS = $(PKG_CFLAGS_BASE) $(PKG_CFLAGS_EXTRA) -I$(XCB_EWMH_INCLUDE) $(VENDOR_INCLUDES) $(CPPFLAGS)
-LDFLAGS = $(PKG_LDFLAGS_BASE) $(PKG_LDFLAGS_EXTRA) -L$(XCB_EWMH_LIB) -lxcb-ewmh -pthread -lc
+CFLAGS = $(PKG_CFLAGS_CORE) $(PKG_CFLAGS_EXTRA) $(VENDOR_INCLUDES) $(CPPFLAGS)
+LDFLAGS = $(PKG_LDFLAGS_CORE) $(PKG_LDFLAGS_EXTRA) -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
 	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG
@@ -65,6 +58,10 @@ TEST_OBJ = ${TEST_SRC:.c=.o}
 
 all: compile_flags.txt $(NAME)
 	@echo "Build complete."
+	@# Optionally regenerate compile_commands.json if bear is available
+	@if command -v bear >/dev/null 2>&1; then \
+		echo "Note: Run 'make compile-commands' to generate compile_commands.json for clang tooling"; \
+	fi
 
 # Generate compile_commands.json for clang tools using bear
 # Usage: bear -- make (or make rebuild-compile-commands)
@@ -86,11 +83,14 @@ rebuild-compile-commands: clean
 compile_flags.txt:
 	@echo "${CFLAGS}" > compile_flags.txt
 
-%.o: %.c %.h $(wildcard *.h)
-	${CC} -c ${CFLAGS} -o $@ $<
+%.o: %.c
+	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
 
-src/xcb/%.o: src/xcb/%.c src/xcb/%.h $(wildcard *.h)
-	${CC} -c ${CFLAGS} -o $@ $<
+src/xcb/%.o: src/xcb/%.c
+	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
+
+-include $(OBJ:.o=.d)
+-include $(TEST_OBJ:.o=.d)
 
 $(NAME): ${OBJ} $(NAME).o
 	${CC} -o $@ ${OBJ} ${LDFLAGS}
@@ -100,7 +100,7 @@ test: ${TEST_OBJ} ${OBJ}
 	&& ./test
 
 clean:
-	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test
+	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.json compile_flags.txt
 
 container-start:
 	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc

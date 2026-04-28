@@ -17,17 +17,16 @@ pre-commit:
     # Generate with: bear -- make (or make rebuild-compile-commands)
     tidy:
       glob: "**/*.{c,h}"
-      run: clang-tidy --quiet {staged_files} 2>/dev/null || true
+      run: clang-tidy --quiet {staged_files}
       stage_fixed: true
 
-    # Static analysis using clang static analyzer
-    # Runs scan-build for deeper analysis
+    # Static analysis using clang static analyzer (scan-build)
     analyze:
       glob: "**/*.{c,h}"
       run: |
         for f in {staged_files}; do
-          echo "Analyzing $f..."
-          clang-tidy --quiet "$f" 2>/dev/null || true
+          echo "Running static analysis on $f..."
+          clang-scan-deps --compilation-database compile_commands.json -- scan-build --status-bugs clang ${CFLAGS} -c "$f" -o /dev/null 2>&1 || true
         done
       stage_fixed: true
 
@@ -40,4 +39,4 @@ pre-push:
 
     tidy:
       glob: "**/*.{c,h}"
-      run: clang-tidy --quiet {push_files} 2>/dev/null || true
+      run: clang-tidy --quiet {push_files}
