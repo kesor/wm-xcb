@@ -1,12 +1,13 @@
+#include "wm-hub.h"
+
 #include <stdlib.h>
 #include <string.h>
 
-#include "wm-hub.h"
 #include "wm-log.h"
 
 /* Registry data structures */
-#define MAX_COMPONENTS 64
-#define MAX_TARGETS    256
+#define MAX_COMPONENTS    64
+#define MAX_TARGETS       256
 #define MAX_REQUEST_TYPES 256
 
 static HubComponent* components[MAX_COMPONENTS];
@@ -14,7 +15,7 @@ static uint32_t      component_count = 0;
 
 /* Component lookup by name */
 typedef struct {
-  const char*    name;
+  const char*   name;
   HubComponent* comp;
 } component_name_entry_t;
 
@@ -32,8 +33,8 @@ static uint32_t   target_count = 0;
 #define TARGET_ID_MAP_SIZE 512
 
 typedef struct target_id_entry {
-  TargetID        id;
-  HubTarget*      target;
+  TargetID                id;
+  HubTarget*              target;
   struct target_id_entry* next;
 } target_id_entry_t;
 
@@ -43,17 +44,29 @@ static uint32_t
 target_id_hash(TargetID id)
 {
   /* Simple hash function for TargetID */
-  return (uint32_t)((id ^ (id >> 16)) % TARGET_ID_MAP_SIZE);
+  return (uint32_t) ((id ^ (id >> 16)) % TARGET_ID_MAP_SIZE);
 }
 
 /* Targets grouped by type (array of arrays) */
 static HubTarget* targets_by_type[TARGET_TYPE_COUNT][MAX_TARGETS];
 static uint32_t   targets_by_type_count[TARGET_TYPE_COUNT];
 
+/* Event Bus - maximum number of event types */
+#define MAX_EVENT_TYPES 64
+
+/* Event Bus - maximum subscribers per event type */
+#define MAX_SUBSCRIBERS 16
+
+/* Event Bus - subscription array per event type */
+static struct {
+  struct Subscriber subscribers[MAX_SUBSCRIBERS];
+  int               count;
+} subscribers[MAX_EVENT_TYPES];
+
 /* Forward declarations */
-static void component_add_to_request_type_index(HubComponent* comp);
-static void target_by_id_map_insert(HubTarget* target);
-static void target_by_id_map_remove(TargetID id);
+static void       component_add_to_request_type_index(HubComponent* comp);
+static void       target_by_id_map_insert(HubTarget* target);
+static void       target_by_id_map_remove(TargetID id);
 static HubTarget* target_by_id_map_lookup(TargetID id);
 
 /*
@@ -74,9 +87,12 @@ clear_registry_state(void)
   memset(targets_by_type, 0, sizeof(targets_by_type));
   memset(targets_by_type_count, 0, sizeof(targets_by_type_count));
 
-  component_count = 0;
+  /* Clear event bus subscriber arrays */
+  memset(subscribers, 0, sizeof(subscribers));
+
+  component_count  = 0;
   name_entry_count = 0;
-  target_count = 0;
+  target_count     = 0;
 }
 
 void
@@ -127,7 +143,7 @@ hub_register_component(HubComponent* comp)
 
   /* Add to main component array */
   components[component_count++] = comp;
-  comp->registered = true;
+  comp->registered              = true;
 
   /* Add to name index */
   if (name_entry_count < MAX_COMPONENTS) {
@@ -180,13 +196,13 @@ hub_unregister_component(const char* name)
         if (component_by_request_type[rt] == comp) {
           component_by_request_type[rt] = NULL;
           /* Recompute from remaining registered components */
-          for (int32_t j = (int32_t)component_count - 1; j >= 0; j--) {
+          for (int32_t j = (int32_t) component_count - 1; j >= 0; j--) {
             HubComponent* other = components[j];
             if (other != NULL && other->requests != NULL) {
               for (int k = 0; other->requests[k] != 0; k++) {
                 if (other->requests[k] == rt) {
                   component_by_request_type[rt] = other;
-                  j = -1;  /* Signal found, break outer loop */
+                  j                             = -1; /* Signal found, break outer loop */
                   break;
                 }
               }
@@ -244,7 +260,7 @@ hub_register_target(HubTarget* target)
   }
 
   if (target->registered) {
-    LOG_ERROR("Target %lu is already registered", (unsigned long)target->id);
+    LOG_ERROR("Target %lu is already registered", (unsigned long) target->id);
     return;
   }
 
@@ -265,13 +281,13 @@ hub_register_target(HubTarget* target)
 
   /* Check for duplicate ID */
   if (hub_get_target_by_id(target->id) != NULL) {
-    LOG_ERROR("Target with ID %lu already registered", (unsigned long)target->id);
+    LOG_ERROR("Target with ID %lu already registered", (unsigned long) target->id);
     return;
   }
 
   /* Add to main target array */
   targets[target_count++] = target;
-  target->registered = true;
+  target->registered      = true;
 
   /* Add to ID index (hash map for arbitrary TargetID values) */
   target_by_id_map_insert(target);
@@ -285,7 +301,7 @@ hub_register_target(HubTarget* target)
     }
   }
 
-  LOG_DEBUG("Registered target: id=%lu, type=%u", (unsigned long)target->id, target->type);
+  LOG_DEBUG("Registered target: id=%lu, type=%u", (unsigned long) target->id, target->type);
 }
 
 void
@@ -298,7 +314,7 @@ hub_unregister_target(TargetID id)
 
   HubTarget* target = hub_get_target_by_id(id);
   if (target == NULL) {
-    LOG_ERROR("Target %lu not found", (unsigned long)id);
+    LOG_ERROR("Target %lu not found", (unsigned long) id);
     return;
   }
 
@@ -306,7 +322,7 @@ hub_unregister_target(TargetID id)
   for (uint32_t i = 0; i < targets_by_type_count[target->type]; i++) {
     if (targets_by_type[target->type][i] == target) {
       targets_by_type[target->type][i] =
-        targets_by_type[target->type][targets_by_type_count[target->type] - 1];
+          targets_by_type[target->type][targets_by_type_count[target->type] - 1];
       targets_by_type_count[target->type]--;
       /* Clear vacated slot and ensure NULL terminator */
       targets_by_type[target->type][targets_by_type_count[target->type]] = NULL;
@@ -327,7 +343,7 @@ hub_unregister_target(TargetID id)
   }
 
   target->registered = false;
-  LOG_DEBUG("Unregistered target: id=%lu", (unsigned long)id);
+  LOG_DEBUG("Unregistered target: id=%lu", (unsigned long) id);
 }
 
 HubTarget*
@@ -387,24 +403,24 @@ component_add_to_request_type_index(HubComponent* comp)
 static void
 target_by_id_map_insert(HubTarget* target)
 {
-  uint32_t hash = target_id_hash(target->id);
+  uint32_t           hash  = target_id_hash(target->id);
   target_id_entry_t* entry = malloc(sizeof(target_id_entry_t));
   if (entry == NULL) {
     LOG_ERROR("Failed to allocate target ID map entry");
     return;
   }
-  entry->id = target->id;
-  entry->target = target;
-  entry->next = target_by_id_map[hash];
+  entry->id              = target->id;
+  entry->target          = target;
+  entry->next            = target_by_id_map[hash];
   target_by_id_map[hash] = entry;
 }
 
 static void
 target_by_id_map_remove(TargetID id)
 {
-  uint32_t hash = target_id_hash(id);
+  uint32_t            hash = target_id_hash(id);
   target_id_entry_t** prev = &target_by_id_map[hash];
-  target_id_entry_t* curr = *prev;
+  target_id_entry_t*  curr = *prev;
 
   while (curr != NULL) {
     if (curr->id == id) {
@@ -420,7 +436,7 @@ target_by_id_map_remove(TargetID id)
 static HubTarget*
 target_by_id_map_lookup(TargetID id)
 {
-  uint32_t hash = target_id_hash(id);
+  uint32_t           hash = target_id_hash(id);
   target_id_entry_t* curr = target_by_id_map[hash];
 
   while (curr != NULL) {
@@ -430,4 +446,91 @@ target_by_id_map_lookup(TargetID id)
     curr = curr->next;
   }
   return NULL;
+}
+
+/*
+ * Event Bus Implementation
+ *
+ * Provides pub/sub communication between components.
+ * Components emit events when their state machines transition.
+ * Other components subscribe to these events.
+ */
+
+void
+hub_emit(EventType type, TargetID target, void* data)
+{
+  if (type >= MAX_EVENT_TYPES) {
+    return;
+  }
+
+  int count = subscribers[type].count;
+  if (count == 0) {
+    return;
+  }
+
+  /* Snapshot subscribers to safely handle unsubscribe during emit */
+  struct Subscriber snapshot[MAX_SUBSCRIBERS];
+  memcpy(snapshot, subscribers[type].subscribers, (size_t) count * sizeof(struct Subscriber));
+
+  for (int i = 0; i < count; i++) {
+    struct Event e = {
+      .type     = type,
+      .target   = target,
+      .data     = data,
+      .userdata = snapshot[i].userdata,
+    };
+    snapshot[i].handler(e);
+  }
+}
+
+void
+hub_subscribe(EventType type, EventHandler handler, void* userdata)
+{
+  if (type >= MAX_EVENT_TYPES) {
+    return;
+  }
+
+  if (handler == NULL) {
+    return;
+  }
+
+  int count = subscribers[type].count;
+  if (count >= MAX_SUBSCRIBERS) {
+    return;
+  }
+
+  /* Check for duplicate handler */
+  for (int i = 0; i < count; i++) {
+    if (subscribers[type].subscribers[i].handler == handler) {
+      return;
+    }
+  }
+
+  subscribers[type].subscribers[count].handler  = handler;
+  subscribers[type].subscribers[count].userdata = userdata;
+  subscribers[type].count++;
+}
+
+void
+hub_unsubscribe(EventType type, EventHandler handler)
+{
+  if (type >= MAX_EVENT_TYPES) {
+    return;
+  }
+
+  if (handler == NULL) {
+    return;
+  }
+
+  int count = subscribers[type].count;
+  for (int i = 0; i < count; i++) {
+    if (subscribers[type].subscribers[i].handler == handler) {
+      /* Remove by shifting remaining subscribers */
+      for (int j = i; j < count - 1; j++) {
+        subscribers[type].subscribers[j] = subscribers[type].subscribers[j + 1];
+      }
+      subscribers[type].count--;
+      return;
+    }
+  }
 }

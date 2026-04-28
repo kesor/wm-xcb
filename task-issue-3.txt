@@ -1,0 +1,44 @@
+# Task: Implement Hub Event Bus (Issue #3)
+
+You are implementing GitHub issue #3: https://github.com/kesor/wm-xcb/issues/3
+
+## Context
+
+Read these files first for architecture context:
+- `docs/architecture/overview.md` — core concepts
+- `docs/architecture/hub.md` — hub design details
+
+## Your Task
+
+Implement the Hub event bus for pub/sub communication.
+
+### Functions to Implement
+
+- `hub_emit(EventType, TargetID, data)` — emit an event to all subscribers
+- `hub_subscribe(EventType, handler, userdata)` — subscribe to an event type
+- `hub_unsubscribe(EventType, handler)` — unsubscribe
+
+Components emit events when their state machines transition. Other components (like bar) subscribe to these events.
+
+### Code Location
+
+Add to existing `wm-hub.c` and `wm-hub.h`.
+
+### Acceptance Criteria
+
+- [ ] Subscriber receives event after emission
+- [ ] Multiple subscribers can receive the same event
+- [ ] Subscriber can filter by event type
+- [ ] Unsubscribe stops delivery
+- [ ] Write tests in `test-wm-hub.c`
+- [ ] Make sure tests pass
+
+## Rules
+
+- Follow existing code style (see `wm-window-list.c`)
+- Push and create a PR when done
+- Reference issue #3 in commit message
+
+## Start
+
+Begin implementation now. Read the architecture docs first.
