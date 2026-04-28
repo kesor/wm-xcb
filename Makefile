@@ -44,7 +44,9 @@ SRC = \
 	$(NAME)-states.c \
 	$(NAME)-xcb.c \
 	$(NAME).c \
-	src/xcb/xcb-handler.c
+	src/xcb/xcb-handler.c \
+	src/sm/sm-template.c \
+	src/sm/sm-instance.c
 
 OBJ = ${SRC:.c=.o}
 
@@ -61,6 +63,9 @@ compile_flags.txt:
 	@echo "${CFLAGS}" > compile_flags.txt
 
 %.o: %.c
+	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
+
+src/sm/%.o: src/sm/%.c
 	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
 
 src/xcb/%.o: src/xcb/%.c
@@ -117,4 +122,9 @@ test-standalone: wm-hub.o test-wm-hub-standalone.c
 	$(CC) $(CFLAGS) -o $@ test-wm-hub-standalone.c wm-hub.o
 	./test-standalone
 
-.PHONY: all clean container-start container-exec container-build test-standalone compile-commands format tidy analyze check test
+# State Machine standalone test (no XCB dependencies required)
+test-sm-standalone: wm-log.o src/sm/sm-template.o src/sm/sm-instance.o test-sm-standalone.c
+	$(CC) $(CFLAGS) -o $@ wm-log.o src/sm/sm-template.o src/sm/sm-instance.o test-sm-standalone.c
+	./test-sm-standalone
+
+.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone
