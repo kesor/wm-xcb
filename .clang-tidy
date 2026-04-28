@@ -1,0 +1,24 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+FormatStyle: file
+HeaderFileExtensions:
+  - h
+ImplementationFileExtensions:
+  - c
+ExcludeHeaderFilterRegex: ''
+CheckOptions:    {}
+SystemHeaders:   false
+...

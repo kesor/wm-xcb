@@ -1,2 +1,3 @@
 wm
 *.o
+compile_commands.json
