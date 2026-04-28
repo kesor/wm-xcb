@@ -32,6 +32,9 @@ SRC = \
 	$(NAME)-xcb.c \
 	$(NAME).c
 
+SRC += \
+	$(NAME)-hub.c
+
 OBJ = ${SRC:.c=.o}
 
 TEST_SRC = \
@@ -67,4 +70,9 @@ container-exec:
 container-build:
 	docker build -t x11vnc .
 
-.PHONY: all clean container-start container-exec container-build
+# Standalone test (no XCB dependencies required)
+test-standalone: wm-hub.o test-wm-hub-standalone.c
+	gcc -Wall -Wextra -Os -o $@ test-wm-hub-standalone.c wm-hub.o
+	./test-standalone
+
+.PHONY: all clean container-start container-exec container-build test-standalone

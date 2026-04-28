@@ -7,6 +7,8 @@
 /* Forward declarations */
 typedef struct HubComponent HubComponent;
 typedef struct HubTarget HubTarget;
+typedef struct Event Event;
+typedef void (*EventHandler)(Event);
 
 /* Type definitions */
 typedef uint64_t TargetID;
@@ -45,6 +47,27 @@ struct HubTarget {
 	bool           registered;
 };
 
+/*
+ * Event structure passed to handlers
+ *
+ * Note: Event is passed by value. The handler must not store
+ * a pointer to the event beyond the duration of the callback.
+ */
+struct Event {
+  EventType type;
+  TargetID  target;
+  void*     data;
+  void*     userdata;  /* per-subscription userdata */
+};
+
+/*
+ * Subscriber structure
+ */
+struct Subscriber {
+  EventHandler handler;
+  void*        userdata;
+};
+
 /* Hub initialization */
 void hub_init(void);
 void hub_shutdown(void);
@@ -59,7 +82,29 @@ HubComponent*    hub_get_component_by_request_type(RequestType type);
 void         hub_register_target(HubTarget* target);
 void         hub_unregister_target(TargetID id);
 HubTarget*   hub_get_target_by_id(TargetID id);
-HubTarget**  hub_get_targets_by_type(TargetType type);
+HubTarget**   hub_get_targets_by_type(TargetType type);
+
+/* Event bus operations */
+
+/*
+ * Emit an event to all subscribers.
+ * Handlers are called with the event (passed by value).
+ * The handler may not store a pointer to the event after the call returns.
+ */
+void hub_emit(EventType type, TargetID target, void* data);
+
+/*
+ * Subscribe to an event type.
+ * When the event is emitted, handler will be called with
+ * the event and userdata (stored per-subscription).
+ */
+void hub_subscribe(EventType type, EventHandler handler, void* userdata);
+
+/*
+ * Unsubscribe a handler from an event type.
+ * If handler is not subscribed, this is a no-op.
+ */
+void hub_unsubscribe(EventType type, EventHandler handler);
 
 /* Utility */
 uint32_t hub_component_count(void);

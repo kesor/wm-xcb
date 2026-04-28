@@ -1,8 +1,7 @@
+#include "wm-hub.h"
+
 #include <stdlib.h>
 #include <string.h>
-
-#include "wm-hub.h"
-#include "wm-log.h"
 
 /* Registry data structures */
 #define MAX_COMPONENTS 64
@@ -50,6 +49,18 @@ target_id_hash(TargetID id)
 static HubTarget* targets_by_type[TARGET_TYPE_COUNT][MAX_TARGETS];
 static uint32_t   targets_by_type_count[TARGET_TYPE_COUNT];
 
+/* Event Bus - maximum number of event types */
+#define MAX_EVENT_TYPES 64
+
+/* Event Bus - maximum subscribers per event type */
+#define MAX_SUBSCRIBERS 16
+
+/* Event Bus - subscription array per event type */
+static struct {
+  struct Subscriber subscribers[MAX_SUBSCRIBERS];
+  int               count;
+} subscribers[MAX_EVENT_TYPES];
+
 /* Forward declarations */
 static void component_add_to_request_type_index(HubComponent* comp);
 static void target_by_id_map_insert(HubTarget* target);
@@ -73,6 +84,9 @@ clear_registry_state(void)
   memset(target_by_id_map, 0, sizeof(target_by_id_map));
   memset(targets_by_type, 0, sizeof(targets_by_type));
   memset(targets_by_type_count, 0, sizeof(targets_by_type_count));
+
+  /* Clear event bus subscriber arrays */
+  memset(subscribers, 0, sizeof(subscribers));
 
   component_count = 0;
   name_entry_count = 0;
@@ -430,4 +444,91 @@ target_by_id_map_lookup(TargetID id)
     curr = curr->next;
   }
   return NULL;
+}
+
+/*
+ * Event Bus Implementation
+ *
+ * Provides pub/sub communication between components.
+ * Components emit events when their state machines transition.
+ * Other components subscribe to these events.
+ */
+
+void
+hub_emit(EventType type, TargetID target, void* data)
+{
+  if (type >= MAX_EVENT_TYPES) {
+    return;
+  }
+
+  int count = subscribers[type].count;
+  if (count == 0) {
+    return;
+  }
+
+  /* Snapshot subscribers to safely handle unsubscribe during emit */
+  struct Subscriber snapshot[MAX_SUBSCRIBERS];
+  memcpy(snapshot, subscribers[type].subscribers, (size_t) count * sizeof(struct Subscriber));
+
+  for (int i = 0; i < count; i++) {
+    struct Event e = {
+      .type     = type,
+      .target   = target,
+      .data     = data,
+      .userdata = snapshot[i].userdata,
+    };
+    snapshot[i].handler(e);
+  }
+}
+
+void
+hub_subscribe(EventType type, EventHandler handler, void* userdata)
+{
+  if (type >= MAX_EVENT_TYPES) {
+    return;
+  }
+
+  if (handler == NULL) {
+    return;
+  }
+
+  int count = subscribers[type].count;
+  if (count >= MAX_SUBSCRIBERS) {
+    return;
+  }
+
+  /* Check for duplicate handler */
+  for (int i = 0; i < count; i++) {
+    if (subscribers[type].subscribers[i].handler == handler) {
+      return;
+    }
+  }
+
+  subscribers[type].subscribers[count].handler  = handler;
+  subscribers[type].subscribers[count].userdata = userdata;
+  subscribers[type].count++;
+}
+
+void
+hub_unsubscribe(EventType type, EventHandler handler)
+{
+  if (type >= MAX_EVENT_TYPES) {
+    return;
+  }
+
+  if (handler == NULL) {
+    return;
+  }
+
+  int count = subscribers[type].count;
+  for (int i = 0; i < count; i++) {
+    if (subscribers[type].subscribers[i].handler == handler) {
+      /* Remove by shifting remaining subscribers */
+      for (int j = i; j < count - 1; j++) {
+        subscribers[type].subscribers[j] = subscribers[type].subscribers[j + 1];
+      }
+      subscribers[type].count--;
+      return;
+    }
+  }
 }

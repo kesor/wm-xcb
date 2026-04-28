@@ -490,9 +490,273 @@ test_target_type_null_termination(void)
   hub_shutdown();
 }
 
+/*
+ * Event Bus Tests
+ */
+
+/*
+ * Test event types
+ */
+#define EVT_TEST_A ((EventType) 1)
+#define EVT_TEST_B ((EventType) 2)
+#define EVT_TEST_C ((EventType) 3)
+
+/*
+ * Track handler calls
+ */
+static int      handler_a_calls = 0;
+static int      handler_b_calls = 0;
+static int      handler_c_calls = 0;
+static TargetID last_target     = TARGET_ID_NONE;
+static void*    last_data       = NULL;
+
+/*
+ * Test handlers - all static at file scope (not nested)
+ */
+static void
+handler_a(Event e)
+{
+  handler_a_calls++;
+  last_target = e.target;
+  last_data   = e.data;
+  LOG_CLEAN("  handler_a called: type=%u target=%u data=%p", e.type, e.target, e.data);
+}
+
+static void
+handler_b(Event e)
+{
+  handler_b_calls++;
+  last_target = e.target;
+  LOG_CLEAN("  handler_b called: type=%u target=%u", e.type, e.target);
+}
+
+static void
+handler_c(Event e)
+{
+  handler_c_calls++;
+  LOG_CLEAN("  handler_c called: type=%u target=%u", e.type, e.target);
+}
+
+/*
+ * Handler for testing userdata - uses static to track state
+ */
+static int handler_with_data_call_count = 0;
+static int handler_with_data_userdata    = 0;
+
+static void
+handler_check_userdata(Event e)
+{
+  handler_with_data_call_count++;
+  handler_with_data_userdata = (int) (intptr_t) e.userdata;
+}
+
+void
+test_basic_subscribe_emit(void)
+{
+  LOG_CLEAN("== Testing basic subscribe and emit");
+
+  hub_init();
+
+  handler_a_calls = 0;
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+
+  LOG_CLEAN("  Emitting EVT_TEST_A...");
+  hub_emit(EVT_TEST_A, 123, NULL);
+
+  assert(handler_a_calls == 1);
+  assert(last_target == 123);
+}
+
+void
+test_multiple_subscribers(void)
+{
+  LOG_CLEAN("== Testing multiple subscribers receive same event");
+
+  hub_init();
+
+  handler_a_calls = 0;
+  handler_b_calls = 0;
+  handler_c_calls = 0;
+
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+  hub_subscribe(EVT_TEST_A, handler_b, NULL);
+  hub_subscribe(EVT_TEST_A, handler_c, NULL);
+
+  LOG_CLEAN("  Emitting EVT_TEST_A...");
+  hub_emit(EVT_TEST_A, 456, NULL);
+
+  assert(handler_a_calls == 1);
+  assert(handler_b_calls == 1);
+  assert(handler_c_calls == 1);
+  assert(last_target == 456);
+}
+
+void
+test_filter_by_event_type(void)
+{
+  LOG_CLEAN("== Testing subscriber filters by event type");
+
+  hub_init();
+
+  handler_a_calls = 0;
+  handler_b_calls = 0;
+
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+  hub_subscribe(EVT_TEST_B, handler_b, NULL);
+
+  LOG_CLEAN("  Emitting EVT_TEST_A...");
+  hub_emit(EVT_TEST_A, 100, NULL);
+
+  assert(handler_a_calls == 1);
+  assert(handler_b_calls == 0);    // handler_b should NOT be called
+
+  handler_a_calls = 0;
+  handler_b_calls = 0;
+
+  LOG_CLEAN("  Emitting EVT_TEST_B...");
+  hub_emit(EVT_TEST_B, 200, NULL);
+
+  assert(handler_a_calls == 0);    // handler_a should NOT be called
+  assert(handler_b_calls == 1);
+}
+
+void
+test_unsubscribe_stops_delivery(void)
+{
+  LOG_CLEAN("== Testing unsubscribe stops delivery");
+
+  hub_init();
+
+  handler_a_calls = 0;
+
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+
+  LOG_CLEAN("  Emitting before unsubscribe...");
+  hub_emit(EVT_TEST_A, 1, NULL);
+  assert(handler_a_calls == 1);
+
+  hub_unsubscribe(EVT_TEST_A, handler_a);
+
+  LOG_CLEAN("  Emitting after unsubscribe...");
+  hub_emit(EVT_TEST_A, 2, NULL);
+  assert(handler_a_calls == 1);    // should still be 1, not incremented
+}
+
+void
+test_unsubscribe_specific_handler(void)
+{
+  LOG_CLEAN("== Testing unsubscribe only removes specific handler");
+
+  hub_init();
+
+  handler_a_calls = 0;
+  handler_b_calls = 0;
+
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+  hub_subscribe(EVT_TEST_A, handler_b, NULL);
+
+  hub_emit(EVT_TEST_A, 1, NULL);
+  assert(handler_a_calls == 1);
+  assert(handler_b_calls == 1);
+
+  hub_unsubscribe(EVT_TEST_A, handler_a);
+
+  hub_emit(EVT_TEST_A, 2, NULL);
+  assert(handler_a_calls == 1);    // handler_a unchanged
+  assert(handler_b_calls == 2);    // handler_b called again
+}
+
+void
+test_multiple_emit_calls(void)
+{
+  LOG_CLEAN("== Testing multiple emit calls");
+
+  hub_init();
+
+  handler_a_calls = 0;
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+
+  hub_emit(EVT_TEST_A, 1, NULL);
+  hub_emit(EVT_TEST_A, 2, NULL);
+  hub_emit(EVT_TEST_A, 3, NULL);
+
+  assert(handler_a_calls == 3);
+  assert(last_target == 3);
+}
+
+void
+test_data_passed_to_handlers(void)
+{
+  LOG_CLEAN("== Testing event data is passed to handlers");
+
+  hub_init();
+
+  handler_a_calls = 0;
+  last_data       = NULL;
+
+  int test_data = 42;
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+  hub_emit(EVT_TEST_A, 1, &test_data);
+
+  assert(handler_a_calls == 1);
+  assert(last_data == &test_data);
+}
+
+void
+test_userdata_in_subscribe(void)
+{
+  LOG_CLEAN("== Testing userdata stored per subscription");
+
+  hub_init();
+
+  handler_with_data_call_count = 0;
+  handler_with_data_userdata    = 0;
+
+  int my_userdata = 99;
+  hub_subscribe(EVT_TEST_A, handler_check_userdata, (void*) (intptr_t) my_userdata);
+  hub_emit(EVT_TEST_A, 1, NULL);
+
+  assert(handler_with_data_call_count == 1);
+  assert(handler_with_data_userdata == my_userdata);
+}
+
+void
+test_duplicate_subscribe_rejected(void)
+{
+  LOG_CLEAN("== Testing duplicate subscribe is rejected");
+
+  hub_init();
+
+  handler_a_calls = 0;
+
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);    // duplicate
+
+  hub_emit(EVT_TEST_A, 1, NULL);
+  assert(handler_a_calls == 1);                  // should only be called once
+}
+
+void
+test_unsubscribe_nonexistent_handler(void)
+{
+  LOG_CLEAN("== Testing unsubscribe of non-subscribed handler is safe");
+
+  hub_init();
+
+  handler_a_calls = 0;
+
+  hub_subscribe(EVT_TEST_A, handler_a, NULL);
+  hub_unsubscribe(EVT_TEST_A, handler_b);    // different handler
+
+  hub_emit(EVT_TEST_A, 1, NULL);
+  assert(handler_a_calls == 1);              // handler_a still works
+}
+
 int
 main(void)
 {
+  LOG_CLEAN("=== Hub Registry Tests ===");
+
   test_hub_init_shutdown();
   test_register_unregister_component();
   test_register_null_component();
@@ -515,6 +779,19 @@ main(void)
   test_large_target_id_lookup();
   test_target_type_null_termination();
 
-  LOG_CLEAN("== All hub tests passed!");
+  LOG_CLEAN("\n=== Hub Event Bus Tests ===");
+
+  test_basic_subscribe_emit();
+  test_multiple_subscribers();
+  test_filter_by_event_type();
+  test_unsubscribe_stops_delivery();
+  test_unsubscribe_specific_handler();
+  test_multiple_emit_calls();
+  test_data_passed_to_handlers();
+  test_userdata_in_subscribe();
+  test_duplicate_subscribe_rejected();
+  test_unsubscribe_nonexistent_handler();
+
+  LOG_CLEAN("\n== All hub tests passed!");
   return 0;
 }
