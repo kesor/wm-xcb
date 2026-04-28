@@ -25,6 +25,7 @@ SRC = \
 	$(NAME)-running.c \
 	$(NAME)-window-list.c \
 	$(NAME)-clients.c \
+	$(NAME)-hub.c \
 	$(NAME)-xcb-ewmh.c \
 	$(NAME)-xcb-events.c \
 	$(NAME)-states.c \
@@ -34,7 +35,8 @@ SRC = \
 OBJ = ${SRC:.c=.o}
 
 TEST_SRC = \
-	test-$(NAME)-window-list.c
+	test-$(NAME)-window-list.c \
+	test-$(NAME)-hub.c
 
 TEST_OBJ = ${TEST_SRC:.c=.o}
 
