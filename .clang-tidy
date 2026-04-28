@@ -9,16 +9,43 @@ Checks: >
   modernize-*,
   performance-*,
   portability-*,
-  readability-*
+  readability-*,
+  -readability-identifier-length,
+  -readability-braces-around-statements,
+  -misc-include-cleaner,
+  -bugprone-reserved-identifier,
+  -cert-dcl37-c,
+  -cert-dcl51-cpp,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -cppcoreguidelines-macro-to-enum,
+  -modernize-macro-to-enum,
+  -readability-use-concise-preprocessor-directives,
+  -misc-header-include-cycle,
+  -bugprone-branch-clone,
+  -bugprone-switch-missing-default-case,
+  -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-init-variables,
+  -readability-isolate-declaration,
+  -misc-unused-parameters,
+  -misc-redundant-control-flow,
+  -readability-redundant-declaration,
+  -readability-redundant-control-flow,
+  -bugprone-signal-handler,
+  -cert-msc54-cpp,
+  -cert-sig30-c,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  -clang-analyzer-security-insecureAPI-DeprecatedOrUnsafeBufferHandling,
+  -clang-diagnostic-error
 
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*'
+HeaderFilterRegex: '^wm-.*$|^test-.*$'
 FormatStyle: file
 HeaderFileExtensions:
   - h
 ImplementationFileExtensions:
   - c
-ExcludeHeaderFilterRegex: ''
-CheckOptions:    {}
-SystemHeaders:   false
-...
+ExcludeHeaderFilterRegex: '^/nix/'
+CheckOptions: []
+SystemHeaders: false

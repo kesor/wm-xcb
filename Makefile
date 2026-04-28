@@ -22,10 +22,10 @@ CFLAGS = $(PKG_CFLAGS) $(CPPFLAGS)
 LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
-	CFLAGS += -g3 -nostdinc -pedantic -Wall -O0 -DDEBUG
+	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG
 	LDFLAGS += -g
 else
-	CFLAGS += -Os -nostdinc -flto -fuse-linker-plugin
+	CFLAGS += -Os -flto -fuse-linker-plugin
 	LDFLAGS += -Os
 endif
 
