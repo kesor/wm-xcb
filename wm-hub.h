@@ -3,7 +3,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <xcb/xcb.h>
 
 /* Forward declarations */
 typedef struct HubComponent HubComponent;

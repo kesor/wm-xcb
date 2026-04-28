@@ -161,9 +161,13 @@ test_get_component_by_request_type(void)
   found = hub_get_component_by_request_type(3);
   assert(found == &test_focus);
 
-  /* Unregister fullscreen - focus should now handle type 1 */
+  /* Unregister fullscreen - request type 1 should now have no handler */
   hub_unregister_component("fullscreen");
   found = hub_get_component_by_request_type(1);
+  assert(found == NULL);   /* focus only handles type 3, not type 1 */
+
+  /* Focus component still handles type 3 */
+  found = hub_get_component_by_request_type(3);
   assert(found == &test_focus);
 
   /* Unused request type */
