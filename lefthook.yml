@@ -6,6 +6,7 @@ pre-commit:
     format:
       glob: "*.{c,h}"
       run: clang-format --style=file -i {staged_files}
+      stage: true
 
 pre-push:
   commands:
