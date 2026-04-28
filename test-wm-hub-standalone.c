@@ -49,27 +49,40 @@ static void*    last_data       = NULL;
  * Test handlers
  */
 static void
-handler_a(struct Event* e)
+handler_a(struct Event e)
 {
   handler_a_calls++;
-  last_target = e->target;
-  last_data   = e->data;
-  printf("  handler_a called: type=%u target=%u data=%p\n", e->type, e->target, e->data);
+  last_target = e.target;
+  last_data   = e.data;
+  printf("  handler_a called: type=%u target=%u data=%p\n", e.type, e.target, e.data);
 }
 
 static void
-handler_b(struct Event* e)
+handler_b(struct Event e)
 {
   handler_b_calls++;
-  last_target = e->target;
-  printf("  handler_b called: type=%u target=%u\n", e->type, e->target);
+  last_target = e.target;
+  printf("  handler_b called: type=%u target=%u\n", e.type, e.target);
 }
 
 static void
-handler_c(struct Event* e)
+handler_c(struct Event e)
 {
   handler_c_calls++;
-  printf("  handler_c called: type=%u target=%u\n", e->type, e->target);
+  printf("  handler_c called: type=%u target=%u\n", e.type, e.target);
+}
+
+/*
+ * Handler for testing userdata - uses static to track state
+ */
+static int handler_with_data_call_count = 0;
+static int handler_with_data_userdata    = 0;
+
+static void
+handler_check_userdata(struct Event e)
+{
+  handler_with_data_call_count++;
+  handler_with_data_userdata = (int) (intptr_t) e.userdata;
 }
 
 void
@@ -231,24 +244,15 @@ test_userdata_in_subscribe(void)
 
   hub_init();
 
-  int handler_call_count = 0;
-
-  void
-      handler_check_data(struct Event * e)
-  {
-    handler_call_count++;
-    /* userdata is stored per-subscriber, event data is separate */
-    /* For this test, we just verify the handler is called correctly */
-    (void) e;
-  }
-
-  handler_call_count = 0;
+  handler_with_data_call_count = 0;
+  handler_with_data_userdata    = 0;
 
   int my_userdata = 99;
-  hub_subscribe(EVT_TEST_A, handler_check_data, &my_userdata);
+  hub_subscribe(EVT_TEST_A, handler_check_userdata, (void*) (intptr_t) my_userdata);
   hub_emit(EVT_TEST_A, 1, NULL);
 
-  assert(handler_call_count == 1);
+  assert(handler_with_data_call_count == 1);
+  assert(handler_with_data_userdata == my_userdata);
 }
 
 void

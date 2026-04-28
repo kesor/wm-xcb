@@ -60,6 +60,8 @@ struct Event {
   void*     userdata;  /* per-subscription userdata */
 };
 
+typedef void (*EventHandler)(struct Event);
+
 /*
  * Subscriber structure
  */

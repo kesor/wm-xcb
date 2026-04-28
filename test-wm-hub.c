@@ -514,7 +514,7 @@ static void*    last_data       = NULL;
  * Test handlers - all static at file scope (not nested)
  */
 static void
-handler_a(Event e)
+handler_a(struct Event e)
 {
   handler_a_calls++;
   last_target = e.target;
@@ -523,7 +523,7 @@ handler_a(Event e)
 }
 
 static void
-handler_b(Event e)
+handler_b(struct Event e)
 {
   handler_b_calls++;
   last_target = e.target;
@@ -531,7 +531,7 @@ handler_b(Event e)
 }
 
 static void
-handler_c(Event e)
+handler_c(struct Event e)
 {
   handler_c_calls++;
   LOG_CLEAN("  handler_c called: type=%u target=%u", e.type, e.target);
@@ -544,7 +544,7 @@ static int handler_with_data_call_count = 0;
 static int handler_with_data_userdata    = 0;
 
 static void
-handler_check_userdata(Event e)
+handler_check_userdata(struct Event e)
 {
   handler_with_data_call_count++;
   handler_with_data_userdata = (int) (intptr_t) e.userdata;

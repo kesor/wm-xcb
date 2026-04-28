@@ -3,9 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "wm-log.h"
+
 /* Registry data structures */
-#define MAX_COMPONENTS 64
-#define MAX_TARGETS    256
+#define MAX_COMPONENTS    64
+#define MAX_TARGETS       256
 #define MAX_REQUEST_TYPES 256
 
 static HubComponent* components[MAX_COMPONENTS];
@@ -13,7 +15,7 @@ static uint32_t      component_count = 0;
 
 /* Component lookup by name */
 typedef struct {
-  const char*    name;
+  const char*   name;
   HubComponent* comp;
 } component_name_entry_t;
 
@@ -31,8 +33,8 @@ static uint32_t   target_count = 0;
 #define TARGET_ID_MAP_SIZE 512
 
 typedef struct target_id_entry {
-  TargetID        id;
-  HubTarget*      target;
+  TargetID                id;
+  HubTarget*              target;
   struct target_id_entry* next;
 } target_id_entry_t;
 
@@ -42,7 +44,7 @@ static uint32_t
 target_id_hash(TargetID id)
 {
   /* Simple hash function for TargetID */
-  return (uint32_t)((id ^ (id >> 16)) % TARGET_ID_MAP_SIZE);
+  return (uint32_t) ((id ^ (id >> 16)) % TARGET_ID_MAP_SIZE);
 }
 
 /* Targets grouped by type (array of arrays) */
@@ -62,9 +64,9 @@ static struct {
 } subscribers[MAX_EVENT_TYPES];
 
 /* Forward declarations */
-static void component_add_to_request_type_index(HubComponent* comp);
-static void target_by_id_map_insert(HubTarget* target);
-static void target_by_id_map_remove(TargetID id);
+static void       component_add_to_request_type_index(HubComponent* comp);
+static void       target_by_id_map_insert(HubTarget* target);
+static void       target_by_id_map_remove(TargetID id);
 static HubTarget* target_by_id_map_lookup(TargetID id);
 
 /*
@@ -88,9 +90,9 @@ clear_registry_state(void)
   /* Clear event bus subscriber arrays */
   memset(subscribers, 0, sizeof(subscribers));
 
-  component_count = 0;
+  component_count  = 0;
   name_entry_count = 0;
-  target_count = 0;
+  target_count     = 0;
 }
 
 void
@@ -141,7 +143,7 @@ hub_register_component(HubComponent* comp)
 
   /* Add to main component array */
   components[component_count++] = comp;
-  comp->registered = true;
+  comp->registered              = true;
 
   /* Add to name index */
   if (name_entry_count < MAX_COMPONENTS) {
@@ -194,13 +196,13 @@ hub_unregister_component(const char* name)
         if (component_by_request_type[rt] == comp) {
           component_by_request_type[rt] = NULL;
           /* Recompute from remaining registered components */
-          for (int32_t j = (int32_t)component_count - 1; j >= 0; j--) {
+          for (int32_t j = (int32_t) component_count - 1; j >= 0; j--) {
             HubComponent* other = components[j];
             if (other != NULL && other->requests != NULL) {
               for (int k = 0; other->requests[k] != 0; k++) {
                 if (other->requests[k] == rt) {
                   component_by_request_type[rt] = other;
-                  j = -1;  /* Signal found, break outer loop */
+                  j                             = -1; /* Signal found, break outer loop */
                   break;
                 }
               }
@@ -258,7 +260,7 @@ hub_register_target(HubTarget* target)
   }
 
   if (target->registered) {
-    LOG_ERROR("Target %lu is already registered", (unsigned long)target->id);
+    LOG_ERROR("Target %lu is already registered", (unsigned long) target->id);
     return;
   }
 
@@ -279,13 +281,13 @@ hub_register_target(HubTarget* target)
 
   /* Check for duplicate ID */
   if (hub_get_target_by_id(target->id) != NULL) {
-    LOG_ERROR("Target with ID %lu already registered", (unsigned long)target->id);
+    LOG_ERROR("Target with ID %lu already registered", (unsigned long) target->id);
     return;
   }
 
   /* Add to main target array */
   targets[target_count++] = target;
-  target->registered = true;
+  target->registered      = true;
 
   /* Add to ID index (hash map for arbitrary TargetID values) */
   target_by_id_map_insert(target);
@@ -299,7 +301,7 @@ hub_register_target(HubTarget* target)
     }
   }
 
-  LOG_DEBUG("Registered target: id=%lu, type=%u", (unsigned long)target->id, target->type);
+  LOG_DEBUG("Registered target: id=%lu, type=%u", (unsigned long) target->id, target->type);
 }
 
 void
@@ -312,7 +314,7 @@ hub_unregister_target(TargetID id)
 
   HubTarget* target = hub_get_target_by_id(id);
   if (target == NULL) {
-    LOG_ERROR("Target %lu not found", (unsigned long)id);
+    LOG_ERROR("Target %lu not found", (unsigned long) id);
     return;
   }
 
@@ -320,7 +322,7 @@ hub_unregister_target(TargetID id)
   for (uint32_t i = 0; i < targets_by_type_count[target->type]; i++) {
     if (targets_by_type[target->type][i] == target) {
       targets_by_type[target->type][i] =
-        targets_by_type[target->type][targets_by_type_count[target->type] - 1];
+          targets_by_type[target->type][targets_by_type_count[target->type] - 1];
       targets_by_type_count[target->type]--;
       /* Clear vacated slot and ensure NULL terminator */
       targets_by_type[target->type][targets_by_type_count[target->type]] = NULL;
@@ -341,7 +343,7 @@ hub_unregister_target(TargetID id)
   }
 
   target->registered = false;
-  LOG_DEBUG("Unregistered target: id=%lu", (unsigned long)id);
+  LOG_DEBUG("Unregistered target: id=%lu", (unsigned long) id);
 }
 
 HubTarget*
@@ -401,24 +403,24 @@ component_add_to_request_type_index(HubComponent* comp)
 static void
 target_by_id_map_insert(HubTarget* target)
 {
-  uint32_t hash = target_id_hash(target->id);
+  uint32_t           hash  = target_id_hash(target->id);
   target_id_entry_t* entry = malloc(sizeof(target_id_entry_t));
   if (entry == NULL) {
     LOG_ERROR("Failed to allocate target ID map entry");
     return;
   }
-  entry->id = target->id;
-  entry->target = target;
-  entry->next = target_by_id_map[hash];
+  entry->id              = target->id;
+  entry->target          = target;
+  entry->next            = target_by_id_map[hash];
   target_by_id_map[hash] = entry;
 }
 
 static void
 target_by_id_map_remove(TargetID id)
 {
-  uint32_t hash = target_id_hash(id);
+  uint32_t            hash = target_id_hash(id);
   target_id_entry_t** prev = &target_by_id_map[hash];
-  target_id_entry_t* curr = *prev;
+  target_id_entry_t*  curr = *prev;
 
   while (curr != NULL) {
     if (curr->id == id) {
@@ -434,7 +436,7 @@ target_by_id_map_remove(TargetID id)
 static HubTarget*
 target_by_id_map_lookup(TargetID id)
 {
-  uint32_t hash = target_id_hash(id);
+  uint32_t           hash = target_id_hash(id);
   target_id_entry_t* curr = target_by_id_map[hash];
 
   while (curr != NULL) {
