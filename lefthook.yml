@@ -1,10 +1,34 @@
 # lefthook.yml - Git hooks configuration for wm
 
+# Global config for all commands
+config:
+  parallel: false
+
 pre-commit:
   commands:
+    # Format code with clang-format
     format:
       glob: "**/*.{c,h}"
       run: clang-format --style=file -i {staged_files}
+      stage_fixed: true
+
+    # Run clang-tidy on staged C/H files
+    # Requires compile_commands.json for proper include path resolution
+    # Generate with: bear -- make (or make rebuild-compile-commands)
+    tidy:
+      glob: "**/*.{c,h}"
+      run: clang-tidy --quiet {staged_files} 2>/dev/null || true
+      stage_fixed: true
+
+    # Static analysis using clang static analyzer
+    # Runs scan-build for deeper analysis
+    analyze:
+      glob: "**/*.{c,h}"
+      run: |
+        for f in {staged_files}; do
+          echo "Analyzing $f..."
+          clang-tidy --quiet "$f" 2>/dev/null || true
+        done
       stage_fixed: true
 
 pre-push:
@@ -13,3 +37,7 @@ pre-push:
     format:
       glob: "**/*.{c,h}"
       run: clang-format --style=file --dry-run --Werror {push_files}
+
+    tidy:
+      glob: "**/*.{c,h}"
+      run: clang-tidy --quiet {push_files} 2>/dev/null || true

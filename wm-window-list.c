@@ -146,7 +146,6 @@ window_focus_set(xcb_window_t window)
 {
   if (window == XCB_NONE)
     return;
-  dpy->test;
 }
 
 void
