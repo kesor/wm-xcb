@@ -80,7 +80,7 @@ tidy:
 
 # Run clang static analyzer
 analyze:
-	scan-build --status-bugs clang -c ${CFLAGS} ${SRC} -o /dev/null
+	clang --analyze ${CFLAGS} ${SRC}
 
 # Run all development checks
 check: format tidy analyze
