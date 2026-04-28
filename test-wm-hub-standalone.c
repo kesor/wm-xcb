@@ -76,7 +76,7 @@ handler_c(struct Event e)
  * Handler for testing userdata - uses static to track state
  */
 static int handler_with_data_call_count = 0;
-static int handler_with_data_userdata    = 0;
+static int handler_with_data_userdata   = 0;
 
 static void
 handler_check_userdata(struct Event e)
@@ -245,7 +245,7 @@ test_userdata_in_subscribe(void)
   hub_init();
 
   handler_with_data_call_count = 0;
-  handler_with_data_userdata    = 0;
+  handler_with_data_userdata   = 0;
 
   int my_userdata = 99;
   hub_subscribe(EVT_TEST_A, handler_check_userdata, (void*) (intptr_t) my_userdata);

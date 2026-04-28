@@ -6,8 +6,8 @@
 
 /* Forward declarations */
 typedef struct HubComponent HubComponent;
-typedef struct HubTarget HubTarget;
-typedef struct Event Event;
+typedef struct HubTarget    HubTarget;
+typedef struct Event        Event;
 typedef void (*EventHandler)(Event);
 
 /* Type definitions */
@@ -18,33 +18,33 @@ typedef uint32_t EventType;
 
 /* Target types */
 enum {
-	TARGET_TYPE_CLIENT,
-	TARGET_TYPE_MONITOR,
-	TARGET_TYPE_KEYBOARD,
-	TARGET_TYPE_TAG,
-	TARGET_TYPE_SYSTEM,
-	TARGET_TYPE_COUNT,
+  TARGET_TYPE_CLIENT,
+  TARGET_TYPE_MONITOR,
+  TARGET_TYPE_KEYBOARD,
+  TARGET_TYPE_TAG,
+  TARGET_TYPE_SYSTEM,
+  TARGET_TYPE_COUNT,
 };
 
 /* Explicit sentinel for NULL-terminated target arrays (avoids collision with 0) */
 #define TARGET_TYPE_NONE ((TargetType) UINT32_MAX)
 
 /* Invalid ID sentinel */
-#define TARGET_ID_NONE ((TargetID)0)
+#define TARGET_ID_NONE   ((TargetID) 0)
 
 /* Component structure */
 struct HubComponent {
-	const char*    name;
-	RequestType*   requests;   /* NULL-terminated array of request types handled */
-	TargetType*    targets;    /* TARGET_TYPE_NONE-terminated array of accepted types */
-	bool           registered;
+  const char*  name;
+  RequestType* requests; /* NULL-terminated array of request types handled */
+  TargetType*  targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
+  bool         registered;
 };
 
 /* Target structure */
 struct HubTarget {
-	TargetID       id;
-	TargetType     type;
-	bool           registered;
+  TargetID   id;
+  TargetType type;
+  bool       registered;
 };
 
 /*
@@ -57,7 +57,7 @@ struct Event {
   EventType type;
   TargetID  target;
   void*     data;
-  void*     userdata;  /* per-subscription userdata */
+  void*     userdata; /* per-subscription userdata */
 };
 
 typedef void (*EventHandler)(struct Event);
@@ -75,16 +75,16 @@ void hub_init(void);
 void hub_shutdown(void);
 
 /* Component registration */
-void             hub_register_component(HubComponent* comp);
-void             hub_unregister_component(const char* name);
-HubComponent*    hub_get_component_by_name(const char* name);
-HubComponent*    hub_get_component_by_request_type(RequestType type);
+void          hub_register_component(HubComponent* comp);
+void          hub_unregister_component(const char* name);
+HubComponent* hub_get_component_by_name(const char* name);
+HubComponent* hub_get_component_by_request_type(RequestType type);
 
 /* Target registration */
-void         hub_register_target(HubTarget* target);
-void         hub_unregister_target(TargetID id);
-HubTarget*   hub_get_target_by_id(TargetID id);
-HubTarget**   hub_get_targets_by_type(TargetType type);
+void        hub_register_target(HubTarget* target);
+void        hub_unregister_target(TargetID id);
+HubTarget*  hub_get_target_by_id(TargetID id);
+HubTarget** hub_get_targets_by_type(TargetType type);
 
 /* Event bus operations */
 

@@ -8,7 +8,7 @@ pre-commit:
       stage_fixed: true
     tidy:
       glob: "**/*.{c,h}"
-      run: clang-tidy --quiet --fix-errors {staged_files}
+      run: clang-tidy --quiet --fix-errors -p build {staged_files}
       stage_fixed: true
 
 pre-push:
@@ -16,10 +16,10 @@ pre-push:
   commands:
     format:
       glob: "**/*.{c,h}"
-      run: clang-format --style=file --dry-run --Werror {all_files}
+      run: clang-format --style=file --dry-run --Werror {push_files}
     tidy-check:
       glob: "**/*.{c,h}"
-      run: clang-tidy --quiet --warnings-as-errors=* {push_files}
+      run: clang-tidy --quiet --warnings-as-errors=* -p build {push_files}
     analyze:
       glob: "**/*.{c,h}"
       run: clang --analyze -Werror --analyzer-output=text {push_files}
