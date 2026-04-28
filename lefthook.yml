@@ -9,6 +9,7 @@ pre-commit:
       stage: true
 
 pre-push:
+  skip: [pre-commit]
   commands:
     format:
       glob: "*.{c,h}"
