@@ -30,7 +30,8 @@ SRC = \
 	$(NAME)-xcb-events.c \
 	$(NAME)-states.c \
 	$(NAME)-xcb.c \
-	$(NAME).c
+	$(NAME).c \
+	src/xcb/xcb-handler.c
 
 SRC += \
 	$(NAME)-hub.c
@@ -39,7 +40,8 @@ OBJ = ${SRC:.c=.o}
 
 TEST_SRC = \
 	test-$(NAME)-window-list.c \
-	test-$(NAME)-hub.c
+	test-$(NAME)-hub.c \
+	test-$(NAME)-xcb-handler.c
 
 TEST_OBJ = ${TEST_SRC:.c=.o}
 
