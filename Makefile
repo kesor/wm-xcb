@@ -5,11 +5,21 @@ DEBUG = 0
 
 CC = gcc
 
-PKGLIST = xcb xcb-atom xcb-ewmh xcb-xinput
+# Core pkg-config packages (always available)
+PKGLIST = xcb xcb-util xcb-randr xcb-errors
+
+# Optional packages (may not be available in all environments)
+PKG_EWMH := $(shell pkg-config --exists xcb-ewmh 2>/dev/null && echo xcb-ewmh)
+PKG_ATOM := $(shell pkg-config --exists xcb-atom 2>/dev/null && echo xcb-atom)
+PKG_XINPUT := $(shell pkg-config --exists xcb-xinput 2>/dev/null && echo xcb-xinput)
+
+# Build pkg-config flags from available packages
+PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST) $(PKG_EWMH) $(PKG_ATOM) $(PKG_XINPUT) 2>/dev/null)
+PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST) $(PKG_EWMH) $(PKG_ATOM) $(PKG_XINPUT) 2>/dev/null)
 
 CPPFLAGS = -DVERSION=\"${VERSION}\"
-CFLAGS = $(shell pkg-config --cflags ${PKGLIST}) -Ivendor/libxcb-errors/include ${CPPFLAGS}
-LDFLAGS = $(shell pkg-config --libs ${PKGLIST}) -Lvendor/libxcb-errors/lib -lxcb-errors -pthread -lc
+CFLAGS = $(PKG_CFLAGS) $(CPPFLAGS)
+LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
 	CFLAGS += -g3 -nostdinc -pedantic -Wall -O0 -DDEBUG
