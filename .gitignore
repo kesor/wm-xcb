@@ -1,4 +1,7 @@
 wm
 *.o
 compile_commands.json
+*.plist
+*.d
 compile_flags.txt
+task-*.txt
