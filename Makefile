@@ -11,6 +11,12 @@ PKGLIST = xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput
 PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST))
 PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST))
 
+# When using clang, add glibc include path (clang's default search doesn't include it)
+ifeq ($(CC),clang)
+	GLIBC_DEV := $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d ' ')
+	PKG_CFLAGS += -I$(GLIBC_DEV)
+endif
+
 # Vendor dependencies - symlink external headers for portable builds
 VENDOR_INCLUDES = -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
@@ -67,20 +73,25 @@ $(NAME): ${OBJ} $(NAME).o
 	${CC} -o $@ ${OBJ} ${LDFLAGS}
 
 # Generate compile_commands.json for clang tools
+# Forces recompilation with clang so clang-tidy can understand the flags
 compile-commands: clean
-	bear -- make
+	bear -- $(MAKE) CC=clang all
+	@$(MAKE) clean CC=gcc
 
 # Format source files with clang-format
 format:
 	clang-format --style=file -i ${SRC} ${TEST_SRC}
 
 # Run clang-tidy on source files
+# Uses -p . to read compile_commands.json; adds glibc include path for nix
 tidy:
-	clang-tidy --quiet ${SRC} ${TEST_SRC}
+	clang-tidy -p . --quiet \
+		-extra-arg=-I"$(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d ' ')" \
+		${SRC} ${TEST_SRC}
 
-# Run clang static analyzer
+# Run clang static analyzer (requires compile_commands.json from bear)
 analyze:
-	clang --analyze ${CFLAGS} ${SRC}
+	clang -fsyntax-only -Xclang -analyze -Xclang -analyzer-output=text -p . ${SRC}
 
 # Run all development checks
 check: format tidy analyze
