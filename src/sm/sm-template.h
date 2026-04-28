@@ -20,11 +20,11 @@ typedef struct SMTemplate   SMTemplate;
  * Represents a valid state change with optional guard and action.
  */
 typedef struct SMTransition {
-  uint32_t       from_state;
-  uint32_t       to_state;
-  const char*    guard_fn;   /* name of guard function */
-  const char*    action_fn;  /* name of action function */
-  uint32_t       emit_event; /* event to emit on transition */
+  uint32_t    from_state;
+  uint32_t    to_state;
+  const char* guard_fn;   /* name of guard function */
+  const char* action_fn;  /* name of action function */
+  uint32_t    emit_event; /* event to emit on transition */
 } SMTransition;
 
 /*
@@ -32,12 +32,12 @@ typedef struct SMTransition {
  * Defines the blueprint for a state machine.
  */
 struct SMTemplate {
-  const char*    name;             /* template name */
-  uint32_t*      states;           /* array of state values */
-  uint32_t       num_states;       /* number of states */
-  SMTransition*  transitions;      /* array of valid transitions */
-  uint32_t       num_transitions; /* number of transitions */
-  uint32_t       initial_state;   /* default initial state */
+  const char*   name;             /* template name */
+  uint32_t*     states;           /* array of state values */
+  uint32_t      num_states;       /* number of states */
+  SMTransition* transitions;      /* array of valid transitions */
+  uint32_t      num_transitions;  /* number of transitions */
+  uint32_t      initial_state;    /* default initial state */
   void (*init_fn)(StateMachine*); /* optional initialization function */
 };
 
@@ -46,13 +46,12 @@ struct SMTemplate {
  * Returns NULL on allocation failure.
  */
 SMTemplate* sm_template_create(
-  const char*    name,
-  uint32_t*      states,
-  uint32_t       num_states,
-  SMTransition*  transitions,
-  uint32_t       num_transitions,
-  uint32_t       initial_state
-);
+    const char*   name,
+    uint32_t*     states,
+    uint32_t      num_states,
+    SMTransition* transitions,
+    uint32_t      num_transitions,
+    uint32_t      initial_state);
 
 /*
  * Destroy an SMTemplate.
@@ -66,10 +65,9 @@ void sm_template_destroy(SMTemplate* tmpl);
  * Returns NULL if no transition exists.
  */
 SMTransition* sm_template_find_transition(
-  SMTemplate* tmpl,
-  uint32_t    from_state,
-  uint32_t    to_state
-);
+    SMTemplate* tmpl,
+    uint32_t    from_state,
+    uint32_t    to_state);
 
 /*
  * Get the name of a template.

@@ -1,15 +1,15 @@
 #include <stdlib.h>
 
-#include "sm-template.h"
 #include "sm-instance.h"
+#include "sm-template.h"
 #include "wm-log.h"
 
 /*
  * Hook storage for each state machine instance
  */
 typedef struct SMHook {
-  SMHookFn  fn;
-  void*     userdata;
+  SMHookFn       fn;
+  void*          userdata;
   struct SMHook* next;
 } SMHook;
 
@@ -49,10 +49,10 @@ sm_hook_list_add(struct SMHookList* list, SMHookFn fn, void* userdata)
   SMHook* hook = malloc(sizeof(SMHook));
   if (hook == NULL)
     return;
-  hook->fn = fn;
+  hook->fn       = fn;
   hook->userdata = userdata;
-  hook->next = list->head;
-  list->head = hook;
+  hook->next     = list->head;
+  list->head     = hook;
 }
 
 static void
@@ -102,11 +102,11 @@ sm_create(void* owner, SMTemplate* template)
     return NULL;
   }
 
-  sm->name         = template->name;
+  sm->name          = template->name;
   sm->current_state = template->initial_state;
-  sm->owner        = owner;
-  sm->template     = template;
-  sm->data         = NULL;
+  sm->owner         = owner;
+  sm->template      = template;
+  sm->data          = NULL;
 
   /* Allocate hook lists for each phase */
   for (int i = 0; i < SM_HOOK_MAX; i++) {
@@ -155,7 +155,7 @@ sm_can_transition(StateMachine* sm, uint32_t target_state)
     return false;
 
   SMTransition* t = sm_template_find_transition(
-    sm->template, sm->current_state, target_state);
+      sm->template, sm->current_state, target_state);
 
   return t != NULL;
 }
@@ -168,8 +168,8 @@ sm_get_available_transitions(StateMachine* sm, uint32_t* count)
   if (sm == NULL || sm->template == NULL || sm->template->transitions == NULL)
     return NULL;
 
-  uint32_t max_transitions = sm->template->num_transitions;
-  uint32_t* states = malloc(sizeof(uint32_t) * max_transitions);
+  uint32_t  max_transitions = sm->template->num_transitions;
+  uint32_t* states          = malloc(sizeof(uint32_t) * max_transitions);
   if (states == NULL)
     return NULL;
 
@@ -196,7 +196,7 @@ sm_raw_write(StateMachine* sm, uint32_t new_state)
   /* Emit transition event if available */
   if (sm->template != NULL && sm->template->transitions != NULL) {
     SMTransition* t = sm_template_find_transition(
-      sm->template, sm->current_state, new_state);
+        sm->template, sm->current_state, new_state);
     if (t != NULL && t->emit_event != 0) {
       /* Event emission would go through hub_emit() in full implementation */
       LOG_DEBUG("sm_raw_write: emitted event %u", t->emit_event);
@@ -212,7 +212,7 @@ sm_transition(StateMachine* sm, uint32_t target_state)
 
   /* Find transition from current state to target state */
   SMTransition* t = sm_template_find_transition(
-    sm->template, sm->current_state, target_state);
+      sm->template, sm->current_state, target_state);
 
   if (t == NULL) {
     LOG_DEBUG("sm_transition: no valid transition %s: %u -> %u",
@@ -242,7 +242,7 @@ sm_transition(StateMachine* sm, uint32_t target_state)
 
   /* Update state */
   uint32_t old_state = sm->current_state;
-  sm->current_state = target_state;
+  sm->current_state  = target_state;
 
   /* Run post-action hooks */
   sm_hook_list_run(sm->hooks[SM_HOOK_POST_ACTION], sm);

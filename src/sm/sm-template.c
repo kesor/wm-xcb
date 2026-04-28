@@ -1,19 +1,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sm-template.h"
 #include "sm-instance.h"
+#include "sm-template.h"
 #include "wm-log.h"
 
 SMTemplate*
 sm_template_create(
-  const char*    name,
-  uint32_t*      states,
-  uint32_t       num_states,
-  SMTransition*  transitions,
-  uint32_t       num_transitions,
-  uint32_t       initial_state
-) {
+    const char*   name,
+    uint32_t*     states,
+    uint32_t      num_states,
+    SMTransition* transitions,
+    uint32_t      num_transitions,
+    uint32_t      initial_state)
+{
   SMTemplate* tmpl = malloc(sizeof(SMTemplate));
   if (tmpl == NULL) {
     LOG_ERROR("Failed to allocate SMTemplate");
@@ -47,10 +47,10 @@ sm_template_destroy(SMTemplate* tmpl)
 
 SMTransition*
 sm_template_find_transition(
-  SMTemplate* tmpl,
-  uint32_t    from_state,
-  uint32_t    to_state
-) {
+    SMTemplate* tmpl,
+    uint32_t    from_state,
+    uint32_t    to_state)
+{
   if (tmpl == NULL || tmpl->transitions == NULL)
     return NULL;
 

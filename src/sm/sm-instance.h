@@ -14,7 +14,7 @@
 /* Forward declarations (defined in sm-template.h) */
 typedef struct SMTemplate   SMTemplate;
 typedef struct StateMachine StateMachine;
-typedef struct SMHookList    SMHookList;
+typedef struct SMHookList   SMHookList;
 
 /*
  * Hook phases for state machine events
@@ -39,12 +39,12 @@ typedef void (*SMHookFn)(StateMachine*, void*);
  * Instance of a state machine template.
  */
 struct StateMachine {
-  const char*    name;          /* instance name (from template) */
-  uint32_t       current_state; /* current state value */
-  void*          owner;         /* owner target (client, monitor, etc.) */
-  SMTemplate*    template;     /* reference to the template */
-  void*          data;          /* instance-specific data */
-  SMHookList*    hooks[SM_HOOK_MAX]; /* hook lists for each phase */
+  const char* name;               /* instance name (from template) */
+  uint32_t    current_state;      /* current state value */
+  void*       owner;              /* owner target (client, monitor, etc.) */
+  SMTemplate* template;           /* reference to the template */
+  void*       data;               /* instance-specific data */
+  SMHookList* hooks[SM_HOOK_MAX]; /* hook lists for each phase */
 };
 
 /*
@@ -97,20 +97,18 @@ uint32_t* sm_get_available_transitions(StateMachine* sm, uint32_t* count);
  * Add a hook to be called at a specific phase.
  */
 void sm_add_hook(
-  StateMachine* sm,
-  SMHookPhase   phase,
-  SMHookFn      fn,
-  void*         userdata
-);
+    StateMachine* sm,
+    SMHookPhase   phase,
+    SMHookFn      fn,
+    void*         userdata);
 
 /*
  * Remove a hook from a specific phase.
  */
 void sm_remove_hook(
-  StateMachine* sm,
-  SMHookPhase   phase,
-  SMHookFn      fn
-);
+    StateMachine* sm,
+    SMHookPhase   phase,
+    SMHookFn      fn);
 
 /*
  * Get the template associated with a state machine.

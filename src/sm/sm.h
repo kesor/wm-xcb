@@ -12,7 +12,7 @@
  * Instances track current state and belong to an owner target.
  */
 
-#include "sm-template.h"
 #include "sm-instance.h"
+#include "sm-template.h"
 
 #endif /* _SM_H_ */
