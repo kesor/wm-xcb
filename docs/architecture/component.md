@@ -58,43 +58,90 @@ struct Component {
 
 ## XCB Handler Registration
 
-Components register their own XCB event handlers. Raw X events go directly to components, NOT through the hub.
+Components register their own XCB event handlers. Raw X events go directly to components, NOT through the hub. The XCB handler infrastructure (`src/xcb/xcb-handler.c/h`) provides the registration and dispatch mechanism.
+
+### Handler Registration API
 
 ```c
-struct Component {
-    // ... existing fields ...
-    
-    // XCB handler registration
-    void (*on_xcb_event)(xcb_generic_event_t* event);
-    xcb_event_mask_t xcb_event_types[];
-};
+// Register a handler for an XCB event type
+int xcb_handler_register(XCBEventType event_type, HubComponent* component, void (*handler)(void*));
+
+// Lookup handlers for an event type
+XCBHandler* xcb_handler_lookup(XCBEventType event_type);
+
+// Get next handler in chain (for iterating multiple handlers)
+XCBHandler* xcb_handler_next(XCBHandler* handler);
+
+// Dispatch an event to all registered handlers
+void xcb_handler_dispatch(void* event);
+
+// Unregister all handlers for a component
+void xcb_handler_unregister_component(HubComponent* component);
 ```
 
-**Handler registration at init:**
+### Handler Registration at Init
+
 ```c
 void keybinding_on_init(void) {
-    xcb_handler_register(KEY_PRESS, keybinding_handler);
-    xcb_handler_register(KEY_RELEASE, keybinding_handler);
+    xcb_handler_register(XCB_KEY_PRESS, &keybinding_component, keybinding_handler);
+    xcb_handler_register(XCB_KEY_RELEASE, &keybinding_component, keybinding_handler);
 }
 
-void keybinding_handler(xcb_generic_event_t* event) {
+void keybinding_handler(void* event) {
+    xcb_key_press_event_t* e = (xcb_key_press_event_t*)event;
     // Look up keybinding, send request to hub
+    hub_send_request(REQ_CLIENT_FOCUS, TARGET_CURRENT_CLIENT);
 }
 ```
 
-**XCB infrastructure dispatches directly:**
+### XCB Infrastructure Dispatches Directly
+
+The event loop in `wm-xcb.c` routes events to registered handlers:
+
 ```c
 void handle_xcb_events() {
     xcb_generic_event_t* event = xcb_poll_for_event(dpy);
     if (!event) return;
     
-    Component* comp = xcb_handler_lookup(event->response_type);
-    if (comp && comp->on_xcb_event) {
-        comp->on_xcb_event(event);
+    /* Handle errors (response_type = 0) */
+    if (event->response_type == 0) {
+        error_details((xcb_generic_error_t*)event);
+        free(event);
+        return;
     }
+    
+    /* Dispatch to registered handlers */
+    xcb_handler_dispatch(event);
+    
+    /* Handle state events (e.g., running flag changes) */
+    handle_state_event(event);
+    
     free(event);
 }
 ```
+
+### Event Type Mapping
+
+| XCB Event | Handler Function |
+|-----------|------------------|
+| XCB_KEY_PRESS | keybinding_handler |
+| XCB_KEY_RELEASE | keybinding_handler |
+| XCB_BUTTON_PRESS | pointer_handler |
+| XCB_BUTTON_RELEASE | pointer_handler |
+| XCB_MOTION_NOTIFY | pointer_handler |
+| XCB_ENTER_NOTIFY | focus_handler |
+| XCB_FOCUS_IN | focus_handler |
+| XCB_PROPERTY_NOTIFY | fullscreen_handler, urgency_handler |
+| XCB_CREATE_NOTIFY | client_list_handler |
+| XCB_DESTROY_NOTIFY | client_list_handler |
+| XCB_MAP_REQUEST | client_list_handler |
+| XCB_EXPOSE | bar_handler |
+
+### XCB Handler Infrastructure Files
+
+- `src/xcb/xcb-handler.c` — handler registration and dispatch implementation
+- `src/xcb/xcb-handler.h` — public API and event type constants
+- `wm-xcb.c` — event loop integration (calls `xcb_handler_init()`, `xcb_handler_shutdown()`, `xcb_handler_dispatch()`)
 
 ## Lifecycle
 

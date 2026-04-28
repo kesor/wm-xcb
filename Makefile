@@ -30,7 +30,8 @@ SRC = \
 	$(NAME)-xcb-events.c \
 	$(NAME)-states.c \
 	$(NAME)-xcb.c \
-	$(NAME).c
+	$(NAME).c \
+	src/xcb/xcb-handler.c
 
 SRC += \
 	$(NAME)-hub.c

@@ -2,6 +2,7 @@
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
 
+#include "src/xcb/xcb-handler.h"
 #include "wm-log.h"
 #include "wm-running.h"
 #include "wm-states.h"
@@ -98,6 +99,9 @@ setup_xcb()
 {
   static uint32_t values[3];
 
+  /* Initialize XCB handler registry before setting up events */
+  xcb_handler_init();
+
   connect_to_x_display(&dpy);
   get_root_window(dpy, &root);
 
@@ -130,6 +134,9 @@ setup_xcb()
 void
 destruct_xcb()
 {
+  /* Shutdown XCB handler registry */
+  xcb_handler_shutdown();
+
   destruct_window_list();
   xcb_disconnect(dpy);
 }
@@ -196,218 +203,21 @@ wm_manage_all_clients()
 void
 handle_xcb_events()
 {
-  // -- non-blocking event waiting
-  xcb_ge_generic_event_t* generic_event;
-
   xcb_generic_event_t* event = xcb_poll_for_event(dpy);
   if (event == NULL)
     return;
 
-  // -- blocking way for waiting for events
-  // LOG_DEBUG("waiting for xcb events, running is: %d", running);
-  // xcb_generic_event_t* event = xcb_wait_for_event(dpy);
-  // LOG_DEBUG("received an event! %d", (int)event->response_type);
-  // if (event == NULL)
-  // 	LOG_FATAL("error waiting for event");
-
-  switch (event->response_type) {
-  case 0:
+  /* Handle errors (response_type = 0) */
+  if (event->response_type == 0) {
     error_details((xcb_generic_error_t*) event);
-    break;
-
-  case XCB_KEY_PRESS:
-    handle_key_press_release((xcb_key_press_event_t*) event);
-    break;
-  case XCB_KEY_RELEASE:
-    handle_key_press_release((xcb_key_release_event_t*) event);
-    break;
-  case XCB_BUTTON_PRESS:
-    handle_button_press_release((xcb_button_press_event_t*) event);
-    break;
-  case XCB_BUTTON_RELEASE:
-    handle_button_press_release((xcb_button_release_event_t*) event);
-    break;
-  case XCB_MOTION_NOTIFY:
-    handle_motion_notify((xcb_motion_notify_event_t*) event);
-    break;
-  case XCB_ENTER_NOTIFY:
-    handle_enter_notify((xcb_enter_notify_event_t*) event);
-    break;
-  case XCB_LEAVE_NOTIFY:
-    handle_leave_notify((xcb_leave_notify_event_t*) event);
-    break;
-  case XCB_FOCUS_IN:
-    LOG_DEBUG("event: focus in");
-    break;
-  case XCB_FOCUS_OUT:
-    LOG_DEBUG("event: focus out");
-    break;
-  case XCB_KEYMAP_NOTIFY:
-    handle_keymap_notify((xcb_keymap_notify_event_t*) event);
-    break;
-  case XCB_EXPOSE:
-    handle_expose((xcb_expose_event_t*) event);
-    break;
-  case XCB_GRAPHICS_EXPOSURE:
-    LOG_DEBUG("event: graphics exposure");
-    break;
-  case XCB_NO_EXPOSURE:
-    LOG_DEBUG("event: no exposure");
-    break;
-  case XCB_VISIBILITY_NOTIFY:
-    LOG_DEBUG("event: visibility notify");
-    break;
-  case XCB_CREATE_NOTIFY:
-    handle_create_notify((xcb_create_notify_event_t*) event);
-    break;
-  case XCB_DESTROY_NOTIFY:
-    handle_destroy_notify((xcb_destroy_notify_event_t*) event);
-    break;
-  case XCB_UNMAP_NOTIFY:
-    handle_unmap_notify((xcb_unmap_notify_event_t*) event);
-    break;
-  case XCB_MAP_NOTIFY:
-    handle_map_notify((xcb_map_notify_event_t*) event);
-    break;
-  case XCB_MAP_REQUEST:
-    handle_map_request((xcb_map_request_event_t*) event);
-    break;
-  case XCB_REPARENT_NOTIFY:
-    handle_reparent_notify((xcb_reparent_notify_event_t*) event);
-    break;
-  case XCB_CONFIGURE_NOTIFY:
-    LOG_DEBUG("event: configure notify");
-    break;
-  case XCB_CONFIGURE_REQUEST:
-    LOG_DEBUG("event: configure request");
-    break;
-  case XCB_GRAVITY_NOTIFY:
-    LOG_DEBUG("event: gravity notify");
-    break;
-  case XCB_RESIZE_REQUEST:
-    LOG_DEBUG("event: resize request");
-    break;
-  case XCB_CIRCULATE_NOTIFY:
-    LOG_DEBUG("event: circulate notify");
-    break;
-  case XCB_CIRCULATE_REQUEST:
-    LOG_DEBUG("event: circulate request");
-    break;
-  case XCB_PROPERTY_NOTIFY:
-    handle_property_notify((xcb_property_notify_event_t*) event);
-    break;
-  case XCB_SELECTION_CLEAR:
-    LOG_DEBUG("event: selection clear");
-    break;
-  case XCB_SELECTION_REQUEST:
-    LOG_DEBUG("event: selection request");
-    break;
-  case XCB_SELECTION_NOTIFY:
-    LOG_DEBUG("event: selection notify");
-    break;
-  case XCB_COLORMAP_NOTIFY:
-    LOG_DEBUG("event: colormap notify");
-    break;
-  case XCB_CLIENT_MESSAGE:
-    LOG_DEBUG("event: client message");
-    break;
-  case XCB_MAPPING_NOTIFY:
-    LOG_DEBUG("event: mapping notify");
-    break;
-  case XCB_GE_GENERIC:
-    generic_event = (xcb_ge_generic_event_t*) event;
-    handle_ge_generic(generic_event);
-    switch (generic_event->event_type) {
-    case XCB_INPUT_DEVICE_CHANGED:
-      LOG_DEBUG("event: xi device changed");
-      break;
-    case XCB_INPUT_KEY_PRESS:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_KEY_RELEASE:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_BUTTON_PRESS:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_BUTTON_RELEASE:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_MOTION:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_ENTER:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_LEAVE:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_FOCUS_IN:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_FOCUS_OUT:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_HIERARCHY:
-      LOG_DEBUG("event: hierarchy");
-      break;
-    case XCB_INPUT_PROPERTY:
-      LOG_DEBUG("event: property");
-      break;
-    case XCB_INPUT_RAW_KEY_PRESS:
-      handle_xinput_raw_event(generic_event);
-      break;
-    case XCB_INPUT_RAW_KEY_RELEASE:
-      handle_xinput_raw_event(generic_event);
-      break;
-    case XCB_INPUT_RAW_BUTTON_PRESS:
-      handle_xinput_raw_event(generic_event);
-      break;
-    case XCB_INPUT_RAW_BUTTON_RELEASE:
-      handle_xinput_raw_event(generic_event);
-      break;
-    case XCB_INPUT_RAW_MOTION:
-      handle_xinput_raw_event(generic_event);
-      break;
-    case XCB_INPUT_TOUCH_BEGIN:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_TOUCH_UPDATE:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_TOUCH_END:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_TOUCH_OWNERSHIP:
-      handle_xinput_event(generic_event);
-      break;
-    case XCB_INPUT_RAW_TOUCH_BEGIN:
-      handle_xinput_raw_event(generic_event);
-      break;
-    case XCB_INPUT_RAW_TOUCH_UPDATE:
-      handle_xinput_raw_event(generic_event);
-      break;
-    case XCB_INPUT_RAW_TOUCH_END:
-      handle_xinput_raw_event(generic_event);
-      break;
-    case XCB_INPUT_BARRIER_HIT:
-      LOG_DEBUG("event: barrier hit");
-      break;
-    case XCB_INPUT_BARRIER_LEAVE:
-      LOG_DEBUG("event: barrier leave");
-      break;
-    case XCB_INPUT_SEND_EXTENSION_EVENT:
-      LOG_DEBUG("event: send extension event");
-      break;
-    }
-    break;
-  case XCB_REQUEST:
-    LOG_DEBUG("event: xcb request");
-    break;
-  default:
-    printf("Event: XCB Unknown Event\n");
+    free(event);
+    return;
   }
 
+  /* Dispatch to registered handlers */
+  xcb_handler_dispatch(event);
+
+  /* Handle state events (e.g., running flag changes) */
   handle_state_event(event);
 
   free(event);
