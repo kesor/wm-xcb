@@ -3,12 +3,29 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Log stubs - replace with actual wm-log.h in production */
-#ifndef LOG_DEBUG
-#define LOG_DEBUG(pFormat, ...) ((void)0)
+/*
+ * Include wm-hub.h for HubComponent definition when available.
+ * Also include wm-log.h for logging when available.
+ * Falls back to stubs for standalone builds.
+ */
+#ifndef _WM_HUB_H_
+/* Forward declaration for standalone builds */
+typedef struct HubComponent HubComponent;
+struct HubComponent {
+  const char*    name;
+  void*          requests;
+  void*          targets;
+  bool           registered;
+};
+#else
+#include "wm-hub.h"
 #endif
-#ifndef LOG_ERROR
-#define LOG_ERROR(pFormat, ...) ((void)0)
+
+#ifndef _WM_LOG_H_
+#define LOG_DEBUG(pFormat, ...) ((void) 0)
+#define LOG_ERROR(pFormat, ...) ((void) 0)
+#else
+#include "wm-log.h"
 #endif
 
 /*
@@ -19,7 +36,7 @@
 
 /* Handler storage */
 typedef struct handler_entry {
-  XCBHandler         handler;
+  XCBHandler            handler;
   struct handler_entry* next;
 } handler_entry_t;
 
@@ -77,7 +94,7 @@ xcb_handler_register(XCBEventType event_type, HubComponent* component, void (*ha
     return -1;
   }
 
-  if ((unsigned int)event_type >= MAX_EVENT_TYPES) {
+  if ((unsigned int) event_type >= MAX_EVENT_TYPES) {
     LOG_ERROR("Event type %u exceeds maximum (%d)", event_type, MAX_EVENT_TYPES - 1);
     return -1;
   }
@@ -104,15 +121,15 @@ xcb_handler_register(XCBEventType event_type, HubComponent* component, void (*ha
       curr = curr->next;
     }
     curr->next = entry;
-    /* Update handler->next to enable xcb_handler_next() iteration */
+    /* Also link handler chain for xcb_handler_next() iteration */
     curr->handler.next = &entry->handler;
   }
 
   handler_counts[event_type]++;
   total_handlers++;
 
-  LOG_DEBUG("Registered handler for event type %u (component: %s)",
-            event_type, component->name);
+  LOG_DEBUG("Registered handler for event type %u (component: %p)",
+            event_type, (void*) component);
 
   return 0;
 }
@@ -123,7 +140,7 @@ xcb_handler_register(XCBEventType event_type, HubComponent* component, void (*ha
 XCBHandler*
 xcb_handler_lookup(XCBEventType event_type)
 {
-  if ((unsigned int)event_type >= MAX_EVENT_TYPES) {
+  if ((unsigned int) event_type >= MAX_EVENT_TYPES) {
     return NULL;
   }
 
@@ -157,8 +174,13 @@ xcb_handler_dispatch(void* event)
     return;
   }
 
-  /* Extract response_type from event - events start with response_type uint8_t */
-  XCBEventType event_type = ((uint8_t*)event)[0];
+  /*
+   * Extract response_type from event and mask off the XCB synthetic-event flag.
+   * The high bit (0x80) of response_type is set for synthetic events generated
+   * by the X server (e.g., via SendEvent). Masking ensures handlers are
+   * dispatched correctly for both real and synthetic events.
+   */
+  XCBEventType event_type = ((uint8_t*) event)[0] & (uint8_t) ~0x80;
 
   /* Look up first handler for this event type */
   XCBHandler* handler = xcb_handler_lookup(event_type);
@@ -171,8 +193,8 @@ xcb_handler_dispatch(void* event)
   int call_count = 0;
   while (handler != NULL) {
     if (handler->handler != NULL) {
-      LOG_DEBUG("Dispatching event type %u to handler (component: %s)",
-                event_type, handler->component ? handler->component->name : "unknown");
+      LOG_DEBUG("Dispatching event type %u to handler (component: %p)",
+                event_type, (void*) handler->component);
       handler->handler(event);
       call_count++;
     }
@@ -205,7 +227,7 @@ xcb_handler_unregister_component(HubComponent* component)
         handler_entry_t* next = curr->next;
         *prev                 = next;
         free(curr);
-        curr            = next;
+        curr = next;
         handler_counts[i]--;
         total_handlers--;
         removed++;
@@ -215,10 +237,20 @@ xcb_handler_unregister_component(HubComponent* component)
         curr = curr->next;
       }
     }
+
+    /* Rebuild handler chain for remaining entries */
+    handler_entry_t* chain_curr = handlers[i];
+    while (chain_curr != NULL && chain_curr->next != NULL) {
+      chain_curr->handler.next = &chain_curr->next->handler;
+      chain_curr = chain_curr->next;
+    }
+    if (chain_curr != NULL) {
+      chain_curr->handler.next = NULL;
+    }
   }
 
   if (removed > 0) {
-    LOG_DEBUG("Unregistered %d handler(s) for component: %s", removed, component->name);
+    LOG_DEBUG("Unregistered %d handler(s) for component: %p", removed, (void*) component);
   }
 }
 
@@ -237,7 +269,7 @@ xcb_handler_count(void)
 uint32_t
 xcb_handler_count_for_type(XCBEventType event_type)
 {
-  if ((unsigned int)event_type >= MAX_EVENT_TYPES) {
+  if ((unsigned int) event_type >= MAX_EVENT_TYPES) {
     return 0;
   }
 

@@ -3,47 +3,47 @@
  * Can be compiled and run without XCB libraries installed
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* Minimal stub for wm-log.h */
-#define LOG_DEBUG(pFormat, ...) ((void)0)
-#define LOG_ERROR(pFormat, ...) ((void)0)
-#define LOG_CLEAN(pFormat, ...) ((void)fprintf(stdout, pFormat "\n", ##__VA_ARGS__))
+#define LOG_DEBUG(pFormat, ...) ((void) 0)
+#define LOG_ERROR(pFormat, ...) ((void) 0)
+#define LOG_CLEAN(pFormat, ...) ((void) fprintf(stdout, pFormat "\n", ##__VA_ARGS__))
 
 /* Minimal stub for wm-hub.h component type */
 typedef struct HubComponent HubComponent;
 struct HubComponent {
-  const char*    name;
-  void*          requests;
-  void*          targets;
-  bool           registered;
+  const char* name;
+  void*       requests;
+  void*       targets;
+  bool        registered;
 };
 
 /* Include xcb-handler */
 #include "src/xcb/xcb-handler.h"
 
 /* Test helper to track handler calls */
-static int   handler_call_count   = 0;
-static int   last_event_type     = -1;
-static void* last_handler_data   = NULL;
+static int   handler_call_count = 0;
+static int   last_event_type    = -1;
+static void* last_handler_data  = NULL;
 
 /* Mock component for testing */
 static HubComponent mock_component = {
-  .name      = "test-component",
-  .requests  = NULL,
-  .targets   = NULL,
+  .name       = "test-component",
+  .requests   = NULL,
+  .targets    = NULL,
   .registered = true,
 };
 
 /* Another mock component for multiple handler test */
 static HubComponent mock_component2 = {
-  .name      = "test-component-2",
-  .requests  = NULL,
-  .targets   = NULL,
+  .name       = "test-component-2",
+  .requests   = NULL,
+  .targets    = NULL,
   .registered = true,
 };
 
@@ -52,14 +52,14 @@ static void
 test_handler_keypress(void* event)
 {
   handler_call_count++;
-  last_event_type = ((uint8_t*)event)[0];
+  last_event_type = ((uint8_t*) event)[0];
 }
 
 static void
 test_handler_button(void* event)
 {
   handler_call_count++;
-  last_event_type = ((uint8_t*)event)[0];
+  last_event_type = ((uint8_t*) event)[0];
 }
 
 static void
@@ -199,13 +199,13 @@ test_dispatch_calls_handler(void)
   xcb_handler_init();
 
   handler_call_count = 0;
-  last_event_type     = -1;
+  last_event_type    = -1;
 
   xcb_handler_register(XCB_KEY_PRESS, &mock_component, test_handler_keypress);
 
   /* Create a fake event */
-  uint8_t fake_event[32] = {0};
-  fake_event[0] = XCB_KEY_PRESS;
+  uint8_t fake_event[32] = { 0 };
+  fake_event[0]          = XCB_KEY_PRESS;
 
   xcb_handler_dispatch(fake_event);
 
@@ -227,8 +227,8 @@ test_dispatch_calls_all_handlers(void)
   xcb_handler_register(XCB_KEY_PRESS, &mock_component, test_handler_keypress);
   xcb_handler_register(XCB_KEY_PRESS, &mock_component2, test_handler_keypress);
 
-  uint8_t fake_event[32] = {0};
-  fake_event[0] = XCB_KEY_PRESS;
+  uint8_t fake_event[32] = { 0 };
+  fake_event[0]          = XCB_KEY_PRESS;
 
   xcb_handler_dispatch(fake_event);
 
@@ -246,8 +246,8 @@ test_dispatch_no_handler(void)
 
   handler_call_count = 0;
 
-  uint8_t fake_event[32] = {0};
-  fake_event[0] = XCB_BUTTON_PRESS;
+  uint8_t fake_event[32] = { 0 };
+  fake_event[0]          = XCB_BUTTON_PRESS;
 
   xcb_handler_dispatch(fake_event);
 
@@ -351,8 +351,8 @@ test_handler_receives_event_data(void)
 
   xcb_handler_register(XCB_KEY_PRESS, &mock_component, test_handler_data);
 
-  uint8_t fake_event[32] = {0};
-  fake_event[0] = XCB_KEY_PRESS;
+  uint8_t fake_event[32] = { 0 };
+  fake_event[0]          = XCB_KEY_PRESS;
 
   xcb_handler_dispatch(fake_event);
 
