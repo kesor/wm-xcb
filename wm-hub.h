@@ -24,6 +24,9 @@ enum {
 	TARGET_TYPE_COUNT,
 };
 
+/* Explicit sentinel for NULL-terminated target arrays (avoids collision with 0) */
+#define TARGET_TYPE_NONE ((TargetType) UINT32_MAX)
+
 /* Invalid ID sentinel */
 #define TARGET_ID_NONE ((TargetID)0)
 
@@ -31,7 +34,7 @@ enum {
 struct HubComponent {
 	const char*    name;
 	RequestType*   requests;   /* NULL-terminated array of request types handled */
-	TargetType*    targets;    /* NULL-terminated array of target types accepted */
+	TargetType*    targets;    /* TARGET_TYPE_NONE-terminated array of accepted types */
 	bool           registered;
 };
 

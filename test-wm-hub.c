@@ -1,10 +1,10 @@
 #include "test-wm.h"
 #include "wm-hub.h"
 
-/* Test component definitions */
+/* Test component definitions - use TARGET_TYPE_NONE for proper termination */
 static RequestType fullscreen_requests[] = { 1, 2, 0 };   /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */
-static TargetType  client_targets[] = { TARGET_TYPE_CLIENT, 0 };
-static TargetType  monitor_targets[] = { TARGET_TYPE_MONITOR, 0 };
+static TargetType  client_targets[] = { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE };
+static TargetType  monitor_targets[] = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
 
 static HubComponent test_fullscreen = {
   .name       = "fullscreen",
@@ -13,9 +13,11 @@ static HubComponent test_fullscreen = {
   .registered = false,
 };
 
+/* test_focus handles request type 1 AND 3 (for override/fallback testing) */
+static RequestType focus_requests[] = { 1, 3, 0 };   /* REQ_CLIENT_FOCUS = 3, also handles 1 */
 static HubComponent test_focus = {
   .name       = "focus",
-  .requests   = (RequestType[]){ 3, 0 },  /* REQ_CLIENT_FOCUS = 3 */
+  .requests   = focus_requests,
   .targets    = client_targets,
   .registered = false,
 };
@@ -153,22 +155,19 @@ test_get_component_by_request_type(void)
   hub_register_component(&test_fullscreen);
   hub_register_component(&test_focus);
 
-  /* Request type 1 should map to fullscreen component */
+  /* Request type 1: fullscreen handles it, but focus was registered last
+   * and also handles it, so focus wins (last registered wins) */
   HubComponent* found = hub_get_component_by_request_type(1);
-  assert(found == &test_fullscreen);
+  assert(found == &test_focus);
 
-  /* Request type 3 should map to focus component */
+  /* Request type 3: only focus handles it */
   found = hub_get_component_by_request_type(3);
   assert(found == &test_focus);
 
-  /* Unregister fullscreen - request type 1 should now have no handler */
-  hub_unregister_component("fullscreen");
+  /* Unregister focus - request type 1 should now fall back to fullscreen */
+  hub_unregister_component("focus");
   found = hub_get_component_by_request_type(1);
-  assert(found == NULL);   /* focus only handles type 3, not type 1 */
-
-  /* Focus component still handles type 3 */
-  found = hub_get_component_by_request_type(3);
-  assert(found == &test_focus);
+  assert(found == &test_fullscreen);   /* fullscreen now handles type 1 */
 
   /* Unused request type */
   found = hub_get_component_by_request_type(999);
@@ -386,6 +385,111 @@ test_idempotent_shutdown(void)
   assert(hub_target_count() == 0);
 }
 
+void
+test_shutdown_clears_indexes(void)
+{
+  LOG_CLEAN("== Testing shutdown clears lookup indexes");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+  hub_register_target(&test_client1);
+
+  /* Verify lookups work */
+  assert(hub_get_component_by_name("fullscreen") != NULL);
+  assert(hub_get_component_by_request_type(1) != NULL);
+  assert(hub_get_target_by_id(100) != NULL);
+
+  hub_shutdown();
+
+  /* After shutdown, lookups should return NULL */
+  assert(hub_get_component_by_name("fullscreen") == NULL);
+  assert(hub_get_component_by_request_type(1) == NULL);
+  assert(hub_get_target_by_id(100) == NULL);
+
+  /* Re-init should work correctly */
+  hub_init();
+  assert(hub_component_count() == 0);
+  assert(hub_target_count() == 0);
+
+  hub_shutdown();
+}
+
+void
+test_duplicate_target_id_rejected(void)
+{
+  LOG_CLEAN("== Testing duplicate target ID is rejected");
+  hub_init();
+
+  hub_register_target(&test_client1);
+  assert(hub_target_count() == 1);
+  assert(hub_get_target_by_id(100) == &test_client1);
+
+  /* Try to register another target with the same ID - should fail */
+  HubTarget duplicate_target = {
+    .id         = 100,
+    .type       = TARGET_TYPE_MONITOR,
+    .registered = false,
+  };
+  hub_register_target(&duplicate_target);
+  assert(hub_target_count() == 1);  /* Should not increase */
+  assert(hub_get_target_by_id(100) == &test_client1);  /* Should still be client1 */
+
+  hub_shutdown();
+}
+
+void
+test_large_target_id_lookup(void)
+{
+  LOG_CLEAN("== Testing large TargetID values (beyond array bounds)");
+  hub_init();
+
+  /* Use a target ID larger than MAX_TARGETS (256) */
+  HubTarget large_id_target = {
+    .id         = 1000,
+    .type       = TARGET_TYPE_CLIENT,
+    .registered = false,
+  };
+
+  hub_register_target(&large_id_target);
+  assert(hub_target_count() == 1);
+
+  /* Should still be lookupable even though id > MAX_TARGETS */
+  HubTarget* found = hub_get_target_by_id(1000);
+  assert(found == &large_id_target);
+
+  hub_unregister_target(1000);
+  assert(hub_target_count() == 0);
+
+  /* After unregister, lookup should return NULL */
+  found = hub_get_target_by_id(1000);
+  assert(found == NULL);
+
+  hub_shutdown();
+}
+
+void
+test_target_type_null_termination(void)
+{
+  LOG_CLEAN("== Testing target type arrays have proper NULL termination");
+  hub_init();
+
+  hub_register_target(&test_client1);
+  hub_register_target(&test_client2);
+
+  HubTarget** clients = hub_get_targets_by_type(TARGET_TYPE_CLIENT);
+
+  /* Verify proper iteration with NULL terminator */
+  int count = 0;
+  for (int i = 0; clients[i] != NULL; i++) {
+    count++;
+    /* Should not exceed our registered count */
+    assert(i < 10);  /* Safety limit */
+  }
+  assert(count == 2);
+
+  hub_shutdown();
+}
+
 int
 main(void)
 {
@@ -406,6 +510,10 @@ main(void)
   test_double_registration();
   test_double_unregistration();
   test_idempotent_shutdown();
+  test_shutdown_clears_indexes();
+  test_duplicate_target_id_rejected();
+  test_large_target_id_lookup();
+  test_target_type_null_termination();
 
   LOG_CLEAN("== All hub tests passed!");
   return 0;

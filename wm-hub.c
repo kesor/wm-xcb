@@ -13,7 +13,6 @@ static HubComponent* components[MAX_COMPONENTS];
 static uint32_t      component_count = 0;
 
 /* Component lookup by name */
-#define MAX_NAME_LEN 64
 typedef struct {
   const char*    name;
   HubComponent* comp;
@@ -29,8 +28,23 @@ static HubComponent* component_by_request_type[MAX_REQUEST_TYPES];
 static HubTarget* targets[MAX_TARGETS];
 static uint32_t   target_count = 0;
 
-/* Target lookup by ID */
-static HubTarget* target_by_id[MAX_TARGETS];
+/* Target lookup by ID - use hash map for TargetID (uint64_t) beyond MAX_TARGETS */
+#define TARGET_ID_MAP_SIZE 512
+
+typedef struct target_id_entry {
+  TargetID        id;
+  HubTarget*      target;
+  struct target_id_entry* next;
+} target_id_entry_t;
+
+static target_id_entry_t* target_by_id_map[TARGET_ID_MAP_SIZE];
+
+static uint32_t
+target_id_hash(TargetID id)
+{
+  /* Simple hash function for TargetID */
+  return (uint32_t)((id ^ (id >> 16)) % TARGET_ID_MAP_SIZE);
+}
 
 /* Targets grouped by type (array of arrays) */
 static HubTarget* targets_by_type[TARGET_TYPE_COUNT][MAX_TARGETS];
@@ -38,24 +52,38 @@ static uint32_t   targets_by_type_count[TARGET_TYPE_COUNT];
 
 /* Forward declarations */
 static void component_add_to_request_type_index(HubComponent* comp);
+static void target_by_id_map_insert(HubTarget* target);
+static void target_by_id_map_remove(TargetID id);
+static HubTarget* target_by_id_map_lookup(TargetID id);
+
+/*
+ * Clear all registry state.
+ * Called on both init and shutdown for consistent cleanup.
+ */
+static void
+clear_registry_state(void)
+{
+  /* Clear component arrays */
+  memset(components, 0, sizeof(components));
+  memset(component_by_name, 0, sizeof(component_by_name));
+  memset(component_by_request_type, 0, sizeof(component_by_request_type));
+
+  /* Clear target arrays */
+  memset(targets, 0, sizeof(targets));
+  memset(target_by_id_map, 0, sizeof(target_by_id_map));
+  memset(targets_by_type, 0, sizeof(targets_by_type));
+  memset(targets_by_type_count, 0, sizeof(targets_by_type_count));
+
+  component_count = 0;
+  name_entry_count = 0;
+  target_count = 0;
+}
 
 void
 hub_init(void)
 {
   LOG_DEBUG("Initializing hub registry");
-
-  component_count        = 0;
-  name_entry_count       = 0;
-  target_count           = 0;
-
-  /* Clear all arrays */
-  memset(components, 0, sizeof(components));
-  memset(component_by_name, 0, sizeof(component_by_name));
-  memset(component_by_request_type, 0, sizeof(component_by_request_type));
-  memset(targets, 0, sizeof(targets));
-  memset(target_by_id, 0, sizeof(target_by_id));
-  memset(targets_by_type, 0, sizeof(targets_by_type));
-  memset(targets_by_type_count, 0, sizeof(targets_by_type_count));
+  clear_registry_state();
 }
 
 void
@@ -73,12 +101,10 @@ hub_shutdown(void)
   while (target_count > 0) {
     target_count--;
     targets[target_count]->registered = false;
-    target_by_id[targets[target_count]->id] = NULL;
   }
 
-  component_count = 0;
-  name_entry_count = 0;
-  target_count = 0;
+  /* Clear all registry state including indexes */
+  clear_registry_state();
 }
 
 void
@@ -136,13 +162,36 @@ hub_unregister_component(const char* name)
     return;
   }
 
-  /* Remove from request type index */
+  /* Remove from main component array FIRST */
+  for (uint32_t i = 0; i < component_count; i++) {
+    if (components[i] == comp) {
+      components[i] = components[component_count - 1];
+      component_count--;
+      break;
+    }
+  }
+
+  /* Recompute request type mappings - scan remaining components */
   if (comp->requests != NULL) {
     for (int i = 0; comp->requests[i] != 0; i++) {
       RequestType rt = comp->requests[i];
       if (rt < MAX_REQUEST_TYPES) {
+        /* Only recompute if this component was the handler */
         if (component_by_request_type[rt] == comp) {
           component_by_request_type[rt] = NULL;
+          /* Recompute from remaining registered components */
+          for (int32_t j = (int32_t)component_count - 1; j >= 0; j--) {
+            HubComponent* other = components[j];
+            if (other != NULL && other->requests != NULL) {
+              for (int k = 0; other->requests[k] != 0; k++) {
+                if (other->requests[k] == rt) {
+                  component_by_request_type[rt] = other;
+                  j = -1;  /* Signal found, break outer loop */
+                  break;
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -154,15 +203,6 @@ hub_unregister_component(const char* name)
       /* Swap with last and decrement */
       component_by_name[i] = component_by_name[name_entry_count - 1];
       name_entry_count--;
-      break;
-    }
-  }
-
-  /* Remove from main component array */
-  for (uint32_t i = 0; i < component_count; i++) {
-    if (components[i] == comp) {
-      components[i] = components[component_count - 1];
-      component_count--;
       break;
     }
   }
@@ -223,18 +263,26 @@ hub_register_target(HubTarget* target)
     return;
   }
 
+  /* Check for duplicate ID */
+  if (hub_get_target_by_id(target->id) != NULL) {
+    LOG_ERROR("Target with ID %lu already registered", (unsigned long)target->id);
+    return;
+  }
+
   /* Add to main target array */
   targets[target_count++] = target;
   target->registered = true;
 
-  /* Add to ID index */
-  if (target->id < MAX_TARGETS) {
-    target_by_id[target->id] = target;
-  }
+  /* Add to ID index (hash map for arbitrary TargetID values) */
+  target_by_id_map_insert(target);
 
-  /* Add to type index */
+  /* Add to type index with NULL terminator */
   if (targets_by_type_count[target->type] < MAX_TARGETS) {
     targets_by_type[target->type][targets_by_type_count[target->type]++] = target;
+    /* Ensure NULL terminator */
+    if (targets_by_type_count[target->type] < MAX_TARGETS) {
+      targets_by_type[target->type][targets_by_type_count[target->type]] = NULL;
+    }
   }
 
   LOG_DEBUG("Registered target: id=%lu, type=%u", (unsigned long)target->id, target->type);
@@ -260,14 +308,14 @@ hub_unregister_target(TargetID id)
       targets_by_type[target->type][i] =
         targets_by_type[target->type][targets_by_type_count[target->type] - 1];
       targets_by_type_count[target->type]--;
+      /* Clear vacated slot and ensure NULL terminator */
+      targets_by_type[target->type][targets_by_type_count[target->type]] = NULL;
       break;
     }
   }
 
   /* Remove from ID index */
-  if (id < MAX_TARGETS) {
-    target_by_id[id] = NULL;
-  }
+  target_by_id_map_remove(id);
 
   /* Remove from main target array */
   for (uint32_t i = 0; i < target_count; i++) {
@@ -288,10 +336,7 @@ hub_get_target_by_id(TargetID id)
   if (id == TARGET_ID_NONE)
     return NULL;
 
-  if (id >= MAX_TARGETS)
-    return NULL;
-
-  return target_by_id[id];
+  return target_by_id_map_lookup(id);
 }
 
 HubTarget**
@@ -299,6 +344,11 @@ hub_get_targets_by_type(TargetType type)
 {
   if (type >= TARGET_TYPE_COUNT)
     return NULL;
+
+  /* Ensure NULL terminator is set */
+  if (targets_by_type_count[type] < MAX_TARGETS) {
+    targets_by_type[type][targets_by_type_count[type]] = NULL;
+  }
 
   /* Return pointer to the array - caller should not modify */
   return targets_by_type[type];
@@ -331,4 +381,53 @@ component_add_to_request_type_index(HubComponent* comp)
       component_by_request_type[rt] = comp;
     }
   }
+}
+
+/* Hash map implementation for TargetID lookup */
+static void
+target_by_id_map_insert(HubTarget* target)
+{
+  uint32_t hash = target_id_hash(target->id);
+  target_id_entry_t* entry = malloc(sizeof(target_id_entry_t));
+  if (entry == NULL) {
+    LOG_ERROR("Failed to allocate target ID map entry");
+    return;
+  }
+  entry->id = target->id;
+  entry->target = target;
+  entry->next = target_by_id_map[hash];
+  target_by_id_map[hash] = entry;
+}
+
+static void
+target_by_id_map_remove(TargetID id)
+{
+  uint32_t hash = target_id_hash(id);
+  target_id_entry_t** prev = &target_by_id_map[hash];
+  target_id_entry_t* curr = *prev;
+
+  while (curr != NULL) {
+    if (curr->id == id) {
+      *prev = curr->next;
+      free(curr);
+      return;
+    }
+    prev = &curr->next;
+    curr = curr->next;
+  }
+}
+
+static HubTarget*
+target_by_id_map_lookup(TargetID id)
+{
+  uint32_t hash = target_id_hash(id);
+  target_id_entry_t* curr = target_by_id_map[hash];
+
+  while (curr != NULL) {
+    if (curr->id == id) {
+      return curr->target;
+    }
+    curr = curr->next;
+  }
+  return NULL;
 }
