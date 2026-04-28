@@ -3,30 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*
- * Include wm-hub.h for HubComponent definition when available.
- * Also include wm-log.h for logging when available.
- * Falls back to stubs for standalone builds.
- */
-#ifndef _WM_HUB_H_
-/* Forward declaration for standalone builds */
-typedef struct HubComponent HubComponent;
-struct HubComponent {
-  const char*    name;
-  void*          requests;
-  void*          targets;
-  bool           registered;
-};
-#else
 #include "wm-hub.h"
-#endif
-
-#ifndef _WM_LOG_H_
-#define LOG_DEBUG(pFormat, ...) ((void) 0)
-#define LOG_ERROR(pFormat, ...) ((void) 0)
-#else
 #include "wm-log.h"
-#endif
 
 /*
  * Handler registry - array of linked lists indexed by event type
@@ -242,7 +220,7 @@ xcb_handler_unregister_component(HubComponent* component)
     handler_entry_t* chain_curr = handlers[i];
     while (chain_curr != NULL && chain_curr->next != NULL) {
       chain_curr->handler.next = &chain_curr->next->handler;
-      chain_curr = chain_curr->next;
+      chain_curr               = chain_curr->next;
     }
     if (chain_curr != NULL) {
       chain_curr->handler.next = NULL;

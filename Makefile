@@ -40,8 +40,7 @@ OBJ = ${SRC:.c=.o}
 
 TEST_SRC = \
 	test-$(NAME)-window-list.c \
-	test-$(NAME)-hub.c \
-	test-xcb-handler-standalone.c
+	test-$(NAME)-hub.c
 
 TEST_OBJ = ${TEST_SRC:.c=.o}
 
