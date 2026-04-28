@@ -4,7 +4,7 @@
 #include <xcb/xcb.h>
 
 extern xcb_connection_t* dpy;
-extern xcb_window_t root;
+extern xcb_window_t      root;
 
 void setup_xcb();
 void handle_xcb_events();

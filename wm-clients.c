@@ -1,7 +1,7 @@
 #include <xcb/xcb.h>
 
-#include "wm-xcb.h"
 #include "wm-clients.h"
+#include "wm-xcb.h"
 
 /**
  * Change the position, size, border width, and stack order of a client window.
@@ -25,30 +25,25 @@
  * client_configure(wnd, 50, 50, 200, 200, 1, XCB_STACK_MODE_ABOVE);
  *
  * @see xcb_configure_window
-*/
-xcb_void_cookie_t client_configure(
-	xcb_window_t wnd,
-	int16_t      x,
-	int16_t      y,
-	uint16_t     width,
-	uint16_t     height,
-	uint16_t     border_width,
-	enum xcb_stack_mode_t stack_mode
-) {
-	// Prepare the value list for the xcb_configure_window() call.
-	uint32_t value_list[] = { x, y, width, height, border_width, stack_mode };
+ */
+xcb_void_cookie_t
+client_configure(
+    xcb_window_t          wnd,
+    int16_t               x,
+    int16_t               y,
+    uint16_t              width,
+    uint16_t              height,
+    uint16_t              border_width,
+    enum xcb_stack_mode_t stack_mode)
+{
+  // Prepare the value list for the xcb_configure_window() call.
+  uint32_t value_list[] = { x, y, width, height, border_width, stack_mode };
 
-	// Set the value mask to indicate which window parameters should be updated.
-	const uint16_t value_mask = 0
-		| XCB_CONFIG_WINDOW_X
-		| XCB_CONFIG_WINDOW_Y
-		| XCB_CONFIG_WINDOW_WIDTH
-		| XCB_CONFIG_WINDOW_HEIGHT
-		| XCB_CONFIG_WINDOW_BORDER_WIDTH
-		| XCB_CONFIG_WINDOW_STACK_MODE;
+  // Set the value mask to indicate which window parameters should be updated.
+  const uint16_t value_mask = 0 | XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT | XCB_CONFIG_WINDOW_BORDER_WIDTH | XCB_CONFIG_WINDOW_STACK_MODE;
 
-	// Send the request to the X server to update the window.
-	return xcb_configure_window(dpy, wnd, value_mask, value_list);
+  // Send the request to the X server to update the window.
+  return xcb_configure_window(dpy, wnd, value_mask, value_list);
 }
 
 /**
@@ -64,8 +59,10 @@ xcb_void_cookie_t client_configure(
  *
  * @see xcb_map_window
  */
-xcb_void_cookie_t client_show(xcb_window_t wnd) {
-	return xcb_map_window(dpy, wnd);
+xcb_void_cookie_t
+client_show(xcb_window_t wnd)
+{
+  return xcb_map_window(dpy, wnd);
 }
 
 
@@ -82,6 +79,8 @@ xcb_void_cookie_t client_show(xcb_window_t wnd) {
  *
  * @see xcb_unmap_window
  */
-xcb_void_cookie_t client_hide(xcb_window_t wnd) {
-	return xcb_unmap_window(dpy, wnd);
+xcb_void_cookie_t
+client_hide(xcb_window_t wnd)
+{
+  return xcb_unmap_window(dpy, wnd);
 }

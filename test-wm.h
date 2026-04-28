@@ -11,12 +11,13 @@
 // 	} else { LOG_DEBUG(". %s", #EXPRESSION); }
 */
 
-#define assert(EXPRESSION) \
-	if (!(EXPRESSION)) { \
-		LOG_CLEAN("%s:%d: %s - FAIL", __FILE__, __LINE__, #EXPRESSION); \
-		exit(1); \
-	} \
-	else { LOG_CLEAN("%s:%d: %s - pass", __FILE__, __LINE__, #EXPRESSION); }
+#define assert(EXPRESSION)                                          \
+  if (!(EXPRESSION)) {                                              \
+    LOG_CLEAN("%s:%d: %s - FAIL", __FILE__, __LINE__, #EXPRESSION); \
+    exit(1);                                                        \
+  } else {                                                          \
+    LOG_CLEAN("%s:%d: %s - pass", __FILE__, __LINE__, #EXPRESSION); \
+  }
 
 
 #endif
