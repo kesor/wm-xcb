@@ -5,20 +5,23 @@ DEBUG = 0
 
 CC = gcc
 
-# Core pkg-config packages (always available)
-PKGLIST = xcb xcb-util xcb-randr xcb-errors
+# Required pkg-config packages
+PKGLIST = xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput
 
-# Optional packages (may not be available in all environments)
-PKG_EWMH := $(shell pkg-config --exists xcb-ewmh 2>/dev/null && echo xcb-ewmh)
-PKG_ATOM := $(shell pkg-config --exists xcb-atom 2>/dev/null && echo xcb-atom)
-PKG_XINPUT := $(shell pkg-config --exists xcb-xinput 2>/dev/null && echo xcb-xinput)
+PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST))
+PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST))
 
-# Build pkg-config flags from available packages
-PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST) $(PKG_EWMH) $(PKG_ATOM) $(PKG_XINPUT) 2>/dev/null)
-PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST) $(PKG_EWMH) $(PKG_ATOM) $(PKG_XINPUT) 2>/dev/null)
+# When using clang, add glibc include path (clang's default search doesn't include it)
+ifeq ($(CC),clang)
+	GLIBC_DEV := $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d ' ')
+	PKG_CFLAGS += -I$(GLIBC_DEV)
+endif
+
+# Vendor dependencies - symlink external headers for portable builds
+VENDOR_INCLUDES = -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
 CPPFLAGS = -DVERSION=\"${VERSION}\"
-CFLAGS = $(PKG_CFLAGS) $(CPPFLAGS)
+CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
 LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
@@ -43,9 +46,6 @@ SRC = \
 	$(NAME).c \
 	src/xcb/xcb-handler.c
 
-SRC += \
-	$(NAME)-hub.c
-
 OBJ = ${SRC:.c=.o}
 
 TEST_SRC = \
@@ -54,23 +54,54 @@ TEST_SRC = \
 
 TEST_OBJ = ${TEST_SRC:.c=.o}
 
-all: $(NAME)
+all: compile_flags.txt $(NAME)
+	@echo "Build complete."
 
 compile_flags.txt:
 	@echo "${CFLAGS}" > compile_flags.txt
 
-%.o: %.c %.h $(wildcard *.h)
-	${CC} -c ${CFLAGS} $<
+%.o: %.c
+	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
+
+src/xcb/%.o: src/xcb/%.c
+	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
+
+-include $(OBJ:.o=.d)
+-include $(TEST_OBJ:.o=.d)
 
 $(NAME): ${OBJ} $(NAME).o
 	${CC} -o $@ ${OBJ} ${LDFLAGS}
+
+# Generate compile_commands.json for clang tools
+# Forces recompilation with clang so clang-tidy can understand the flags
+compile-commands: clean
+	bear -- $(MAKE) CC=clang all
+	@$(MAKE) clean CC=gcc
+
+# Format source files with clang-format
+format:
+	clang-format --style=file -i ${SRC} ${TEST_SRC}
+
+# Run clang-tidy on source files
+# Uses -p . to read compile_commands.json; adds glibc include path for nix
+tidy:
+	clang-tidy -p . --quiet \
+		-extra-arg=-I"$(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d ' ')" \
+		${SRC} ${TEST_SRC}
+
+# Run clang static analyzer (requires compile_commands.json from bear)
+analyze:
+	clang -fsyntax-only -Xclang -analyze -Xclang -analyzer-output=text -p . ${SRC}
+
+# Run all development checks
+check: format tidy analyze
 
 test: ${TEST_OBJ} ${OBJ}
 	${CC} -o $@ ${TEST_OBJ} $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS} \
 	&& ./test
 
 clean:
-	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test
+	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.json compile_flags.txt
 
 container-start:
 	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc
@@ -86,4 +117,4 @@ test-standalone: wm-hub.o test-wm-hub-standalone.c
 	$(CC) $(CFLAGS) -o $@ test-wm-hub-standalone.c wm-hub.o
 	./test-standalone
 
-.PHONY: all clean container-start container-exec container-build test-standalone
+.PHONY: all clean container-start container-exec container-build test-standalone compile-commands format tidy analyze check test
