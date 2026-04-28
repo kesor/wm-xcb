@@ -1,16 +1,15 @@
 # lefthook.yml - Git hooks configuration for wm
-# This file is tracked in git, so hooks work in worktrees
 
 pre-commit:
   commands:
     format:
-      glob: "*.{c,h}"
+      glob: "**/*.{c,h}"
       run: clang-format --style=file -i {staged_files}
-      stage: true
+      stage_fixed: true
 
 pre-push:
   skip: [pre-commit]
   commands:
     format:
-      glob: "*.{c,h}"
-      run: clang-format --style=file --dry-run --Werror {staged_files}
+      glob: "**/*.{c,h}"
+      run: clang-format --style=file --dry-run --Werror {push_files}

@@ -2,9 +2,9 @@
 #include "wm-hub.h"
 
 /* Test component definitions - use TARGET_TYPE_NONE for proper termination */
-static RequestType fullscreen_requests[] = { 1, 2, 0 };   /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */
-static TargetType  client_targets[] = { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE };
-static TargetType  monitor_targets[] = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
+static RequestType fullscreen_requests[] = { 1, 2, 0 }; /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */
+static TargetType  client_targets[]      = { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE };
+static TargetType  monitor_targets[]     = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
 
 static HubComponent test_fullscreen = {
   .name       = "fullscreen",
@@ -14,17 +14,17 @@ static HubComponent test_fullscreen = {
 };
 
 /* test_focus handles request type 1 AND 3 (for override/fallback testing) */
-static RequestType focus_requests[] = { 1, 3, 0 };   /* REQ_CLIENT_FOCUS = 3, also handles 1 */
-static HubComponent test_focus = {
-  .name       = "focus",
-  .requests   = focus_requests,
-  .targets    = client_targets,
-  .registered = false,
+static RequestType  focus_requests[] = { 1, 3, 0 }; /* REQ_CLIENT_FOCUS = 3, also handles 1 */
+static HubComponent test_focus       = {
+        .name       = "focus",
+        .requests   = focus_requests,
+        .targets    = client_targets,
+        .registered = false,
 };
 
 static HubComponent test_monitor = {
   .name       = "monitor",
-  .requests   = (RequestType[]){ 4, 5, 0 },  /* REQ_MONITOR_* = 4, 5 */
+  .requests   = (RequestType[]) { 4, 5, 0 }, /* REQ_MONITOR_* = 4, 5 */
   .targets    = monitor_targets,
   .registered = false,
 };
@@ -167,7 +167,7 @@ test_get_component_by_request_type(void)
   /* Unregister focus - request type 1 should now fall back to fullscreen */
   hub_unregister_component("focus");
   found = hub_get_component_by_request_type(1);
-  assert(found == &test_fullscreen);   /* fullscreen now handles type 1 */
+  assert(found == &test_fullscreen); /* fullscreen now handles type 1 */
 
   /* Unused request type */
   found = hub_get_component_by_request_type(999);
@@ -293,17 +293,17 @@ test_get_targets_by_type(void)
   assert(clients != NULL);
   assert(clients[0] == &test_client1);
   assert(clients[1] == &test_client2);
-  assert(clients[2] == NULL);   /* NULL-terminated */
+  assert(clients[2] == NULL); /* NULL-terminated */
 
   HubTarget** monitors = hub_get_targets_by_type(TARGET_TYPE_MONITOR);
   assert(monitors != NULL);
   assert(monitors[0] == &test_monitor1);
   assert(monitors[1] == &test_monitor2);
-  assert(monitors[2] == NULL);   /* NULL-terminated */
+  assert(monitors[2] == NULL); /* NULL-terminated */
 
   HubTarget** empty = hub_get_targets_by_type(TARGET_TYPE_KEYBOARD);
   assert(empty != NULL);
-  assert(empty[0] == NULL);   /* No keyboard targets registered */
+  assert(empty[0] == NULL); /* No keyboard targets registered */
 
   /* Invalid type */
   HubTarget** invalid = hub_get_targets_by_type(TARGET_TYPE_COUNT + 1);
@@ -431,8 +431,8 @@ test_duplicate_target_id_rejected(void)
     .registered = false,
   };
   hub_register_target(&duplicate_target);
-  assert(hub_target_count() == 1);  /* Should not increase */
-  assert(hub_get_target_by_id(100) == &test_client1);  /* Should still be client1 */
+  assert(hub_target_count() == 1);                    /* Should not increase */
+  assert(hub_get_target_by_id(100) == &test_client1); /* Should still be client1 */
 
   hub_shutdown();
 }
@@ -483,7 +483,7 @@ test_target_type_null_termination(void)
   for (int i = 0; clients[i] != NULL; i++) {
     count++;
     /* Should not exceed our registered count */
-    assert(i < 10);  /* Safety limit */
+    assert(i < 10); /* Safety limit */
   }
   assert(count == 2);
 
@@ -541,7 +541,7 @@ handler_c(struct Event e)
  * Handler for testing userdata - uses static to track state
  */
 static int handler_with_data_call_count = 0;
-static int handler_with_data_userdata    = 0;
+static int handler_with_data_userdata   = 0;
 
 static void
 handler_check_userdata(struct Event e)
@@ -710,7 +710,7 @@ test_userdata_in_subscribe(void)
   hub_init();
 
   handler_with_data_call_count = 0;
-  handler_with_data_userdata    = 0;
+  handler_with_data_userdata   = 0;
 
   int my_userdata = 99;
   hub_subscribe(EVT_TEST_A, handler_check_userdata, (void*) (intptr_t) my_userdata);
