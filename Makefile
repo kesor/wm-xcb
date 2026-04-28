@@ -5,26 +5,18 @@ DEBUG = 0
 
 CC = gcc
 
-# Core pkg-config packages (always required)
-PKGLIST_CORE = xcb xcb-util xcb-randr xcb-errors
+# Required pkg-config packages
+PKGLIST = xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput
 
-# Optional packages (detected at build time)
-PKGLIST_EXTRA = xcb-ewmh xcb-xinput
-
-# Build pkg-config flags - core packages are required
-PKG_CFLAGS_CORE := $(shell pkg-config --cflags $(PKGLIST_CORE))
-PKG_LDFLAGS_CORE := $(shell pkg-config --libs $(PKGLIST_CORE))
-
-# Add optional packages if available (pkg-config fails if not installed)
-PKG_CFLAGS_EXTRA := $(shell pkg-config --cflags $(PKGLIST_EXTRA) 2>/dev/null)
-PKG_LDFLAGS_EXTRA := $(shell pkg-config --libs $(PKGLIST_EXTRA) 2>/dev/null)
+PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST))
+PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST))
 
 # Vendor dependencies - symlink external headers for portable builds
 VENDOR_INCLUDES = -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
 CPPFLAGS = -DVERSION=\"${VERSION}\"
-CFLAGS = $(PKG_CFLAGS_CORE) $(PKG_CFLAGS_EXTRA) $(VENDOR_INCLUDES) $(CPPFLAGS)
-LDFLAGS = $(PKG_LDFLAGS_CORE) $(PKG_LDFLAGS_EXTRA) -pthread -lc
+CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
+LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
 	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG
@@ -58,27 +50,6 @@ TEST_OBJ = ${TEST_SRC:.c=.o}
 
 all: compile_flags.txt $(NAME)
 	@echo "Build complete."
-	@# Optionally regenerate compile_commands.json if bear is available
-	@if command -v bear >/dev/null 2>&1; then \
-		echo "Note: Run 'make compile-commands' to generate compile_commands.json for clang tooling"; \
-	fi
-
-# Generate compile_commands.json for clang tools using bear
-# Usage: bear -- make (or make rebuild-compile-commands)
-compile-commands:
-	@if command -v bear >/dev/null 2>&1; then \
-		echo "Generating compile_commands.json with bear..."; \
-		bear -- make; \
-	else \
-		echo "bear not found. Install with: nix profile install nixpkgs#bear"; \
-	fi
-
-rebuild-compile-commands: clean
-	@if command -v bear >/dev/null 2>&1; then \
-		bear -- make; \
-	else \
-		echo "bear not found. Install with: nix profile install nixpkgs#bear"; \
-	fi
 
 compile_flags.txt:
 	@echo "${CFLAGS}" > compile_flags.txt
@@ -94,6 +65,25 @@ src/xcb/%.o: src/xcb/%.c
 
 $(NAME): ${OBJ} $(NAME).o
 	${CC} -o $@ ${OBJ} ${LDFLAGS}
+
+# Generate compile_commands.json for clang tools
+compile-commands: clean
+	bear -- make
+
+# Format source files with clang-format
+format:
+	clang-format --style=file -i ${SRC} ${TEST_SRC}
+
+# Run clang-tidy on source files
+tidy:
+	clang-tidy --quiet ${SRC} ${TEST_SRC}
+
+# Run clang static analyzer
+analyze:
+	scan-build --status-bugs clang -c ${CFLAGS} ${SRC} -o /dev/null
+
+# Run all development checks
+check: format tidy analyze
 
 test: ${TEST_OBJ} ${OBJ}
 	${CC} -o $@ ${TEST_OBJ} $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS} \
@@ -116,4 +106,4 @@ test-standalone: wm-hub.o test-wm-hub-standalone.c
 	$(CC) $(CFLAGS) -o $@ test-wm-hub-standalone.c wm-hub.o
 	./test-standalone
 
-.PHONY: all clean container-start container-exec container-build test-standalone compile-commands rebuild-compile-commands
+.PHONY: all clean container-start container-exec container-build test-standalone compile-commands format tidy analyze check test
