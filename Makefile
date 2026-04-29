@@ -52,9 +52,13 @@ SRC = \
 OBJ = ${SRC:.c=.o}
 
 TEST_SRC = \
+	test-registry.c \
 	test-$(NAME)-window-list.c \
 	test-$(NAME)-hub.c \
 	test-$(NAME)-xcb-handler.c
+
+# Header dependencies
+TEST_HDR = test-registry.h test-wm.h test-wm-window-list.h test-wm-hub.h
 
 TEST_OBJ = ${TEST_SRC:.c=.o}
 

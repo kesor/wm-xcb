@@ -1,4 +1,5 @@
 #include "test-wm.h"
+#include "test-registry.h"
 #include "wm-window-list.h"
 
 static int         count = 0;
@@ -7,6 +8,7 @@ static wnd_node_t* sentinel;
 void
 count_callback(wnd_node_t* wnd)
 {
+  (void)wnd;
   count++;
 }
 
@@ -146,9 +148,7 @@ test_window_insert_returns_node()
   destruct_window_list();
 }
 
-int
-main()
-{
+TEST_GROUP(WindowList, {
   test_add_remove();
   test_iteration();
   test_remove_non_existent_window();
@@ -158,4 +158,4 @@ main()
   test_window_remove_invalid();
   test_window_insert_duplicate();
   test_window_insert_returns_node();
-}
+});
