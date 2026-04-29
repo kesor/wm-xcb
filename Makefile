@@ -12,8 +12,10 @@ PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST))
 PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST))
 
 # When using clang, add glibc include path (clang's default search doesn't include it)
-ifeq ($(CC),clang)
+ifneq ($(filter clang,$(CC)),)
 	GLIBC_DEV := $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d ' ')
+	# Add all necessary include paths for nix
+	PKG_CFLAGS += -I/nix/store/fbbw928argckfii0j322346ihmllg7a7-glibc-2.42-61-dev/include -I/nix/store/x44m80ahg51pz32dr0j39yzsr7bn7d5v-libxcb-1.17.0-dev/include -I/nix/store/9ag3dbrwgbf1pzzbrhcyk6kqss2h9qgz-libxcb-util-0.4.1-dev/include -I/nix/store/vqmfrfyskw51vmibb695p3li5lxmada-libxcb-errors-1.0.1-dev/include -I/nix/store/zba0kgibxmp87ddlnnvwxrlfbc85w4cy-libxcb-wm-0.4.2-dev/include -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 	PKG_CFLAGS += -I$(GLIBC_DEV)
 endif
 
@@ -88,8 +90,7 @@ $(NAME): ${OBJ} $(NAME).o
 # Generate compile_commands.json for clang tools
 # Forces recompilation with clang so clang-tidy can understand the flags
 compile-commands: clean
-	bear -- $(MAKE) CC=clang all
-	@$(MAKE) clean CC=gcc
+	@bear -- $(MAKE) CC=clang all || true
 
 # Format source files with clang-format
 format:
@@ -97,13 +98,25 @@ format:
 
 # Run clang-tidy on source files
 # Uses -p . to read compile_commands.json; adds glibc include path for nix
+# Note: grep output may have leading space, so we trim with sed
+GLIBC_INCLUDE = $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | sed 's/^ *//')
 tidy:
+	@test -f compile_commands.json || $(MAKE) compile-commands
 	clang-tidy -p . --quiet \
-		-extra-arg=-I"$(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep \"glibc.*include\" | head -1 | tr -d ' ')" \
+		-extra-arg=-I/nix/store/fbbw928argckfii0j322346ihmllg7a7-glibc-2.42-61-dev/include \
+		-extra-arg=-I/nix/store/x44m80ahg51pz32dr0j39yzsr7bn7d5v-libxcb-1.17.0-dev/include \
+		-extra-arg=-I/nix/store/9ag3dbrwgbf1pzzbrhcyk6kqss2h9qgz-libxcb-util-0.4.1-dev/include \
+		-extra-arg=-I/nix/store/vqmfrfyskw51vmibb695p3li5lxmada-libxcb-errors-1.0.1-dev/include \
+		-extra-arg=-I/nix/store/zba0kgibxmp87ddlnnvwxrlfbc85w4cy-libxcb-wm-0.4.2-dev/include \
+		-extra-arg=-I. \
+		-extra-arg=-Ivendor/xcb-errors-include \
+		-extra-arg=-Ivendor/libxcb-errors/include \
+		-extra-arg=-I/nix/store/mvyxqkpyj2mgymljzj9bqi9bmz7ca5fk-xorgproto-2025.1/include \
 		${SRC} ${TEST_SRC}
 
 # Run clang static analyzer (requires compile_commands.json from bear)
 analyze:
+	@test -f compile_commands.json || $(MAKE) compile-commands
 	clang -fsyntax-only -Xclang -analyze -Xclang -analyzer-output=text -p . ${SRC}
 
 # Run all development checks
