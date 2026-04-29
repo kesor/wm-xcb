@@ -532,7 +532,6 @@ hub_send_request_data(RequestType type, TargetID target, void* data)
   };
 
 
-
   LOG_DEBUG("Routing request type=%u to component '%s' for target %lu",
             type, comp->name, (unsigned long) target);
 

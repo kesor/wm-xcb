@@ -1,7 +1,7 @@
+#include <inttypes.h>
 #include "test-registry.h"
 #include "test-wm.h"
 #include "wm-hub.h"
-#include <inttypes.h>
 
 /* Test component definitions - use TARGET_TYPE_NONE for proper termination */
 static RequestType fullscreen_requests[] = { 1, 2, 0 }; /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */

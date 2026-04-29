@@ -20,9 +20,9 @@
 /*
  * Global monitor list
  */
-static Monitor* monitor_list       = NULL;
-static Monitor* selected_monitor  = NULL;
-static uint32_t  monitor_count     = 0;
+static Monitor* monitor_list     = NULL;
+static Monitor* selected_monitor = NULL;
+static uint32_t monitor_count    = 0;
 
 /*
  * Default monitor values
@@ -41,9 +41,9 @@ monitor_create(xcb_randr_output_t output)
   }
 
   /* Initialize HubTarget */
-  m->target.id         = (TargetID)output;
-  m->target.type        = TARGET_TYPE_MONITOR;
-  m->target.registered  = false;
+  m->target.id         = (TargetID) output;
+  m->target.type       = TARGET_TYPE_MONITOR;
+  m->target.registered = false;
 
   /* RandR properties */
   m->output = output;
@@ -124,9 +124,9 @@ void
 monitor_list_init(void)
 {
   LOG_DEBUG("Initializing monitor list");
-  monitor_list      = NULL;
-  selected_monitor  = NULL;
-  monitor_count     = 0;
+  monitor_list     = NULL;
+  selected_monitor = NULL;
+  monitor_count    = 0;
 }
 
 void
@@ -142,7 +142,7 @@ monitor_list_shutdown(void)
 
   monitor_list     = NULL;
   selected_monitor = NULL;
-  monitor_count     = 0;
+  monitor_count    = 0;
 
   LOG_DEBUG("Monitor list shutdown complete");
 }
@@ -170,8 +170,8 @@ monitor_list_add(Monitor* m)
   }
 
   /* Add to head of list */
-  m->next       = monitor_list;
-  monitor_list  = m;
+  m->next      = monitor_list;
+  monitor_list = m;
   monitor_count++;
 
   /* Always select the most recently added monitor */
@@ -202,7 +202,7 @@ monitor_list_remove(Monitor* m)
     }
   }
 
-  m->next       = NULL;
+  m->next = NULL;
   monitor_count--;
 
   /* If removed selected monitor, select first remaining */
@@ -263,7 +263,7 @@ monitor_client_count(Monitor* m)
 
   /* Iterate using Monitor's per-monitor client list linkage */
   uint32_t count = 0;
-  Client*  c     = (Client*)m->clients;
+  Client*  c     = (Client*) m->clients;
   while (c != NULL) {
     count++;
     c = c->next;
