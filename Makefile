@@ -53,7 +53,8 @@ OBJ = ${SRC:.c=.o}
 
 TEST_SRC = \
 	test-$(NAME)-window-list.c \
-	test-$(NAME)-hub.c
+	test-$(NAME)-hub.c \
+	test-$(NAME)-xcb-handler.c
 
 TEST_OBJ = ${TEST_SRC:.c=.o}
 
@@ -102,12 +103,23 @@ analyze:
 # Run all development checks
 check: format tidy analyze
 
-test: ${TEST_OBJ} ${OBJ}
-	${CC} -o $@ ${TEST_OBJ} $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS} \
-	&& ./test
+# Run all tests (each test is a separate executable)
+test: test-window-list test-hub test-xcb-handler
+	./test-window-list
+	./test-hub
+	./test-xcb-handler
+
+test-window-list: test-$(NAME)-window-list.o $(filter-out $(NAME).o, ${OBJ})
+	${CC} -o $@ test-$(NAME)-window-list.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+
+test-hub: test-$(NAME)-hub.o $(filter-out $(NAME).o, ${OBJ})
+	${CC} -o $@ test-$(NAME)-hub.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+
+test-xcb-handler: test-$(NAME)-xcb-handler.o $(filter-out $(NAME).o, ${OBJ})
+	${CC} -o $@ test-$(NAME)-xcb-handler.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
 
 clean:
-	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.json compile_flags.txt
+	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.txt compile_flags.txt test-window-list test-hub
 
 container-start:
 	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc
@@ -128,4 +140,4 @@ test-sm-standalone: wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-registry.o 
 	$(CC) $(CFLAGS) -o $@ wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-registry.o src/sm/sm-instance.o test-sm-standalone.c
 	./test-sm-standalone
 
-.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone
+.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone test-window-list test-hub test-xcb-handler
