@@ -4,9 +4,6 @@
  * This file includes all test headers to register their test groups.
  * The main() function is provided in test-registry.c.
  *
- * Note: This file is kept for historical reference. The actual test
- * binary is built from test-registry.c which includes all test headers.
- *
  * Usage: make test
  */
 
@@ -16,6 +13,9 @@
  * Include all test headers to register their test groups
  */
 #include "test-wm-hub.h"
+#include "test-wm-xcb-handler.h"
+#include "test-wm-monitor.h"
 #include "test-wm-window-list.h"
+#include "test-wm-keybinding.h"
 #include "test-wm.h"
 /* Add more test headers as needed */

@@ -145,6 +145,13 @@ Monitor* monitor_get_selected(void);
 void monitor_set_selected(Monitor* m);
 
 /*
+ * Get the TargetID of the currently selected monitor.
+ * Returns TARGET_ID_NONE if no monitor is selected.
+ * Used by keybinding component to resolve TARGET_CURRENT_MONITOR.
+ */
+TargetID monitor_get_current_monitor(void);
+
+/*
  * Selection - selected monitor is always the most recently added one
  * (this is a simplification - can be updated later)
  */
