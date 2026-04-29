@@ -9,17 +9,17 @@
 /* Registry entry - uses separate typed function pointer fields to avoid
  * casting between function pointers and data pointers (UB in standard C) */
 typedef struct RegistryEntry {
-  const char*  name;
+  const char* name;
   union {
     SMGuardFn  guard_fn;
     SMActionFn action_fn;
   } fn;
   struct RegistryEntry* next;
-  bool is_guard;  /* true for guard entries, false for action entries */
+  bool                  is_guard; /* true for guard entries, false for action entries */
 } RegistryEntry;
 
 /* Registry buckets */
-#define GUARD_REGISTRY_BUCKETS 16
+#define GUARD_REGISTRY_BUCKETS  16
 #define ACTION_REGISTRY_BUCKETS 16
 
 static RegistryEntry* guard_registry[GUARD_REGISTRY_BUCKETS];
@@ -44,7 +44,7 @@ lookup_in_bucket(RegistryEntry** buckets, int num_buckets, const char* name, boo
   if (name == NULL)
     return NULL;
 
-  uint32_t hash = hash_string(name) % (uint32_t) num_buckets;
+  uint32_t       hash  = hash_string(name) % (uint32_t) num_buckets;
   RegistryEntry* entry = buckets[hash];
 
   while (entry != NULL) {
@@ -79,7 +79,7 @@ register_in_bucket(RegistryEntry** buckets, int num_buckets,
     return;
   }
 
-  entry->name    = name;
+  entry->name     = name;
   entry->is_guard = is_guard;
   /* Store in union field based on type */
   if (is_guard) {
@@ -87,7 +87,7 @@ register_in_bucket(RegistryEntry** buckets, int num_buckets,
   } else {
     entry->fn.action_fn = (SMActionFn) fn;
   }
-  entry->next = buckets[hash];
+  entry->next   = buckets[hash];
   buckets[hash] = entry;
 }
 
@@ -98,9 +98,9 @@ unregister_from_bucket(RegistryEntry** buckets, int num_buckets,
   if (name == NULL)
     return;
 
-  uint32_t hash = hash_string(name) % (uint32_t) num_buckets;
+  uint32_t        hash = hash_string(name) % (uint32_t) num_buckets;
   RegistryEntry** prev = &buckets[hash];
-  RegistryEntry* curr = *prev;
+  RegistryEntry*  curr = *prev;
 
   while (curr != NULL) {
     if (strcmp(curr->name, name) == 0) {
@@ -225,12 +225,12 @@ bool
 sm_run_guard(StateMachine* sm, const char* guard_name, void* data)
 {
   if (guard_name == NULL)
-    return true;  /* No guard = always allowed */
+    return true; /* No guard = always allowed */
 
   SMGuardFn guard = sm_lookup_guard(guard_name);
   if (guard == NULL) {
     LOG_WARN("Guard '%s' not found, allowing transition", guard_name);
-    return true;  /* Failsafe: allow if guard not found */
+    return true; /* Failsafe: allow if guard not found */
   }
 
   return guard(sm, data);
@@ -240,12 +240,12 @@ bool
 sm_run_action(StateMachine* sm, const char* action_name, void* data)
 {
   if (action_name == NULL)
-    return true;  /* No action = success */
+    return true; /* No action = success */
 
   SMActionFn action = sm_lookup_action(action_name);
   if (action == NULL) {
     LOG_WARN("Action '%s' not found", action_name);
-    return false;  /* Fail if action not found */
+    return false; /* Fail if action not found */
   }
 
   return action(sm, data);

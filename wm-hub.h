@@ -45,11 +45,11 @@ typedef void (*RequestExecutor)(struct HubRequest* req);
 
 /* Component structure */
 struct HubComponent {
-  const char*      name;
-  RequestType*     requests;      /* NULL-terminated array of request types handled */
-  TargetType*      targets;       /* TARGET_TYPE_NONE-terminated array of accepted types */
-  RequestExecutor  executor;      /* called when this component receives a request */
-  bool             registered;
+  const char*     name;
+  RequestType*    requests; /* NULL-terminated array of request types handled */
+  TargetType*     targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
+  RequestExecutor executor; /* called when this component receives a request */
+  bool            registered;
 };
 
 /* Target structure */

@@ -1,6 +1,6 @@
-#include "test-wm.h"
-#include "test-registry.h"
 #include "src/xcb/xcb-handler.h"
+#include "test-registry.h"
+#include "test-wm.h"
 #include "wm-hub.h"
 
 /* Mock component for testing */
@@ -19,7 +19,7 @@ static HubComponent mock_component2 = {
 };
 
 /* Track handler calls */
-static int handler_call_count    = 0;
+static int   handler_call_count = 0;
 static void* last_handler_event = NULL;
 
 static void
@@ -38,8 +38,8 @@ test_handler2(void* event)
 static void
 reset_handler_state(void)
 {
-  handler_call_count    = 0;
-  last_handler_event    = NULL;
+  handler_call_count = 0;
+  last_handler_event = NULL;
 }
 
 void
@@ -276,7 +276,7 @@ test_xcb_handler_unregister_nonexistent(void)
 
   /* Unregister a component that has no handlers - should be safe */
   xcb_handler_unregister_component(&mock_component2);
-  assert(xcb_handler_count() == 1);  /* mock_component still registered */
+  assert(xcb_handler_count() == 1); /* mock_component still registered */
 
   xcb_handler_shutdown();
   hub_shutdown();
@@ -295,7 +295,7 @@ test_unregister_null_component(void)
 
   /* Unregister NULL - should be safe */
   xcb_handler_unregister_component(NULL);
-  assert(xcb_handler_count() == 1);  /* handler still registered */
+  assert(xcb_handler_count() == 1); /* handler still registered */
 
   xcb_handler_shutdown();
   hub_shutdown();
@@ -330,7 +330,7 @@ test_next_returns_null_at_end(void)
   XCBHandler* h2 = xcb_handler_next(h);
 
   assert(h != NULL);
-  assert(h2 == NULL);  /* Only one handler, next should be NULL */
+  assert(h2 == NULL); /* Only one handler, next should be NULL */
 
   xcb_handler_shutdown();
   hub_shutdown();
@@ -382,7 +382,7 @@ test_dispatch_null_event(void)
 
   xcb_handler_dispatch(NULL);
 
-  assert(handler_call_count == 0);  /* Should not call handler */
+  assert(handler_call_count == 0); /* Should not call handler */
 
   xcb_handler_shutdown();
   hub_shutdown();

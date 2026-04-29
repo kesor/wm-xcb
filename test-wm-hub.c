@@ -1,5 +1,5 @@
-#include "test-wm.h"
 #include "test-registry.h"
+#include "test-wm.h"
 #include "wm-hub.h"
 
 /* Test component definitions - use TARGET_TYPE_NONE for proper termination */
@@ -758,11 +758,11 @@ test_unsubscribe_nonexistent_handler(void)
  */
 
 /* Track executor calls */
-static int      executor_call_count  = 0;
-static RequestType last_exec_type  = 0;
-static TargetID    last_exec_target = TARGET_ID_NONE;
-static void*      last_exec_data    = NULL;
-static uint64_t    last_exec_cid     = 0;
+static int         executor_call_count = 0;
+static RequestType last_exec_type      = 0;
+static TargetID    last_exec_target    = TARGET_ID_NONE;
+static void*       last_exec_data      = NULL;
+static uint64_t    last_exec_cid       = 0;
 
 /* Test executors - must be static at file scope */
 static void
@@ -879,7 +879,7 @@ test_routing_data_passed(void)
   hub_register_component(&routing_fullscreen);
 
   executor_call_count = 0;
-  int test_data = 42;
+  int test_data       = 42;
   hub_send_request_data(1, 100, &test_data);
 
   assert(executor_call_count == 1);
@@ -918,12 +918,12 @@ test_routing_to_correct_component(void)
   hub_register_component(&routing_monitor);
 
   executor_call_count = 0;
-  hub_send_request(3, 100); /* Request type 3 - focus component */
+  hub_send_request(3, 100);    /* Request type 3 - focus component */
   assert(executor_call_count == 1);
   assert(last_exec_type == 3); /* Focus should handle type 3 */
 
   executor_call_count = 0;
-  hub_send_request(4, 200); /* Request type 4 - monitor component */
+  hub_send_request(4, 200);    /* Request type 4 - monitor component */
   assert(executor_call_count == 1);
   assert(last_exec_type == 4); /* Monitor should handle type 4 */
 

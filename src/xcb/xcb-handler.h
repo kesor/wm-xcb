@@ -18,10 +18,10 @@ typedef uint8_t XCBEventType;
  * Handler structure - stores registration info
  */
 typedef struct XCBHandler {
-  XCBEventType        event_type;
-  HubComponent*       component;
+  XCBEventType  event_type;
+  HubComponent* component;
   void (*handler)(void* event);
-  struct XCBHandler*  next;
+  struct XCBHandler* next;
 } XCBHandler;
 
 /*
