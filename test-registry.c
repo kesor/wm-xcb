@@ -48,14 +48,12 @@ run_all_tests(void)
   printf("=== Running All Tests ===\n\n");
 
   TestGroup* group = test_registry_head;
-  int        group_num = 1;
 
   while (group != NULL) {
     printf("--- %s ---\n", group->name);
 
     int passed_before = tests_passed;
     int failed_before = tests_failed;
-
     group->run();
 
     int passed_this = tests_passed - passed_before;
@@ -67,7 +65,6 @@ run_all_tests(void)
            failed_this);
 
     group = group->next;
-    group_num++;
   }
 
   printf("=== Test Results ===\n");
