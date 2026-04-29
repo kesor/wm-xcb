@@ -54,7 +54,7 @@ event_catcher(Event e)
 }
 
 /* Simple test emitter that records events */
-static uint32_t
+static void
 test_emitter(StateMachine* sm, uint32_t from_state, uint32_t to_state, void* userdata)
 {
   (void) sm;
@@ -63,7 +63,6 @@ test_emitter(StateMachine* sm, uint32_t from_state, uint32_t to_state, void* use
   (void) userdata;
   LOG_DEBUG("Custom emitter called");
   raw_write_events_emitted++;
-  return 100; /* custom event type */
 }
 
 void
@@ -216,8 +215,8 @@ test_sm_raw_write_event_emission()
   hub_subscribe(EVT_OFF_TO_ON, event_catcher, NULL);
   hub_subscribe(EVT_ON_TO_OFF, event_catcher, NULL);
 
-  int           owner = 0;
-  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
+  /* Pass target as owner so events include correct target_id */
+  StateMachine* sm    = sm_create(&target, tmpl, NULL, NULL);
 
   LOG_CLEAN("  Test 1: raw_write STATE_OFF -> STATE_ON");
   sm_raw_write(sm, STATE_ON);
@@ -239,7 +238,7 @@ test_sm_raw_write_event_emission()
   /* Test 2: raw_write with custom emitter */
   LOG_CLEAN("  Test 3: raw_write with custom EventEmitter");
   raw_write_events_emitted = 0;
-  StateMachine* sm2 = sm_create(&owner, tmpl, test_emitter, NULL);
+  StateMachine* sm2 = sm_create(&target, tmpl, test_emitter, NULL);
 
   sm_raw_write(sm2, STATE_ON);
   assert(sm_get_state(sm2) == STATE_ON);

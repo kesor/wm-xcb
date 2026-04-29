@@ -20,9 +20,11 @@ typedef struct SMHookList   SMHookList;
  * Event emitter function type
  * Called when a state machine transitions.
  * Receives the SM, from_state, to_state, and emit_userdata.
- * Returns the event type to emit, or 0 if no event should be emitted.
+ *
+ * The callback is invoked for transition notification; its return value
+ * is currently ignored by the state machine implementation.
  */
-typedef uint32_t (*EventEmitter)(StateMachine*, uint32_t from_state, uint32_t to_state, void* emit_userdata);
+typedef void (*EventEmitter)(StateMachine*, uint32_t from_state, uint32_t to_state, void* emit_userdata);
 
 /*
  * Hook phases for state machine events
