@@ -94,7 +94,18 @@ format:
 # Run clang-tidy on source files
 # Uses -p . to read compile_commands.json; adds glibc include path for nix
 tidy: compile-commands
-	@clang-tidy -p . --quiet -extra-arg=-I$(GLIBC_DEV) $(shell pkg-config --cflags $(PKGLIST) 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") ${SRC} ${TEST_SRC}
+	@clang-tidy -p . --quiet \
+		-extra-arg=-I$(GLIBC_DEV) \
+		-extra-arg=-I. \
+		-extra-arg=-Ivendor/xcb-errors-include \
+		-extra-arg=-Ivendor/libxcb-errors/include \
+		-extra-arg=-I/nix/store/x44m80ahg51pz32dr0j39yzsr7bn7d5v-libxcb-1.17.0-dev/include \
+		-extra-arg=-I/nix/store/9ag3dbrwgbf1pzzbrhcyk6kqss2h9qgz-libxcb-util-0.4.1-dev/include \
+		-extra-arg=-I/nix/store/vqmfrfyskw51vmibb695p3xli5lxmada-libxcb-errors-1.0.1-dev/include \
+		-extra-arg=-I/nix/store/yihma6aw528nj48ddwm835f8yg3jjb7p-libxcb-keysyms-0.4.1-dev/include \
+		-extra-arg=-I/nix/store/zba0kgibxmp87ddlnnvwxrlfbc85w4cy-libxcb-wm-0.4.2-dev/include \
+		-extra-arg=-I/nix/store/mvyxqkpyj2mgymljzj9bqi9bmz7ca5fk-xorgproto-2025.1/include \
+		${SRC} ${TEST_SRC}
 # Run clang static analyzer (requires compile_commands.json from bear)
 analyze:
 	@test -f compile_commands.json || $(MAKE) compile-commands
