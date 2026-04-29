@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 /* Forward declarations */
 typedef struct HubComponent HubComponent;
@@ -32,12 +33,18 @@ enum {
 /* Invalid ID sentinel */
 #define TARGET_ID_NONE   ((TargetID) 0)
 
-/* Request structure - passed to component executors */
+/*
+ * Request structure - passed to component executors
+ *
+ * Note: The request is passed by pointer. The executor must not store
+ * a pointer to the request beyond the duration of the callback.
+ * For async operations, copy any needed data before returning.
+ */
 struct HubRequest {
   RequestType type;
-  TargetID    target;
-  void*       data;
-  uint64_t    correlation_id; /* for async response correlation */
+  TargetID   target;
+  void*      data;
+  uint64_t   correlation_id; /* for async response correlation */
 };
 
 /* Forward declaration for executor type */
@@ -45,11 +52,11 @@ typedef void (*RequestExecutor)(struct HubRequest* req);
 
 /* Component structure */
 struct HubComponent {
-  const char*     name;
-  RequestType*    requests; /* NULL-terminated array of request types handled */
-  TargetType*     targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
-  RequestExecutor executor; /* called when this component receives a request */
-  bool            registered;
+  const char*      name;
+  RequestType*     requests; /* 0-terminated array of request types handled */
+  TargetType*      targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
+  RequestExecutor  executor; /* called when this component receives a request */
+  bool             registered;
 };
 
 /* Target structure */
@@ -155,7 +162,9 @@ void hub_unsubscribe(EventType type, EventHandler handler);
 uint32_t hub_component_count(void);
 uint32_t hub_target_count(void);
 
+#ifdef WM_HUB_TESTING
 /* Request routing (for testing) */
 RequestExecutor hub_get_executor_for_request(RequestType type);
+#endif
 
 #endif

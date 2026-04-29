@@ -1,5 +1,6 @@
 #include "wm-hub.h"
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -239,7 +240,7 @@ hub_register_target(HubTarget* target)
   }
 
   if (target->registered) {
-    LOG_ERROR("Target %lu is already registered", (unsigned long) target->id);
+    LOG_ERROR("Target %" PRIu64 " is already registered", target->id);
     return;
   }
 
@@ -260,7 +261,7 @@ hub_register_target(HubTarget* target)
 
   /* Check for duplicate ID */
   if (hub_get_target_by_id(target->id) != NULL) {
-    LOG_ERROR("Target with ID %lu already registered", (unsigned long) target->id);
+    LOG_ERROR("Target with ID %" PRIu64 " already registered", target->id);
     return;
   }
 
@@ -280,7 +281,7 @@ hub_register_target(HubTarget* target)
     }
   }
 
-  LOG_DEBUG("Registered target: id=%lu, type=%u", (unsigned long) target->id, target->type);
+  LOG_DEBUG("Registered target: id=%" PRIu64 ", type=%u", target->id, target->type);
 }
 
 void
@@ -293,7 +294,7 @@ hub_unregister_target(TargetID id)
 
   HubTarget* target = hub_get_target_by_id(id);
   if (target == NULL) {
-    LOG_ERROR("Target %lu not found", (unsigned long) id);
+    LOG_ERROR("Target %" PRIu64 " not found", id);
     return;
   }
 
@@ -322,7 +323,7 @@ hub_unregister_target(TargetID id)
   }
 
   target->registered = false;
-  LOG_DEBUG("Unregistered target: id=%lu", (unsigned long) id);
+  LOG_DEBUG("Unregistered target: id=%" PRIu64, id);
 }
 
 HubTarget*
@@ -531,6 +532,7 @@ hub_send_request_data(RequestType type, TargetID target, void* data)
   };
 
 
+
   LOG_DEBUG("Routing request type=%u to component '%s' for target %lu",
             type, comp->name, (unsigned long) target);
 
@@ -563,6 +565,7 @@ hub_send_request_with_cid(RequestType type, TargetID target, uint64_t correlatio
 
   LOG_DEBUG("Routing request type=%u to component '%s' for target %lu (cid=%lu)",
             type, comp->name, (unsigned long) target, (unsigned long) correlation_id);
+
 
   comp->executor(&req);
 }

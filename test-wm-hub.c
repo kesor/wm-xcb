@@ -1,6 +1,7 @@
 #include "test-registry.h"
 #include "test-wm.h"
 #include "wm-hub.h"
+#include <inttypes.h>
 
 /* Test component definitions - use TARGET_TYPE_NONE for proper termination */
 static RequestType fullscreen_requests[] = { 1, 2, 0 }; /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */
@@ -773,8 +774,8 @@ exec_fullscreen(struct HubRequest* req)
   last_exec_target = req->target;
   last_exec_data   = req->data;
   last_exec_cid    = req->correlation_id;
-  LOG_CLEAN("  exec_fullscreen: type=%u target=%lu cid=%lu",
-            req->type, (unsigned long) req->target, (unsigned long) req->correlation_id);
+  LOG_CLEAN("  exec_fullscreen: type=%" PRIu32 " target=%" PRIu64 " cid=%" PRIu64,
+            req->type, req->target, req->correlation_id);
 }
 
 static void
@@ -785,8 +786,8 @@ exec_focus(struct HubRequest* req)
   last_exec_target = req->target;
   last_exec_data   = req->data;
   last_exec_cid    = req->correlation_id;
-  LOG_CLEAN("  exec_focus: type=%u target=%lu cid=%lu",
-            req->type, (unsigned long) req->target, (unsigned long) req->correlation_id);
+  LOG_CLEAN("  exec_focus: type=%" PRIu32 " target=%" PRIu64 " cid=%" PRIu64,
+            req->type, req->target, req->correlation_id);
 }
 
 static void
@@ -797,8 +798,8 @@ exec_monitor(struct HubRequest* req)
   last_exec_target = req->target;
   last_exec_data   = req->data;
   last_exec_cid    = req->correlation_id;
-  LOG_CLEAN("  exec_monitor: type=%u target=%lu cid=%lu",
-            req->type, (unsigned long) req->target, (unsigned long) req->correlation_id);
+  LOG_CLEAN("  exec_monitor: type=%" PRIu32 " target=%" PRIu64 " cid=%" PRIu64,
+            req->type, req->target, req->correlation_id);
 }
 
 /* Components with executors */
