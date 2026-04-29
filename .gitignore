@@ -5,3 +5,8 @@ compile_commands.json
 *.d
 compile_flags.txt
 task-*.txt
+
+# Test binaries
+test
+test-*
+test-wm-*
