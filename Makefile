@@ -15,6 +15,7 @@ PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST))
 # clang-tidy uses a standalone clang binary that does not include glibc in its search path
 GLIBC_DEV := $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d " ")
 PKG_CFLAGS += -I$(GLIBC_DEV)
+PKG_CFLAGS += -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
 CPPFLAGS = -DVERSION=\"${VERSION}\" -DWM_HUB_TESTING
 CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
