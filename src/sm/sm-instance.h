@@ -17,6 +17,14 @@ typedef struct StateMachine StateMachine;
 typedef struct SMHookList   SMHookList;
 
 /*
+ * Event emitter function type
+ * Called when a state machine transitions.
+ * Receives the SM, from_state, to_state, and emit_userdata.
+ * Returns the event type to emit, or 0 if no event should be emitted.
+ */
+typedef uint32_t (*EventEmitter)(StateMachine*, uint32_t from_state, uint32_t to_state, void* emit_userdata);
+
+/*
  * Hook phases for state machine events
  */
 typedef enum SMHookPhase {
@@ -39,12 +47,14 @@ typedef void (*SMHookFn)(StateMachine*, void*);
  * Instance of a state machine template.
  */
 struct StateMachine {
-  const char* name;               /* instance name (from template) */
-  uint32_t    current_state;      /* current state value */
-  void*       owner;              /* owner target (client, monitor, etc.) */
-  SMTemplate* template;           /* reference to the template */
-  void*       data;               /* instance-specific data */
-  SMHookList* hooks[SM_HOOK_MAX]; /* hook lists for each phase */
+  const char*   name;               /* instance name (from template) */
+  uint32_t      current_state;      /* current state value */
+  void*         owner;              /* owner target (client, monitor, etc.) */
+  SMTemplate*   template;           /* reference to the template */
+  void*         data;               /* instance-specific data */
+  SMHookList*   hooks[SM_HOOK_MAX]; /* hook lists for each phase */
+  EventEmitter  emit;               /* event emitter function (e.g., hub_emit) */
+  void*         emit_userdata;      /* userdata passed to emit function */
 };
 
 /*
@@ -53,8 +63,22 @@ struct StateMachine {
  * hook-list storage and any template-specific initialization
  * performed by the template's init function.
  * Returns NULL on allocation failure.
+ *
+ * The emit parameter is optional and specifies the event emitter function.
+ * If provided, it will be called during state transitions (including
+ * raw_write) to emit events. Set emit_userdata to pass additional context.
  */
-StateMachine* sm_create(void* owner, SMTemplate* template);
+StateMachine* sm_create(
+    void*        owner,
+    SMTemplate*  template,
+    EventEmitter emit,
+    void*        emit_userdata);
+
+/*
+ * Set the event emitter for a state machine.
+ * Can be called after sm_create() to configure event emission.
+ */
+void sm_set_emitter(StateMachine* sm, EventEmitter emit, void* emit_userdata);
 
 /*
  * Destroy a StateMachine instance.
