@@ -38,8 +38,32 @@ sig_atomic_t running = 1;
   }
 
 #include "src/sm/sm.h"
+#include "wm-hub.h"
 
+/* Track events for testing */
 static int hook_called = 0;
+static int raw_write_events_emitted = 0;
+static uint32_t last_raw_write_event = 0;
+
+void
+event_catcher(Event e)
+{
+  raw_write_events_emitted++;
+  last_raw_write_event = e.type;
+  LOG_DEBUG("Event caught: type=%u, target=%lu", e.type, (unsigned long) e.target);
+}
+
+/* Simple test emitter that records events */
+static void
+test_emitter(StateMachine* sm, uint32_t from_state, uint32_t to_state, void* userdata)
+{
+  (void) sm;
+  (void) from_state;
+  (void) to_state;
+  (void) userdata;
+  LOG_DEBUG("Custom emitter called");
+  raw_write_events_emitted++;
+}
 
 void
 test_hook_fn(StateMachine* sm, void* userdata)
@@ -105,7 +129,7 @@ test_sm_instance_create_destroy()
       STATE_A);
 
   int           owner = 42;
-  StateMachine* sm    = sm_create(&owner, tmpl);
+  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
 
   assert(sm != NULL);
   assert(strcmp(sm_get_name(sm), "test-instance") == 0);
@@ -141,7 +165,7 @@ test_sm_raw_write()
       STATE_A);
 
   int           owner = 0;
-  StateMachine* sm    = sm_create(&owner, tmpl);
+  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
 
   assert(sm_get_state(sm) == STATE_A);
 
@@ -153,6 +177,87 @@ test_sm_raw_write()
 
   sm_destroy(sm);
   sm_template_destroy(tmpl);
+}
+
+void
+test_sm_raw_write_event_emission()
+{
+  LOG_CLEAN("== Testing sm_raw_write event emission");
+  hub_init();
+
+  enum { STATE_OFF = 0,
+         STATE_ON  = 1,
+  };
+
+  /* Event types for transitions - use values within MAX_EVENT_TYPES (64) */
+#define EVT_OFF_TO_ON  20
+#define EVT_ON_TO_OFF 21
+
+  uint32_t     states[]      = { STATE_OFF, STATE_ON };
+  SMTransition transitions[] = {
+    { STATE_OFF, STATE_ON,  NULL, NULL, EVT_OFF_TO_ON },
+    { STATE_ON,  STATE_OFF, NULL, NULL, EVT_ON_TO_OFF },
+  };
+
+  SMTemplate* tmpl = sm_template_create(
+      "test-raw-write-emit",
+      states,
+      2,
+      transitions,
+      2,
+      STATE_OFF);
+
+  HubTarget target = { .id = 42, .type = TARGET_TYPE_CLIENT, .registered = false };
+  hub_register_target(&target);
+
+  /* Test 1: raw_write emits event via hub */
+  raw_write_events_emitted = 0;
+  hub_subscribe(EVT_OFF_TO_ON, event_catcher, NULL);
+  hub_subscribe(EVT_ON_TO_OFF, event_catcher, NULL);
+
+  /* Pass target as owner so events include correct target_id */
+  StateMachine* sm    = sm_create(&target, tmpl, NULL, NULL);
+
+  LOG_CLEAN("  Test 1: raw_write STATE_OFF -> STATE_ON");
+  sm_raw_write(sm, STATE_ON);
+  assert(sm_get_state(sm) == STATE_ON);
+  assert(raw_write_events_emitted == 1);
+  assert(last_raw_write_event == EVT_OFF_TO_ON);
+
+  LOG_CLEAN("  Test 2: raw_write STATE_ON -> STATE_OFF");
+  sm_raw_write(sm, STATE_OFF);
+  assert(sm_get_state(sm) == STATE_OFF);
+  assert(raw_write_events_emitted == 2);
+  assert(last_raw_write_event == EVT_ON_TO_OFF);
+
+  hub_unsubscribe(EVT_OFF_TO_ON, event_catcher);
+  hub_unsubscribe(EVT_ON_TO_OFF, event_catcher);
+
+  hub_unregister_target(target.id);
+
+  /* Test 2: raw_write with custom emitter */
+  LOG_CLEAN("  Test 3: raw_write with custom EventEmitter");
+  raw_write_events_emitted = 0;
+  StateMachine* sm2 = sm_create(&target, tmpl, test_emitter, NULL);
+
+  sm_raw_write(sm2, STATE_ON);
+  assert(sm_get_state(sm2) == STATE_ON);
+  assert(raw_write_events_emitted == 1);
+
+  /* Test 3: raw_write succeeds for invalid transition (reality is authoritative) */
+  LOG_CLEAN("  Test 4: raw_write to invalid transition succeeds");
+  raw_write_events_emitted = 0;
+  /* STATE_ON -> STATE_ON is not a defined transition, but raw_write still updates state */
+  /* No event emitted because there's no transition OFF->ON from STATE_ON */
+  sm_raw_write(sm2, STATE_ON); /* Already in STATE_ON */
+  assert(sm_get_state(sm2) == STATE_ON);
+  /* Event NOT emitted because STATE_ON -> STATE_ON is not a valid transition */
+  assert(raw_write_events_emitted == 0);
+
+  sm_destroy(sm2);
+  sm_destroy(sm);
+  sm_template_destroy(tmpl);
+  hub_shutdown();
 }
 
 void
@@ -179,7 +284,7 @@ test_sm_transition()
       STATE_OFF);
 
   int           owner = 0;
-  StateMachine* sm    = sm_create(&owner, tmpl);
+  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
 
   assert(sm_transition(sm, STATE_ON) == true);
   assert(sm_get_state(sm) == STATE_ON);
@@ -216,7 +321,7 @@ test_sm_hooks()
       STATE_A);
 
   int           owner = 0;
-  StateMachine* sm    = sm_create(&owner, tmpl);
+  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
 
   hook_called = 0;
   sm_add_hook(sm, SM_HOOK_POST_ACTION, test_hook_fn, NULL);
@@ -233,6 +338,7 @@ main()
   test_sm_template_create_destroy();
   test_sm_instance_create_destroy();
   test_sm_raw_write();
+  test_sm_raw_write_event_emission();
   test_sm_transition();
   test_sm_hooks();
 

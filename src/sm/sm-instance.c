@@ -2,6 +2,7 @@
 
 #include "sm-instance.h"
 #include "sm-template.h"
+#include "wm-hub.h"
 #include "wm-log.h"
 
 /*
@@ -89,7 +90,7 @@ sm_hook_list_run(struct SMHookList* list, StateMachine* sm)
 }
 
 StateMachine*
-sm_create(void* owner, SMTemplate* template)
+sm_create(void* owner, SMTemplate* template, EventEmitter emit, void* emit_userdata)
 {
   if (owner == NULL || template == NULL) {
     LOG_ERROR("sm_create: owner and template are required");
@@ -107,6 +108,8 @@ sm_create(void* owner, SMTemplate* template)
   sm->owner         = owner;
   sm->template      = template;
   sm->data          = NULL;
+  sm->emit          = emit;
+  sm->emit_userdata = emit_userdata;
 
   /* Allocate hook lists for each phase */
   for (int i = 0; i < SM_HOOK_MAX; i++) {
@@ -187,6 +190,35 @@ sm_get_available_transitions(StateMachine* sm, uint32_t* count)
   return states;
 }
 
+/*
+ * Emit a transition event.
+ * This is an internal helper called by sm_raw_write and sm_transition
+ * to emit events through the registered emitter.
+ *
+ * Note: hub_emit is declared in wm-hub.h and defined in wm-hub.c.
+ * When linked with wm-hub.o, this function is available.
+ */
+static void
+sm_emit_event(StateMachine* sm, uint32_t from_state, uint32_t to_state, uint32_t emit_event)
+{
+  if (emit_event == 0)
+    return;
+
+
+  if (sm->emit != NULL) {
+    sm->emit(sm, from_state, to_state, sm->emit_userdata);
+  } else {
+    /*
+     * Fallback: use hub_emit from wm-hub.c.
+     *
+     * StateMachine.owner is a generic owner pointer, so it must not be
+     * cast to HubTarget* here. If a caller needs target-specific event
+     * emission, it should provide sm->emit and sm->emit_userdata.
+     */
+    hub_emit(emit_event, TARGET_ID_NONE, sm->data);
+  }
+}
+
 void
 sm_raw_write(StateMachine* sm, uint32_t new_state)
 {
@@ -197,17 +229,13 @@ sm_raw_write(StateMachine* sm, uint32_t new_state)
   LOG_DEBUG("sm_raw_write: %s: %u -> %u",
             sm->name, old_state, new_state);
 
+  /* No guard check - reality is authoritative */
   sm->current_state = new_state;
 
-  /* Emit transition event if available */
-  if (sm->template != NULL && sm->template->transitions != NULL) {
-    SMTransition* t = sm_template_find_transition(
-        sm->template, old_state, new_state);
-    if (t != NULL && t->emit_event != 0) {
-      /* Event emission would go through hub_emit() in full implementation */
-      LOG_DEBUG("sm_raw_write: emitted event %u", t->emit_event);
-    }
-  }
+  /* Emit transition event if a valid transition exists */
+  SMTransition* t = sm_template_find_transition(
+      sm->template, old_state, new_state);
+  sm_emit_event(sm, old_state, new_state, t ? t->emit_event : 0);
 }
 
 bool
@@ -260,7 +288,8 @@ sm_transition(StateMachine* sm, uint32_t target_state)
 
     LOG_DEBUG("sm_transition: emitted event %u for %s: %u -> %u",
               t->emit_event, sm->name, old_state, target_state);
-    /* In full implementation, would call hub_emit() */
+
+    sm_emit_event(sm, old_state, target_state, t->emit_event);
   }
 
   /* Run post-emit hooks */
@@ -299,4 +328,13 @@ sm_get_name(StateMachine* sm)
   if (sm == NULL)
     return NULL;
   return sm->name;
+}
+
+void
+sm_set_emitter(StateMachine* sm, EventEmitter emit, void* emit_userdata)
+{
+  if (sm == NULL)
+    return;
+  sm->emit          = emit;
+  sm->emit_userdata = emit_userdata;
 }
