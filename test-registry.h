@@ -26,9 +26,9 @@
  * Test group structure
  */
 typedef struct TestGroup {
-  const char*          name;
+  const char* name;
   void (*run)(void);
-  struct TestGroup*    next;
+  struct TestGroup* next;
 } TestGroup;
 
 /*
@@ -40,22 +40,24 @@ extern TestGroup* test_registry_tail;
 /*
  * Register a test group - use constructor attribute for auto-registration
  */
-#define TEST_GROUP(NAME, BODY)                                     \
-  static void test_group_##NAME##_runner(void) {                   \
-    BODY;                                                          \
-  }                                                                \
-  __attribute__((constructor)) void register_test_group_##NAME(void) { \
-    static TestGroup group = {                                     \
-      .name = #NAME,                                               \
-      .run  = test_group_##NAME##_runner,                           \
-      .next = NULL,                                                \
-    };                                                             \
-    if (test_registry_head == NULL) {                              \
-      test_registry_head = test_registry_tail = &group;           \
-    } else {                                                      \
-      test_registry_tail->next = &group;                           \
-      test_registry_tail = &group;                                 \
-    }                                                              \
+#define TEST_GROUP(NAME, BODY)                                       \
+  static void test_group_##NAME##_runner(void)                       \
+  {                                                                  \
+    BODY;                                                            \
+  }                                                                  \
+  __attribute__((constructor)) void register_test_group_##NAME(void) \
+  {                                                                  \
+    static TestGroup group = {                                       \
+      .name = #NAME,                                                 \
+      .run  = test_group_##NAME##_runner,                            \
+      .next = NULL,                                                  \
+    };                                                               \
+    if (test_registry_head == NULL) {                                \
+      test_registry_head = test_registry_tail = &group;              \
+    } else {                                                         \
+      test_registry_tail->next = &group;                             \
+      test_registry_tail       = &group;                             \
+    }                                                                \
   }
 
 /*

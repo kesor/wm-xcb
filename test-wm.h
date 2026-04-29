@@ -14,15 +14,15 @@
 extern int tests_passed;
 extern int tests_failed;
 
-#define assert(EXPRESSION)                                          \
-  do {                                                               \
-    if (!(EXPRESSION)) {                                             \
+#define assert(EXPRESSION)                                            \
+  do {                                                                \
+    if (!(EXPRESSION)) {                                              \
       LOG_CLEAN("%s:%d: %s - FAIL", __FILE__, __LINE__, #EXPRESSION); \
       tests_failed++;                                                 \
-    } else {                                                         \
+    } else {                                                          \
       LOG_CLEAN("%s:%d: %s - pass", __FILE__, __LINE__, #EXPRESSION); \
       tests_passed++;                                                 \
-    }                                                                \
+    }                                                                 \
   } while (0)
 
 

@@ -20,7 +20,7 @@ endif
 # Vendor dependencies - symlink external headers for portable builds
 VENDOR_INCLUDES = -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
-CPPFLAGS = -DVERSION=\"${VERSION}\"
+CPPFLAGS = -DVERSION=\"${VERSION}\" -DWM_HUB_TESTING
 CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
 LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
 

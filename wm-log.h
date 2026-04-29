@@ -23,9 +23,9 @@ void logger(FILE* io, const char* fmt, ...);
   {                                                   \
     logger(stderr, "ERROR: " pFormat, ##__VA_ARGS__); \
   }
-#define LOG_WARN(pFormat, ...)                        \
-  {                                                   \
-    logger(stderr, "WARN: " pFormat, ##__VA_ARGS__);  \
+#define LOG_WARN(pFormat, ...)                       \
+  {                                                  \
+    logger(stderr, "WARN: " pFormat, ##__VA_ARGS__); \
   }
 #define LOG_FATAL(pFormat, ...)                       \
   {                                                   \

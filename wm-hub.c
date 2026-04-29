@@ -1,5 +1,6 @@
 #include "wm-hub.h"
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -99,27 +100,6 @@ void
 hub_init(void)
 {
   LOG_DEBUG("Initializing hub registry");
-  clear_registry_state();
-}
-
-void
-hub_shutdown(void)
-{
-  LOG_DEBUG("Shutting down hub registry");
-
-  /* Unregister all components */
-  while (component_count > 0) {
-    component_count--;
-    components[component_count]->registered = false;
-  }
-
-  /* Unregister all targets */
-  while (target_count > 0) {
-    target_count--;
-    targets[target_count]->registered = false;
-  }
-
-  /* Clear all registry state including indexes */
   clear_registry_state();
 }
 
@@ -260,7 +240,7 @@ hub_register_target(HubTarget* target)
   }
 
   if (target->registered) {
-    LOG_ERROR("Target %lu is already registered", (unsigned long) target->id);
+    LOG_ERROR("Target %" PRIu64 " is already registered", target->id);
     return;
   }
 
@@ -281,7 +261,7 @@ hub_register_target(HubTarget* target)
 
   /* Check for duplicate ID */
   if (hub_get_target_by_id(target->id) != NULL) {
-    LOG_ERROR("Target with ID %lu already registered", (unsigned long) target->id);
+    LOG_ERROR("Target with ID %" PRIu64 " already registered", target->id);
     return;
   }
 
@@ -301,7 +281,7 @@ hub_register_target(HubTarget* target)
     }
   }
 
-  LOG_DEBUG("Registered target: id=%lu, type=%u", (unsigned long) target->id, target->type);
+  LOG_DEBUG("Registered target: id=%" PRIu64 ", type=%u", target->id, target->type);
 }
 
 void
@@ -314,7 +294,7 @@ hub_unregister_target(TargetID id)
 
   HubTarget* target = hub_get_target_by_id(id);
   if (target == NULL) {
-    LOG_ERROR("Target %lu not found", (unsigned long) id);
+    LOG_ERROR("Target %" PRIu64 " not found", id);
     return;
   }
 
@@ -343,7 +323,7 @@ hub_unregister_target(TargetID id)
   }
 
   target->registered = false;
-  LOG_DEBUG("Unregistered target: id=%lu", (unsigned long) id);
+  LOG_DEBUG("Unregistered target: id=%" PRIu64, id);
 }
 
 HubTarget*
@@ -511,6 +491,133 @@ hub_subscribe(EventType type, EventHandler handler, void* userdata)
   subscribers[type].count++;
 }
 
+/*
+ * Request Routing
+ *
+ * Routes requests to the appropriate component executor.
+ * Components register which request types they handle via the
+ * requests[] array. The hub maintains a lookup index for efficient routing.
+ */
+
+/* Forward declaration for hub_shutdown cleanup */
+static void clear_routing_indexes(void);
+
+void
+hub_send_request(RequestType type, TargetID target)
+{
+  hub_send_request_data(type, target, NULL);
+}
+
+void
+hub_send_request_data(RequestType type, TargetID target, void* data)
+{
+  HubComponent* comp = hub_get_component_by_request_type(type);
+  if (comp == NULL) {
+    LOG_DEBUG("No component handles request type %u for target %lu",
+              type, (unsigned long) target);
+    return;
+  }
+
+  if (comp->executor == NULL) {
+    LOG_DEBUG("Component '%s' has no executor for request type %u",
+              comp->name, type);
+    return;
+  }
+
+  struct HubRequest req = {
+    .type           = type,
+    .target         = target,
+    .data           = data,
+    .correlation_id = 0,
+  };
+
+
+
+  LOG_DEBUG("Routing request type=%u to component '%s' for target %lu",
+            type, comp->name, (unsigned long) target);
+
+  comp->executor(&req);
+}
+
+void
+hub_send_request_with_cid(RequestType type, TargetID target, uint64_t correlation_id)
+{
+  HubComponent* comp = hub_get_component_by_request_type(type);
+  if (comp == NULL) {
+    LOG_DEBUG("No component handles request type %u for target %lu",
+              type, (unsigned long) target);
+    return;
+  }
+
+  if (comp->executor == NULL) {
+    LOG_DEBUG("Component '%s' has no executor for request type %u",
+              comp->name, type);
+    return;
+  }
+
+
+  struct HubRequest req = {
+    .type           = type,
+    .target         = target,
+    .data           = NULL,
+    .correlation_id = correlation_id,
+  };
+
+  LOG_DEBUG("Routing request type=%u to component '%s' for target %lu (cid=%lu)",
+            type, comp->name, (unsigned long) target, (unsigned long) correlation_id);
+
+
+  comp->executor(&req);
+}
+
+/*
+ * Get the executor function for a request type.
+ * Used for testing purposes.
+ */
+RequestExecutor
+hub_get_executor_for_request(RequestType type)
+{
+  HubComponent* comp = hub_get_component_by_request_type(type);
+  if (comp == NULL) {
+    return NULL;
+  }
+  return comp->executor;
+}
+
+/*
+ * Clear routing indexes when shutting down.
+ * Components are responsible for clearing their executors.
+ */
+static void
+clear_routing_indexes(void)
+{
+  memset(component_by_request_type, 0, sizeof(component_by_request_type));
+}
+
+void
+hub_shutdown(void)
+{
+  LOG_DEBUG("Shutting down hub registry");
+
+  /* Clear routing indexes first */
+  clear_routing_indexes();
+
+  /* Unregister all components */
+  while (component_count > 0) {
+    component_count--;
+    components[component_count]->registered = false;
+  }
+
+  /* Unregister all targets */
+  while (target_count > 0) {
+    target_count--;
+    targets[target_count]->registered = false;
+  }
+
+  /* Clear all registry state including indexes */
+  clear_registry_state();
+}
+
 void
 hub_unsubscribe(EventType type, EventHandler handler)
 {
@@ -521,6 +628,7 @@ hub_unsubscribe(EventType type, EventHandler handler)
   if (handler == NULL) {
     return;
   }
+
 
   int count = subscribers[type].count;
   for (int i = 0; i < count; i++) {

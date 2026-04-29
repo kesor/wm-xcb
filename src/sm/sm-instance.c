@@ -1,8 +1,8 @@
 #include <stdlib.h>
 
 #include "sm-instance.h"
-#include "sm-template.h"
 #include "sm-registry.h"
+#include "sm-template.h"
 #include "wm-hub.h"
 #include "wm-log.h"
 

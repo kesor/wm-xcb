@@ -1,5 +1,5 @@
-#include "test-wm.h"
 #include "test-registry.h"
+#include "test-wm.h"
 #include "wm-window-list.h"
 
 static int         count = 0;
@@ -8,7 +8,7 @@ static wnd_node_t* sentinel;
 void
 count_callback(wnd_node_t* wnd)
 {
-  (void)wnd;
+  (void) wnd;
   count++;
 }
 

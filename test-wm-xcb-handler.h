@@ -13,8 +13,8 @@ extern HubComponent mock_component;
 extern HubComponent mock_component2;
 
 /* Track handler calls */
-extern int      handler_call_count;
-extern void*    last_handler_event;
+extern int   handler_call_count;
+extern void* last_handler_event;
 
 typedef void (*test_handler_fn)(void*);
 

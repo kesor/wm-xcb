@@ -32,12 +32,12 @@ typedef struct SMTransition {
  * Defines the blueprint for a state machine.
  */
 struct SMTemplate {
-  const char*   name;              /* template name */
-  uint32_t*     states;            /* array of state values */
-  uint32_t      num_states;        /* number of states */
-  SMTransition* transitions;       /* array of valid transitions */
-  uint32_t      num_transitions;   /* number of transitions */
-  uint32_t      initial_state;    /* default initial state */
+  const char*   name;            /* template name */
+  uint32_t*     states;          /* array of state values */
+  uint32_t      num_states;      /* number of states */
+  SMTransition* transitions;     /* array of valid transitions */
+  uint32_t      num_transitions; /* number of transitions */
+  uint32_t      initial_state;   /* default initial state */
 };
 
 /*

@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 /* Forward declarations */
 typedef struct HubComponent HubComponent;
@@ -32,12 +33,30 @@ enum {
 /* Invalid ID sentinel */
 #define TARGET_ID_NONE   ((TargetID) 0)
 
+/*
+ * Request structure - passed to component executors
+ *
+ * Note: The request is passed by pointer. The executor must not store
+ * a pointer to the request beyond the duration of the callback.
+ * For async operations, copy any needed data before returning.
+ */
+struct HubRequest {
+  RequestType type;
+  TargetID   target;
+  void*      data;
+  uint64_t   correlation_id; /* for async response correlation */
+};
+
+/* Forward declaration for executor type */
+typedef void (*RequestExecutor)(struct HubRequest* req);
+
 /* Component structure */
 struct HubComponent {
-  const char*  name;
-  RequestType* requests; /* NULL-terminated array of request types handled */
-  TargetType*  targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
-  bool         registered;
+  const char*      name;
+  RequestType*     requests; /* 0-terminated array of request types handled */
+  TargetType*      targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
+  RequestExecutor  executor; /* called when this component receives a request */
+  bool             registered;
 };
 
 /* Target structure */
@@ -73,6 +92,37 @@ struct Subscriber {
 /* Hub initialization */
 void hub_init(void);
 void hub_shutdown(void);
+
+/* Request routing */
+
+/*
+ * Send a request to the hub for routing to the appropriate component.
+ * The hub will find the component that handles this request type
+ * and call its executor with the request.
+ *
+ * @param type    The request type (e.g., REQ_CLIENT_FULLSCREEN)
+ * @param target  The target ID to pass to the executor
+ */
+void hub_send_request(RequestType type, TargetID target);
+
+/*
+ * Send a request with data payload.
+ * The data is passed to the component executor.
+ *
+ * @param type    The request type
+ * @param target  The target ID
+ * @param data    Arbitrary data to pass to the executor
+ */
+void hub_send_request_data(RequestType type, TargetID target, void* data);
+
+/*
+ * Send a request with correlation ID for async response tracking.
+ *
+ * @param type           The request type
+ * @param target         The target ID
+ * @param correlation_id Caller-provided ID to match with response events
+ */
+void hub_send_request_with_cid(RequestType type, TargetID target, uint64_t correlation_id);
 
 /* Component registration */
 void          hub_register_component(HubComponent* comp);
@@ -111,5 +161,10 @@ void hub_unsubscribe(EventType type, EventHandler handler);
 /* Utility */
 uint32_t hub_component_count(void);
 uint32_t hub_target_count(void);
+
+#ifdef WM_HUB_TESTING
+/* Request routing (for testing) */
+RequestExecutor hub_get_executor_for_request(RequestType type);
+#endif
 
 #endif
