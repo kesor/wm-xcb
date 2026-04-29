@@ -16,8 +16,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <xcb/xcb.h>
 #include <xcb/randr.h>
+#include <xcb/xcb.h>
 
 #include "../../wm-hub.h"
 #include "../sm/sm.h"
@@ -26,13 +26,13 @@
  * Number of available tags (bits in tag mask)
  * Standard dwm uses 9 tags (0-8)
  */
-#define MONITOR_NUM_TAGS 9
+#define MONITOR_NUM_TAGS    9
 
 /*
  * Tag mask helpers
  */
-#define MONITOR_TAG_MASK(n) ((uint32_t)1 << ((n) % MONITOR_NUM_TAGS))
-#define MONITOR_ALL_TAGS   ((uint32_t)((1 << MONITOR_NUM_TAGS) - 1))
+#define MONITOR_TAG_MASK(n) ((uint32_t) 1 << ((n) % MONITOR_NUM_TAGS))
+#define MONITOR_ALL_TAGS    ((uint32_t) ((1 << MONITOR_NUM_TAGS) - 1))
 
 /*
  * Monitor structure
@@ -53,15 +53,15 @@ typedef struct Monitor {
   uint16_t height;
 
   /* Tag state */
-  uint32_t tagset;      /* currently visible tags */
-  uint32_t prevtagset;  /* previous tagset for switching */
+  uint32_t tagset;     /* currently visible tags */
+  uint32_t prevtagset; /* previous tagset for switching */
 
   /* Layout configuration */
-  float mfact;  /* master factor (0.0 - 1.0) */
+  float mfact;   /* master factor (0.0 - 1.0) */
   int   nmaster; /* number of clients in master area */
 
   /* Client tracking - decoupled design (use hub to query) */
-  uint32_t client_count;
+  uint32_t     client_count;
   xcb_window_t sel_window; /* window ID of selected client */
   xcb_window_t stack_head; /* window ID of bottom of stack */
 

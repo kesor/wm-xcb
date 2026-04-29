@@ -21,8 +21,8 @@
 #include <xcb/xcb.h>
 
 #include "../../wm-hub.h"
-#include "../sm/sm.h"
 #include "../sm/sm-registry.h"
+#include "../sm/sm.h"
 
 /* Forward declaration */
 typedef struct Monitor Monitor;
@@ -54,10 +54,10 @@ typedef struct Client {
   uint32_t tags;
 
   /* Managed state */
-  bool managed;   /* added to window list */
-  bool urgent;    /* has urgency hint */
-  bool focusable; /* can receive focus */
-  bool mapped;    /* is currently mapped */
+  bool                  managed;    /* added to window list */
+  bool                  urgent;     /* has urgency hint */
+  bool                  focusable;  /* can receive focus */
+  bool                  mapped;     /* is currently mapped */
   enum xcb_stack_mode_t stack_mode; /* X11 stack mode */
 
   /* Adopted state machines - dynamically allocated on demand */
@@ -205,7 +205,7 @@ void client_set_focusable(Client* c, bool focusable);
 /*
  * Monitor association
  */
-void client_set_monitor(Client* c, Monitor* m);
+void     client_set_monitor(Client* c, Monitor* m);
 Monitor* client_get_monitor(const Client* c);
 
 /*
@@ -259,7 +259,7 @@ bool client_is_mapped(const Client* c);
 /*
  * Stack mode
  */
-void client_set_stack_mode(Client* c, enum xcb_stack_mode_t stack_mode);
+void                  client_set_stack_mode(Client* c, enum xcb_stack_mode_t stack_mode);
 enum xcb_stack_mode_t client_get_stack_mode(const Client* c);
 
 /*
