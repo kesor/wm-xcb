@@ -62,6 +62,10 @@ test_client_create(void)
   client_list_init();
 
   Client* c = client_create(100);
+  if (c == NULL) {
+    LOG_ERROR("client_create failed");
+    abort();
+  }
   assert(c != NULL);
   assert(c->window == 100);
   assert(c->target.type == TARGET_TYPE_CLIENT);
@@ -70,6 +74,10 @@ test_client_create(void)
 
   /* Verify registered with Hub */
   HubTarget* t = hub_get_target_by_id(100);
+  if (t == NULL) {
+    LOG_ERROR("hub_get_target_by_id failed");
+    abort();
+  }
   assert(t != NULL);
   assert(t->type == TARGET_TYPE_CLIENT);
 
@@ -269,17 +277,21 @@ test_client_properties(void)
   client_list_init();
 
   Client* c = client_create(100);
+  assert_or_abort(c != NULL);
 
   /* Test title */
   char* title = strdup("Test Window");
+  assert_or_abort(c != NULL);
   client_set_title(c, title);
-  assert(c->title != NULL);
+  assert_or_abort(c->title != NULL);
   assert(strcmp(c->title, "Test Window") == 0);
 
   /* Test class */
   char* class_name = strdup("test-class");
+  assert_or_abort(c != NULL);
   client_set_class(c, class_name);
-  assert(c->class_name != NULL);
+  assert_or_abort(c->class_name != NULL);
+  // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
   assert(strcmp(c->class_name, "test-class") == 0);
 
   /* Test geometry */

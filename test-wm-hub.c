@@ -292,18 +292,30 @@ test_get_targets_by_type(void)
   hub_register_target(&test_monitor2);
 
   HubTarget** clients = hub_get_targets_by_type(TARGET_TYPE_CLIENT);
+  if (clients == NULL) {
+    LOG_ERROR("hub_get_targets_by_type returned NULL");
+    abort();
+  }
   assert(clients != NULL);
   assert(clients[0] == &test_client1);
   assert(clients[1] == &test_client2);
   assert(clients[2] == NULL); /* NULL-terminated */
 
   HubTarget** monitors = hub_get_targets_by_type(TARGET_TYPE_MONITOR);
+  if (monitors == NULL) {
+    LOG_ERROR("hub_get_targets_by_type returned NULL");
+    abort();
+  }
   assert(monitors != NULL);
   assert(monitors[0] == &test_monitor1);
   assert(monitors[1] == &test_monitor2);
   assert(monitors[2] == NULL); /* NULL-terminated */
 
   HubTarget** empty = hub_get_targets_by_type(TARGET_TYPE_KEYBOARD);
+  if (empty == NULL) {
+    LOG_ERROR("hub_get_targets_by_type returned NULL");
+    abort();
+  }
   assert(empty != NULL);
   assert(empty[0] == NULL); /* No keyboard targets registered */
 
@@ -715,6 +727,7 @@ test_userdata_in_subscribe(void)
   handler_with_data_userdata   = 0;
 
   int my_userdata = 99;
+  /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
   hub_subscribe(EVT_TEST_A, handler_check_userdata, (void*) (intptr_t) my_userdata);
   hub_emit(EVT_TEST_A, 1, NULL);
 

@@ -36,39 +36,79 @@ const char*
 mod_key_name(enum ModKey mod_key)
 {
   static char buf[MOD_KEY_NAME_BUF_SIZE];
-  buf[0] = '\0';
+  char*       dst       = buf;
+  size_t      remaining = sizeof(buf);
 
-  if (mod_key & KeyShift)
-    strcat(buf, "KeyShift|");
-  if (mod_key & KeyLock)
-    strcat(buf, "KeyLock|");
-  if (mod_key & KeyMod1)
-    strcat(buf, "KeyMod1|");
-  if (mod_key & KeyMod2)
-    strcat(buf, "KeyMod2|");
-  if (mod_key & KeyMod3)
-    strcat(buf, "KeyMod3|");
-  if (mod_key & KeyMod4)
-    strcat(buf, "KeyMod4|");
-  if (mod_key & KeyMod5)
-    strcat(buf, "KeyMod5|");
-  if (mod_key & Btn1)
-    strcat(buf, "Btn1|");
-  if (mod_key & Btn2)
-    strcat(buf, "Btn2|");
-  if (mod_key & Btn3)
-    strcat(buf, "Btn3|");
-  if (mod_key & Btn4)
-    strcat(buf, "Btn4|");
-  if (mod_key & Btn5)
-    strcat(buf, "Btn5|");
+  if (mod_key & KeyShift) {
+    size_t n = strlcpy(dst, "KeyShift|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & KeyLock) {
+    size_t n = strlcpy(dst, "KeyLock|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & KeyMod1) {
+    size_t n = strlcpy(dst, "KeyMod1|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & KeyMod2) {
+    size_t n = strlcpy(dst, "KeyMod2|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & KeyMod3) {
+    size_t n = strlcpy(dst, "KeyMod3|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & KeyMod4) {
+    size_t n = strlcpy(dst, "KeyMod4|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & KeyMod5) {
+    size_t n = strlcpy(dst, "KeyMod5|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & Btn1) {
+    size_t n = strlcpy(dst, "Btn1|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & Btn2) {
+    size_t n = strlcpy(dst, "Btn2|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & Btn3) {
+    size_t n = strlcpy(dst, "Btn3|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & Btn4) {
+    size_t n = strlcpy(dst, "Btn4|", remaining);
+    dst += n;
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
+  if (mod_key & Btn5) {
+    size_t n = strlcpy(dst, "Btn5|", remaining);
+    /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
+    dst += n;
+    /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
+    remaining = (n < remaining) ? remaining - n : 0;
+  }
 
-  // remove the trailing '|' character
-  int len = strlen(buf);
-  if (len > 0)
-    buf[len - 1] = '\0';
-  else
-    strcpy(buf, "INVALID");
+  /* remove the trailing '|' character */
+  if (dst > buf) {
+    /* NOLINTNEXTLINE(clang-analyzer-security.ArrayBound) */
+    *(dst - 1) = '\0';
+  } else {
+    strlcpy(buf, "INVALID", sizeof(buf));
+  }
 
   return buf;
 }

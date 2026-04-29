@@ -11,6 +11,7 @@
 void
 sigchld(int unused)
 {
+  /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
   if (signal(SIGCHLD, sigchld) == SIG_ERR)
     LOG_ERROR("cannot install SIGCHLD event handler:");
   while (0 < waitpid(-1, NULL, WNOHANG))
@@ -35,9 +36,11 @@ sigint(int unused)
 void
 setup_signals()
 {
+  /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
   if (signal(SIGINT, sigint) == SIG_ERR)
     LOG_FATAL("cannot install SIGINT event handler");
 
+  /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
   if (signal(SIGTERM, sigint) == SIG_ERR)
     LOG_FATAL("cannot install SIGTERM event handler");
 }

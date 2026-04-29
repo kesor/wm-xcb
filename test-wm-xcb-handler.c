@@ -96,11 +96,17 @@ test_register_multiple_handlers_same_event(void)
 
   /* Verify we can look up handlers */
   XCBHandler* h = xcb_handler_lookup(XCB_BUTTON_PRESS);
-  assert(h != NULL);
+  if (h == NULL) {
+    LOG_ERROR("Handler lookup failed");
+    abort();
+  }
   assert(h->handler == test_handler);
 
   XCBHandler* h2 = xcb_handler_next(h);
-  assert(h2 != NULL);
+  if (h2 == NULL) {
+    LOG_ERROR("Second handler lookup failed");
+    abort();
+  }
   assert(h2->handler == test_handler2);
 
   xcb_handler_shutdown();
