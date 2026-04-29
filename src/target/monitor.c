@@ -14,15 +14,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "monitor.h"
 #include "../../wm-hub.h"
 #include "../../wm-log.h"
+#include "monitor.h"
 
 /*
  * Monitor list
  */
-static Monitor* monitor_list       = NULL;
-Monitor*       _monitor_selected  = NULL;
+static Monitor* monitor_list      = NULL;
+Monitor*        _monitor_selected = NULL;
 
 /*
  * Initialize the monitor list.
@@ -109,7 +109,7 @@ monitor_create(xcb_randr_output_t output)
   m->prevtagset = MONITOR_TAG_MASK(0);
 
   /* Initialize layout configuration */
-  m->mfact   = 0.5;
+  m->mfact   = 0.5F;
   m->nmaster = 1;
 
   /* Initialize client associations (decoupled - use hub to query) */
@@ -121,7 +121,7 @@ monitor_create(xcb_randr_output_t output)
   m->bar = NULL;
 
   /* Add to list */
-  m->next = monitor_list;
+  m->next      = monitor_list;
   monitor_list = m;
 
   /* Always select the most recently added monitor */

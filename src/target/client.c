@@ -9,12 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "client.h"
 #include "../../wm-hub.h"
-#include "../sm/sm.h"
-#include "../sm/sm-registry.h"
 #include "../../wm-log.h"
 #include "../../wm-xcb.h"
+#include "../sm/sm-registry.h"
+#include "../sm/sm.h"
+#include "client.h"
 #include "monitor.h"
 
 /*
@@ -32,20 +32,20 @@ static Client client_sentinel;
 static void
 client_properties_init(Client* c)
 {
-  c->title         = NULL;
-  c->class_name    = NULL;
-  c->x             = 0;
-  c->y             = 0;
-  c->width         = 0;
-  c->height        = 0;
-  c->border_width  = 0;
-  c->tags          = 0;
-  c->monitor       = NULL;
-  c->managed       = false;
-  c->urgent        = false;
-  c->focusable     = true;
-  c->mapped        = false;
-  c->stack_mode    = XCB_STACK_MODE_ABOVE;
+  c->title          = NULL;
+  c->class_name     = NULL;
+  c->x              = 0;
+  c->y              = 0;
+  c->width          = 0;
+  c->height         = 0;
+  c->border_width   = 0;
+  c->tags           = 0;
+  c->monitor        = NULL;
+  c->managed        = false;
+  c->urgent         = false;
+  c->focusable      = true;
+  c->mapped         = false;
+  c->stack_mode     = XCB_STACK_MODE_ABOVE;
   c->sms.fullscreen = NULL;
   c->sms.floating   = NULL;
   c->sms.urgency    = NULL;
@@ -124,10 +124,10 @@ client_list_add(Client* c)
   if (c == NULL)
     return;
 
-  c->next            = client_sentinel.next;
-  c->prev            = &client_sentinel;
+  c->next                    = client_sentinel.next;
+  c->prev                    = &client_sentinel;
   client_sentinel.next->prev = c;
-  client_sentinel.next = c;
+  client_sentinel.next       = c;
 }
 
 /*
@@ -141,8 +141,8 @@ client_list_remove(Client* c)
 
   c->prev->next = c->next;
   c->next->prev = c->prev;
-  c->prev = NULL;
-  c->next = NULL;
+  c->prev       = NULL;
+  c->next       = NULL;
 }
 
 /*
@@ -325,7 +325,7 @@ client_foreach(void (*callback)(Client*))
 {
   Client* c = client_sentinel.next;
   while (c != &client_sentinel) {
-    Client* next = c->next;  /* Save next before callback might free c */
+    Client* next = c->next; /* Save next before callback might free c */
     callback(c);
     c = next;
   }
@@ -340,7 +340,7 @@ client_foreach_reverse(void (*callback)(Client*))
 {
   Client* c = client_sentinel.prev;
   while (c != &client_sentinel) {
-    Client* prev = c->prev;  /* Save prev before callback might free c */
+    Client* prev = c->prev; /* Save prev before callback might free c */
     callback(c);
     c = prev;
   }
@@ -567,7 +567,7 @@ client_add_tag(Client* c, uint32_t tag)
 {
   if (c == NULL || tag >= 32)
     return;
-  c->tags |= (1u << tag);
+  c->tags |= (1U << tag);
 }
 
 /*
@@ -579,7 +579,7 @@ client_remove_tag(Client* c, uint32_t tag)
 {
   if (c == NULL || tag >= 32)
     return;
-  c->tags &= ~(1u << tag);
+  c->tags &= ~(1U << tag);
 }
 
 /*
@@ -591,7 +591,7 @@ client_has_tag(const Client* c, uint32_t tag)
 {
   if (c == NULL || tag >= 32)
     return false;
-  return (c->tags & (1u << tag)) != 0;
+  return (c->tags & (1U << tag)) != 0;
 }
 
 /*

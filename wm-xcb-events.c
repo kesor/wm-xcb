@@ -1,8 +1,8 @@
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
 
-#include "wm-log.h"
 #include "src/target/client.h"
+#include "wm-log.h"
 #include "wm-xcb-ewmh.h"
 #include "wm-xcb.h"
 

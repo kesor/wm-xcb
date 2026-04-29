@@ -8,14 +8,14 @@
  * - Hub registration
  */
 
-#include "test-registry.h"
-#include "test-wm.h"
 #include <string.h>
-#include "wm-hub.h"
-#include "src/sm/sm.h"
 #include "src/sm/sm-registry.h"
+#include "src/sm/sm.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
+#include "test-registry.h"
+#include "test-wm.h"
+#include "wm-hub.h"
 #include "wm-log.h"
 
 /* Callback helper for foreach tests */
@@ -24,7 +24,7 @@ static int g_callback_count = 0;
 static void
 inc_count_callback(Client* c)
 {
-  (void)c;
+  (void) c;
   g_callback_count++;
 }
 
@@ -191,7 +191,7 @@ test_client_sentinel_list(void)
   assert(client_list_contains_window(999) == false);
 
   /* Test next/prev traversal */
-  assert(client_get_next(c1) == NULL);  /* c1 is tail */
+  assert(client_get_next(c1) == NULL); /* c1 is tail */
   assert(client_get_next(c2) == c1);
   assert(client_get_next(c3) == c2);
 

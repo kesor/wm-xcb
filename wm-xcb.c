@@ -2,11 +2,11 @@
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
 
+#include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-log.h"
 #include "wm-running.h"
 #include "wm-states.h"
-#include "src/target/client.h"
 #include "wm-xcb-events.h"
 #include "wm-xcb.h"
 

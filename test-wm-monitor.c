@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "test-wm.h"
 #include "test-wm-monitor.h"
 #include "src/target/monitor.h"
 #include "src/target/client.h"
