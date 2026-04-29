@@ -1,4 +1,5 @@
 #include "test-wm.h"
+#include "test-registry.h"
 #include "wm-hub.h"
 
 /* Test component definitions - use TARGET_TYPE_NONE for proper termination */
@@ -752,11 +753,7 @@ test_unsubscribe_nonexistent_handler(void)
   assert(handler_a_calls == 1);              // handler_a still works
 }
 
-int
-main(void)
-{
-  LOG_CLEAN("=== Hub Registry Tests ===");
-
+TEST_GROUP(HubRegistry, {
   test_hub_init_shutdown();
   test_register_unregister_component();
   test_register_null_component();
@@ -778,9 +775,9 @@ main(void)
   test_duplicate_target_id_rejected();
   test_large_target_id_lookup();
   test_target_type_null_termination();
+});
 
-  LOG_CLEAN("\n=== Hub Event Bus Tests ===");
-
+TEST_GROUP(HubEventBus, {
   test_basic_subscribe_emit();
   test_multiple_subscribers();
   test_filter_by_event_type();
@@ -791,7 +788,4 @@ main(void)
   test_userdata_in_subscribe();
   test_duplicate_subscribe_rejected();
   test_unsubscribe_nonexistent_handler();
-
-  LOG_CLEAN("\n== All hub tests passed!");
-  return 0;
-}
+});
