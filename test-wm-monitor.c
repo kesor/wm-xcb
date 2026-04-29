@@ -5,15 +5,15 @@
  * Requires: hub, window-list
  */
 
-#include "test-registry.h"  /* Must be first - defines TEST_GROUP macro */
+#include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
 #include <assert.h>
 #include <stdlib.h>
 
-#include "test-wm.h"
 #include "test-wm-monitor.h"
-#include "wm-monitor.h"
+#include "test-wm.h"
 #include "wm-hub.h"
+#include "wm-monitor.h"
 #include "wm-window-list.h"
 
 void
@@ -26,10 +26,10 @@ test_monitor_create_destroy(void)
 
   /* Create a monitor */
   xcb_randr_output_t output = 100;
-  Monitor* m = monitor_create(output);
+  Monitor*           m      = monitor_create(output);
 
   assert(m != NULL);
-  assert(m->target.id == (TargetID)output);
+  assert(m->target.id == (TargetID) output);
   assert(m->target.type == TARGET_TYPE_MONITOR);
   assert(m->target.registered == true);
   assert(m->output == output);
@@ -48,13 +48,13 @@ test_monitor_create_destroy(void)
   assert(m->next == NULL);
 
   /* Verify it's registered with hub */
-  HubTarget* t = hub_get_target_by_id((TargetID)output);
+  HubTarget* t = hub_get_target_by_id((TargetID) output);
   assert(t != NULL);
   assert(t->type == TARGET_TYPE_MONITOR);
 
   /* Destroy */
   monitor_destroy(m);
-  assert(hub_get_target_by_id((TargetID)output) == NULL);
+  assert(hub_get_target_by_id((TargetID) output) == NULL);
 
   monitor_list_shutdown();
   hub_shutdown();
@@ -100,7 +100,7 @@ test_monitor_list_add_remove(void)
 
   /* Remove m2 */
   monitor_list_remove(m2);
-  monitor_destroy(m2);  /* Properly destroy after remove */
+  monitor_destroy(m2); /* Properly destroy after remove */
   assert(monitor_list_get_first() == m1);
 
   /* Remove m1 */
@@ -237,7 +237,7 @@ test_monitor_tag_operations(void)
 
   /* Invalid tag index should be safe */
   assert(monitor_tag_visible(m, -1) == false);
-  assert(monitor_tag_visible(m, 9) == false);  /* MONITOR_NUM_TAGS = 9 */
+  assert(monitor_tag_visible(m, 9) == false); /* MONITOR_NUM_TAGS = 9 */
 
   /* Clean up */
   monitor_destroy(m);
@@ -349,23 +349,23 @@ test_monitor_multiple_monitors(void)
   monitor_list_init();
 
   /* Create monitors with different outputs */
-  Monitor* m1 = monitor_create(100);  /* Primary */
-  m1->x      = 0;
-  m1->y      = 0;
-  m1->width  = 1920;
-  m1->height = 1080;
+  Monitor* m1 = monitor_create(100); /* Primary */
+  m1->x       = 0;
+  m1->y       = 0;
+  m1->width   = 1920;
+  m1->height  = 1080;
 
-  Monitor* m2 = monitor_create(200);  /* Secondary */
-  m2->x      = 1920;
-  m2->y      = 0;
-  m2->width  = 1920;
-  m2->height = 1080;
+  Monitor* m2 = monitor_create(200); /* Secondary */
+  m2->x       = 1920;
+  m2->y       = 0;
+  m2->width   = 1920;
+  m2->height  = 1080;
 
-  Monitor* m3 = monitor_create(300);  /* Tertiary */
-  m3->x      = 0;
-  m3->y      = 1080;
-  m3->width  = 3840;
-  m3->height = 2160;
+  Monitor* m3 = monitor_create(300); /* Tertiary */
+  m3->x       = 0;
+  m3->y       = 1080;
+  m3->width   = 3840;
+  m3->height  = 2160;
 
   /* All three should be registered */
   assert(hub_get_target_by_id(100) != NULL);
@@ -373,7 +373,7 @@ test_monitor_multiple_monitors(void)
   assert(hub_get_target_by_id(300) != NULL);
 
   /* Selection */
-  assert(monitor_get_selected() == m3);  /* Last created */
+  assert(monitor_get_selected() == m3); /* Last created */
 
   /* Destroy middle monitor */
   monitor_destroy(m2);
@@ -403,7 +403,7 @@ test_monitor_double_create(void)
 
   /* Try to create another with same output - will create a new monitor
    * but hub will reject duplicate ID */
-  Monitor* m2 = monitor_create(100);  /* This should fail in hub due to duplicate ID */
+  Monitor* m2 = monitor_create(100); /* This should fail in hub due to duplicate ID */
 
   /* m2 might be created but not registered, or registration fails */
   /* The current implementation allows creating with duplicate ID but
@@ -461,12 +461,12 @@ test_monitor_with_hub_integration(void)
   HubTarget** monitors = hub_get_targets_by_type(TARGET_TYPE_MONITOR);
   assert(monitors != NULL);
   assert(monitors[0] == &m->target);
-  assert(monitors[1] == NULL);  /* NULL-terminated */
+  assert(monitors[1] == NULL); /* NULL-terminated */
 
   /* Verify client type is separate */
   HubTarget** clients = hub_get_targets_by_type(TARGET_TYPE_CLIENT);
   assert(clients != NULL);
-  assert(clients[0] == NULL);  /* No clients */
+  assert(clients[0] == NULL); /* No clients */
 
   /* Clean up */
   hub_unregister_component("test-monitor-component");

@@ -180,9 +180,9 @@ client_list_shutdown(void)
    * Ownership is not established by this module. */
   Client* current = client_sentinel.next;
   while (current != &client_sentinel) {
-    Client* next = current->next;
+    Client* next  = current->next;
     current->next = NULL;
-    current = next;
+    current       = next;
   }
   client_sentinel.next = &client_sentinel;
 }
@@ -212,7 +212,7 @@ client_list_add(Client* c)
     return;
   }
   /* Insert at head of circular list */
-  c->next            = client_sentinel.next;
+  c->next              = client_sentinel.next;
   client_sentinel.next = c;
 }
 

@@ -6,19 +6,16 @@ DEBUG = 0
 CC = gcc
 
 # Required pkg-config packages
-PKGLIST = xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput
+PKGLIST = xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms
 
 PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST))
 PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST))
 
-# When using clang, add glibc include path (clang's default search doesn't include it)
-ifeq ($(CC),clang)
-	GLIBC_DEV := $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d ' ')
-	PKG_CFLAGS += -I$(GLIBC_DEV)
-endif
-
-# Vendor dependencies - symlink external headers for portable builds
-VENDOR_INCLUDES = -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
+# Always add glibc include path for clang tools
+# clang-tidy uses a standalone clang binary that does not include glibc in its search path
+GLIBC_DEV := $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d " ")
+PKG_CFLAGS += -I$(GLIBC_DEV)
+PKG_CFLAGS += -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
 CPPFLAGS = -DVERSION=\"${VERSION}\" -DWM_HUB_TESTING
 CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
@@ -88,8 +85,7 @@ $(NAME): ${OBJ} $(NAME).o
 # Generate compile_commands.json for clang tools
 # Forces recompilation with clang so clang-tidy can understand the flags
 compile-commands: clean
-	bear -- $(MAKE) CC=clang all
-	@$(MAKE) clean CC=gcc
+	@bear -- $(MAKE) -k CC=clang all
 
 # Format source files with clang-format
 format:
@@ -97,14 +93,23 @@ format:
 
 # Run clang-tidy on source files
 # Uses -p . to read compile_commands.json; adds glibc include path for nix
-tidy:
-	clang-tidy -p . --quiet \
-		-extra-arg=-I"$(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep \"glibc.*include\" | head -1 | tr -d ' ')" \
+tidy: compile-commands
+	@clang-tidy -p . --quiet \
+		-extra-arg=-I$(GLIBC_DEV) \
+		-extra-arg=-I. \
+		-extra-arg=-Ivendor/xcb-errors-include \
+		-extra-arg=-Ivendor/libxcb-errors/include \
+		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
 		${SRC} ${TEST_SRC}
-
 # Run clang static analyzer (requires compile_commands.json from bear)
 analyze:
-	clang -fsyntax-only -Xclang -analyze -Xclang -analyzer-output=text -p . ${SRC}
+	@clang-tidy -p . --quiet \
+		-extra-arg=-I$(GLIBC_DEV) \
+		-extra-arg=-I. \
+		-extra-arg=-Ivendor/xcb-errors-include \
+		-extra-arg=-Ivendor/libxcb-errors/include \
+		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
+		${SRC} ${TEST_SRC}
 
 # Run all development checks
 check: format tidy analyze
