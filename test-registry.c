@@ -22,11 +22,12 @@
 /*
  * Include all test headers to register their test groups
  */
+#include "test-wm.h"
 #include "test-wm-hub.h"
 #include "test-wm-monitor.h"
 #include "test-wm-window-list.h"
 #include "test-wm-xcb-handler.h"
-#include "test-wm.h"
+#include "test-target-client.h"
 
 /*
  * Registry linked list

@@ -34,7 +34,6 @@ SRC = \
 	$(NAME)-signals.c \
 	$(NAME)-running.c \
 	$(NAME)-window-list.c \
-	$(NAME)-clients.c \
 	$(NAME)-hub.c \
 	$(NAME)-monitor.c \
 	$(NAME)-xcb-ewmh.c \
@@ -45,7 +44,9 @@ SRC = \
 	src/xcb/xcb-handler.c \
 	src/sm/sm-template.c \
 	src/sm/sm-registry.c \
-	src/sm/sm-instance.c
+	src/sm/sm-instance.c \
+	src/target/client.c \
+	src/target/monitor.c
 
 OBJ = ${SRC:.c=.o}
 
@@ -54,7 +55,8 @@ TEST_SRC = \
 	test-$(NAME)-window-list.c \
 	test-$(NAME)-hub.c \
 	test-$(NAME)-xcb-handler.c \
-	test-$(NAME)-monitor.c
+	test-$(NAME)-monitor.c \
+	test-target-client.c
 
 # Header dependencies
 TEST_HDR = test-registry.h test-wm.h test-wm-window-list.h test-wm-hub.h test-wm-monitor.h
@@ -74,6 +76,9 @@ src/sm/%.o: src/sm/%.c
 	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
 
 src/xcb/%.o: src/xcb/%.c
+	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
+
+src/target/%.o: src/target/%.c
 	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
 
 -include $(OBJ:.o=.d)
@@ -115,8 +120,8 @@ analyze:
 check: format tidy analyze
 
 # Unified test runner - builds and runs all tests in a single executable
-test: test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o $(filter-out $(NAME).o, ${OBJ})
-	${CC} -o $@ test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+test: test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o $(filter-out $(NAME).o, ${OBJ})
+	${CC} -o $@ test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
 	./test
 
 clean:
