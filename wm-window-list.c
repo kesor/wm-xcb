@@ -152,3 +152,95 @@ void
 window_focus_clear(xcb_window_t window)
 {
 }
+
+/*
+ * Client list implementation
+ *
+ * This is a separate list from the window list (wnd_node_t).
+ * Client represents managed windows with WM-specific state.
+ *
+ * Ownership: This list does NOT own the Client objects. It maintains
+ * linkage for iteration only. Callers are responsible for allocating
+ * and freeing Client objects.
+ */
+
+/* Client list sentinel (circular list) */
+static Client client_sentinel;
+
+void
+client_list_init(void)
+{
+  client_sentinel.next = &client_sentinel;
+}
+
+void
+client_list_shutdown(void)
+{
+  /* Clear the list without freeing Client objects.
+   * Ownership is not established by this module. */
+  Client* current = client_sentinel.next;
+  while (current != &client_sentinel) {
+    Client* next = current->next;
+    current->next = NULL;
+    current = next;
+  }
+  client_sentinel.next = &client_sentinel;
+}
+
+Client*
+client_list_get_first(void)
+{
+  if (client_sentinel.next == &client_sentinel) {
+    return NULL;
+  }
+  return client_sentinel.next;
+}
+
+Client*
+client_list_get_next(Client* c)
+{
+  if (c == NULL || c->next == &client_sentinel) {
+    return NULL;
+  }
+  return c->next;
+}
+
+void
+client_list_add(Client* c)
+{
+  if (c == NULL) {
+    return;
+  }
+  /* Insert at head of circular list */
+  c->next            = client_sentinel.next;
+  client_sentinel.next = c;
+}
+
+void
+client_list_remove(Client* c)
+{
+  if (c == NULL) {
+    return;
+  }
+  /* Find previous node */
+  Client* prev = &client_sentinel;
+  while (prev->next != &client_sentinel && prev->next != c) {
+    prev = prev->next;
+  }
+  if (prev->next == c) {
+    prev->next = c->next;
+  }
+}
+
+Client*
+client_list_find(xcb_window_t window)
+{
+  Client* current = client_sentinel.next;
+  while (current != &client_sentinel) {
+    if (current->window == window) {
+      return current;
+    }
+    current = current->next;
+  }
+  return NULL;
+}
