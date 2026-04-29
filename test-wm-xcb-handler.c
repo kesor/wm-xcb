@@ -1,4 +1,5 @@
 #include "test-wm.h"
+#include "test-registry.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
 
@@ -46,7 +47,7 @@ test_xcb_handler_init_shutdown(void)
 {
   LOG_CLEAN("== Testing xcb_handler init and shutdown");
 
-  /* Initialize hub first (xcb_handler depends on it for logging) */
+  /* Initialize the hub first to keep test setup consistent. */
   hub_init();
 
   xcb_handler_init();
@@ -263,7 +264,7 @@ test_unregister_component(void)
 }
 
 void
-test_unregister_nonexistent_component(void)
+test_xcb_handler_unregister_nonexistent(void)
 {
   LOG_CLEAN("== Testing unregister non-existent component is safe");
 
@@ -387,11 +388,7 @@ test_dispatch_null_event(void)
   hub_shutdown();
 }
 
-int
-main(void)
-{
-  LOG_CLEAN("=== XCB Handler Registry Tests ===");
-
+TEST_GROUP(XCBHandler, {
   test_xcb_handler_init_shutdown();
   test_register_single_handler();
   test_register_multiple_handlers_same_event();
@@ -401,14 +398,11 @@ main(void)
   test_dispatch_no_handler();
   test_dispatch_with_synthetic_event_flag();
   test_unregister_component();
-  test_unregister_nonexistent_component();
+  test_xcb_handler_unregister_nonexistent();
   test_unregister_null_component();
   test_lookup_returns_null_for_empty();
   test_next_returns_null_at_end();
   test_register_with_null_handler_fails();
   test_register_with_null_component_fails();
   test_dispatch_null_event();
-
-  LOG_CLEAN("\n== All xcb handler tests passed!");
-  return 0;
-}
+});

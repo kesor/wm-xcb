@@ -97,7 +97,7 @@ format:
 # Uses -p . to read compile_commands.json; adds glibc include path for nix
 tidy:
 	clang-tidy -p . --quiet \
-		-extra-arg=-I"$(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d ' ')" \
+		-extra-arg=-I"$(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep \"glibc.*include\" | head -1 | tr -d ' ')" \
 		${SRC} ${TEST_SRC}
 
 # Run clang static analyzer (requires compile_commands.json from bear)
@@ -107,23 +107,13 @@ analyze:
 # Run all development checks
 check: format tidy analyze
 
-# Run all tests (each test is a separate executable)
-test: test-window-list test-hub test-xcb-handler
-	./test-window-list
-	./test-hub
-	./test-xcb-handler
-
-test-window-list: test-$(NAME)-window-list.o $(filter-out $(NAME).o, ${OBJ})
-	${CC} -o $@ test-$(NAME)-window-list.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
-
-test-hub: test-$(NAME)-hub.o $(filter-out $(NAME).o, ${OBJ})
-	${CC} -o $@ test-$(NAME)-hub.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
-
-test-xcb-handler: test-$(NAME)-xcb-handler.o $(filter-out $(NAME).o, ${OBJ})
-	${CC} -o $@ test-$(NAME)-xcb-handler.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+# Unified test runner - builds and runs all tests in a single executable
+test: test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o $(filter-out $(NAME).o, ${OBJ})
+	${CC} -o $@ test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+	./test
 
 clean:
-	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.txt compile_flags.txt test-window-list test-hub
+	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.json compile_flags.txt test-window-list test-hub test-xcb-handler
 
 container-start:
 	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc
@@ -144,4 +134,4 @@ test-sm-standalone: wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-registry.o 
 	$(CC) $(CFLAGS) -o $@ wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-registry.o src/sm/sm-instance.o test-sm-standalone.c
 	./test-sm-standalone
 
-.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone test-window-list test-hub test-xcb-handler
+.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone
