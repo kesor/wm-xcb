@@ -8,6 +8,7 @@
 /* Mock running for LOG_FATAL */
 sig_atomic_t running = 1;
 
+/* Minimal LOG mocks */
 #define LOG_DEBUG(pFormat, ...)                    \
   {                                                \
     printf("DEBUG: " pFormat "\n", ##__VA_ARGS__); \
@@ -19,7 +20,7 @@ sig_atomic_t running = 1;
   }
 
 #define LOG_ERROR(pFormat, ...)                             \
-  {                                                         \
+  {                                                        \
     fprintf(stderr, "ERROR: " pFormat "\n", ##__VA_ARGS__); \
   }
 
@@ -46,572 +47,524 @@ sig_atomic_t running = 1;
 #include "src/sm/sm-registry.h"
 #include "wm-hub.h"
 
-/* Track events for testing */
-static int hook_called = 0;
-static int raw_write_events_emitted = 0;
-static uint32_t last_raw_write_event = 0;
+/* ==================== TEST FIXTURE ==================== */
 
-void
-event_catcher(Event e)
-{
-  raw_write_events_emitted++;
-  last_raw_write_event = e.type;
-  LOG_DEBUG("Event caught: type=%u, target=%lu", e.type, (unsigned long) e.target);
+static int g_raw_write_events = 0;
+static uint32_t g_last_event = 0;
+
+static void event_catcher(Event e) {
+  g_raw_write_events++;
+  g_last_event = e.type;
+  LOG_DEBUG("Event caught: type=%u", e.type);
 }
 
-/* Simple test emitter that records events */
-static void
-test_emitter(StateMachine* sm, uint32_t from_state, uint32_t to_state, void* userdata)
-{
-  (void) sm;
-  (void) from_state;
-  (void) to_state;
-  (void) userdata;
+static void test_emitter(StateMachine* sm, uint32_t from, uint32_t to, void* ud) {
+  (void)sm; (void)from; (void)to; (void)ud;
   LOG_DEBUG("Custom emitter called");
-  raw_write_events_emitted++;
+  g_raw_write_events++;
 }
 
-/* Guard that always allows */
-static bool
-guard_allow(StateMachine* sm, void* data)
-{
-  (void) sm;
-  (void) data;
+/* Guard / Action helpers */
+static bool guard_allow(StateMachine* sm, void* data) {
+  (void)sm; (void)data;
   return true;
 }
 
-/* Guard that always rejects */
-static bool
-guard_deny(StateMachine* sm, void* data)
-{
-  (void) sm;
-  (void) data;
+static bool guard_deny(StateMachine* sm, void* data) {
+  (void)sm; (void)data;
   return false;
 }
 
-/* Guard that checks data */
-static bool
-guard_conditional(StateMachine* sm, void* data)
-{
-  (void) sm;
-  int* allow = (int*) data;
-  return allow != NULL && *allow;
+static bool guard_conditional(StateMachine* sm, void* data) {
+  (void)sm;
+  int* allow = (int*)data;
+  return allow && *allow;
 }
 
-/* Action that always fails */
-static bool
-action_fail(StateMachine* sm, void* data)
-{
-  (void) sm;
-  (void) data;
+static bool action_fail(StateMachine* sm, void* data) {
+  (void)sm; (void)data;
   return false;
 }
 
-/* Action that tracks calls */
-static bool
-action_track(StateMachine* sm, void* data)
-{
-  (void) sm;
-  int* count = (int*) data;
-  if (count != NULL)
-    (*count)++;
+static bool action_track(StateMachine* sm, void* data) {
+  (void)sm;
+  int* count = (int*)data;
+  if (count) (*count)++;
   return true;
 }
 
-/* Track hook calls per phase for comprehensive testing */
-static int hook_calls[SM_HOOK_MAX] = {0};
+/* Hook tracking */
+static int g_hook_calls[SM_HOOK_MAX];
+static int g_hook_order[SM_HOOK_MAX * 2];
+static int g_hook_order_count;
 
-/* Track hook execution order for order verification */
-static int hook_order[SM_HOOK_MAX * 2];
-static int hook_order_count = 0;
-
-void
-test_hook_fn(StateMachine* sm, void* userdata)
-{
-  (void) sm;
-  (void) userdata;
-  hook_called++;
+static void reset_hook_tracking(void) {
+  memset(g_hook_calls, 0, sizeof(g_hook_calls));
+  g_hook_order_count = 0;
 }
 
-/* Hook functions for each phase - track which phase called them */
-static void hook_pre_guard(StateMachine* sm, void* userdata) {
-  (void) sm; (void) userdata;
-  hook_calls[SM_HOOK_PRE_GUARD]++;
-  hook_order[hook_order_count++] = SM_HOOK_PRE_GUARD;
-}
-static void hook_post_guard(StateMachine* sm, void* userdata) {
-  (void) sm; (void) userdata;
-  hook_calls[SM_HOOK_POST_GUARD]++;
-  hook_order[hook_order_count++] = SM_HOOK_POST_GUARD;
-}
-static void hook_pre_action(StateMachine* sm, void* userdata) {
-  (void) sm; (void) userdata;
-  hook_calls[SM_HOOK_PRE_ACTION]++;
-  hook_order[hook_order_count++] = SM_HOOK_PRE_ACTION;
-}
-static void hook_post_action(StateMachine* sm, void* userdata) {
-  (void) sm; (void) userdata;
-  hook_calls[SM_HOOK_POST_ACTION]++;
-  hook_order[hook_order_count++] = SM_HOOK_POST_ACTION;
-}
-static void hook_pre_emit(StateMachine* sm, void* userdata) {
-  (void) sm; (void) userdata;
-  hook_calls[SM_HOOK_PRE_EMIT]++;
-  hook_order[hook_order_count++] = SM_HOOK_PRE_EMIT;
-}
-static void hook_post_emit(StateMachine* sm, void* userdata) {
-  (void) sm; (void) userdata;
-  hook_calls[SM_HOOK_POST_EMIT]++;
-  hook_order[hook_order_count++] = SM_HOOK_POST_EMIT;
+static void hook_pre_guard(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_calls[SM_HOOK_PRE_GUARD]++;
+  g_hook_order[g_hook_order_count++] = SM_HOOK_PRE_GUARD;
 }
 
-/* Hook with userdata to verify it's passed correctly */
+static void hook_post_guard(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_calls[SM_HOOK_POST_GUARD]++;
+  g_hook_order[g_hook_order_count++] = SM_HOOK_POST_GUARD;
+}
+
+static void hook_pre_action(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_calls[SM_HOOK_PRE_ACTION]++;
+  g_hook_order[g_hook_order_count++] = SM_HOOK_PRE_ACTION;
+}
+
+static void hook_post_action(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_calls[SM_HOOK_POST_ACTION]++;
+  g_hook_order[g_hook_order_count++] = SM_HOOK_POST_ACTION;
+}
+
+static void hook_pre_emit(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_calls[SM_HOOK_PRE_EMIT]++;
+  g_hook_order[g_hook_order_count++] = SM_HOOK_PRE_EMIT;
+}
+
+static void hook_post_emit(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_calls[SM_HOOK_POST_EMIT]++;
+  g_hook_order[g_hook_order_count++] = SM_HOOK_POST_EMIT;
+}
+
 static void hook_with_userdata(StateMachine* sm, void* userdata) {
-  (void) sm;
-  int* counter = (int*) userdata;
-  if (counter)
-    (*counter)++;
+  (void)sm;
+  int* counter = (int*)userdata;
+  if (counter) (*counter)++;
 }
 
-/* Hook that can be removed - verify removal works */
-static int hook_remove_test_count = 0;
-static void hook_remove_test(StateMachine* sm, void* userdata) {
-  (void) sm; (void) userdata;
-  hook_remove_test_count++;
+static int g_hook_remove_count = 0;
+static void hook_remove_test(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_remove_count++;
 }
 
-void
-test_sm_template_create_destroy()
-{
-  LOG_CLEAN("== Testing SMTemplate create/destroy");
+/* ==================== TEST HELPERS ==================== */
 
-  enum { STATE_A = 0,
-         STATE_B = 1,
-  };
+/* Simple state enum for most tests */
+enum { S0 = 0, S1 = 1, S2 = 2 };
 
-  uint32_t     states[]      = { STATE_A, STATE_B };
-  SMTransition transitions[] = {
-    { STATE_A, STATE_B, NULL, NULL, 10 },
-    { STATE_B, STATE_A, NULL, NULL, 11 },
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-sm",
-      states,
-      2,
-      transitions,
-      2,
-      STATE_A);
-
-  assert(tmpl != NULL);
-  assert(strcmp(sm_template_get_name(tmpl), "test-sm") == 0);
-  assert(tmpl->num_states == 2);
-  assert(tmpl->num_transitions == 2);
-  assert(tmpl->initial_state == STATE_A);
-
-  sm_template_destroy(tmpl);
+static SMTemplate* make_tmpl(const char* name, uint32_t* states, int nstates,
+                             SMTransition* trans, int ntrans, uint32_t init) {
+  return sm_template_create(name, states, nstates, trans, ntrans, init);
 }
 
-void
-test_sm_instance_create_destroy()
-{
-  LOG_CLEAN("== Testing StateMachine create/destroy");
+/* Create SM with custom emitter (no hub needed) */
+static StateMachine* make_sm(void* owner, SMTemplate* tmpl) {
+  return sm_create(owner, tmpl, test_emitter, NULL);
+}
 
-  enum { STATE_A = 0,
-         STATE_B = 1,
-  };
+/* ==================== TESTS ==================== */
 
-  uint32_t     states[]      = { STATE_A, STATE_B };
-  SMTransition transitions[] = {
-    { STATE_A, STATE_B, NULL, NULL, 10 },
-    { STATE_B, STATE_A, NULL, NULL, 11 },
-  };
+void test_tmpl_create_destroy(void) {
+  LOG_CLEAN("== SMTemplate create/destroy");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 10 }, { S1, S0, NULL, NULL, 11 } };
 
-  SMTemplate* tmpl = sm_template_create(
-      "test-instance",
-      states,
-      2,
-      transitions,
-      2,
-      STATE_A);
+  SMTemplate* t = make_tmpl("test", states, 2, trans, 2, S0);
+  assert(t != NULL);
+  assert(strcmp(sm_template_get_name(t), "test") == 0);
+  assert(t->num_states == 2);
+  assert(t->initial_state == S0);
+  sm_template_destroy(t);
+}
 
-  int           owner = 42;
-  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
+void test_sm_create_destroy(void) {
+  LOG_CLEAN("== StateMachine create/destroy");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 10 } };
+
+  SMTemplate* t = make_tmpl("test", states, 2, trans, 1, S0);
+  int owner = 42;
+  StateMachine* sm = make_sm(&owner, t);
 
   assert(sm != NULL);
-  assert(strcmp(sm_get_name(sm), "test-instance") == 0);
-  assert(sm_get_state(sm) == STATE_A);
+  assert(sm_get_state(sm) == S0);
   assert(sm->owner == &owner);
-  assert(sm_get_template(sm) == tmpl);
+  assert(strcmp(sm_get_name(sm), "test") == 0);
+  assert(sm_get_template(sm) == t);
 
   sm_destroy(sm);
-  sm_template_destroy(tmpl);
+  sm_template_destroy(t);
 }
 
-void
-test_sm_raw_write()
-{
-  LOG_CLEAN("== Testing sm_raw_write");
+void test_sm_create_requires_params(void) {
+  LOG_CLEAN("== sm_create requires owner and template");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 10 } };
+  SMTemplate* t = make_tmpl("test", states, 2, trans, 1, S0);
 
-  enum { STATE_A = 0,
-         STATE_B = 1,
-  };
+  /* NULL owner fails */
+  assert(sm_create(NULL, t, test_emitter, NULL) == NULL);
 
-  uint32_t     states[]      = { STATE_A, STATE_B };
-  SMTransition transitions[] = {
-    { STATE_A, STATE_B, NULL, NULL, 10 },
-    { STATE_B, STATE_A, NULL, NULL, 11 },
-  };
+  /* NULL template fails */
+  int owner = 0;
+  assert(sm_create(&owner, NULL, test_emitter, NULL) == NULL);
 
-  SMTemplate* tmpl = sm_template_create(
-      "test-raw-write",
-      states,
-      2,
-      transitions,
-      2,
-      STATE_A);
+  sm_template_destroy(t);
+}
 
-  int           owner = 0;
-  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
+void test_sm_set_emitter(void) {
+  LOG_CLEAN("== sm_set_emitter after creation");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 10 }, { S1, S0, NULL, NULL, 11 } };
+  SMTemplate* t = make_tmpl("test", states, 2, trans, 2, S0);
 
-  assert(sm_get_state(sm) == STATE_A);
+  int owner = 0;
+  StateMachine* sm = sm_create(&owner, t, NULL, NULL);
+  assert(sm != NULL);
+  assert(sm->emit == NULL);
 
-  sm_raw_write(sm, STATE_B);
-  assert(sm_get_state(sm) == STATE_B);
-
-  sm_raw_write(sm, STATE_A);
-  assert(sm_get_state(sm) == STATE_A);
+  /* Set emitter after creation */
+  sm_set_emitter(sm, test_emitter, NULL);
+  assert(sm->emit == test_emitter);
 
   sm_destroy(sm);
-  sm_template_destroy(tmpl);
+  sm_template_destroy(t);
 }
 
-void
-test_sm_raw_write_event_emission()
-{
-  LOG_CLEAN("== Testing sm_raw_write event emission");
+void test_raw_write(void) {
+  LOG_CLEAN("== sm_raw_write");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 10 }, { S1, S0, NULL, NULL, 11 } };
+  SMTemplate* t = make_tmpl("raw", states, 2, trans, 2, S0);
+
+  int owner = 0;
+  StateMachine* sm = make_sm(&owner, t);
+
+  assert(sm_get_state(sm) == S0);
+  sm_raw_write(sm, S1);
+  assert(sm_get_state(sm) == S1);
+  sm_raw_write(sm, S0);
+  assert(sm_get_state(sm) == S0);
+
+  sm_destroy(sm);
+  sm_template_destroy(t);
+}
+
+void test_raw_write_emits_via_hub(void) {
+  LOG_CLEAN("== sm_raw_write emits via hub");
   hub_init();
 
-  enum { STATE_OFF = 0,
-         STATE_ON  = 1,
-  };
-
-  /* Event types for transitions - use values within MAX_EVENT_TYPES (64) */
-#define EVT_OFF_TO_ON  20
-#define EVT_ON_TO_OFF 21
-
-  uint32_t     states[]      = { STATE_OFF, STATE_ON };
-  SMTransition transitions[] = {
-    { STATE_OFF, STATE_ON,  NULL, NULL, EVT_OFF_TO_ON },
-    { STATE_ON,  STATE_OFF, NULL, NULL, EVT_ON_TO_OFF },
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-raw-write-emit",
-      states,
-      2,
-      transitions,
-      2,
-      STATE_OFF);
+  enum { OFF = 20, ON = 21 };
+  uint32_t states[] = { OFF, ON };
+  SMTransition trans[] = { { OFF, ON, NULL, NULL, OFF }, { ON, OFF, NULL, NULL, ON } };
+  SMTemplate* t = make_tmpl("raw-emit", states, 2, trans, 2, OFF);
 
   HubTarget target = { .id = 42, .type = TARGET_TYPE_CLIENT, .registered = false };
   hub_register_target(&target);
 
-  /* Test 1: raw_write emits event via hub */
-  raw_write_events_emitted = 0;
-  hub_subscribe(EVT_OFF_TO_ON, event_catcher, NULL);
-  hub_subscribe(EVT_ON_TO_OFF, event_catcher, NULL);
+  hub_subscribe(OFF, event_catcher, NULL);
+  hub_subscribe(ON, event_catcher, NULL);
 
-  /* Pass target as owner so events include correct target_id */
-  StateMachine* sm    = sm_create(&target, tmpl, NULL, NULL);
+  g_raw_write_events = 0;
+  StateMachine* sm = sm_create(&target, t, NULL, NULL);
 
-  LOG_CLEAN("  Test 1: raw_write STATE_OFF -> STATE_ON");
-  sm_raw_write(sm, STATE_ON);
-  assert(sm_get_state(sm) == STATE_ON);
-  assert(raw_write_events_emitted == 1);
-  assert(last_raw_write_event == EVT_OFF_TO_ON);
+  sm_raw_write(sm, ON);
+  assert(sm_get_state(sm) == ON);
+  assert(g_raw_write_events == 1);
+  assert(g_last_event == OFF);
 
-  LOG_CLEAN("  Test 2: raw_write STATE_ON -> STATE_OFF");
-  sm_raw_write(sm, STATE_OFF);
-  assert(sm_get_state(sm) == STATE_OFF);
-  assert(raw_write_events_emitted == 2);
-  assert(last_raw_write_event == EVT_ON_TO_OFF);
+  sm_raw_write(sm, OFF);
+  assert(sm_get_state(sm) == OFF);
+  assert(g_raw_write_events == 2);
+  assert(g_last_event == ON);
 
-  hub_unsubscribe(EVT_OFF_TO_ON, event_catcher);
-  hub_unsubscribe(EVT_ON_TO_OFF, event_catcher);
-
+  hub_unsubscribe(OFF, event_catcher);
+  hub_unsubscribe(ON, event_catcher);
   hub_unregister_target(target.id);
 
-  /* Test 2: raw_write with custom emitter */
-  LOG_CLEAN("  Test 3: raw_write with custom EventEmitter");
-  raw_write_events_emitted = 0;
-  StateMachine* sm2 = sm_create(&target, tmpl, test_emitter, NULL);
-
-  sm_raw_write(sm2, STATE_ON);
-  assert(sm_get_state(sm2) == STATE_ON);
-  assert(raw_write_events_emitted == 1);
-
-  /* Test 3: raw_write succeeds for invalid transition (reality is authoritative) */
-  LOG_CLEAN("  Test 4: raw_write to invalid transition succeeds");
-  raw_write_events_emitted = 0;
-  /* STATE_ON -> STATE_ON is not a defined transition, but raw_write still updates state */
-  /* No event emitted because there's no transition OFF->ON from STATE_ON */
-  sm_raw_write(sm2, STATE_ON); /* Already in STATE_ON */
-  assert(sm_get_state(sm2) == STATE_ON);
-  /* Event NOT emitted because STATE_ON -> STATE_ON is not a valid transition */
-  assert(raw_write_events_emitted == 0);
-
-  sm_destroy(sm2);
   sm_destroy(sm);
-  sm_template_destroy(tmpl);
+  sm_template_destroy(t);
   hub_shutdown();
 }
 
-void
-test_sm_transition()
-{
-  LOG_CLEAN("== Testing sm_transition");
+void test_raw_write_with_custom_emitter(void) {
+  LOG_CLEAN("== sm_raw_write with custom emitter");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 10 }, { S1, S0, NULL, NULL, 11 } };
+  SMTemplate* t = make_tmpl("custom-emit", states, 2, trans, 2, S0);
 
-  enum { STATE_OFF = 0,
-         STATE_ON  = 1,
-  };
-
-  uint32_t     states[]      = { STATE_OFF, STATE_ON };
-  SMTransition transitions[] = {
-    { STATE_OFF, STATE_ON,  NULL, NULL, 100 },
-    { STATE_ON,  STATE_OFF, NULL, NULL, 101 },
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-transition",
-      states,
-      2,
-      transitions,
-      2,
-      STATE_OFF);
-
-  int           owner = 0;
-  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
-
-  assert(sm_transition(sm, STATE_ON) == true);
-  assert(sm_get_state(sm) == STATE_ON);
-
-  assert(sm_transition(sm, STATE_OFF) == true);
-  assert(sm_get_state(sm) == STATE_OFF);
-
-  assert(sm_transition(sm, STATE_OFF) == false);
-
-  sm_destroy(sm);
-  sm_template_destroy(tmpl);
-}
-
-void
-test_sm_hooks()
-{
-  LOG_CLEAN("== Testing sm hooks");
-
-  enum { STATE_A = 0,
-         STATE_B = 1,
-  };
-
-  uint32_t     states[]      = { STATE_A, STATE_B };
-  SMTransition transitions[] = {
-    { STATE_A, STATE_B, NULL, NULL, 0 },
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-hooks",
-      states,
-      2,
-      transitions,
-      1,
-      STATE_A);
-
-  int           owner = 0;
-  StateMachine* sm    = sm_create(&owner, tmpl, NULL, NULL);
-
-  hook_called = 0;
-  sm_add_hook(sm, SM_HOOK_POST_ACTION, test_hook_fn, NULL);
-  sm_transition(sm, STATE_B);
-  assert(hook_called == 1);
-
-  sm_destroy(sm);
-  sm_template_destroy(tmpl);
-}
-
-void
-test_sm_hooks_all_phases()
-{
-  LOG_CLEAN("== Testing all hook phases");
-  sm_registry_init();
-
-  /* Register guard and action needed for testing */
-  sm_register_guard("allow_all", guard_allow);
-  sm_register_action("action_track", action_track);
-
-  enum { STATE_IDLE = 0,
-         STATE_WORK = 1,
-         STATE_DONE = 2,
-  };
-
-  uint32_t     states[]      = { STATE_IDLE, STATE_WORK, STATE_DONE };
-  SMTransition transitions[] = {
-    { STATE_IDLE, STATE_WORK, "allow_all", "action_track", 35 },
-    { STATE_WORK, STATE_DONE, NULL,         "action_track", 36 },
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-all-hooks",
-      states,
-      3,
-      transitions,
-      2,
-      STATE_IDLE);
-
-  int action_count = 0;
   int owner = 0;
-  StateMachine* sm = sm_create(&owner, tmpl, NULL, NULL);
-  sm->data = &action_count;
+  StateMachine* sm = make_sm(&owner, t);
 
-  /* Add hooks for all phases */
-  sm_add_hook(sm, SM_HOOK_PRE_GUARD,   hook_pre_guard,   NULL);
-  sm_add_hook(sm, SM_HOOK_POST_GUARD,  hook_post_guard,  NULL);
-  sm_add_hook(sm, SM_HOOK_PRE_ACTION,  hook_pre_action,  NULL);
-  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_post_action, NULL);
-  sm_add_hook(sm, SM_HOOK_PRE_EMIT,    hook_pre_emit,    NULL);
-  sm_add_hook(sm, SM_HOOK_POST_EMIT,   hook_post_emit,    NULL);
+  g_raw_write_events = 0;
+  sm_raw_write(sm, S1);
+  assert(g_raw_write_events == 1);
 
-  /* Subscribe to events so emit hooks get called */
-  hub_init();
-  hub_subscribe(35, event_catcher, NULL);
-  hub_subscribe(36, event_catcher, NULL);
+  sm_destroy(sm);
+  sm_template_destroy(t);
+}
 
-  /* Reset hook call counts and order tracking */
-  for (int i = 0; i < SM_HOOK_MAX; i++)
-    hook_calls[i] = 0;
-  hook_order_count = 0;
+void test_transition(void) {
+  LOG_CLEAN("== sm_transition");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 100 }, { S1, S0, NULL, NULL, 101 } };
+  SMTemplate* t = make_tmpl("trans", states, 2, trans, 2, S0);
 
-  /* Transition IDLE -> WORK (with guard and action, emits event 35) */
-  assert(sm_transition(sm, STATE_WORK) == true);
-  assert(hook_calls[SM_HOOK_PRE_GUARD]  == 1);
-  assert(hook_calls[SM_HOOK_POST_GUARD] == 1);
-  assert(hook_calls[SM_HOOK_PRE_ACTION]  == 1);
-  assert(hook_calls[SM_HOOK_POST_ACTION] == 1);
-  assert(hook_calls[SM_HOOK_PRE_EMIT]    == 1);
-  assert(hook_calls[SM_HOOK_POST_EMIT]   == 1);
+  int owner = 0;
+  StateMachine* sm = make_sm(&owner, t);
 
-  /* Verify hook execution order */
-  assert(hook_order_count == 6);
-  assert(hook_order[0] == SM_HOOK_PRE_GUARD);
-  assert(hook_order[1] == SM_HOOK_POST_GUARD);
-  assert(hook_order[2] == SM_HOOK_PRE_ACTION);
-  assert(hook_order[3] == SM_HOOK_POST_ACTION);
-  assert(hook_order[4] == SM_HOOK_PRE_EMIT);
-  assert(hook_order[5] == SM_HOOK_POST_EMIT);
+  assert(sm_transition(sm, S1) == true);
+  assert(sm_get_state(sm) == S1);
 
-  LOG_CLEAN("  Test: all hooks called in correct order for transition with event");
+  assert(sm_transition(sm, S0) == true);
+  assert(sm_get_state(sm) == S0);
 
-  /* Transition WORK -> DONE (no guard defined, has action, emits event 36) */
-  for (int i = 0; i < SM_HOOK_MAX; i++)
-    hook_calls[i] = 0;
-  hook_order_count = 0;
+  /* Invalid transition: no path from S0 to S0 */
+  assert(sm_transition(sm, S0) == false);
 
-  assert(sm_transition(sm, STATE_DONE) == true);
-  /* PRE/POST_GUARD hooks always run (even when no guard_fn is configured) */
-  assert(hook_calls[SM_HOOK_PRE_GUARD]  == 1);
-  assert(hook_calls[SM_HOOK_POST_GUARD] == 1);
-  assert(hook_calls[SM_HOOK_PRE_ACTION]  == 1);
-  assert(hook_calls[SM_HOOK_POST_ACTION] == 1);
-  assert(hook_calls[SM_HOOK_PRE_EMIT]    == 1);
-  assert(hook_calls[SM_HOOK_POST_EMIT]   == 1);
+  sm_destroy(sm);
+  sm_template_destroy(t);
+}
 
-  /* Verify order: PRE_GUARD, POST_GUARD run (guard hooks always called),
-   * then PRE_ACTION, POST_ACTION, PRE_EMIT, POST_EMIT */
-  assert(hook_order_count == 6);
-  assert(hook_order[0] == SM_HOOK_PRE_GUARD);
-  assert(hook_order[1] == SM_HOOK_POST_GUARD);
-  assert(hook_order[2] == SM_HOOK_PRE_ACTION);
-  assert(hook_order[3] == SM_HOOK_POST_ACTION);
-  assert(hook_order[4] == SM_HOOK_PRE_EMIT);
-  assert(hook_order[5] == SM_HOOK_POST_EMIT);
+void test_can_transition(void) {
+  LOG_CLEAN("== sm_can_transition");
+  uint32_t states[] = { S0, S1, S2 };
+  SMTransition trans[] = {
+    { S0, S1, NULL, NULL, 0 },
+    { S1, S2, NULL, NULL, 0 },
+  };
+  SMTemplate* t = make_tmpl("can-trans", states, 3, trans, 2, S0);
 
-  LOG_CLEAN("  Test: hooks called in correct order for transition without guard");
+  int owner = 0;
+  StateMachine* sm = make_sm(&owner, t);
 
-  /* Test hooks receive correct userdata */
-  LOG_CLEAN("  Test: hooks receive correct userdata");
-  StateMachine* sm2 = sm_create(&owner, tmpl, NULL, NULL);
-  int userdata_counter = 0;
+  /* From S0: can go to S1, but not to S2 */
+  assert(sm_can_transition(sm, S1) == true);
+  assert(sm_can_transition(sm, S2) == false);
 
-  sm_add_hook(sm2, SM_HOOK_POST_ACTION, hook_with_userdata, &userdata_counter);
-  sm_add_hook(sm2, SM_HOOK_POST_ACTION, hook_with_userdata, &userdata_counter);
+  sm_destroy(sm);
+  sm_template_destroy(t);
+}
 
-  sm_raw_write(sm2, STATE_IDLE);
-  sm_transition(sm2, STATE_WORK);
-  assert(userdata_counter == 2); /* Both hooks called with same userdata */
+void test_transition_with_guards(void) {
+  LOG_CLEAN("== sm_transition with guards");
+  sm_registry_init();
+  sm_register_guard("allow", guard_allow);
+  sm_register_guard("deny", guard_deny);
+  sm_register_guard("cond", guard_conditional);
 
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = {
+    { S0, S1, "allow", NULL, 40 },
+    { S1, S0, "deny",  NULL, 41 },
+  };
+  SMTemplate* t = make_tmpl("guards", states, 2, trans, 2, S0);
+
+  int owner = 0;
+
+  /* Test 1: allowing guard */
+  g_raw_write_events = 0;
+  StateMachine* sm1 = make_sm(&owner, t);
+  assert(sm_transition(sm1, S1) == true);
+  assert(sm_get_state(sm1) == S1);
+  sm_destroy(sm1);
+
+  /* Test 2: denying guard blocks transition */
+  StateMachine* sm2 = make_sm(&owner, t);
+  assert(sm_transition(sm2, S1) == true); /* S0 -> S1 with "allow" */
+  g_raw_write_events = 0;
+  assert(sm_transition(sm2, S0) == false); /* blocked by "deny" */
+  assert(sm_get_state(sm2) == S1);
+  assert(g_raw_write_events == 0); /* no event emitted */
   sm_destroy(sm2);
 
-  /* Test hook removal */
-  LOG_CLEAN("  Test: hook can be removed");
-  StateMachine* sm3 = sm_create(&owner, tmpl, NULL, NULL);
-  hook_remove_test_count = 0;
-  hook_called = 0;
+  /* Test 3: conditional guard based on data */
+  SMTransition ctrans[] = { { S0, S1, "cond", NULL, 42 } };
+  SMTemplate* ct = make_tmpl("cond", states, 2, ctrans, 1, S0);
 
-  sm_add_hook(sm3, SM_HOOK_POST_ACTION, hook_remove_test, NULL);
-  sm_add_hook(sm3, SM_HOOK_POST_ACTION, test_hook_fn, NULL);
+  int allow_true = 1;
+  StateMachine* sm_allow = make_sm(&owner, ct);
+  sm_allow->data = &allow_true;
+  assert(sm_transition(sm_allow, S1) == true);
+  sm_destroy(sm_allow);
 
-  sm_raw_write(sm3, STATE_IDLE);
-  sm_transition(sm3, STATE_WORK);
-  assert(hook_remove_test_count == 1);
-  assert(hook_called == 1);
+  int allow_false = 0;
+  StateMachine* sm_deny = make_sm(&owner, ct);
+  sm_deny->data = &allow_false;
+  assert(sm_transition(sm_deny, S1) == false);
+  sm_destroy(sm_deny);
 
-  /* Remove hook_remove_test */
-  sm_remove_hook(sm3, SM_HOOK_POST_ACTION, hook_remove_test);
-  hook_remove_test_count = 0;
-  hook_called = 0;
-
-  /* Transition again - removed hook should not be called */
-  sm_raw_write(sm3, STATE_IDLE);
-  sm_transition(sm3, STATE_WORK);
-  assert(hook_remove_test_count == 0); /* Removed hook not called */
-  assert(hook_called == 1); /* Other hook still called */
-
-  sm_destroy(sm3);
-  sm_destroy(sm);
-  sm_template_destroy(tmpl);
-  hub_shutdown();
+  sm_template_destroy(ct);
+  sm_template_destroy(t);
   sm_registry_shutdown();
 }
 
-void
-test_sm_hooks_order()
-{
-  LOG_CLEAN("== Testing hook order");
+void test_transition_with_actions(void) {
+  LOG_CLEAN("== sm_transition with actions");
+  sm_registry_init();
+  sm_register_action("track", action_track);
+  sm_register_action("fail", action_fail);
 
-  /* Register guard for this test */
-  sm_register_guard("allow_hook_test", guard_allow);
-
-  enum { STATE_OFF = 0,
-         STATE_ON  = 1,
+  uint32_t states[] = { S0, S1, S2 };
+  SMTransition trans[] = {
+    { S0, S1, NULL, "track", 30 },
+    { S1, S2, NULL, "track", 31 },
+    { S0, S2, NULL, "fail",  32 },
   };
-
-  uint32_t     states[]      = { STATE_OFF, STATE_ON };
-  SMTransition transitions[] = {
-    { STATE_OFF, STATE_ON, "allow_hook_test", NULL, 10 },
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-hook-order",
-      states,
-      2,
-      transitions,
-      1,
-      STATE_OFF);
+  SMTemplate* t = make_tmpl("actions", states, 3, trans, 3, S0);
 
   int owner = 0;
-  StateMachine* sm = sm_create(&owner, tmpl, NULL, NULL);
 
-  /* Add simple tracking hooks for each phase */
+  /* Action runs on successful transition */
+  int count = 0;
+  StateMachine* sm1 = make_sm(&owner, t);
+  sm1->data = &count;
+  g_raw_write_events = 0;
+
+  assert(sm_transition(sm1, S1) == true);
+  assert(count == 1);
+  assert(g_raw_write_events == 1);
+  sm_destroy(sm1);
+
+  /* Chain of actions */
+  count = 0;
+  StateMachine* sm2 = make_sm(&owner, t);
+  sm2->data = &count;
+  assert(sm_transition(sm2, S1) == true);
+  assert(sm_transition(sm2, S2) == true);
+  assert(count == 2);
+  sm_destroy(sm2);
+
+  /* Failed action prevents transition */
+  StateMachine* sm3 = make_sm(&owner, t);
+  assert(sm_transition(sm3, S2) == false);
+  assert(sm_get_state(sm3) == S0); /* unchanged */
+  sm_destroy(sm3);
+
+  sm_template_destroy(t);
+  sm_registry_shutdown();
+}
+
+void test_complete_flow(void) {
+  LOG_CLEAN("== sm_transition complete flow");
+  sm_registry_init();
+  sm_register_guard("can_work", guard_allow);
+  sm_register_action("do_work", action_track);
+
+  uint32_t states[] = { S0, S1, S2 };
+  SMTransition trans[] = {
+    { S0, S1, "can_work", "do_work", 35 },
+    { S1, S2, NULL,       "do_work", 36 },
+  };
+  SMTemplate* t = make_tmpl("flow", states, 3, trans, 2, S0);
+
+  int owner = 0;
+  int count = 0;
+  StateMachine* sm = make_sm(&owner, t);
+  sm->data = &count;
+
+  /* Valid transition with guard + action */
+  g_raw_write_events = 0;
+  assert(sm_transition(sm, S1) == true);
+  assert(sm_get_state(sm) == S1);
+  assert(g_raw_write_events == 1);
+  assert(count == 1);
+
+  /* Transition without guard */
+  count = 0;
+  sm_raw_write(sm, S0);
+  sm->data = &count;
+  assert(sm_transition(sm, S1) == true);
+  assert(count == 1);
+
+  /* get_available_transitions */
+  sm_raw_write(sm, S0);
+  uint32_t n = 0;
+  uint32_t* avail = sm_get_available_transitions(sm, &n);
+  assert(avail != NULL);
+  assert(n == 1);
+  assert(avail[0] == S1);
+  free(avail);
+
+  sm_destroy(sm);
+  sm_template_destroy(t);
+  sm_registry_shutdown();
+}
+
+void test_invalid_transition_rejected(void) {
+  LOG_CLEAN("== invalid transition rejected");
+  sm_registry_init();
+  sm_register_guard("can_open", guard_allow);
+
+  enum { LOCKED = 0, OPEN = 1, BROKEN = 2 };
+  uint32_t states[] = { LOCKED, OPEN, BROKEN };
+  SMTransition trans[] = {
+    { LOCKED, OPEN,   "can_open", NULL, 50 },
+    { OPEN,   LOCKED, NULL,       NULL, 51 },
+    { OPEN,   BROKEN, NULL,       NULL, 52 },
+    { BROKEN, OPEN,   "can_open", NULL, 53 },
+  };
+  SMTemplate* t = make_tmpl("invalid", states, 3, trans, 4, LOCKED);
+
+  int owner = 0;
+  StateMachine* sm = make_sm(&owner, t);
+
+  /* No path LOCKED -> BROKEN */
+  assert(sm_transition(sm, BROKEN) == false);
+  assert(sm_get_state(sm) == LOCKED);
+
+  /* Valid transition works */
+  g_raw_write_events = 0;
+  assert(sm_transition(sm, OPEN) == true);
+  assert(sm_get_state(sm) == OPEN);
+  assert(g_raw_write_events == 1);
+
+  sm_destroy(sm);
+  sm_template_destroy(t);
+  sm_registry_shutdown();
+}
+
+void test_hooks_basic(void) {
+  LOG_CLEAN("== sm hooks basic");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 0 } };
+  SMTemplate* t = make_tmpl("hooks", states, 2, trans, 1, S0);
+
+  int called = 0;
+  void hook_fn(StateMachine* sm, void* ud) { (void)sm; (void)ud; called++; }
+
+  int owner = 0;
+  StateMachine* sm = make_sm(&owner, t);
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_fn, NULL);
+  sm_transition(sm, S1);
+  assert(called == 1);
+
+  sm_destroy(sm);
+  sm_template_destroy(t);
+}
+
+void test_hooks_all_phases(void) {
+  LOG_CLEAN("== sm hooks all phases");
+  sm_registry_init();
+  sm_register_guard("allow_all", guard_allow);
+  sm_register_action("track", action_track);
+
+  enum { IDLE = 0, WORK = 1, DONE = 2 };
+  uint32_t states[] = { IDLE, WORK, DONE };
+  SMTransition trans[] = {
+    { IDLE, WORK, "allow_all", "track", 35 },
+    { WORK, DONE, NULL,        "track", 36 },
+  };
+  SMTemplate* t = make_tmpl("all-hooks", states, 3, trans, 2, IDLE);
+
+  int owner = 0;
+  StateMachine* sm = make_sm(&owner, t);
+
+  /* Add hooks for all phases */
   sm_add_hook(sm, SM_HOOK_PRE_GUARD,   hook_pre_guard,   NULL);
   sm_add_hook(sm, SM_HOOK_POST_GUARD,  hook_post_guard,  NULL);
   sm_add_hook(sm, SM_HOOK_PRE_ACTION,  hook_pre_action,  NULL);
@@ -620,393 +573,112 @@ test_sm_hooks_order()
   sm_add_hook(sm, SM_HOOK_POST_EMIT,   hook_post_emit,   NULL);
 
   hub_init();
-  hub_subscribe(10, event_catcher, NULL);
+  hub_subscribe(35, event_catcher, NULL);
 
+  reset_hook_tracking();
+  sm_transition(sm, WORK);
+
+  /* All phases called */
   for (int i = 0; i < SM_HOOK_MAX; i++)
-    hook_calls[i] = 0;
-  hook_order_count = 0;
+    assert(g_hook_calls[i] == 1);
 
-  sm_transition(sm, STATE_ON);
+  /* Correct order */
+  assert(g_hook_order_count == 6);
+  assert(g_hook_order[0] == SM_HOOK_PRE_GUARD);
+  assert(g_hook_order[1] == SM_HOOK_POST_GUARD);
+  assert(g_hook_order[2] == SM_HOOK_PRE_ACTION);
+  assert(g_hook_order[3] == SM_HOOK_POST_ACTION);
+  assert(g_hook_order[4] == SM_HOOK_PRE_EMIT);
+  assert(g_hook_order[5] == SM_HOOK_POST_EMIT);
 
-  /* Verify all phases called and in correct order */
-  assert(hook_calls[SM_HOOK_PRE_GUARD]   == 1);
-  assert(hook_calls[SM_HOOK_POST_GUARD]  == 1);
-  assert(hook_calls[SM_HOOK_PRE_ACTION]  == 1);
-  assert(hook_calls[SM_HOOK_POST_ACTION] == 1);
-  assert(hook_calls[SM_HOOK_PRE_EMIT]    == 1);
-  assert(hook_calls[SM_HOOK_POST_EMIT]   == 1);
+  hub_unsubscribe(35, event_catcher);
 
-  /* Verify exact execution order */
-  assert(hook_order_count == 6);
-  assert(hook_order[0] == SM_HOOK_PRE_GUARD);
-  assert(hook_order[1] == SM_HOOK_POST_GUARD);
-  assert(hook_order[2] == SM_HOOK_PRE_ACTION);
-  assert(hook_order[3] == SM_HOOK_POST_ACTION);
-  assert(hook_order[4] == SM_HOOK_PRE_EMIT);
-  assert(hook_order[5] == SM_HOOK_POST_EMIT);
+  /* Transition without guard still runs guard hooks */
+  hub_subscribe(36, event_catcher, NULL);
+  reset_hook_tracking();
+  sm_transition(sm, DONE);
+  for (int i = 0; i < SM_HOOK_MAX; i++)
+    assert(g_hook_calls[i] == 1);
 
-  LOG_CLEAN("  Test: all hooks called in phase order");
+  hub_unsubscribe(36, event_catcher);
+  hub_shutdown();
+  sm_destroy(sm);
+  sm_template_destroy(t);
+  sm_registry_shutdown();
+}
+
+void test_hooks_userdata(void) {
+  LOG_CLEAN("== sm hooks userdata");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 0 } };
+  SMTemplate* t = make_tmpl("ud", states, 2, trans, 1, S0);
+
+  int counter = 0;
+  int owner = 0;
+  StateMachine* sm = make_sm(&owner, t);
+
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_with_userdata, &counter);
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_with_userdata, &counter);
+
+  sm_transition(sm, S1);
+  assert(counter == 2);
 
   sm_destroy(sm);
-  sm_template_destroy(tmpl);
-  hub_shutdown();
+  sm_template_destroy(t);
 }
 
-void
-test_sm_transition_with_guards()
-{
-  LOG_CLEAN("== Testing sm_transition with guards");
-  sm_registry_init();
+void test_hooks_removal(void) {
+  LOG_CLEAN("== sm hooks removal");
+  uint32_t states[] = { S0, S1 };
+  SMTransition trans[] = { { S0, S1, NULL, NULL, 0 } };
+  SMTemplate* t = make_tmpl("removal", states, 2, trans, 1, S0);
 
-  enum { STATE_OFF = 0,
-         STATE_ON  = 1,
-  };
-
-  /* Register guards */
-  sm_register_guard("guard_allow", guard_allow);
-  sm_register_guard("guard_deny", guard_deny);
-  sm_register_guard("guard_conditional", guard_conditional);
-
-  uint32_t     states[]      = { STATE_OFF, STATE_ON };
-  SMTransition transitions[] = {
-    { STATE_OFF, STATE_ON,  "guard_allow",     NULL, 40 },  /* Changed from 200 to 40 */
-    { STATE_ON,  STATE_OFF, "guard_deny",      NULL, 41 },  /* Changed from 201 to 41 */
-    { STATE_OFF, STATE_ON,  "guard_conditional", NULL, 42 }, /* Changed from 202 to 42 */
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-transition-guards",
-      states,
-      2,
-      transitions,
-      3,
-      STATE_OFF);
+  int called = 0;
+  void hook_a(StateMachine* sm, void* ud) { (void)sm; (void)ud; called++; }
 
   int owner = 0;
-  hub_init();
+  StateMachine* sm = make_sm(&owner, t);
 
-  /* Test 1: Guard that allows */
-  LOG_CLEAN("  Test 1: transition with allowing guard");
-  StateMachine* sm1 = sm_create(&owner, tmpl, NULL, NULL);
-  raw_write_events_emitted = 0;
-  hub_subscribe(40, event_catcher, NULL);  /* Changed from 200 to 40 */
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_a, NULL);
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_remove_test, NULL);
 
-  assert(sm_transition(sm1, STATE_ON) == true);
-  assert(sm_get_state(sm1) == STATE_ON);
-  assert(raw_write_events_emitted == 1);
+  called = 0;
+  g_hook_remove_count = 0;
+  sm_transition(sm, S1);
+  assert(called == 1);
+  assert(g_hook_remove_count == 1);
 
-  hub_unsubscribe(40, event_catcher);  /* Changed from 200 to 40 */
-  sm_destroy(sm1);
+  /* Remove one hook */
+  sm_remove_hook(sm, SM_HOOK_POST_ACTION, hook_remove_test);
+  called = 0;
+  g_hook_remove_count = 0;
+  sm_raw_write(sm, S0);
+  sm_transition(sm, S1);
+  assert(called == 1);
+  assert(g_hook_remove_count == 0); /* removed */
 
-  /* Test 2: Guard that denies - transition fails */
-  LOG_CLEAN("  Test 2: transition rejected by denying guard");
-  StateMachine* sm2 = sm_create(&owner, tmpl, NULL, NULL);
-  assert(sm_get_state(sm2) == STATE_OFF);
-
-  /* STATE_ON -> STATE_OFF has guard_deny which always rejects */
-  assert(sm_transition(sm2, STATE_ON) == true); /* guard_allow passes */
-  assert(sm_get_state(sm2) == STATE_ON);
-
-  /* Now try STATE_ON -> STATE_OFF with guard_deny */
-  raw_write_events_emitted = 0;
-  hub_subscribe(41, event_catcher, NULL);  /* Changed from 201 to 41 */
-  assert(sm_transition(sm2, STATE_OFF) == false); /* guard_deny rejects */
-  assert(sm_get_state(sm2) == STATE_ON); /* State unchanged */
-  assert(raw_write_events_emitted == 0); /* No event emitted */
-
-  hub_unsubscribe(41, event_catcher);  /* Changed from 201 to 41 */
-  sm_destroy(sm2);
-
-  /* Test 3: Conditional guard based on data */
-  LOG_CLEAN("  Test 3: conditional guard with data");
-  StateMachine* sm3 = sm_create(&owner, tmpl, NULL, NULL);
-  sm3->data = NULL;  /* Default - no data */
-  assert(sm_transition(sm3, STATE_ON) == true); /* guard_allow passes */
-  assert(sm_get_state(sm3) == STATE_ON);
-
-  /* Reset to OFF, try with conditional guard */
-  sm_raw_write(sm3, STATE_OFF);
-
-  /* Manually test a transition with conditional guard */
-  /* We need to create a new SM with just conditional transitions */
-  SMTransition cond_trans[] = {
-    { STATE_OFF, STATE_ON, "guard_conditional", NULL, 42 },  /* Changed from 202 to 42 */
-  };
-  SMTemplate* cond_tmpl = sm_template_create(
-      "test-conditional",
-      states,
-      2,
-      cond_trans,
-      1,
-      STATE_OFF);
-
-  /* With data = allow = true */
-  int allow_true = 1;
-  StateMachine* sm_allow = sm_create(&owner, cond_tmpl, NULL, NULL);
-  sm_allow->data = &allow_true;
-  assert(sm_transition(sm_allow, STATE_ON) == true);
-  assert(sm_get_state(sm_allow) == STATE_ON);
-  sm_destroy(sm_allow);
-
-  /* With data = allow = false */
-  int allow_false = 0;
-  StateMachine* sm_deny = sm_create(&owner, cond_tmpl, NULL, NULL);
-  sm_deny->data = &allow_false;
-  assert(sm_transition(sm_deny, STATE_ON) == false);
-  assert(sm_get_state(sm_deny) == STATE_OFF);
-  sm_destroy(sm_deny);
-
-  sm_template_destroy(cond_tmpl);
-  sm_template_destroy(tmpl);
-  hub_shutdown();
-  sm_registry_shutdown();
-}
-
-void
-test_sm_transition_with_actions()
-{
-  LOG_CLEAN("== Testing sm_transition with actions");
-  sm_registry_init();
-  hub_init();
-
-  enum { STATE_A = 0,
-         STATE_B = 1,
-         STATE_C = 2,
-  };
-
-  /* Register actions */
-  sm_register_action("action_track", action_track);
-  sm_register_action("action_fail", action_fail);
-
-  uint32_t     states[]      = { STATE_A, STATE_B, STATE_C };
-  SMTransition transitions[] = {
-    { STATE_A, STATE_B, NULL, "action_track", 30 },   /* Changed from 300 */
-    { STATE_B, STATE_C, NULL, "action_track", 31 },  /* Changed from 301 */
-    { STATE_A, STATE_C, NULL, "action_fail",  32 },   /* Changed from 302 */
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-transition-actions",
-      states,
-      3,
-      transitions,
-      3,
-      STATE_A);
-
-  int owner = 0;
-
-  /* Test 1: Action is executed on transition */
-  LOG_CLEAN("  Test 1: action executed on successful transition");
-  int action_count = 0;
-  StateMachine* sm1 = sm_create(&owner, tmpl, NULL, NULL);
-  sm1->data = &action_count;
-
-  raw_write_events_emitted = 0;
-  hub_subscribe(30, event_catcher, NULL);  /* Changed from 300 */
-
-  assert(sm_transition(sm1, STATE_B) == true);
-  assert(sm_get_state(sm1) == STATE_B);
-  assert(action_count == 1);
-  assert(raw_write_events_emitted == 1);
-
-  hub_unsubscribe(30, event_catcher);  /* Changed from 300 */
-  sm_destroy(sm1);
-
-  /* Test 2: Multiple actions via chain */
-  LOG_CLEAN("  Test 2: multiple transitions with actions");
-  action_count = 0;
-  StateMachine* sm2 = sm_create(&owner, tmpl, NULL, NULL);
-  sm2->data = &action_count;
-
-  assert(sm_transition(sm2, STATE_B) == true);
-  assert(action_count == 1);
-
-  hub_subscribe(31, event_catcher, NULL);  /* Changed from 301 */
-  assert(sm_transition(sm2, STATE_C) == true);
-  assert(action_count == 2);
-  hub_unsubscribe(31, event_catcher);  /* Changed from 301 */
-
-  sm_destroy(sm2);
-
-  /* Test 3: Transition fails if action fails */
-  LOG_CLEAN("  Test 3: transition fails when action fails");
-  StateMachine* sm3 = sm_create(&owner, tmpl, NULL, NULL);
-
-  /* Try A -> C with action_fail - should fail */
-  assert(sm_transition(sm3, STATE_C) == false);
-  assert(sm_get_state(sm3) == STATE_A); /* State unchanged */
-
-  sm_destroy(sm3);
-
-  sm_template_destroy(tmpl);
-  hub_shutdown();
-  sm_registry_shutdown();
-}
-
-void
-test_sm_transition_complete_flow()
-{
-  LOG_CLEAN("== Testing sm_transition complete flow");
-  sm_registry_init();
-  hub_init();
-
-  enum { STATE_IDLE = 0,
-         STATE_WORK = 1,
-         STATE_DONE = 2,
-  };
-
-  /* Register guard and action */
-  sm_register_guard("can_start_work", guard_allow);
-  sm_register_action("do_work", action_track);
-
-  uint32_t     states[]      = { STATE_IDLE, STATE_WORK, STATE_DONE };
-  SMTransition transitions[] = {
-    { STATE_IDLE, STATE_WORK, "can_start_work", "do_work", 35 },  /* Changed from 400 */
-    { STATE_WORK, STATE_DONE, NULL,             "do_work", 36 }, /* Changed from 401 */
-    { STATE_DONE, STATE_IDLE, NULL,             NULL,       0   },
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-complete-flow",
-      states,
-      3,
-      transitions,
-      3,
-      STATE_IDLE);
-
-  int owner = 0;
-  int action_count = 0;
-  StateMachine* sm = sm_create(&owner, tmpl, NULL, NULL);
-  sm->data = &action_count;
-
-  /* Subscribe to events */
-  hub_subscribe(35, event_catcher, NULL);  /* Changed from 400 */
-  hub_subscribe(36, event_catcher, NULL);  /* Changed from 401 */
-  raw_write_events_emitted = 0;
-
-  /* Test 1: Valid transition succeeds and emits event */
-  LOG_CLEAN("  Test 1: valid transition succeeds and emits event");
-  assert(sm_get_state(sm) == STATE_IDLE);
-  assert(sm_transition(sm, STATE_WORK) == true);
-  assert(sm_get_state(sm) == STATE_WORK);
-  assert(raw_write_events_emitted == 1);
-
-  /* Test 2: Action is executed on successful transition */
-  LOG_CLEAN("  Test 2: action executed on successful transition");
-  action_count = 0;
-  sm_raw_write(sm, STATE_IDLE);  /* Reset */
-  sm->data = &action_count;
-  assert(sm_transition(sm, STATE_WORK) == true);
-  assert(action_count == 1);
-
-  /* Test 3: sm_get_state returns current state */
-  LOG_CLEAN("  Test 3: sm_get_state returns correct state");
-  sm_raw_write(sm, STATE_DONE);
-  assert(sm_get_state(sm) == STATE_DONE);
-
-  /* Test 4: sm_get_available_transitions returns valid next states */
-  LOG_CLEAN("  Test 4: sm_get_available_transitions returns valid states");
-  uint32_t count = 0;
-  uint32_t* available = sm_get_available_transitions(sm, &count);
-  assert(available != NULL);
-  assert(count == 1);
-  assert(available[0] == STATE_IDLE);
-  free(available);
-
-  /* Test from STATE_IDLE */
-  sm_raw_write(sm, STATE_IDLE);
-  available = sm_get_available_transitions(sm, &count);
-  assert(available != NULL);
-  assert(count == 1);
-  assert(available[0] == STATE_WORK);
-  free(available);
-
-  /* Test from STATE_WORK */
-  sm_raw_write(sm, STATE_WORK);
-  available = sm_get_available_transitions(sm, &count);
-  assert(available != NULL);
-  assert(count == 1);
-  assert(available[0] == STATE_DONE);
-  free(available);
-
-  hub_unsubscribe(35, event_catcher);  /* Changed from 400 */
-  hub_unsubscribe(36, event_catcher);  /* Changed from 401 */
   sm_destroy(sm);
-  sm_template_destroy(tmpl);
-  hub_shutdown();
-  sm_registry_shutdown();
+  sm_template_destroy(t);
 }
 
-void
-test_sm_transition_invalid_rejected()
-{
-  LOG_CLEAN("== Testing invalid transition rejected by guard");
-  sm_registry_init();
-  hub_init();
-
-  enum { STATE_LOCKED = 0,
-         STATE_OPEN   = 1,
-         STATE_BROKEN = 2,
-  };
-
-  /* Guard that only allows opening if not already broken */
-  sm_register_guard("guard_can_open", guard_allow);
-
-  uint32_t     states[]      = { STATE_LOCKED, STATE_OPEN, STATE_BROKEN };
-  SMTransition transitions[] = {
-    { STATE_LOCKED, STATE_OPEN,   "guard_can_open", NULL, 50 },  /* Changed from 500 */
-    { STATE_OPEN,   STATE_LOCKED, NULL,             NULL, 51 },  /* Changed from 501 */
-    { STATE_OPEN,   STATE_BROKEN, NULL,             NULL, 52 },  /* Changed from 502 */
-    { STATE_BROKEN, STATE_OPEN,   "guard_can_open", NULL, 53 },  /* Changed from 503 */
-  };
-
-  SMTemplate* tmpl = sm_template_create(
-      "test-invalid-rejected",
-      states,
-      3,
-      transitions,
-      4,
-      STATE_LOCKED);
-
-  int owner = 0;
-  StateMachine* sm = sm_create(&owner, tmpl, NULL, NULL);
-
-  /* Test: Invalid transition (no transition defined) is rejected */
-  LOG_CLEAN("  Test: transition from LOCKED to BROKEN (no transition) is rejected");
-  assert(sm_get_state(sm) == STATE_LOCKED);
-  assert(sm_transition(sm, STATE_BROKEN) == false); /* No transition LOCKED -> BROKEN */
-  assert(sm_get_state(sm) == STATE_LOCKED); /* State unchanged */
-
-  /* Valid transition: LOCKED -> OPEN */
-  LOG_CLEAN("  Test: valid transition LOCKED -> OPEN");
-  hub_subscribe(50, event_catcher, NULL);  /* Changed from 500 */
-  raw_write_events_emitted = 0;
-  assert(sm_transition(sm, STATE_OPEN) == true);
-  assert(sm_get_state(sm) == STATE_OPEN);
-  assert(raw_write_events_emitted == 1);
-
-  hub_unsubscribe(50, event_catcher);  /* Changed from 500 */
-  sm_destroy(sm);
-  sm_template_destroy(tmpl);
-  hub_shutdown();
-  sm_registry_shutdown();
-}
-
-int
-main()
-{
-  test_sm_template_create_destroy();
-  test_sm_instance_create_destroy();
-  test_sm_raw_write();
-  test_sm_raw_write_event_emission();
-  test_sm_transition();
-  test_sm_transition_with_guards();
-  test_sm_transition_with_actions();
-  test_sm_transition_complete_flow();
-  test_sm_transition_invalid_rejected();
-  test_sm_hooks();
-  test_sm_hooks_all_phases();
-  test_sm_hooks_order();
+int main(void) {
+  test_tmpl_create_destroy();
+  test_sm_create_destroy();
+  test_sm_create_requires_params();
+  test_sm_set_emitter();
+  test_raw_write();
+  test_raw_write_emits_via_hub();
+  test_raw_write_with_custom_emitter();
+  test_transition();
+  test_can_transition();
+  test_transition_with_guards();
+  test_transition_with_actions();
+  test_complete_flow();
+  test_invalid_transition_rejected();
+  test_hooks_basic();
+  test_hooks_all_phases();
+  test_hooks_userdata();
+  test_hooks_removal();
 
   LOG_CLEAN("All SM tests passed!");
   return 0;
