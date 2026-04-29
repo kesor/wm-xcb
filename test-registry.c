@@ -25,7 +25,7 @@
 #include "test-wm.h"
 #include "test-wm-window-list.h"
 #include "test-wm-hub.h"
-/* Add more test headers as needed */
+#include "test-wm-xcb-handler.h"
 
 /*
  * Registry linked list
