@@ -10,3 +10,4 @@ task-*.txt
 test-*
 !test-*.c
 !test-*.h
+test
