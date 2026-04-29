@@ -46,7 +46,7 @@ test_xcb_handler_init_shutdown(void)
 {
   LOG_CLEAN("== Testing xcb_handler init and shutdown");
 
-  /* Initialize hub first (xcb_handler depends on it for logging) */
+  /* Initialize the hub first to keep test setup consistent. */
   hub_init();
 
   xcb_handler_init();

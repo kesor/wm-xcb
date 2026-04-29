@@ -110,7 +110,7 @@ check: format tidy analyze
 # Run all tests (each test is a separate executable)
 test: test-window-list test-hub test-xcb-handler
 	./test-window-list
-	./test-hub
+	./test-hub test-xcb-handler
 	./test-xcb-handler
 
 test-window-list: test-$(NAME)-window-list.o $(filter-out $(NAME).o, ${OBJ})
@@ -123,7 +123,7 @@ test-xcb-handler: test-$(NAME)-xcb-handler.o $(filter-out $(NAME).o, ${OBJ})
 	${CC} -o $@ test-$(NAME)-xcb-handler.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
 
 clean:
-	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.txt compile_flags.txt test-window-list test-hub
+	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.json compile_flags.txt test-window-list test-hub test-xcb-handler
 
 container-start:
 	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc
