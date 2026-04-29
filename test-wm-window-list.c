@@ -176,7 +176,7 @@ test_client_create_duplicate()
   Client* c1 = client_create(1);
   assert(c1 != NULL);
 
-  /* Creating same window again should return existing client */
+  /* Creating same window again should return NULL (already registered) */
   Client* c2 = client_create(1);
   assert(c2 == NULL); /* Should fail - already exists */
   assert(client_list_count() == 1);

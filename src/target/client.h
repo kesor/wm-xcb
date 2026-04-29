@@ -3,9 +3,9 @@
  *
  * A Client represents a managed X11 window. It owns:
  * - X properties (window, title, class, geometry)
- * - Adopted state machines (on-demand allocation)
  * - Monitor and tag associations
  * - Linked list links for window ordering
+ * - State machine slots (allocated on demand by components)
  *
  * Uses a sentinel-based circular doubly-linked list for efficient
  * insertion, removal, and iteration.
@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
-#include "../../wm-hub.h"
+#include "wm-hub.h"
 #include "../sm/sm-registry.h"
 #include "../sm/sm.h"
 
@@ -179,10 +179,10 @@ uint32_t client_count_managed(void);
  */
 
 /*
- * Get a state machine adopted by this client by name.
- * Allocates the SM on first access (on-demand allocation).
+ * Get a state machine attached to this client by name.
  *
- * Returns NULL if the component providing this SM is not adopted.
+ * Returns the StateMachine pointer stored via client_set_sm(), or
+ * NULL if no state machine has been attached for the given name.
  */
 StateMachine* client_get_sm(Client* c, const char* sm_name);
 

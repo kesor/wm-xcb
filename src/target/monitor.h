@@ -1,14 +1,15 @@
 /*
  * Monitor Target - Physical display entity for the window manager
  *
- * A Monitor represents a physical display (RandR output). It owns:
+ * A Monitor represents a physical display (RandR output). This header
+ * provides the Monitor type definition and its public API declarations.
+ *
+ * It owns:
  * - RandR properties (output, crtc)
  * - Geometry (position and resolution)
  * - Adopted state machines
  * - Tag state and layout configuration
- *
- * Note: Client associations are decoupled - use hub or client_list
- * to query clients by monitor, rather than storing Client pointers.
+ * - Client list associations (decoupled via window IDs)
  */
 
 #ifndef _MONITOR_H_
@@ -19,7 +20,7 @@
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 
-#include "../../wm-hub.h"
+#include "wm-hub.h"
 #include "../sm/sm.h"
 
 /*

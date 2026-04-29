@@ -137,7 +137,9 @@ destruct_xcb()
   /* Shutdown XCB handler registry */
   xcb_handler_shutdown();
 
-  /* Client list is cleaned up when clients are destroyed individually */
+  /* Tear down any remaining managed clients before disconnecting XCB */
+  client_list_shutdown();
+
   xcb_disconnect(dpy);
 }
 

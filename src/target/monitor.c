@@ -14,9 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../wm-hub.h"
-#include "../../wm-log.h"
 #include "monitor.h"
+#include "wm-hub.h"
+#include "wm-log.h"
 
 /*
  * Monitor list

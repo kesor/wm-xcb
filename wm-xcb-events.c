@@ -267,7 +267,8 @@ handle_reparent_notify(xcb_reparent_notify_event_t* event)
   Client* c = client_create(event->window);
   if (c != NULL) {
     /* Set initial geometry from reparent event */
-    /* TODO: Set monitor association based on parent */
+    c->x = event->x;
+    c->y = event->y;
   }
 }
 
