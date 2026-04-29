@@ -152,16 +152,16 @@ static void hook_with_userdata(StateMachine* sm, void* userdata) {
 }
 
 /* Hook for test_hooks_basic */
-static int g_hook_basic_count = 0;
-static void hook_basic_fn(StateMachine* sm, void* ud) {
-  (void)sm; (void)ud;
-  g_hook_basic_count++;
-}
-
 static int g_hook_remove_count = 0;
 static void hook_remove_test(StateMachine* sm, void* ud) {
   (void)sm; (void)ud;
   g_hook_remove_count++;
+}
+
+static int g_hook_basic_count = 0;
+static void hook_basic_fn(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_basic_count++;
 }
 
 /* ==================== TEST HELPERS ==================== */
@@ -647,22 +647,22 @@ void test_hooks_removal(void) {
   int owner = 0;
   StateMachine* sm = make_sm(&owner, t);
 
-  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_removal_fn, NULL);
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_basic_fn, NULL);
   sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_remove_test, NULL);
 
-  g_hook_removal_count = 0;
+  g_hook_basic_count = 0;
   g_hook_remove_count = 0;
   sm_transition(sm, S1);
-  assert(g_hook_removal_count == 1);
+  assert(g_hook_basic_count == 1);
   assert(g_hook_remove_count == 1);
 
   /* Remove one hook */
   sm_remove_hook(sm, SM_HOOK_POST_ACTION, hook_remove_test);
-  g_hook_removal_count = 0;
+  g_hook_basic_count = 0;
   g_hook_remove_count = 0;
   sm_raw_write(sm, S0);
   sm_transition(sm, S1);
-  assert(g_hook_removal_count == 1);
+  assert(g_hook_basic_count == 1);
   assert(g_hook_remove_count == 0); /* removed */
 
   sm_destroy(sm);
