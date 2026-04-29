@@ -21,7 +21,7 @@
 /*
  * Monitor list
  */
-static Monitor* monitor_list      = NULL;
+static Monitor* monitor_list     = NULL;
 Monitor*        selected_monitor = NULL;
 
 /*
@@ -40,7 +40,7 @@ monitor_list_init(void)
     }
     monitor_list = next;
   }
-  monitor_list      = NULL;
+  monitor_list     = NULL;
   selected_monitor = NULL;
 }
 
@@ -60,7 +60,7 @@ monitor_list_shutdown(void)
     free(monitor_list);
     monitor_list = next;
   }
-  monitor_list      = NULL;
+  monitor_list     = NULL;
   selected_monitor = NULL;
 }
 

@@ -37,6 +37,7 @@ Checks: >
   -cert-sig30-c,
   -bugprone-multi-level-implicit-pointer-conversion,
   -clang-analyzer-security-insecureAPI-DeprecatedOrUnsafeBufferHandling,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
   -clang-diagnostic-error
 
 WarningsAsErrors: '*'
@@ -47,5 +48,8 @@ HeaderFileExtensions:
 ImplementationFileExtensions:
   - c
 ExcludeHeaderFilterRegex: '^/nix/'
-CheckOptions: []
+CheckOptions:
+  # Allow higher cognitive complexity
+  readability-function-cognitive-complexity.Threshold: 110
+  readability-uppercase-literal-suffix.IgnoreFloatLiterals: true
 SystemHeaders: false

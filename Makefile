@@ -17,7 +17,7 @@ GLIBC_DEV := $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include"
 PKG_CFLAGS += -I$(GLIBC_DEV)
 PKG_CFLAGS += -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
-CPPFLAGS = -DVERSION=\"${VERSION}\" -DWM_HUB_TESTING
+CPPFLAGS = -DVERSION=\"${VERSION}\" -DWM_HUB_TESTING -D_DEFAULT_SOURCE
 CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
 LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
 
@@ -97,20 +97,26 @@ format:
 # Uses -p . to read compile_commands.json; adds glibc include path for nix
 tidy: compile-commands
 	@clang-tidy -p . --quiet \
+		-extra-arg=-DWM_HUB_TESTING \
+		-extra-arg=-D_DEFAULT_SOURCE \
 		-extra-arg=-I$(GLIBC_DEV) \
-		-extra-arg=-I. \
-		-extra-arg=-Ivendor/xcb-errors-include \
-		-extra-arg=-Ivendor/libxcb-errors/include \
-		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
+		-extra-arg=-I$(abspath .) \
+		-extra-arg=-I$(abspath src) \
+		-extra-arg=-I$(abspath vendor/xcb-errors-include) \
+		-extra-arg=-I$(abspath vendor/libxcb-errors/include) \
+		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto xcb-errors 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
 		${SRC} ${TEST_SRC}
 # Run clang static analyzer (requires compile_commands.json from bear)
 analyze:
 	@clang-tidy -p . --quiet \
+		-extra-arg=-DWM_HUB_TESTING \
+		-extra-arg=-D_DEFAULT_SOURCE \
 		-extra-arg=-I$(GLIBC_DEV) \
-		-extra-arg=-I. \
-		-extra-arg=-Ivendor/xcb-errors-include \
-		-extra-arg=-Ivendor/libxcb-errors/include \
-		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
+		-extra-arg=-I$(abspath .) \
+		-extra-arg=-I$(abspath src) \
+		-extra-arg=-I$(abspath vendor/xcb-errors-include) \
+		-extra-arg=-I$(abspath vendor/libxcb-errors/include) \
+		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto xcb-errors 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
 		${SRC} ${TEST_SRC}
 
 # Run all development checks

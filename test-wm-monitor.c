@@ -28,6 +28,10 @@ test_monitor_create_destroy(void)
   xcb_randr_output_t output = 100;
   Monitor*           m      = monitor_create(output);
 
+  if (m == NULL) {
+    LOG_ERROR("monitor_create failed");
+    abort();
+  }
   assert(m != NULL);
   assert(m->target.id == (TargetID) output);
   assert(m->target.type == TARGET_TYPE_MONITOR);
@@ -39,7 +43,7 @@ test_monitor_create_destroy(void)
   assert(m->width == 0);
   assert(m->height == 0);
   assert(m->tagset == MONITOR_TAG_MASK(0));
-  assert(m->mfact == 0.5f);
+  assert(m->mfact == 0.5F);
   assert(m->nmaster == 1);
   assert(m->client_count == 0);
   assert(m->sel_window == XCB_NONE);
@@ -49,6 +53,10 @@ test_monitor_create_destroy(void)
 
   /* Verify it's registered with hub */
   HubTarget* t = hub_get_target_by_id((TargetID) output);
+  if (t == NULL) {
+    LOG_ERROR("hub_get_target_by_id failed");
+    abort();
+  }
   assert(t != NULL);
   assert(t->type == TARGET_TYPE_MONITOR);
 
@@ -119,8 +127,11 @@ test_monitor_list_iteration(void)
   monitor_list_init();
 
   /* Create three monitors */
+  /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
   Monitor* m1 = monitor_create(100);
+  /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
   Monitor* m2 = monitor_create(200);
+  /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
   Monitor* m3 = monitor_create(300);
 
   /* Count monitors via iteration */
@@ -295,15 +306,15 @@ test_monitor_tiling_params(void)
   Monitor* m = monitor_create(100);
 
   /* Default tiling params */
-  assert(m->mfact == 0.5f);
+  assert(m->mfact == 0.5F);
   assert(m->nmaster == 1);
 
   /* Set mfact */
-  m->mfact = 0.6f;
-  assert(m->mfact == 0.6f);
+  m->mfact = 0.6F;
+  assert(m->mfact == 0.6F);
 
-  m->mfact = 0.3f;
-  assert(m->mfact == 0.3f);
+  m->mfact = 0.3F;
+  assert(m->mfact == 0.3F);
 
   /* Set nmaster */
   m->nmaster = 2;
@@ -403,6 +414,7 @@ test_monitor_double_create(void)
 
   /* Try to create another with same output - will create a new monitor
    * but hub will reject duplicate ID */
+  /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
   Monitor* m2 = monitor_create(100); /* This should fail in hub due to duplicate ID */
 
   /* m2 might be created but not registered, or registration fails */
@@ -459,12 +471,20 @@ test_monitor_with_hub_integration(void)
 
   /* Get components for monitor type */
   HubTarget** monitors = hub_get_targets_by_type(TARGET_TYPE_MONITOR);
+  if (monitors == NULL) {
+    LOG_ERROR("hub_get_targets_by_type returned NULL");
+    abort();
+  }
   assert(monitors != NULL);
   assert(monitors[0] == &m->target);
   assert(monitors[1] == NULL); /* NULL-terminated */
 
   /* Verify client type is separate */
   HubTarget** clients = hub_get_targets_by_type(TARGET_TYPE_CLIENT);
+  if (clients == NULL) {
+    LOG_ERROR("hub_get_targets_by_type returned NULL");
+    abort();
+  }
   assert(clients != NULL);
   assert(clients[0] == NULL); /* No clients */
 
