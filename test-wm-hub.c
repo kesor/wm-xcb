@@ -2,8 +2,36 @@
 #include "test-registry.h"
 #include "wm-hub.h"
 
+/* Test request types */
+enum TestRequestType {
+  REQ_TEST_FULLSCREEN = 1,
+  REQ_TEST_FOCUS      = 3,
+  REQ_TEST_TILE       = 6,
+  REQ_TEST_TAG        = 7,
+};
+
+/* Executor call tracking for request routing tests */
+static int executor_call_count = 0;
+static RequestType last_executor_request_type = 0;
+static TargetID last_executor_target = 0;
+static void* last_executor_data = NULL;
+
+static void test_executor(Request* req) {
+  executor_call_count++;
+  last_executor_request_type = req->type;
+  last_executor_target = req->target;
+  last_executor_data = req->data;
+}
+
+static void test_monitor_executor(Request* req) {
+  executor_call_count++;
+  last_executor_request_type = req->type;
+  last_executor_target = req->target;
+  last_executor_data = req->data;
+}
+
 /* Test component definitions - use TARGET_TYPE_NONE for proper termination */
-static RequestType fullscreen_requests[] = { 1, 2, 0 }; /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */
+static RequestType fullscreen_requests[] = { REQ_TEST_FULLSCREEN, 2, 0 };
 static TargetType  client_targets[]      = { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE };
 static TargetType  monitor_targets[]     = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
 
@@ -11,22 +39,25 @@ static HubComponent test_fullscreen = {
   .name       = "fullscreen",
   .requests   = fullscreen_requests,
   .targets    = client_targets,
+  .executor   = test_executor,
   .registered = false,
 };
 
 /* test_focus handles request type 1 AND 3 (for override/fallback testing) */
-static RequestType  focus_requests[] = { 1, 3, 0 }; /* REQ_CLIENT_FOCUS = 3, also handles 1 */
+static RequestType  focus_requests[] = { REQ_TEST_FOCUS, REQ_TEST_FULLSCREEN, 0 };
 static HubComponent test_focus       = {
-        .name       = "focus",
-        .requests   = focus_requests,
-        .targets    = client_targets,
-        .registered = false,
+  .name       = "focus",
+  .requests   = focus_requests,
+  .targets    = client_targets,
+  .executor   = test_executor,
+  .registered = false,
 };
 
 static HubComponent test_monitor = {
   .name       = "monitor",
-  .requests   = (RequestType[]) { 4, 5, 0 }, /* REQ_MONITOR_* = 4, 5 */
+  .requests   = (RequestType[]) { 4, 5, 0 },
   .targets    = monitor_targets,
+  .executor   = test_monitor_executor,
   .registered = false,
 };
 
@@ -775,6 +806,200 @@ TEST_GROUP(HubRegistry, {
   test_duplicate_target_id_rejected();
   test_large_target_id_lookup();
   test_target_type_null_termination();
+});
+
+/* Request Routing Tests */
+
+void
+test_request_routes_to_correct_component(void)
+{
+  LOG_CLEAN("== Testing request routes to correct component");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+  hub_register_component(&test_focus);
+
+  executor_call_count = 0;
+
+  /* Send REQ_TEST_FULLSCREEN - should route to test_fullscreen */
+  hub_send_request(REQ_TEST_FULLSCREEN, 100, NULL);
+  assert(executor_call_count == 1);
+  assert(last_executor_request_type == REQ_TEST_FULLSCREEN);
+  assert(last_executor_target == 100);
+
+  /* Send REQ_TEST_FOCUS - should route to test_focus */
+  hub_send_request(REQ_TEST_FOCUS, 101, NULL);
+  assert(executor_call_count == 2);
+  assert(last_executor_request_type == REQ_TEST_FOCUS);
+  assert(last_executor_target == 101);
+
+  hub_shutdown();
+}
+
+void
+test_request_with_data(void)
+{
+  LOG_CLEAN("== Testing request passes data to executor");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+
+  executor_call_count = 0;
+  last_executor_data = NULL;
+
+  int test_data = 42;
+  hub_send_request(REQ_TEST_FULLSCREEN, 100, &test_data);
+
+  assert(executor_call_count == 1);
+  assert(last_executor_data == &test_data);
+
+  hub_shutdown();
+}
+
+void
+test_request_unhandled_type_no_crash(void)
+{
+  LOG_CLEAN("== Testing request with unhandled type does not crash");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+
+  executor_call_count = 0;
+
+  /* Request type 999 is not handled by any component */
+  hub_send_request(999, 100, NULL);
+  assert(executor_call_count == 0); /* Should not call any executor */
+
+  hub_shutdown();
+}
+
+void
+test_request_no_component_registered(void)
+{
+  LOG_CLEAN("== Testing request when no component registered");
+
+  hub_init();
+
+  executor_call_count = 0;
+
+  /* No components registered - should not crash */
+  hub_send_request(REQ_TEST_FULLSCREEN, 100, NULL);
+  assert(executor_call_count == 0);
+
+  hub_shutdown();
+}
+
+void
+test_request_with_concrete_target(void)
+{
+  LOG_CLEAN("== Testing request with concrete target ID");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+  hub_register_target(&test_client1);
+
+  executor_call_count = 0;
+
+  hub_send_request(REQ_TEST_FULLSCREEN, test_client1.id, NULL);
+  assert(executor_call_count == 1);
+  assert(last_executor_target == test_client1.id);
+
+  hub_shutdown();
+}
+
+void
+test_broadcast_request(void)
+{
+  LOG_CLEAN("== Testing broadcast request to all targets of type");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+  hub_register_target(&test_client1);
+  hub_register_target(&test_client2);
+
+  executor_call_count = 0;
+
+  /* Broadcast REQ_TEST_FULLSCREEN to all clients */
+  hub_broadcast_request(REQ_TEST_FULLSCREEN, TARGET_TYPE_CLIENT, NULL);
+
+  assert(executor_call_count == 2); /* Both clients should receive */
+  assert(last_executor_request_type == REQ_TEST_FULLSCREEN);
+
+  hub_shutdown();
+}
+
+void
+test_broadcast_empty_when_no_targets(void)
+{
+  LOG_CLEAN("== Testing broadcast request when no targets of type exist");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+
+  executor_call_count = 0;
+
+  /* No clients registered - should not crash */
+  hub_broadcast_request(REQ_TEST_FULLSCREEN, TARGET_TYPE_CLIENT, NULL);
+  assert(executor_call_count == 0);
+
+  hub_shutdown();
+}
+
+void
+test_target_resolution_concrete_ids(void)
+{
+  LOG_CLEAN("== Testing target resolution passes through concrete IDs");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+
+  executor_call_count = 0;
+
+  /* Concrete ID should pass through unchanged */
+  hub_send_request(REQ_TEST_FULLSCREEN, 12345, NULL);
+  assert(executor_call_count == 1);
+  assert(last_executor_target == 12345);
+
+  hub_shutdown();
+}
+
+void
+test_component_without_executor(void)
+{
+  LOG_CLEAN("== Testing component without executor does not crash");
+
+  hub_init();
+
+  /* Component without executor - use static arrays like other components */
+  static RequestType noexec_requests[] = { REQ_TEST_FULLSCREEN, 0 };
+  static HubComponent no_exec_comp = {
+    .name       = "noexec",
+    .requests   = noexec_requests,
+    .targets    = client_targets,
+    .executor   = NULL,
+    .registered = false,
+  };
+
+  hub_register_component(&no_exec_comp);
+
+  executor_call_count = 0;
+
+  hub_send_request(REQ_TEST_FULLSCREEN, 100, NULL);
+  assert(executor_call_count == 0); /* No executor called */
+
+  hub_shutdown();
+}
+
+TEST_GROUP(HubRequestRouting, {
+  test_request_routes_to_correct_component();
+  test_request_with_data();
+  test_request_unhandled_type_no_crash();
+  test_request_no_component_registered();
+  test_request_with_concrete_target();
+  test_broadcast_request();
+  test_broadcast_empty_when_no_targets();
+  test_target_resolution_concrete_ids();
+  test_component_without_executor();
 });
 
 TEST_GROUP(HubEventBus, {

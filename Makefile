@@ -39,6 +39,8 @@ SRC = \
 	$(NAME)-window-list.c \
 	$(NAME)-clients.c \
 	$(NAME)-hub.c \
+	$(NAME)-client.c \
+	$(NAME)-monitor.c \
 	$(NAME)-xcb-ewmh.c \
 	$(NAME)-xcb-events.c \
 	$(NAME)-states.c \

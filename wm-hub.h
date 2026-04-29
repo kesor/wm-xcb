@@ -8,13 +8,22 @@
 typedef struct HubComponent HubComponent;
 typedef struct HubTarget    HubTarget;
 typedef struct Event        Event;
+typedef struct Request       Request;
 typedef void (*EventHandler)(Event);
+typedef void (*RequestExecutor)(Request* req);
 
-/* Type definitions */
+/* Type definitions - must be before Request struct */
 typedef uint64_t TargetID;
 typedef uint32_t TargetType;
 typedef uint32_t RequestType;
 typedef uint32_t EventType;
+
+/* Request structure for routing */
+struct Request {
+  RequestType type;
+  TargetID    target;
+  void*       data;
+};
 
 /* Target types */
 enum {
@@ -34,10 +43,11 @@ enum {
 
 /* Component structure */
 struct HubComponent {
-  const char*  name;
-  RequestType* requests; /* NULL-terminated array of request types handled */
-  TargetType*  targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
-  bool         registered;
+  const char*        name;
+  RequestType*      requests;    /* NULL-terminated array of request types handled */
+  TargetType*       targets;     /* TARGET_TYPE_NONE-terminated array of accepted types */
+  RequestExecutor   executor;    /* Function to call when this component receives a request */
+  bool              registered;
 };
 
 /* Target structure */
@@ -111,5 +121,44 @@ void hub_unsubscribe(EventType type, EventHandler handler);
 /* Utility */
 uint32_t hub_component_count(void);
 uint32_t hub_target_count(void);
+
+/* Request routing */
+
+/*
+ * Send a request to the hub for routing to the appropriate component.
+ *
+ * The request is routed to the component that handles the request type.
+ * The component's executor function is called with the request.
+ *
+ * @param type    The request type (e.g., REQ_CLIENT_FOCUS)
+ * @param target  The target ID (e.g., client window ID)
+ * @param data    Optional data for the request (can be NULL)
+ */
+void hub_send_request(RequestType type, TargetID target, void* data);
+
+/*
+ * Broadcast a request to all targets of a specific type.
+ * The request is sent to the component that handles the request type,
+ * which then iterates over all targets of the specified type.
+ *
+ * @param type    The request type
+ * @param type_   The target type to broadcast to (e.g., TARGET_TYPE_CLIENT)
+ * @param data    Optional data for the request (can be NULL)
+ */
+void hub_broadcast_request(RequestType type, TargetType type_, void* data);
+
+/* Symbolic target IDs */
+enum {
+  TARGET_ID_CURRENT_CLIENT  = UINT64_MAX - 1,
+  TARGET_ID_CURRENT_MONITOR = UINT64_MAX - 2,
+  TARGET_ID_ALL_CLIENTS     = UINT64_MAX - 3,
+  TARGET_ID_ALL_MONITORS    = UINT64_MAX - 4,
+};
+
+/*
+ * Resolve a symbolic target ID to a concrete target ID.
+ * Returns the concrete TargetID, or the original value if not symbolic.
+ */
+TargetID hub_resolve_target(TargetID symbolic);
 
 #endif

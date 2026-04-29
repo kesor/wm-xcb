@@ -5,6 +5,9 @@
 
 #include "wm-log.h"
 
+/* Forward declaration for target resolvers */
+static TargetID hub_resolve_target_internal(TargetID symbolic);
+
 /* Registry data structures */
 #define MAX_COMPONENTS    64
 #define MAX_TARGETS       256
@@ -382,6 +385,102 @@ hub_target_count(void)
   return target_count;
 }
 
+/* Request routing implementation */
+void
+hub_send_request(RequestType type, TargetID target, void* data)
+{
+  /* Resolve symbolic target IDs */
+  TargetID resolved = hub_resolve_target_internal(target);
+
+  /* Find component that handles this request type */
+  HubComponent* comp = hub_get_component_by_request_type(type);
+  if (comp == NULL) {
+    LOG_DEBUG("No component handles request type %u", type);
+    return;
+  }
+
+  /* Check if component has an executor */
+  if (comp->executor == NULL) {
+    LOG_DEBUG("Component '%s' has no executor for request type %u",
+              comp->name, type);
+    return;
+  }
+
+  /* Create request and dispatch to executor */
+  Request req = {
+    .type   = type,
+    .target = resolved,
+    .data   = data,
+  };
+
+  LOG_DEBUG("Routing request type=%u target=%lu to component '%s'",
+            type, (unsigned long) resolved, comp->name);
+
+  comp->executor(&req);
+}
+
+void
+hub_broadcast_request(RequestType type, TargetType target_type, void* data)
+{
+  /* Find component that handles this request type */
+  HubComponent* comp = hub_get_component_by_request_type(type);
+  if (comp == NULL) {
+    LOG_DEBUG("No component handles request type %u for broadcast", type);
+    return;
+  }
+
+  /* Get all targets of the specified type */
+  HubTarget** targets = hub_get_targets_by_type(target_type);
+  if (targets == NULL) {
+    LOG_DEBUG("Invalid target type %u for broadcast", target_type);
+    return;
+  }
+
+  LOG_DEBUG("Broadcasting request type=%u to all targets of type %u",
+            type, target_type);
+
+  /* Send request to each target */
+  for (uint32_t i = 0; targets[i] != NULL; i++) {
+    Request req = {
+      .type   = type,
+      .target = targets[i]->id,
+      .data   = data,
+    };
+
+    if (comp->executor != NULL) {
+      comp->executor(&req);
+    }
+  }
+}
+
+static TargetID
+hub_resolve_target_internal(TargetID symbolic)
+{
+  switch (symbolic) {
+    case TARGET_ID_CURRENT_CLIENT:
+    case TARGET_ID_CURRENT_MONITOR:
+    case TARGET_ID_ALL_CLIENTS:
+    case TARGET_ID_ALL_MONITORS:
+      /* Symbolic targets need external resolution - for now return as-is
+       * Components that use these should resolve them before/after calling
+       * hub_send_request. The executor receives the raw value and can
+       * interpret symbolic targets specially. */
+      LOG_DEBUG("Symbolic target %lu not resolved (no resolver registered)",
+                (unsigned long) symbolic);
+      return symbolic;
+
+    default:
+      /* Already concrete */
+      return symbolic;
+  }
+}
+
+TargetID
+hub_resolve_target(TargetID symbolic)
+{
+  return hub_resolve_target_internal(symbolic);
+}
+
 /* Internal helper: add component to request type index */
 static void
 component_add_to_request_type_index(HubComponent* comp)
@@ -534,3 +633,18 @@ hub_unsubscribe(EventType type, EventHandler handler)
     }
   }
 }
+
+/* TODO: Target resolver registry for symbolic target resolution
+ *
+ * Components can register themselves as resolvers for symbolic targets:
+ * - Focus component resolves TARGET_ID_CURRENT_CLIENT
+ * - Monitor component resolves TARGET_ID_CURRENT_MONITOR
+ *
+ * This allows hub_resolve_target_internal() to actually resolve
+ * symbolic targets to concrete IDs.
+ *
+ * Implementation would add:
+ * - resolver_register(TargetResolver resolver)
+ * - resolver_unregister(TargetResolver resolver)
+ * - Update hub_resolve_target_internal() to call registered resolvers
+ */
