@@ -753,6 +753,292 @@ test_unsubscribe_nonexistent_handler(void)
   assert(handler_a_calls == 1);              // handler_a still works
 }
 
+/*
+ * Request Routing Tests
+ */
+
+/* Track executor calls */
+static int      executor_call_count  = 0;
+static RequestType last_exec_type  = 0;
+static TargetID    last_exec_target = TARGET_ID_NONE;
+static void*      last_exec_data    = NULL;
+static uint64_t    last_exec_cid     = 0;
+
+/* Test executors - must be static at file scope */
+static void
+exec_fullscreen(struct HubRequest* req)
+{
+  executor_call_count++;
+  last_exec_type   = req->type;
+  last_exec_target = req->target;
+  last_exec_data   = req->data;
+  last_exec_cid    = req->correlation_id;
+  LOG_CLEAN("  exec_fullscreen: type=%u target=%lu cid=%lu",
+            req->type, (unsigned long) req->target, (unsigned long) req->correlation_id);
+}
+
+static void
+exec_focus(struct HubRequest* req)
+{
+  executor_call_count++;
+  last_exec_type   = req->type;
+  last_exec_target = req->target;
+  last_exec_data   = req->data;
+  last_exec_cid    = req->correlation_id;
+  LOG_CLEAN("  exec_focus: type=%u target=%lu cid=%lu",
+            req->type, (unsigned long) req->target, (unsigned long) req->correlation_id);
+}
+
+static void
+exec_monitor(struct HubRequest* req)
+{
+  executor_call_count++;
+  last_exec_type   = req->type;
+  last_exec_target = req->target;
+  last_exec_data   = req->data;
+  last_exec_cid    = req->correlation_id;
+  LOG_CLEAN("  exec_monitor: type=%u target=%lu cid=%lu",
+            req->type, (unsigned long) req->target, (unsigned long) req->correlation_id);
+}
+
+/* Components with executors */
+static HubComponent routing_fullscreen = {
+  .name       = "routing-fullscreen",
+  .requests   = (RequestType[]) { 1, 2, 0 }, /* Request types 1, 2 */
+  .targets    = client_targets,
+  .executor   = exec_fullscreen,
+  .registered = false,
+};
+
+static HubComponent routing_focus = {
+  .name       = "routing-focus",
+  .requests   = (RequestType[]) { 3, 0 }, /* Request type 3 */
+  .targets    = client_targets,
+  .executor   = exec_focus,
+  .registered = false,
+};
+
+static HubComponent routing_monitor = {
+  .name       = "routing-monitor",
+  .requests   = (RequestType[]) { 4, 5, 0 }, /* Request types 4, 5 */
+  .targets    = monitor_targets,
+  .executor   = exec_monitor,
+  .registered = false,
+};
+
+static HubComponent routing_no_exec = {
+  .name       = "routing-no-exec",
+  .requests   = (RequestType[]) { 99, 0 }, /* Request type 99 */
+  .targets    = client_targets,
+  .executor   = NULL, /* No executor - should not be called */
+  .registered = false,
+};
+
+void
+test_routing_basic_request(void)
+{
+  LOG_CLEAN("== Testing basic request routing");
+  hub_init();
+
+  hub_register_component(&routing_fullscreen);
+
+  executor_call_count = 0;
+  hub_send_request(1, 100); /* Send request type 1 to target 100 */
+
+  assert(executor_call_count == 1);
+  assert(last_exec_type == 1);
+  assert(last_exec_target == 100);
+
+  hub_shutdown();
+}
+
+void
+test_routing_target_id_passed(void)
+{
+  LOG_CLEAN("== Testing target ID is passed to executor");
+  hub_init();
+
+  hub_register_component(&routing_focus);
+
+  executor_call_count = 0;
+  hub_send_request(3, 999);
+
+
+  assert(executor_call_count == 1);
+  assert(last_exec_target == 999);
+
+  hub_shutdown();
+}
+
+void
+test_routing_data_passed(void)
+{
+  LOG_CLEAN("== Testing request data is passed to executor");
+  hub_init();
+
+  hub_register_component(&routing_fullscreen);
+
+  executor_call_count = 0;
+  int test_data = 42;
+  hub_send_request_data(1, 100, &test_data);
+
+  assert(executor_call_count == 1);
+  assert(last_exec_data == &test_data);
+
+  hub_shutdown();
+}
+
+void
+test_routing_correlation_id(void)
+{
+  LOG_CLEAN("== Testing correlation ID is passed to executor");
+  hub_init();
+
+  hub_register_component(&routing_fullscreen);
+
+
+  executor_call_count = 0;
+  hub_send_request_with_cid(1, 100, 0xDEADBEEF);
+
+  assert(executor_call_count == 1);
+  assert(last_exec_cid == 0xDEADBEEF);
+
+  hub_shutdown();
+}
+
+void
+test_routing_to_correct_component(void)
+{
+  LOG_CLEAN("== Testing request routes to correct component");
+  hub_init();
+
+  hub_register_component(&routing_fullscreen);
+  hub_register_component(&routing_focus);
+
+  hub_register_component(&routing_monitor);
+
+  executor_call_count = 0;
+  hub_send_request(3, 100); /* Request type 3 - focus component */
+  assert(executor_call_count == 1);
+  assert(last_exec_type == 3); /* Focus should handle type 3 */
+
+  executor_call_count = 0;
+  hub_send_request(4, 200); /* Request type 4 - monitor component */
+  assert(executor_call_count == 1);
+  assert(last_exec_type == 4); /* Monitor should handle type 4 */
+
+  hub_shutdown();
+}
+
+void
+test_routing_no_handler(void)
+{
+  LOG_CLEAN("== Testing routing to non-existent handler is safe");
+  hub_init();
+
+  /* Don't register any component */
+  executor_call_count = 0;
+  hub_send_request(999, 100);
+
+  assert(executor_call_count == 0); /* No executor called */
+
+  hub_shutdown();
+}
+
+void
+test_routing_no_executor(void)
+{
+  LOG_CLEAN("== Testing routing to component without executor");
+  hub_init();
+
+  hub_register_component(&routing_no_exec);
+
+  executor_call_count = 0;
+  hub_send_request(99, 100);
+
+  assert(executor_call_count == 0); /* Executor is NULL, should not be called */
+
+  hub_shutdown();
+}
+
+void
+test_get_executor_for_request(void)
+{
+  LOG_CLEAN("== Testing get executor for request type");
+  hub_init();
+
+
+  hub_register_component(&routing_fullscreen);
+  hub_register_component(&routing_focus);
+
+  assert(hub_get_executor_for_request(1) == exec_fullscreen);
+  assert(hub_get_executor_for_request(3) == exec_focus);
+  assert(hub_get_executor_for_request(99) == NULL); /* Not registered */
+
+  hub_shutdown();
+}
+
+void
+test_get_executor_after_unregister(void)
+{
+  LOG_CLEAN("== Testing get executor returns NULL after unregister");
+  hub_init();
+
+  hub_register_component(&routing_fullscreen);
+  assert(hub_get_executor_for_request(1) == exec_fullscreen);
+
+  hub_unregister_component("routing-fullscreen");
+  assert(hub_get_executor_for_request(1) == NULL);
+
+
+  hub_shutdown();
+}
+
+void
+test_simple_request_flow(void)
+{
+  LOG_CLEAN("== Testing simple request flow (keybinding -> hub -> component)");
+  hub_init();
+
+  /* Simulate: keybinding component sends REQ_CLIENT_FOCUS */
+  hub_register_component(&routing_focus);
+
+  /* Simulate: user presses keybinding */
+  executor_call_count = 0;
+  hub_send_request(3, 100);
+
+  assert(executor_call_count == 1);
+  assert(last_exec_type == 3);
+  assert(last_exec_target == 100);
+
+  hub_shutdown();
+}
+
+void
+test_fullscreen_toggle_flow(void)
+{
+  LOG_CLEAN("== Testing fullscreen toggle flow");
+  hub_init();
+
+  hub_register_component(&routing_fullscreen);
+
+  /* Toggle fullscreen on */
+  executor_call_count = 0;
+  hub_send_request(1, 100);
+
+  assert(executor_call_count == 1);
+  assert(last_exec_type == 1);
+
+  /* Toggle fullscreen off */
+  executor_call_count = 0;
+  hub_send_request(2, 100);
+
+  assert(executor_call_count == 1);
+  assert(last_exec_type == 2);
+
+  hub_shutdown();
+}
+
 TEST_GROUP(HubRegistry, {
   test_hub_init_shutdown();
   test_register_unregister_component();
@@ -788,4 +1074,18 @@ TEST_GROUP(HubEventBus, {
   test_userdata_in_subscribe();
   test_duplicate_subscribe_rejected();
   test_unsubscribe_nonexistent_handler();
+});
+
+TEST_GROUP(HubRouting, {
+  test_routing_basic_request();
+  test_routing_target_id_passed();
+  test_routing_data_passed();
+  test_routing_correlation_id();
+  test_routing_to_correct_component();
+  test_routing_no_handler();
+  test_routing_no_executor();
+  test_get_executor_for_request();
+  test_get_executor_after_unregister();
+  test_simple_request_flow();
+  test_fullscreen_toggle_flow();
 });
