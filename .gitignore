@@ -6,7 +6,7 @@ compile_commands.json
 compile_flags.txt
 task-*.txt
 
-# Test binaries
+# Test binaries (compiled executables, not source files)
 test
-test-*
-test-wm-*
+test-sm-standalone
+test-wm-hub-standalone
