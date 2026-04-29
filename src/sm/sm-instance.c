@@ -123,11 +123,6 @@ sm_create(void* owner, SMTemplate* template)
     }
   }
 
-  /* Call template init function if present */
-  if (template->init_fn != NULL) {
-    template->init_fn(sm);
-  }
-
   LOG_DEBUG("Created StateMachine: %s, initial_state=%u",
             sm->name, sm->current_state);
   return sm;

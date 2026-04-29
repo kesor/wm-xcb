@@ -26,7 +26,6 @@ sm_template_create(
   tmpl->transitions     = transitions;
   tmpl->num_transitions = num_transitions;
   tmpl->initial_state   = initial_state;
-  tmpl->init_fn         = NULL;
 
   LOG_DEBUG("Created SMTemplate: %s", name);
   return tmpl;

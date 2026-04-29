@@ -102,23 +102,19 @@ typedef struct SMTemplate {
 
 ## State Machine Operations
 
-### Create (lazy)
+### Create
 ```c
-StateMachine* sm_create(Target* owner, SMTemplate* template) {
+StateMachine* sm_create(void* owner, SMTemplate* template, EventEmitter emit) {
     StateMachine* sm = malloc(sizeof(StateMachine));
     sm->name = template->name;
     sm->owner = owner;
     sm->template = template;
     sm->current_state = template->initial_state;
-    sm->pre_guards = NULL;
-    sm->post_actions = NULL;
     sm->data = NULL;
-    
-    // Call template init function if any
-    if (template->init_fn) {
-        template->init_fn(sm);
-    }
-    
+
+    // Emit callback is required - owner must connect SM to hub
+    sm->emit = emit;
+
     return sm;
 }
 ```
