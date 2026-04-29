@@ -98,15 +98,6 @@ guard_conditional(StateMachine* sm, void* data)
   return allow != NULL && *allow;
 }
 
-/* Action that always succeeds */
-static bool
-action_success(StateMachine* sm, void* data)
-{
-  (void) sm;
-  (void) data;
-  return true;
-}
-
 /* Action that always fails */
 static bool
 action_fail(StateMachine* sm, void* data)

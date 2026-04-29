@@ -6,11 +6,16 @@
 #include "sm-instance.h"
 #include "wm-log.h"
 
-/* Registry entry */
+/* Registry entry - uses separate typed function pointer fields to avoid
+ * casting between function pointers and data pointers (UB in standard C) */
 typedef struct RegistryEntry {
   const char*  name;
-  void*        fn;
+  union {
+    SMGuardFn  guard_fn;
+    SMActionFn action_fn;
+  } fn;
   struct RegistryEntry* next;
+  bool is_guard;  /* true for guard entries, false for action entries */
 } RegistryEntry;
 
 /* Registry buckets */
@@ -34,7 +39,7 @@ hash_string(const char* s)
 }
 
 static void*
-lookup_in_bucket(RegistryEntry** buckets, int num_buckets, const char* name)
+lookup_in_bucket(RegistryEntry** buckets, int num_buckets, const char* name, bool is_guard)
 {
   if (name == NULL)
     return NULL;
@@ -43,8 +48,9 @@ lookup_in_bucket(RegistryEntry** buckets, int num_buckets, const char* name)
   RegistryEntry* entry = buckets[hash];
 
   while (entry != NULL) {
-    if (strcmp(entry->name, name) == 0) {
-      return entry->fn;
+    if (entry->is_guard == is_guard && strcmp(entry->name, name) == 0) {
+      /* Return the appropriate function pointer from the union */
+      return is_guard ? (void*) entry->fn.guard_fn : (void*) entry->fn.action_fn;
     }
     entry = entry->next;
   }
@@ -54,7 +60,7 @@ lookup_in_bucket(RegistryEntry** buckets, int num_buckets, const char* name)
 
 static void
 register_in_bucket(RegistryEntry** buckets, int num_buckets,
-                   const char* name, void* fn)
+                   const char* name, void* fn, bool is_guard)
 {
   if (name == NULL || fn == NULL)
     return;
@@ -62,7 +68,7 @@ register_in_bucket(RegistryEntry** buckets, int num_buckets,
   uint32_t hash = hash_string(name) % (uint32_t) num_buckets;
 
   /* Check if already registered */
-  if (lookup_in_bucket(buckets, num_buckets, name) != NULL) {
+  if (lookup_in_bucket(buckets, num_buckets, name, is_guard) != NULL) {
     LOG_WARN("Function '%s' already registered", name);
     return;
   }
@@ -73,8 +79,14 @@ register_in_bucket(RegistryEntry** buckets, int num_buckets,
     return;
   }
 
-  entry->name = name;
-  entry->fn   = fn;
+  entry->name    = name;
+  entry->is_guard = is_guard;
+  /* Store in union field based on type */
+  if (is_guard) {
+    entry->fn.guard_fn = (SMGuardFn) fn;
+  } else {
+    entry->fn.action_fn = (SMActionFn) fn;
+  }
   entry->next = buckets[hash];
   buckets[hash] = entry;
 }
@@ -114,11 +126,30 @@ sm_registry_init(void)
   LOG_DEBUG("SM registry initialized");
 }
 
+/*
+ * Ensure registry is initialized.
+ * Called automatically by registration functions.
+ * Returns true if initialization succeeded or already initialized.
+ */
+static bool
+ensure_initialized(void)
+{
+  if (!initialized) {
+    sm_registry_init();
+  }
+  return initialized;
+}
+
 void
 sm_registry_shutdown(void)
 {
-  if (!initialized)
+  /* Always free buckets, regardless of initialized state */
+  if (!initialized) {
+    /* Buckets might have been allocated without init call */
+    memset(guard_registry, 0, sizeof(guard_registry));
+    memset(action_registry, 0, sizeof(action_registry));
     return;
+  }
 
   /* Free all guard entries */
   for (int i = 0; i < GUARD_REGISTRY_BUCKETS; i++) {
@@ -149,37 +180,45 @@ sm_registry_shutdown(void)
 void
 sm_register_guard(const char* name, SMGuardFn fn)
 {
-  register_in_bucket(guard_registry, GUARD_REGISTRY_BUCKETS, name, (void*) fn);
+  if (!ensure_initialized())
+    return;
+  register_in_bucket(guard_registry, GUARD_REGISTRY_BUCKETS, name, fn, true);
 }
 
 void
 sm_unregister_guard(const char* name)
 {
+  if (!initialized)
+    return;
   unregister_from_bucket(guard_registry, GUARD_REGISTRY_BUCKETS, name);
 }
 
 void
 sm_register_action(const char* name, SMActionFn fn)
 {
-  register_in_bucket(action_registry, ACTION_REGISTRY_BUCKETS, name, (void*) fn);
+  if (!ensure_initialized())
+    return;
+  register_in_bucket(action_registry, ACTION_REGISTRY_BUCKETS, name, fn, false);
 }
 
 void
 sm_unregister_action(const char* name)
 {
+  if (!initialized)
+    return;
   unregister_from_bucket(action_registry, ACTION_REGISTRY_BUCKETS, name);
 }
 
 SMGuardFn
 sm_lookup_guard(const char* name)
 {
-  return (SMGuardFn) lookup_in_bucket(guard_registry, GUARD_REGISTRY_BUCKETS, name);
+  return (SMGuardFn) lookup_in_bucket(guard_registry, GUARD_REGISTRY_BUCKETS, name, true);
 }
 
 SMActionFn
 sm_lookup_action(const char* name)
 {
-  return (SMActionFn) lookup_in_bucket(action_registry, ACTION_REGISTRY_BUCKETS, name);
+  return (SMActionFn) lookup_in_bucket(action_registry, ACTION_REGISTRY_BUCKETS, name, false);
 }
 
 bool

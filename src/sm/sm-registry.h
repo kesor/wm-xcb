@@ -68,15 +68,18 @@ SMGuardFn sm_lookup_guard(const char* name);
 SMActionFn sm_lookup_action(const char* name);
 
 /*
- * Run a guard by name
- * Returns true if guard passes or doesn't exist (failsafe).
- * Logs warning if guard not found.
+ * Run a guard by name.
+ * Returns true if guard passes.
+ * If guard_name is non-NULL but guard is not found, returns true (failsafe).
+ * This design ensures missing guards don't block transitions, with LOG_WARN
+ * to alert about potential misconfiguration.
+ * Set guard_name to NULL to skip guard checking (always allowed).
  */
 bool sm_run_guard(StateMachine* sm, const char* guard_name, void* data);
 
 /*
  * Run an action by name
- * Returns true if action succeeds or doesn't exist.
+ * Returns true if action succeeds, false if action fails or is not found.
  * Logs warning if action not found.
  */
 bool sm_run_action(StateMachine* sm, const char* action_name, void* data);
