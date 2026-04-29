@@ -11,10 +11,9 @@
 #include <stdlib.h>
 
 #include "test-wm-monitor.h"
-#include "test-wm.h"
+#include "src/target/monitor.h"
+#include "src/target/client.h"
 #include "wm-hub.h"
-#include "wm-monitor.h"
-#include "wm-window-list.h"
 
 void
 test_monitor_create_destroy(void)
@@ -41,9 +40,9 @@ test_monitor_create_destroy(void)
   assert(m->tagset == MONITOR_TAG_MASK(0));
   assert(m->mfact == 0.5f);
   assert(m->nmaster == 1);
-  assert(m->clients == NULL);
-  assert(m->sel == NULL);
-  assert(m->stack == NULL);
+  assert(m->client_count == 0);
+  assert(m->sel_window == XCB_NONE);
+  assert(m->stack_head == XCB_NONE);
   assert(m->bar == NULL);
   assert(m->next == NULL);
 

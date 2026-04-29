@@ -85,6 +85,12 @@ typedef struct Client {
 void client_list_init(void);
 
 /*
+ * Shutdown the client list.
+ * Destroys all clients in the list and cleans up resources.
+ */
+void client_list_shutdown(void);
+
+/*
  * Get the client list sentinel.
  * The sentinel marks both the head and tail of the circular list.
  */

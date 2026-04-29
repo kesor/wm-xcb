@@ -6,7 +6,7 @@
 #include "wm-log.h"
 #include "wm-running.h"
 #include "wm-states.h"
-#include "wm-window-list.h"
+#include "src/target/client.h"
 #include "wm-xcb-events.h"
 #include "wm-xcb.h"
 
@@ -105,7 +105,7 @@ setup_xcb()
   connect_to_x_display(&dpy);
   get_root_window(dpy, &root);
 
-  setup_window_list();
+  client_list_init();
 
   check_no_running_wm();
   if (!running)
@@ -121,7 +121,7 @@ setup_xcb()
 
   xcb_map_window(dpy, root);
 
-  window_insert(root);
+  /* Note: root window is not a client */
 
   wm_manage_all_clients();
 
@@ -137,7 +137,7 @@ destruct_xcb()
   /* Shutdown XCB handler registry */
   xcb_handler_shutdown();
 
-  destruct_window_list();
+  /* Client list is cleaned up when clients are destroyed individually */
   xcb_disconnect(dpy);
 }
 

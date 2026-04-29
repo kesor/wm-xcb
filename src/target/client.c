@@ -64,6 +64,25 @@ client_list_init(void)
 }
 
 /*
+ * Shutdown the client list.
+ * Destroys all clients in the list and cleans up resources.
+ */
+void
+client_list_shutdown(void)
+{
+  /* Destroy all clients in the list */
+  Client* c = client_sentinel.next;
+  while (c != &client_sentinel) {
+    Client* next = c->next;
+    client_destroy(c);
+    c = next;
+  }
+  /* Re-initialize sentinel */
+  client_sentinel.next = &client_sentinel;
+  client_sentinel.prev = &client_sentinel;
+}
+
+/*
  * Get the client list sentinel for iteration.
  * Returns the sentinel node (head/tail of the circular list).
  */
@@ -228,10 +247,7 @@ client_destroy(Client* c)
 
   LOG_DEBUG("Destroying client: window=%u", c->window);
 
-  /* Detach from monitor if associated */
-  if (c->monitor != NULL && c->monitor->clients == c) {
-    c->monitor->clients = NULL;
-  }
+  /* Detach from monitor (Monitor tracks by window ID via hub) */
   c->monitor = NULL;
 
   /* Remove from client list */
@@ -464,17 +480,9 @@ client_set_monitor(Client* c, Monitor* m)
   if (c == NULL)
     return;
 
-  /* Detach from the previous monitor if it still points back to this client */
-  if (c->monitor != NULL && c->monitor->clients == c) {
-    c->monitor->clients = NULL;
-  }
-
   c->monitor = m;
-
-  /* Attach to the new monitor */
-  if (m != NULL && m->clients == NULL) {
-    m->clients = c;
-  }
+  /* Note: Monitor tracks client associations by window ID via hub,
+   * not by direct pointers. This keeps Monitor and Client decoupled. */
 }
 
 /*
