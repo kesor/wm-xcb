@@ -39,6 +39,7 @@ SRC = \
 	$(NAME)-window-list.c \
 	$(NAME)-clients.c \
 	$(NAME)-hub.c \
+	$(NAME)-monitor.c \
 	$(NAME)-xcb-ewmh.c \
 	$(NAME)-xcb-events.c \
 	$(NAME)-states.c \
@@ -55,10 +56,11 @@ TEST_SRC = \
 	test-registry.c \
 	test-$(NAME)-window-list.c \
 	test-$(NAME)-hub.c \
-	test-$(NAME)-xcb-handler.c
+	test-$(NAME)-xcb-handler.c \
+	test-$(NAME)-monitor.c
 
 # Header dependencies
-TEST_HDR = test-registry.h test-wm.h test-wm-window-list.h test-wm-hub.h
+TEST_HDR = test-registry.h test-wm.h test-wm-window-list.h test-wm-hub.h test-wm-monitor.h
 
 TEST_OBJ = ${TEST_SRC:.c=.o}
 
@@ -108,8 +110,8 @@ analyze:
 check: format tidy analyze
 
 # Unified test runner - builds and runs all tests in a single executable
-test: test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o $(filter-out $(NAME).o, ${OBJ})
-	${CC} -o $@ test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+test: test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o $(filter-out $(NAME).o, ${OBJ})
+	${CC} -o $@ test-registry.o test-wm-window-list.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
 	./test
 
 clean:
