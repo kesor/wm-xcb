@@ -46,6 +46,7 @@ SRC = \
 	$(NAME).c \
 	src/xcb/xcb-handler.c \
 	src/sm/sm-template.c \
+	src/sm/sm-registry.c \
 	src/sm/sm-instance.c
 
 OBJ = ${SRC:.c=.o}
@@ -123,8 +124,8 @@ test-standalone: wm-hub.o test-wm-hub-standalone.c
 	./test-standalone
 
 # State Machine standalone test (no XCB dependencies required)
-test-sm-standalone: wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-instance.o test-sm-standalone.c
-	$(CC) $(CFLAGS) -o $@ wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-instance.o test-sm-standalone.c
+test-sm-standalone: wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-registry.o src/sm/sm-instance.o test-sm-standalone.c
+	$(CC) $(CFLAGS) -o $@ wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-registry.o src/sm/sm-instance.o test-sm-standalone.c
 	./test-sm-standalone
 
 .PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone

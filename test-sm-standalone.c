@@ -29,6 +29,11 @@ sig_atomic_t running = 1;
     running = 0;                                            \
   }
 
+#define LOG_WARN(pFormat, ...)                              \
+  {                                                         \
+    fprintf(stderr, "WARN: " pFormat "\n", ##__VA_ARGS__);  \
+  }
+
 #define assert(EXPRESSION)                                         \
   if (!(EXPRESSION)) {                                             \
     printf("%s:%d: %s - FAIL\n", __FILE__, __LINE__, #EXPRESSION); \
@@ -38,6 +43,7 @@ sig_atomic_t running = 1;
   }
 
 #include "src/sm/sm.h"
+#include "src/sm/sm-registry.h"
 #include "wm-hub.h"
 
 /* Track events for testing */
@@ -63,6 +69,62 @@ test_emitter(StateMachine* sm, uint32_t from_state, uint32_t to_state, void* use
   (void) userdata;
   LOG_DEBUG("Custom emitter called");
   raw_write_events_emitted++;
+}
+
+/* Guard that always allows */
+static bool
+guard_allow(StateMachine* sm, void* data)
+{
+  (void) sm;
+  (void) data;
+  return true;
+}
+
+/* Guard that always rejects */
+static bool
+guard_deny(StateMachine* sm, void* data)
+{
+  (void) sm;
+  (void) data;
+  return false;
+}
+
+/* Guard that checks data */
+static bool
+guard_conditional(StateMachine* sm, void* data)
+{
+  (void) sm;
+  int* allow = (int*) data;
+  return allow != NULL && *allow;
+}
+
+/* Action that always succeeds */
+static bool
+action_success(StateMachine* sm, void* data)
+{
+  (void) sm;
+  (void) data;
+  return true;
+}
+
+/* Action that always fails */
+static bool
+action_fail(StateMachine* sm, void* data)
+{
+  (void) sm;
+  (void) data;
+  return false;
+}
+
+/* Action that tracks calls */
+static bool
+action_track(StateMachine* sm, void* data)
+{
+  (void) sm;
+  int* count = (int*) data;
+  if (count != NULL)
+    (*count)++;
+  return true;
 }
 
 void
@@ -332,6 +394,346 @@ test_sm_hooks()
   sm_template_destroy(tmpl);
 }
 
+void
+test_sm_transition_with_guards()
+{
+  LOG_CLEAN("== Testing sm_transition with guards");
+  sm_registry_init();
+
+  enum { STATE_OFF = 0,
+         STATE_ON  = 1,
+  };
+
+  /* Register guards */
+  sm_register_guard("guard_allow", guard_allow);
+  sm_register_guard("guard_deny", guard_deny);
+  sm_register_guard("guard_conditional", guard_conditional);
+
+  uint32_t     states[]      = { STATE_OFF, STATE_ON };
+  SMTransition transitions[] = {
+    { STATE_OFF, STATE_ON,  "guard_allow",     NULL, 40 },  /* Changed from 200 to 40 */
+    { STATE_ON,  STATE_OFF, "guard_deny",      NULL, 41 },  /* Changed from 201 to 41 */
+    { STATE_OFF, STATE_ON,  "guard_conditional", NULL, 42 }, /* Changed from 202 to 42 */
+  };
+
+  SMTemplate* tmpl = sm_template_create(
+      "test-transition-guards",
+      states,
+      2,
+      transitions,
+      3,
+      STATE_OFF);
+
+  int owner = 0;
+  hub_init();
+
+  /* Test 1: Guard that allows */
+  LOG_CLEAN("  Test 1: transition with allowing guard");
+  StateMachine* sm1 = sm_create(&owner, tmpl, NULL, NULL);
+  raw_write_events_emitted = 0;
+  hub_subscribe(40, event_catcher, NULL);  /* Changed from 200 to 40 */
+
+  assert(sm_transition(sm1, STATE_ON) == true);
+  assert(sm_get_state(sm1) == STATE_ON);
+  assert(raw_write_events_emitted == 1);
+
+  hub_unsubscribe(40, event_catcher);  /* Changed from 200 to 40 */
+  sm_destroy(sm1);
+
+  /* Test 2: Guard that denies - transition fails */
+  LOG_CLEAN("  Test 2: transition rejected by denying guard");
+  StateMachine* sm2 = sm_create(&owner, tmpl, NULL, NULL);
+  assert(sm_get_state(sm2) == STATE_OFF);
+
+  /* STATE_ON -> STATE_OFF has guard_deny which always rejects */
+  assert(sm_transition(sm2, STATE_ON) == true); /* guard_allow passes */
+  assert(sm_get_state(sm2) == STATE_ON);
+
+  /* Now try STATE_ON -> STATE_OFF with guard_deny */
+  raw_write_events_emitted = 0;
+  hub_subscribe(41, event_catcher, NULL);  /* Changed from 201 to 41 */
+  assert(sm_transition(sm2, STATE_OFF) == false); /* guard_deny rejects */
+  assert(sm_get_state(sm2) == STATE_ON); /* State unchanged */
+  assert(raw_write_events_emitted == 0); /* No event emitted */
+
+  hub_unsubscribe(41, event_catcher);  /* Changed from 201 to 41 */
+  sm_destroy(sm2);
+
+  /* Test 3: Conditional guard based on data */
+  LOG_CLEAN("  Test 3: conditional guard with data");
+  StateMachine* sm3 = sm_create(&owner, tmpl, NULL, NULL);
+  sm3->data = NULL;  /* Default - no data */
+  assert(sm_transition(sm3, STATE_ON) == true); /* guard_allow passes */
+  assert(sm_get_state(sm3) == STATE_ON);
+
+  /* Reset to OFF, try with conditional guard */
+  sm_raw_write(sm3, STATE_OFF);
+
+  /* Manually test a transition with conditional guard */
+  /* We need to create a new SM with just conditional transitions */
+  SMTransition cond_trans[] = {
+    { STATE_OFF, STATE_ON, "guard_conditional", NULL, 42 },  /* Changed from 202 to 42 */
+  };
+  SMTemplate* cond_tmpl = sm_template_create(
+      "test-conditional",
+      states,
+      2,
+      cond_trans,
+      1,
+      STATE_OFF);
+
+  /* With data = allow = true */
+  int allow_true = 1;
+  StateMachine* sm_allow = sm_create(&owner, cond_tmpl, NULL, NULL);
+  sm_allow->data = &allow_true;
+  assert(sm_transition(sm_allow, STATE_ON) == true);
+  assert(sm_get_state(sm_allow) == STATE_ON);
+  sm_destroy(sm_allow);
+
+  /* With data = allow = false */
+  int allow_false = 0;
+  StateMachine* sm_deny = sm_create(&owner, cond_tmpl, NULL, NULL);
+  sm_deny->data = &allow_false;
+  assert(sm_transition(sm_deny, STATE_ON) == false);
+  assert(sm_get_state(sm_deny) == STATE_OFF);
+  sm_destroy(sm_deny);
+
+  sm_template_destroy(cond_tmpl);
+  sm_template_destroy(tmpl);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+void
+test_sm_transition_with_actions()
+{
+  LOG_CLEAN("== Testing sm_transition with actions");
+  sm_registry_init();
+  hub_init();
+
+  enum { STATE_A = 0,
+         STATE_B = 1,
+         STATE_C = 2,
+  };
+
+  /* Register actions */
+  sm_register_action("action_track", action_track);
+  sm_register_action("action_fail", action_fail);
+
+  uint32_t     states[]      = { STATE_A, STATE_B, STATE_C };
+  SMTransition transitions[] = {
+    { STATE_A, STATE_B, NULL, "action_track", 30 },   /* Changed from 300 */
+    { STATE_B, STATE_C, NULL, "action_track", 31 },  /* Changed from 301 */
+    { STATE_A, STATE_C, NULL, "action_fail",  32 },   /* Changed from 302 */
+  };
+
+  SMTemplate* tmpl = sm_template_create(
+      "test-transition-actions",
+      states,
+      3,
+      transitions,
+      3,
+      STATE_A);
+
+  int owner = 0;
+
+  /* Test 1: Action is executed on transition */
+  LOG_CLEAN("  Test 1: action executed on successful transition");
+  int action_count = 0;
+  StateMachine* sm1 = sm_create(&owner, tmpl, NULL, NULL);
+  sm1->data = &action_count;
+
+  raw_write_events_emitted = 0;
+  hub_subscribe(30, event_catcher, NULL);  /* Changed from 300 */
+
+  assert(sm_transition(sm1, STATE_B) == true);
+  assert(sm_get_state(sm1) == STATE_B);
+  assert(action_count == 1);
+  assert(raw_write_events_emitted == 1);
+
+  hub_unsubscribe(30, event_catcher);  /* Changed from 300 */
+  sm_destroy(sm1);
+
+  /* Test 2: Multiple actions via chain */
+  LOG_CLEAN("  Test 2: multiple transitions with actions");
+  action_count = 0;
+  StateMachine* sm2 = sm_create(&owner, tmpl, NULL, NULL);
+  sm2->data = &action_count;
+
+  assert(sm_transition(sm2, STATE_B) == true);
+  assert(action_count == 1);
+
+  hub_subscribe(31, event_catcher, NULL);  /* Changed from 301 */
+  assert(sm_transition(sm2, STATE_C) == true);
+  assert(action_count == 2);
+  hub_unsubscribe(31, event_catcher);  /* Changed from 301 */
+
+  sm_destroy(sm2);
+
+  /* Test 3: Transition fails if action fails */
+  LOG_CLEAN("  Test 3: transition fails when action fails");
+  StateMachine* sm3 = sm_create(&owner, tmpl, NULL, NULL);
+
+  /* Try A -> C with action_fail - should fail */
+  assert(sm_transition(sm3, STATE_C) == false);
+  assert(sm_get_state(sm3) == STATE_A); /* State unchanged */
+
+  sm_destroy(sm3);
+
+  sm_template_destroy(tmpl);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+void
+test_sm_transition_complete_flow()
+{
+  LOG_CLEAN("== Testing sm_transition complete flow");
+  sm_registry_init();
+  hub_init();
+
+  enum { STATE_IDLE = 0,
+         STATE_WORK = 1,
+         STATE_DONE = 2,
+  };
+
+  /* Register guard and action */
+  sm_register_guard("can_start_work", guard_allow);
+  sm_register_action("do_work", action_track);
+
+  uint32_t     states[]      = { STATE_IDLE, STATE_WORK, STATE_DONE };
+  SMTransition transitions[] = {
+    { STATE_IDLE, STATE_WORK, "can_start_work", "do_work", 35 },  /* Changed from 400 */
+    { STATE_WORK, STATE_DONE, NULL,             "do_work", 36 }, /* Changed from 401 */
+    { STATE_DONE, STATE_IDLE, NULL,             NULL,       0   },
+  };
+
+  SMTemplate* tmpl = sm_template_create(
+      "test-complete-flow",
+      states,
+      3,
+      transitions,
+      3,
+      STATE_IDLE);
+
+  int owner = 0;
+  int action_count = 0;
+  StateMachine* sm = sm_create(&owner, tmpl, NULL, NULL);
+  sm->data = &action_count;
+
+  /* Subscribe to events */
+  hub_subscribe(35, event_catcher, NULL);  /* Changed from 400 */
+  hub_subscribe(36, event_catcher, NULL);  /* Changed from 401 */
+  raw_write_events_emitted = 0;
+
+  /* Test 1: Valid transition succeeds and emits event */
+  LOG_CLEAN("  Test 1: valid transition succeeds and emits event");
+  assert(sm_get_state(sm) == STATE_IDLE);
+  assert(sm_transition(sm, STATE_WORK) == true);
+  assert(sm_get_state(sm) == STATE_WORK);
+  assert(raw_write_events_emitted == 1);
+
+  /* Test 2: Action is executed on successful transition */
+  LOG_CLEAN("  Test 2: action executed on successful transition");
+  action_count = 0;
+  sm_raw_write(sm, STATE_IDLE);  /* Reset */
+  sm->data = &action_count;
+  assert(sm_transition(sm, STATE_WORK) == true);
+  assert(action_count == 1);
+
+  /* Test 3: sm_get_state returns current state */
+  LOG_CLEAN("  Test 3: sm_get_state returns correct state");
+  sm_raw_write(sm, STATE_DONE);
+  assert(sm_get_state(sm) == STATE_DONE);
+
+  /* Test 4: sm_get_available_transitions returns valid next states */
+  LOG_CLEAN("  Test 4: sm_get_available_transitions returns valid states");
+  uint32_t count = 0;
+  uint32_t* available = sm_get_available_transitions(sm, &count);
+  assert(available != NULL);
+  assert(count == 1);
+  assert(available[0] == STATE_IDLE);
+  free(available);
+
+  /* Test from STATE_IDLE */
+  sm_raw_write(sm, STATE_IDLE);
+  available = sm_get_available_transitions(sm, &count);
+  assert(available != NULL);
+  assert(count == 1);
+  assert(available[0] == STATE_WORK);
+  free(available);
+
+  /* Test from STATE_WORK */
+  sm_raw_write(sm, STATE_WORK);
+  available = sm_get_available_transitions(sm, &count);
+  assert(available != NULL);
+  assert(count == 1);
+  assert(available[0] == STATE_DONE);
+  free(available);
+
+  hub_unsubscribe(35, event_catcher);  /* Changed from 400 */
+  hub_unsubscribe(36, event_catcher);  /* Changed from 401 */
+  sm_destroy(sm);
+  sm_template_destroy(tmpl);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+void
+test_sm_transition_invalid_rejected()
+{
+  LOG_CLEAN("== Testing invalid transition rejected by guard");
+  sm_registry_init();
+  hub_init();
+
+  enum { STATE_LOCKED = 0,
+         STATE_OPEN   = 1,
+         STATE_BROKEN = 2,
+  };
+
+  /* Guard that only allows opening if not already broken */
+  sm_register_guard("guard_can_open", guard_allow);
+
+  uint32_t     states[]      = { STATE_LOCKED, STATE_OPEN, STATE_BROKEN };
+  SMTransition transitions[] = {
+    { STATE_LOCKED, STATE_OPEN,   "guard_can_open", NULL, 50 },  /* Changed from 500 */
+    { STATE_OPEN,   STATE_LOCKED, NULL,             NULL, 51 },  /* Changed from 501 */
+    { STATE_OPEN,   STATE_BROKEN, NULL,             NULL, 52 },  /* Changed from 502 */
+    { STATE_BROKEN, STATE_OPEN,   "guard_can_open", NULL, 53 },  /* Changed from 503 */
+  };
+
+  SMTemplate* tmpl = sm_template_create(
+      "test-invalid-rejected",
+      states,
+      3,
+      transitions,
+      4,
+      STATE_LOCKED);
+
+  int owner = 0;
+  StateMachine* sm = sm_create(&owner, tmpl, NULL, NULL);
+
+  /* Test: Invalid transition (no transition defined) is rejected */
+  LOG_CLEAN("  Test: transition from LOCKED to BROKEN (no transition) is rejected");
+  assert(sm_get_state(sm) == STATE_LOCKED);
+  assert(sm_transition(sm, STATE_BROKEN) == false); /* No transition LOCKED -> BROKEN */
+  assert(sm_get_state(sm) == STATE_LOCKED); /* State unchanged */
+
+  /* Valid transition: LOCKED -> OPEN */
+  LOG_CLEAN("  Test: valid transition LOCKED -> OPEN");
+  hub_subscribe(50, event_catcher, NULL);  /* Changed from 500 */
+  raw_write_events_emitted = 0;
+  assert(sm_transition(sm, STATE_OPEN) == true);
+  assert(sm_get_state(sm) == STATE_OPEN);
+  assert(raw_write_events_emitted == 1);
+
+  hub_unsubscribe(50, event_catcher);  /* Changed from 500 */
+  sm_destroy(sm);
+  sm_template_destroy(tmpl);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
 int
 main()
 {
@@ -340,6 +742,10 @@ main()
   test_sm_raw_write();
   test_sm_raw_write_event_emission();
   test_sm_transition();
+  test_sm_transition_with_guards();
+  test_sm_transition_with_actions();
+  test_sm_transition_complete_flow();
+  test_sm_transition_invalid_rejected();
   test_sm_hooks();
 
   LOG_CLEAN("All SM tests passed!");

@@ -2,6 +2,7 @@
 
 #include "sm-instance.h"
 #include "sm-template.h"
+#include "sm-registry.h"
 #include "wm-hub.h"
 #include "wm-log.h"
 
@@ -257,10 +258,17 @@ sm_transition(StateMachine* sm, uint32_t target_state)
   /* Run pre-guard hooks */
   sm_hook_list_run(sm->hooks[SM_HOOK_PRE_GUARD], sm);
 
-  /* Run guards (placeholder - would call guard functions by name) */
+  /* Run guards - use registry to find and call guard function */
   if (t->guard_fn != NULL) {
-    /* In full implementation, would look up and call guard function */
-    LOG_DEBUG("sm_transition: guard %s would run here", t->guard_fn);
+    LOG_DEBUG("sm_transition: checking guard '%s' for %s", t->guard_fn, sm->name);
+    if (!sm_run_guard(sm, t->guard_fn, sm->data)) {
+      LOG_DEBUG("sm_transition: guard '%s' rejected transition %s: %u -> %u",
+                t->guard_fn, sm->name, sm->current_state, target_state);
+      return false;
+    }
+    LOG_DEBUG("sm_transition: guard '%s' passed for %s", t->guard_fn, sm->name);
+  } else {
+    LOG_DEBUG("sm_transition: no guard for %s", sm->name);
   }
 
   /* Run post-guard hooks */
@@ -269,9 +277,13 @@ sm_transition(StateMachine* sm, uint32_t target_state)
   /* Run pre-action hooks */
   sm_hook_list_run(sm->hooks[SM_HOOK_PRE_ACTION], sm);
 
-  /* Execute action (placeholder - would call action function by name) */
+  /* Execute action - use registry to find and call action function */
   if (t->action_fn != NULL) {
-    LOG_DEBUG("sm_transition: action %s would run here", t->action_fn);
+    if (!sm_run_action(sm, t->action_fn, sm->data)) {
+      LOG_ERROR("sm_transition: action '%s' failed for %s", t->action_fn, sm->name);
+      return false;
+    }
+    LOG_DEBUG("sm_transition: executed action '%s' for %s", t->action_fn, sm->name);
   }
 
   /* Update state */
