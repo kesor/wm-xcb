@@ -19,6 +19,7 @@ pre-commit:
 
 pre-push:
   skip: [pre-commit]
+  runner: bypass
   commands:
     format:
       glob: "**/*.{c,h}"
