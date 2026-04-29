@@ -5,3 +5,8 @@ compile_commands.json
 *.d
 compile_flags.txt
 task-*.txt
+
+# Test binaries - ignore all test-* then un-ignore source files
+test-*
+!test-*.c
+!test-*.h
