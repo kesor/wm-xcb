@@ -93,8 +93,7 @@ format:
 
 # Run clang-tidy on source files
 # Uses -p . to read compile_commands.json; adds glibc include path for nix
-tidy:
-	@test -f compile_commands.json || (echo "Error: compile_commands.json not found. Run 'make compile-commands' first." && exit 1)
+tidy: compile-commands
 	@clang-tidy -p . --quiet \
 		-extra-arg=-I$(GLIBC_DEV) \
 		-extra-arg=-I. \
@@ -104,8 +103,13 @@ tidy:
 		${SRC} ${TEST_SRC}
 # Run clang static analyzer (requires compile_commands.json from bear)
 analyze:
-	@test -f compile_commands.json || $(MAKE) compile-commands
-	clang -fsyntax-only -Xclang -analyze -Xclang -analyzer-output=text -p . ${SRC}
+	@clang-tidy -p . --quiet \
+		-extra-arg=-I$(GLIBC_DEV) \
+		-extra-arg=-I. \
+		-extra-arg=-Ivendor/xcb-errors-include \
+		-extra-arg=-Ivendor/libxcb-errors/include \
+		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
+		${SRC} ${TEST_SRC}
 
 # Run all development checks
 check: format tidy analyze
