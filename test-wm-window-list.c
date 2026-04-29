@@ -1,161 +1,234 @@
+/*
+ * Client List Tests
+ *
+ * Tests for the Client entity list implementation.
+ * Tests the sentinel-based circular doubly-linked list.
+ */
+
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-window-list.h"
+#include "src/target/client.h"
 
-static int         count = 0;
-static wnd_node_t* sentinel;
+static int count = 0;
 
 void
-count_callback(wnd_node_t* wnd)
+count_callback(Client* c)
 {
-  (void) wnd;
+  (void) c;
   count++;
 }
 
 void
 test_add_remove()
 {
-  LOG_CLEAN("== Testing adding and removing nodes from the list");
-  setup_window_list();
-  window_insert(1);
-  window_insert(2);
-  window_insert(3);
-  assert(window_find(1) != NULL);
-  assert(window_find(2) != NULL);
-  assert(window_find(3) != NULL);
-  window_remove(2);
-  assert(window_find(1) != NULL);
-  assert(window_find(2) == NULL);
-  assert(window_find(3) != NULL);
-  window_remove(1);
-  window_remove(3);
-  assert(window_find(1) == NULL);
-  assert(window_find(2) == NULL);
-  assert(window_find(3) == NULL);
-  destruct_window_list();
+  LOG_CLEAN("== Testing adding and removing clients from the list");
+
+  hub_init();
+  client_list_init();
+
+  Client* c1 = client_create(1);
+  Client* c2 = client_create(2);
+  Client* c3 = client_create(3);
+
+  assert(c1 != NULL);
+  assert(c2 != NULL);
+  assert(c3 != NULL);
+
+  assert(client_get_by_window(1) == c1);
+  assert(client_get_by_window(2) == c2);
+  assert(client_get_by_window(3) == c3);
+
+  assert(client_list_count() == 3);
+
+  /* Destroy client 2 */
+  client_destroy(c2);
+  assert(client_get_by_window(1) == c1);
+  assert(client_get_by_window(2) == NULL);
+  assert(client_get_by_window(3) == c3);
+
+  /* Destroy clients 1 and 3 */
+  client_destroy(c1);
+  client_destroy(c3);
+
+  assert(client_list_count() == 0);
+  hub_shutdown();
 }
 
 void
 test_iteration()
 {
   LOG_CLEAN("== Testing iteration over the list");
-  setup_window_list();
+
+  hub_init();
+  client_list_init();
 
   count = 0;
-  window_foreach(count_callback);
+  client_foreach(count_callback);
   assert(count == 0);
 
-  window_insert(1);
-  window_insert(2);
-  window_insert(3);
-  window_foreach(count_callback);
+  client_create(1);
+  client_create(2);
+  client_create(3);
+
+  count = 0;
+  client_foreach(count_callback);
   assert(count == 3);
 
-  destruct_window_list();
+  hub_shutdown();
 }
 
 void
-test_remove_non_existent_window()
+test_reverse_iteration()
 {
-  LOG_CLEAN("== Testing removal of non-existent window");
-  setup_window_list();
-  window_insert(1);
-  window_remove(2);    // try to remove window 2 from an empty list
-  assert(window_find(2) == NULL);
-  destruct_window_list();
+  LOG_CLEAN("== Testing reverse iteration over the list");
+
+  hub_init();
+  client_list_init();
+
+  client_create(1);
+  client_create(2);
+  client_create(3);
+
+  /* Count in reverse */
+  count = 0;
+  client_foreach_reverse(count_callback);
+  assert(count == 3);
+
+  hub_shutdown();
+}
+
+void
+test_remove_non_existent_client()
+{
+  LOG_CLEAN("== Testing removal of non-existent client");
+
+  hub_init();
+  client_list_init();
+
+  client_create(1);
+
+  /* Try to get non-existent client */
+  assert(client_get_by_window(2) == NULL);
+  assert(client_list_count() == 1);
+
+  hub_shutdown();
 }
 
 void
 test_empty_list()
 {
   LOG_CLEAN("== Testing empty list");
-  setup_window_list();
-  sentinel = get_wnd_list_sentinel();
-  assert(window_find(1) == NULL);
-  assert(sentinel->next == sentinel);
-  assert(sentinel->prev == sentinel);
-  destruct_window_list();
+
+  hub_init();
+  client_list_init();
+
+  assert(client_list_count() == 0);
+  assert(client_list_is_empty() == true);
+  assert(client_list_get_head() == NULL);
+
+  hub_shutdown();
 }
 
 void
-test_window_find()
+test_client_get_by_window()
 {
-  LOG_CLEAN("== Testing window_find");
-  setup_window_list();
-  window_insert(1);
-  window_insert(2);
-  window_insert(3);
-  assert(window_find(1) != NULL);
-  assert(window_find(2) != NULL);
-  assert(window_find(3) != NULL);
-  assert(window_find(4) == NULL);
-  destruct_window_list();
+  LOG_CLEAN("== Testing client_get_by_window");
+
+  hub_init();
+  client_list_init();
+
+  Client* c1 = client_create(1);
+  Client* c2 = client_create(2);
+  Client* c3 = client_create(3);
+
+  assert(client_get_by_window(1) == c1);
+  assert(client_get_by_window(2) == c2);
+  assert(client_get_by_window(3) == c3);
+  assert(client_get_by_window(4) == NULL);
+
+  hub_shutdown();
 }
 
 void
-test_window_insert_invalid()
+test_client_create_invalid()
 {
-  LOG_CLEAN("== Testing window_insert with XCB_NONE");
-  setup_window_list();
-  assert(window_insert(XCB_NONE) == XCB_NONE);
-  assert(window_find(XCB_NONE) == NULL);
-  assert(sentinel->next == sentinel);
-  assert(sentinel->prev == sentinel);
-  destruct_window_list();
+  LOG_CLEAN("== Testing client_create with invalid window");
+
+  hub_init();
+  client_list_init();
+
+  /* Create with XCB_NONE should fail */
+  Client* c = client_create(XCB_NONE);
+  assert(c == NULL);
+  assert(client_list_count() == 0);
+
+  hub_shutdown();
 }
 
 void
-test_window_remove_invalid()
+test_client_create_duplicate()
 {
-  LOG_CLEAN("== Testing window_remove with invalid window XCB_NONE");
-  setup_window_list();
-  window_remove(XCB_NONE);
-  assert(sentinel->next == sentinel);
-  assert(sentinel->prev == sentinel);
-  destruct_window_list();
+  LOG_CLEAN("== Testing client_create with duplicate window");
+
+  hub_init();
+  client_list_init();
+
+  Client* c1 = client_create(1);
+  assert(c1 != NULL);
+
+  /* Creating same window again should return NULL (already registered) */
+  Client* c2 = client_create(1);
+  assert(c2 == NULL); /* Should fail - already exists */
+  assert(client_list_count() == 1);
+
+  hub_shutdown();
 }
 
 void
-test_window_insert_duplicate()
+test_client_destroy_by_window()
 {
-  LOG_CLEAN("== Testing window_insert with duplicate window handle");
-  setup_window_list();
-  xcb_window_t window = 1;
-  window_insert(window);
-  assert(window_find(window) != NULL);
-  assert(sentinel->next != sentinel);
-  assert(sentinel->prev != sentinel);
-  // Insert the same window handle again
-  window_insert(window);
+  LOG_CLEAN("== Testing client_destroy_by_window");
 
-  // Check that the window handle has been updated in the existing node, rather than creating a new node
-  assert(window_find(window) != NULL);
-  assert(sentinel->next != sentinel);
-  assert(sentinel->prev != sentinel);
-  assert(sentinel->next == sentinel->prev);    // there should only be one node in the list
-  destruct_window_list();
+  hub_init();
+  client_list_init();
+
+  client_create(1);
+  client_create(2);
+  assert(client_list_count() == 2);
+
+  client_destroy_by_window(1);
+  assert(client_list_count() == 1);
+  assert(client_get_by_window(1) == NULL);
+
+  hub_shutdown();
 }
 
 void
-test_window_insert_returns_node()
+test_client_list_contains_window()
 {
-  LOG_CLEAN("== Testing window_insert returning the window object");
-  setup_window_list();
-  xcb_window_t window = 123;
-  wnd_node_t*  node   = window_insert(window);
-  assert(node->window == window);
-  assert(window_find(window) == node);
-  destruct_window_list();
+  LOG_CLEAN("== Testing client_list_contains_window");
+
+  hub_init();
+  client_list_init();
+
+  assert(client_list_contains_window(1) == false);
+
+  client_create(1);
+  assert(client_list_contains_window(1) == true);
+  assert(client_list_contains_window(2) == false);
+
+  hub_shutdown();
 }
 
-TEST_GROUP(WindowList, {
+TEST_GROUP(ClientList, {
   test_add_remove();
   test_iteration();
-  test_remove_non_existent_window();
+  test_reverse_iteration();
+  test_remove_non_existent_client();
   test_empty_list();
-  test_window_find();
-  test_window_insert_invalid();
-  test_window_remove_invalid();
-  test_window_insert_duplicate();
-  test_window_insert_returns_node();
+  test_client_get_by_window();
+  test_client_create_invalid();
+  test_client_create_duplicate();
+  test_client_destroy_by_window();
+  test_client_list_contains_window();
 });

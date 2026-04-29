@@ -1,8 +1,8 @@
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
 
+#include "src/target/client.h"
 #include "wm-log.h"
-#include "wm-window-list.h"
 #include "wm-xcb-ewmh.h"
 #include "wm-xcb.h"
 
@@ -35,7 +35,7 @@ handle_create_notify(xcb_create_notify_event_t* event)
               event->height,
               event->border_width,
               event->override_redirect);
-  window_insert(event->window);
+  client_create(event->window);
 }
 
 void
@@ -45,7 +45,7 @@ handle_destroy_notify(xcb_destroy_notify_event_t* event)
               event->sequence,
               event->event,
               event->window);
-  window_remove(event->window);
+  client_destroy_by_window(event->window);
 }
 
 void
@@ -264,10 +264,12 @@ handle_reparent_notify(xcb_reparent_notify_event_t* event)
               event->x,
               event->y,
               event->override_redirect);
-  wnd_node_t* wnd = window_insert(event->window);
-  wnd->parent     = event->parent;
-  wnd->x          = event->x;
-  wnd->y          = event->y;
+  Client* c = client_create(event->window);
+  if (c != NULL) {
+    /* Set initial geometry from reparent event */
+    c->x = event->x;
+    c->y = event->y;
+  }
 }
 
 void

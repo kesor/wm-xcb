@@ -22,6 +22,7 @@
 /*
  * Include all test headers to register their test groups
  */
+#include "test-target-client.h"
 #include "test-wm-hub.h"
 #include "test-wm-monitor.h"
 #include "test-wm-window-list.h"
