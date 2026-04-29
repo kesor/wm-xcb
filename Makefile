@@ -85,7 +85,7 @@ $(NAME): ${OBJ} $(NAME).o
 # Generate compile_commands.json for clang tools
 # Forces recompilation with clang so clang-tidy can understand the flags
 compile-commands: clean
-	@bear -- $(MAKE) CC=clang all || true
+	@bear -- $(MAKE) -k CC=clang all
 
 # Format source files with clang-format
 format:
