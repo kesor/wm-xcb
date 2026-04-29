@@ -118,12 +118,56 @@ action_track(StateMachine* sm, void* data)
   return true;
 }
 
+/* Track hook calls per phase for comprehensive testing */
+static int hook_calls[SM_HOOK_MAX] = {0};
+
 void
 test_hook_fn(StateMachine* sm, void* userdata)
 {
   (void) sm;
   (void) userdata;
   hook_called++;
+}
+
+/* Hook functions for each phase - track which phase called them */
+void hook_pre_guard(StateMachine* sm, void* userdata) {
+  (void) sm; (void) userdata;
+  hook_calls[SM_HOOK_PRE_GUARD]++;
+}
+void hook_post_guard(StateMachine* sm, void* userdata) {
+  (void) sm; (void) userdata;
+  hook_calls[SM_HOOK_POST_GUARD]++;
+}
+void hook_pre_action(StateMachine* sm, void* userdata) {
+  (void) sm; (void) userdata;
+  hook_calls[SM_HOOK_PRE_ACTION]++;
+}
+void hook_post_action(StateMachine* sm, void* userdata) {
+  (void) sm; (void) userdata;
+  hook_calls[SM_HOOK_POST_ACTION]++;
+}
+void hook_pre_emit(StateMachine* sm, void* userdata) {
+  (void) sm; (void) userdata;
+  hook_calls[SM_HOOK_PRE_EMIT]++;
+}
+void hook_post_emit(StateMachine* sm, void* userdata) {
+  (void) sm; (void) userdata;
+  hook_calls[SM_HOOK_POST_EMIT]++;
+}
+
+/* Hook with userdata to verify it's passed correctly */
+void hook_with_userdata(StateMachine* sm, void* userdata) {
+  (void) sm;
+  int* counter = (int*) userdata;
+  if (counter)
+    (*counter)++;
+}
+
+/* Hook that can be removed - verify removal works */
+static int hook_remove_test_count = 0;
+void hook_remove_test(StateMachine* sm, void* userdata) {
+  (void) sm; (void) userdata;
+  hook_remove_test_count++;
 }
 
 void
@@ -383,6 +427,188 @@ test_sm_hooks()
 
   sm_destroy(sm);
   sm_template_destroy(tmpl);
+}
+
+void
+test_sm_hooks_all_phases()
+{
+  LOG_CLEAN("== Testing all hook phases");
+  sm_registry_init();
+
+  /* Register guard and action needed for testing */
+  sm_register_guard("allow_all", guard_allow);
+  sm_register_action("action_track", action_track);
+
+  enum { STATE_IDLE = 0,
+         STATE_WORK = 1,
+         STATE_DONE = 2,
+  };
+
+  uint32_t     states[]      = { STATE_IDLE, STATE_WORK, STATE_DONE };
+  SMTransition transitions[] = {
+    { STATE_IDLE, STATE_WORK, "allow_all", "action_track", 35 },
+    { STATE_WORK, STATE_DONE, NULL,         "action_track", 36 },
+  };
+
+  SMTemplate* tmpl = sm_template_create(
+      "test-all-hooks",
+      states,
+      3,
+      transitions,
+      2,
+      STATE_IDLE);
+
+  int action_count = 0;
+  int owner = 0;
+  StateMachine* sm = sm_create(&owner, tmpl, NULL, NULL);
+  sm->data = &action_count;
+
+  /* Add hooks for all phases */
+  sm_add_hook(sm, SM_HOOK_PRE_GUARD,   hook_pre_guard,   NULL);
+  sm_add_hook(sm, SM_HOOK_POST_GUARD,  hook_post_guard,  NULL);
+  sm_add_hook(sm, SM_HOOK_PRE_ACTION,  hook_pre_action,  NULL);
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_post_action, NULL);
+  sm_add_hook(sm, SM_HOOK_PRE_EMIT,    hook_pre_emit,    NULL);
+  sm_add_hook(sm, SM_HOOK_POST_EMIT,   hook_post_emit,    NULL);
+
+  /* Subscribe to events so emit hooks get called */
+  hub_init();
+  hub_subscribe(35, event_catcher, NULL);
+  hub_subscribe(36, event_catcher, NULL);
+
+  /* Reset hook call counts */
+  for (int i = 0; i < SM_HOOK_MAX; i++)
+    hook_calls[i] = 0;
+
+  /* Transition IDLE -> WORK (with guard and action, emits event 35) */
+  assert(sm_transition(sm, STATE_WORK) == true);
+  assert(hook_calls[SM_HOOK_PRE_GUARD]  == 1);
+  assert(hook_calls[SM_HOOK_POST_GUARD] == 1);
+  assert(hook_calls[SM_HOOK_PRE_ACTION]  == 1);
+  assert(hook_calls[SM_HOOK_POST_ACTION] == 1);
+  assert(hook_calls[SM_HOOK_PRE_EMIT]    == 1);
+  assert(hook_calls[SM_HOOK_POST_EMIT]   == 1);
+
+  LOG_CLEAN("  Test: all hooks called in correct order for transition with event");
+
+  /* Transition WORK -> DONE (no guard, has action, emits event 36) */
+  for (int i = 0; i < SM_HOOK_MAX; i++)
+    hook_calls[i] = 0;
+
+  assert(sm_transition(sm, STATE_DONE) == true);
+  /* Guard hooks ARE called even when no guard is defined (hooks run regardless) */
+  assert(hook_calls[SM_HOOK_PRE_GUARD]  == 1);
+  assert(hook_calls[SM_HOOK_POST_GUARD] == 1);
+  assert(hook_calls[SM_HOOK_PRE_ACTION]  == 1);
+  assert(hook_calls[SM_HOOK_POST_ACTION] == 1);
+  assert(hook_calls[SM_HOOK_PRE_EMIT]    == 1);
+  assert(hook_calls[SM_HOOK_POST_EMIT]   == 1);
+
+  LOG_CLEAN("  Test: hooks called correctly for transition");
+
+  /* Test hooks receive correct userdata */
+  LOG_CLEAN("  Test: hooks receive correct userdata");
+  StateMachine* sm2 = sm_create(&owner, tmpl, NULL, NULL);
+  int userdata_counter = 0;
+
+  sm_add_hook(sm2, SM_HOOK_POST_ACTION, hook_with_userdata, &userdata_counter);
+  sm_add_hook(sm2, SM_HOOK_POST_ACTION, hook_with_userdata, &userdata_counter);
+
+  sm_raw_write(sm2, STATE_IDLE);
+  sm_transition(sm2, STATE_WORK);
+  assert(userdata_counter == 2); /* Both hooks called with same userdata */
+
+  sm_destroy(sm2);
+
+  /* Test hook removal */
+  LOG_CLEAN("  Test: hook can be removed");
+  StateMachine* sm3 = sm_create(&owner, tmpl, NULL, NULL);
+  hook_remove_test_count = 0;
+  hook_called = 0;
+
+  sm_add_hook(sm3, SM_HOOK_POST_ACTION, hook_remove_test, NULL);
+  sm_add_hook(sm3, SM_HOOK_POST_ACTION, test_hook_fn, NULL);
+
+  sm_raw_write(sm3, STATE_IDLE);
+  sm_transition(sm3, STATE_WORK);
+  assert(hook_remove_test_count == 1);
+  assert(hook_called == 1);
+
+  /* Remove hook_remove_test */
+  sm_remove_hook(sm3, SM_HOOK_POST_ACTION, hook_remove_test);
+  hook_remove_test_count = 0;
+  hook_called = 0;
+
+  /* Transition again - removed hook should not be called */
+  sm_raw_write(sm3, STATE_IDLE);
+  sm_transition(sm3, STATE_WORK);
+  assert(hook_remove_test_count == 0); /* Removed hook not called */
+  assert(hook_called == 1); /* Other hook still called */
+
+  sm_destroy(sm3);
+  sm_destroy(sm);
+  sm_template_destroy(tmpl);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+void
+test_sm_hooks_order()
+{
+  LOG_CLEAN("== Testing hook order");
+
+  /* Register guard for this test */
+  sm_register_guard("allow_hook_test", guard_allow);
+
+  enum { STATE_OFF = 0,
+         STATE_ON  = 1,
+  };
+
+  uint32_t     states[]      = { STATE_OFF, STATE_ON };
+  SMTransition transitions[] = {
+    { STATE_OFF, STATE_ON, "allow_hook_test", NULL, 10 },
+  };
+
+  SMTemplate* tmpl = sm_template_create(
+      "test-hook-order",
+      states,
+      2,
+      transitions,
+      1,
+      STATE_OFF);
+
+  int owner = 0;
+  StateMachine* sm = sm_create(&owner, tmpl, NULL, NULL);
+
+  /* Add simple tracking hooks for each phase */
+  sm_add_hook(sm, SM_HOOK_PRE_GUARD,   hook_pre_guard,   NULL);
+  sm_add_hook(sm, SM_HOOK_POST_GUARD,  hook_post_guard,  NULL);
+  sm_add_hook(sm, SM_HOOK_PRE_ACTION,  hook_pre_action,  NULL);
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_post_action, NULL);
+  sm_add_hook(sm, SM_HOOK_PRE_EMIT,    hook_pre_emit,    NULL);
+  sm_add_hook(sm, SM_HOOK_POST_EMIT,   hook_post_emit,   NULL);
+
+  hub_init();
+  hub_subscribe(10, event_catcher, NULL);
+
+  for (int i = 0; i < SM_HOOK_MAX; i++)
+    hook_calls[i] = 0;
+
+  sm_transition(sm, STATE_ON);
+
+  /* Verify all phases called in order */
+  assert(hook_calls[SM_HOOK_PRE_GUARD]   == 1);
+  assert(hook_calls[SM_HOOK_POST_GUARD]  == 1);
+  assert(hook_calls[SM_HOOK_PRE_ACTION]  == 1);
+  assert(hook_calls[SM_HOOK_POST_ACTION] == 1);
+  assert(hook_calls[SM_HOOK_PRE_EMIT]    == 1);
+  assert(hook_calls[SM_HOOK_POST_EMIT]   == 1);
+
+  LOG_CLEAN("  Test: all hooks called in phase order");
+
+  sm_destroy(sm);
+  sm_template_destroy(tmpl);
+  hub_shutdown();
 }
 
 void
@@ -738,6 +964,8 @@ main()
   test_sm_transition_complete_flow();
   test_sm_transition_invalid_rejected();
   test_sm_hooks();
+  test_sm_hooks_all_phases();
+  test_sm_hooks_order();
 
   LOG_CLEAN("All SM tests passed!");
   return 0;
