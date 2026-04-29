@@ -100,6 +100,7 @@ test_monitor_list_add_remove(void)
 
   /* Remove m2 */
   monitor_list_remove(m2);
+  monitor_destroy(m2);  /* Properly destroy after remove */
   assert(monitor_list_get_first() == m1);
 
   /* Remove m1 */
@@ -416,20 +417,15 @@ test_monitor_double_create(void)
 }
 
 void
-test_monitor_double_destroy(void)
+test_monitor_null_destroy(void)
 {
-  LOG_CLEAN("== Testing double monitor destroy");
+  LOG_CLEAN("== Testing NULL monitor destroy is safe");
 
   hub_init();
   monitor_list_init();
 
-  Monitor* m = monitor_create(100);
-
-  /* First destroy */
-  monitor_destroy(m);
-
-  /* Second destroy should be safe (NULL check) */
-  monitor_destroy(NULL);  /* Should not crash */
+  /* NULL destroy should be safe (no crash) */
+  monitor_destroy(NULL);
 
   monitor_list_shutdown();
   hub_shutdown();
@@ -492,6 +488,6 @@ TEST_GROUP(Monitor, {
   test_monitor_client_list();
   test_monitor_multiple_monitors();
   test_monitor_double_create();
-  test_monitor_double_destroy();
+  test_monitor_null_destroy();
   test_monitor_with_hub_integration();
 });

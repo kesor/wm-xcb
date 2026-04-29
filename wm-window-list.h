@@ -9,9 +9,15 @@
  *
  * Represents a managed X window. Minimal definition for Monitor integration.
  * Extended client properties are managed by the client component.
+ *
+ * Note: The `next` pointer is used for per-monitor client lists.
+ * Clients are linked via their `next` field within each Monitor's client list.
+ * The client_list_* functions provide global list operations, but ownership
+ * of Client objects remains with the creating component (typically the
+ * client management component, not this module).
  */
 typedef struct Client {
-  struct Client* next; /* Next client in monitor's client list */
+  struct Client* next; /* Next client in this monitor's client list */
 
   xcb_window_t window;   /* X window ID */
   uint32_t     tags;     /* Tag mask for this client */

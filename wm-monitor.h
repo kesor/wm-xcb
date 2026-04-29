@@ -166,7 +166,7 @@ Monitor* monitor_by_output(xcb_randr_output_t output);
  * Get the currently selected monitor.
  * Used for TARGET_CURRENT_MONITOR resolution.
  *
- * @return The selected monitor, or first monitor if none selected
+ * @return The selected monitor, or NULL if none selected
  */
 Monitor* monitor_get_selected(void);
 

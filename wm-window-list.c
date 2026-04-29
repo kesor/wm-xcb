@@ -158,6 +158,10 @@ window_focus_clear(xcb_window_t window)
  *
  * This is a separate list from the window list (wnd_node_t).
  * Client represents managed windows with WM-specific state.
+ *
+ * Ownership: This list does NOT own the Client objects. It maintains
+ * linkage for iteration only. Callers are responsible for allocating
+ * and freeing Client objects.
  */
 
 /* Client list sentinel (circular list) */
@@ -172,11 +176,12 @@ client_list_init(void)
 void
 client_list_shutdown(void)
 {
-  /* Free all clients in the list */
+  /* Clear the list without freeing Client objects.
+   * Ownership is not established by this module. */
   Client* current = client_sentinel.next;
   while (current != &client_sentinel) {
     Client* next = current->next;
-    free(current);
+    current->next = NULL;
     current = next;
   }
   client_sentinel.next = &client_sentinel;

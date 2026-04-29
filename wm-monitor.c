@@ -96,8 +96,10 @@ monitor_destroy(Monitor* m)
   /* Remove from global list if present */
   monitor_list_remove(m);
 
-  /* Unregister from hub */
-  hub_unregister_target(m->target.id);
+  /* Unregister from hub only if registration succeeded */
+  if (m->target.registered) {
+    hub_unregister_target(m->target.id);
+  }
 
   /* Note: Clients are not destroyed here.
    * They should be unmanaged first by the caller.
@@ -132,19 +134,15 @@ monitor_list_shutdown(void)
 {
   LOG_DEBUG("Shutting down monitor list (count=%u)", monitor_count);
 
-  /* Destroy all monitors */
-  Monitor* current = monitor_list;
-  while (current != NULL) {
-    Monitor* next = current->next;
-    /* Clear the next pointer before destroy to prevent issues */
-    current->next = NULL;
-    monitor_destroy(current);
-    current = next;
+  /* Destroy all monitors through the normal removal path.
+   * This keeps list bookkeeping (monitor_count, selected_monitor) correct. */
+  while (monitor_list != NULL) {
+    monitor_destroy(monitor_list);
   }
 
   monitor_list     = NULL;
   selected_monitor = NULL;
-  monitor_count    = 0;
+  monitor_count     = 0;
 
   LOG_DEBUG("Monitor list shutdown complete");
 }
@@ -263,11 +261,12 @@ monitor_client_count(Monitor* m)
     return 0;
   }
 
+  /* Iterate using Monitor's per-monitor client list linkage */
   uint32_t count = 0;
   Client*  c     = (Client*)m->clients;
   while (c != NULL) {
     count++;
-    c = client_list_get_next(c);
+    c = c->next;
   }
   return count;
 }
