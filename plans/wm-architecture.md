@@ -56,12 +56,12 @@ The hub does NOT handle XCB events. It only handles:
 Framework for targets to own state machines.
 
 **SM Template:**
-- `SMTemplate` struct: name, states[], transitions[], guards[], actions[], events[]
+- `SMTemplate` struct: name, states[], transitions[]
 - `sm_template_create()` / `sm_template_destroy()`
 
 **SM Instance:**
-- `StateMachine` struct: name, current_state, owner (Target*), template, data
-- `sm_create(Target*, SMTemplate*)` — lazy allocation
+- `StateMachine` struct: name, current_state, owner, template, data, emit callback
+- `sm_create(owner, template, emit)` — emit callback connects SM to hub (required)
 - `sm_destroy(StateMachine*)`
 - `sm_raw_write(StateMachine*, uint32_t new_state)` — authoritative, no guard
 - `sm_transition(StateMachine*, uint32_t target_state)` — with guard, emits event

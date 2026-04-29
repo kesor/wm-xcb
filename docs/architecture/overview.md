@@ -31,7 +31,7 @@ An entity that exists in the system and can be the subject of state transitions.
 
 **A target owns:**
 - Its properties (which can change but are not state-machine-tracked)
-- Adopted state machines (lazy-allocated)
+- Adopted state machines (on-demand allocation)
 - Adopted component listeners
 
 ### 2. State Machine
@@ -170,10 +170,12 @@ Client* client_create(xcb_window_t window) {
 1. Attaches component's listener (filtered for this target's ID)
 2. Attaches component's SM template (not yet allocated)
 
-**Lazy state machine allocation:**
+**On-demand state machine allocation:**
+
 ```c
-FullscreenSM* sm = target_get_sm(client, COMPONENT_FULLSCREEN);
-// First call allocates and initializes the SM
+// Target decides when to create SM - not at target creation
+StateMachine* sm = target_get_sm(client, COMPONENT_FULLSCREEN);
+// First call to sm_create() allocates and initializes the SM
 // SM allocated only when actually needed
 ```
 
@@ -391,7 +393,7 @@ wm/
 | SMs are | Mutually exclusive per SM | Client is FULLSCREEN OR WINDOWED, never both |
 | SMs include | Raw writers + request writers | Hardware events are authoritative; user requests need execution |
 | Target resolution | In hub | Components get concrete IDs; don't need to know resolution logic |
-| SM creation | Lazy | Don't allocate SM unless it's actually needed |
+| SM allocation | On-demand | Targets call sm_create() when first needed |
 | Component adoption | Based on target type | Component declares accepted_targets[] |
 | Requests | Fire-and-forget by default | Can listen to events for confirmation |
 | Executor SMs | Not needed for v1 | Simple request-reply; executor doesn't need intermediate states |

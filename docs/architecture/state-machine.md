@@ -102,23 +102,19 @@ typedef struct SMTemplate {
 
 ## State Machine Operations
 
-### Create (lazy)
+### Create
 ```c
-StateMachine* sm_create(Target* owner, SMTemplate* template) {
+StateMachine* sm_create(void* owner, SMTemplate* template, EventEmitter emit) {
     StateMachine* sm = malloc(sizeof(StateMachine));
     sm->name = template->name;
     sm->owner = owner;
     sm->template = template;
     sm->current_state = template->initial_state;
-    sm->pre_guards = NULL;
-    sm->post_actions = NULL;
     sm->data = NULL;
-    
-    // Call template init function if any
-    if (template->init_fn) {
-        template->init_fn(sm);
-    }
-    
+
+    // Emit callback is required - owner must connect SM to hub
+    sm->emit = emit;
+
     return sm;
 }
 ```
@@ -336,18 +332,9 @@ struct Client {
 };
 ```
 
-**Lazy allocation:**
-```c
-StateMachine* client_get_sm(Client* c, const char* sm_name) {
-    if (strcmp(sm_name, "fullscreen") == 0) {
-        if (!c->sm_fullscreen) {
-            c->sm_fullscreen = sm_create(c, &fullscreen_template);
-        }
-        return c->sm_fullscreen;
-    }
-    // ... other SMs
-}
-```
+**On-demand allocation:**
+
+Targets decide when to allocate SMs. Call `sm_create()` when the SM is first needed (e.g., on first request), not at target creation time. The SM stays allocated for the lifetime of the target.
 
 **Target destruction:**
 ```c

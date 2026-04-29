@@ -199,7 +199,7 @@ void fullscreen_executor(Request* req) {
         return;
     }
     
-    // Get or create the SM (lazy allocation)
+    // Get or create the SM (on-demand allocation)
     StateMachine* sm = client_get_sm(c, "fullscreen");
     
     // Determine target state based on current state
