@@ -38,6 +38,11 @@ enum TargetType {
 | TAG | pertag (stores per-tag state), ... |
 | SYSTEM | (global event handlers) |
 
+> **Important:** Tags are **not** properties of monitors — tags are their own targets.
+> A tag (e.g., "work", "web", "9") is a virtual workspace that exists independently.
+> Monitors "view" tags via the `pertag` component, which bridges TAG targets and MONITOR targets.
+> See [TAG Target](#tag-target) below.
+
 ---
 
 ## Base Target Structure
@@ -156,7 +161,10 @@ struct Monitor {
     int x, y;               // screen position
     uint16_t width, height; // resolution
     
-    // Tag state
+    // Tag state — **Note:** This is a temporary simplification.
+    // Tags should be their own targets (see TAG Target section below).
+    // The proper design uses the `pertag` component to bridge TAG → MONITOR.
+    // TODO: Remove tagset/prevtagset once TAG targets are implemented.
     uint32_t tagset;         // bitmask of visible tags
     uint32_t prevtagset;     // for switching
     
@@ -218,6 +226,56 @@ Monitor* monitor_create(xcb_randr_output_t output) {
     return m;
 }
 ```
+
+---
+
+## TAG Target
+
+Tags are virtual workspaces that exist independently of monitors. A monitor "views" a subset of tags via the `pertag` component.
+
+```c
+struct Tag {
+    // Base target
+    Target target;
+    
+    // Identity
+    int index;               // 0-8 (for 9 tags)
+    char* name;              // optional: "work", "web", "9", etc.
+    
+    // Bitmask for this tag (1 << index)
+    uint32_t mask;
+    
+    // Next tag (for iteration)
+    Tag* next;
+};
+```
+
+### TAG Target Design Principles
+
+1. **Tags exist independently** — A tag like "tag 1" exists whether or not any monitor is viewing it
+2. **Monitors "view" tags** — via the `pertag` component, a monitor indicates which tags it displays
+3. **Client ↔ Tag relationship** — clients have a tagmask; they're visible on monitors whose tagset overlaps
+4. **TAG target is simple** — tags don't adopt many components; they're mainly referenced by `pertag`
+
+### Tag → Client Visibility
+
+A client is visible on a monitor when:
+```c
+bool client_visible_on_monitor(Client* c, Monitor* m) {
+    return (c->tags & m->tagset) != 0;
+}
+```
+
+### Monitor ↔ Tag Relationship (via pertag)
+
+```
+MONITOR ──adopts──> pertag component ──references──> TAG targets
+```
+
+The `pertag` component bridges monitors and tags:
+- Stores per-tag layout parameters (mfact, nmaster, layout) for each monitor
+- Maps from tag index → TAG target
+- When user switches tags, the component updates the monitor's active view
 
 ---
 

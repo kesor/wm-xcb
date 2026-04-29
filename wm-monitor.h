@@ -25,6 +25,13 @@ typedef struct Client Client;
  * - Tiling parameters (master factor, master count)
  * - Client list
  * - Bar reference
+ *
+ * ARCHITECTURAL NOTE: Tags are not properties of monitors — tags are their own
+ * targets (TARGET_TYPE_TAG). Monitors "view" tags via the pertag component.
+ *
+ * The current tagset/prevtagset fields are a temporary simplification.
+ * See docs/architecture/target.md for the full TAG target design.
+ * TODO: Remove tagset from Monitor once TAG targets are implemented.
  */
 
 /*
@@ -59,7 +66,7 @@ typedef struct Monitor {
   uint16_t width;   /* Resolution width */
   uint16_t height;  /* Resolution height */
 
-  /* Tag state */
+  /* Tag state — TODO: Remove once TAG targets implemented (see target.md) */
   uint32_t tagset;     /* Currently visible tags (bitmask) */
   uint32_t prevtagset; /* Previous tagset for switching */
 
