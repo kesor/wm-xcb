@@ -9,7 +9,7 @@
 
 A Target is an entity that exists in the system and can be the subject of state transitions. Targets own:
 - Their properties (geometry, title, etc.)
-- Adopted state machines (lazy-allocated)
+- Adopted state machines (on-demand allocation)
 - Adopted component listeners
 
 Examples: CLIENT (windows), MONITOR (displays), KEYBOARD (future), TAG (virtual workspaces)
@@ -243,7 +243,7 @@ void target_adopt(Target* t, Component* c) {
 }
 ```
 
-### Lazy SM Allocation
+### On-Demand SM Allocation
 ```c
 StateMachine* target_get_sm(Target* t, const char* sm_name) {
     // Check if SM already exists
@@ -380,7 +380,7 @@ Component** hub_get_components_for_target_type(TargetType type) {
 
 ---
 
-## Lazy vs Eager Adoption
+## On-Demand vs Eager Adoption
 
 ### Current Design: Eager for Built-in Components
 
@@ -644,7 +644,7 @@ void monitor_destroy(Monitor* m);
 ## Testing Strategy
 
 1. **Unit tests for target creation**: Verify components adopted
-2. **Unit tests for lazy SM allocation**: First access creates SM
+2. **Unit tests for on-demand SM allocation**: First access creates SM
 3. **Unit tests for component adoption/unadoption**: Correct hooks called
 4. **Unit tests for target lookup**: By ID, by window, by type
 5. **Integration tests**: Full lifecycle (create → use → destroy)

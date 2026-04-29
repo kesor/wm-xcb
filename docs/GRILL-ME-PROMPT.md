@@ -358,7 +358,7 @@ The grill-me session on 2026-04-28 resolved all pending questions:
 |----------|--------|----------|
 | SM granularity | Per-domain per-target | `architecture/decisions.md` |
 | SM lives on | Target (not component) | `architecture/decisions.md` |
-| SM allocation | Lazy | `architecture/decisions.md` |
+| SM allocation | On-demand | `architecture/decisions.md` |
 | Two writer types | Raw + Request | `architecture/decisions.md` |
 | Requests | Fire-and-forget async | `architecture/decisions.md` |
 | Component ownership | SM templates, not SMs | `architecture/decisions.md` |

@@ -332,18 +332,9 @@ struct Client {
 };
 ```
 
-**Lazy allocation:**
-```c
-StateMachine* client_get_sm(Client* c, const char* sm_name) {
-    if (strcmp(sm_name, "fullscreen") == 0) {
-        if (!c->sm_fullscreen) {
-            c->sm_fullscreen = sm_create(c, &fullscreen_template);
-        }
-        return c->sm_fullscreen;
-    }
-    // ... other SMs
-}
-```
+**On-demand allocation:**
+
+Targets decide when to allocate SMs. Call `sm_create()` when the SM is first needed (e.g., on first request), not at target creation time. The SM stays allocated for the lifetime of the target.
 
 **Target destruction:**
 ```c

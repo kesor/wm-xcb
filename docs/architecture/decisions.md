@@ -33,9 +33,9 @@ This document records key design decisions made during the architecture design p
 
 ---
 
-### Decision: Lazy SM Allocation
+### Decision: On-Demand SM Allocation
 
-**Decision:** State machines are allocated lazily — only when first accessed, not at target creation.
+**Decision:** State machines are allocated on-demand — targets call `sm_create()` when first needed, not at target creation time.
 
 **Rationale:**
 - Most targets won't use all SMs. A client might never go fullscreen.
@@ -199,14 +199,13 @@ struct FullscreenComponent {
 
 ---
 
-### Decision: Lazy Adoption for Targets
+### Decision: Eager Component Adoption, On-Demand SM Allocation
 
-**Decision:** When a target is created, it immediately adopts all compatible components (eager adoption at creation time). SMs are allocated lazily.
+**Decision:** When a target is created, it immediately adopts all compatible components (eager adoption). However, SMs are allocated on-demand (only when first needed).
 
 **Rationale:**
-- Simplicity: Don't need to track "which components have been adopted but SM not created."
-- Built-in functionality is always available: Client can fullscreen immediately.
-- Plugin adoption can be lazy (plugin-loaded later adopts to existing targets).
+- **Eager adoption:** Simplicity — don't need to track "which components have been adopted but SM not created." Built-in functionality is always available.
+- **On-demand SM allocation:** Most targets won't use all SMs. Reduces memory usage.
 
 **Alternatives considered:**
 - Fully lazy adoption: Components adopted on first request. Adds tracking complexity.

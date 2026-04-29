@@ -15,7 +15,7 @@ This directory contains the authoritative documentation for the wm architecture,
 | **[hub.md](hub.md)** | Hub implementation: registry, router, event bus, target resolution |
 | **[state-machine.md](state-machine.md)** | State machine framework: templates, transitions, guards, hooks |
 | **[component.md](component.md)** | Component design: executors, listeners, SM templates, lifecycle |
-| **[target.md](target.md)** | Target design: Client, Monitor, adoption, lazy SM allocation |
+| **[target.md](target.md)** | Target design: Client, Monitor, adoption, on-demand SM allocation |
 | **[decisions.md](decisions.md)** | Decision log with rationale for all major choices |
 
 ---
