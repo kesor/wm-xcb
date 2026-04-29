@@ -99,12 +99,7 @@ tidy: compile-commands
 		-extra-arg=-I. \
 		-extra-arg=-Ivendor/xcb-errors-include \
 		-extra-arg=-Ivendor/libxcb-errors/include \
-		-extra-arg=-I/nix/store/x44m80ahg51pz32dr0j39yzsr7bn7d5v-libxcb-1.17.0-dev/include \
-		-extra-arg=-I/nix/store/9ag3dbrwgbf1pzzbrhcyk6kqss2h9qgz-libxcb-util-0.4.1-dev/include \
-		-extra-arg=-I/nix/store/vqmfrfyskw51vmibb695p3xli5lxmada-libxcb-errors-1.0.1-dev/include \
-		-extra-arg=-I/nix/store/yihma6aw528nj48ddwm835f8yg3jjb7p-libxcb-keysyms-0.4.1-dev/include \
-		-extra-arg=-I/nix/store/zba0kgibxmp87ddlnnvwxrlfbc85w4cy-libxcb-wm-0.4.2-dev/include \
-		-extra-arg=-I/nix/store/mvyxqkpyj2mgymljzj9bqi9bmz7ca5fk-xorgproto-2025.1/include \
+		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-keysyms 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
 		${SRC} ${TEST_SRC}
 # Run clang static analyzer (requires compile_commands.json from bear)
 analyze:
