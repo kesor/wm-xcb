@@ -47,14 +47,14 @@ typedef void (*SMHookFn)(StateMachine*, void*);
  * Instance of a state machine template.
  */
 struct StateMachine {
-  const char*   name;               /* instance name (from template) */
-  uint32_t      current_state;      /* current state value */
-  void*         owner;              /* owner target (client, monitor, etc.) */
-  SMTemplate*   template;           /* reference to the template */
-  void*         data;               /* instance-specific data */
-  SMHookList*   hooks[SM_HOOK_MAX]; /* hook lists for each phase */
-  EventEmitter  emit;               /* event emitter function (e.g., hub_emit) */
-  void*         emit_userdata;      /* userdata passed to emit function */
+  const char*  name;               /* instance name (from template) */
+  uint32_t     current_state;      /* current state value */
+  void*        owner;              /* owner target (client, monitor, etc.) */
+  SMTemplate*  template;           /* reference to the template */
+  void*        data;               /* instance-specific data */
+  SMHookList*  hooks[SM_HOOK_MAX]; /* hook lists for each phase */
+  EventEmitter emit;               /* event emitter function (e.g., hub_emit) */
+  void*        emit_userdata;      /* userdata passed to emit function */
 };
 
 /*

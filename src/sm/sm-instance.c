@@ -2,8 +2,8 @@
 
 #include "sm-instance.h"
 #include "sm-template.h"
-#include "wm-log.h"
 #include "wm-hub.h"
+#include "wm-log.h"
 
 /*
  * Hook storage for each state machine instance
@@ -103,13 +103,13 @@ sm_create(void* owner, SMTemplate* template, EventEmitter emit, void* emit_userd
     return NULL;
   }
 
-  sm->name            = template->name;
-  sm->current_state   = template->initial_state;
-  sm->owner           = owner;
-  sm->template        = template;
-  sm->data            = NULL;
-  sm->emit            = emit;
-  sm->emit_userdata   = emit_userdata;
+  sm->name          = template->name;
+  sm->current_state = template->initial_state;
+  sm->owner         = owner;
+  sm->template      = template;
+  sm->data          = NULL;
+  sm->emit          = emit;
+  sm->emit_userdata = emit_userdata;
 
   /* Allocate hook lists for each phase */
   for (int i = 0; i < SM_HOOK_MAX; i++) {
