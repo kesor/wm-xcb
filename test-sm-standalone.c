@@ -139,10 +139,23 @@ static void hook_post_emit(StateMachine* sm, void* ud) {
   g_hook_order[g_hook_order_count++] = SM_HOOK_POST_EMIT;
 }
 
+static int g_hook_removal_count = 0;
+static void hook_removal_fn(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_removal_count++;
+}
+
 static void hook_with_userdata(StateMachine* sm, void* userdata) {
   (void)sm;
   int* counter = (int*)userdata;
   if (counter) (*counter)++;
+}
+
+/* Hook for test_hooks_basic */
+static int g_hook_basic_count = 0;
+static void hook_basic_fn(StateMachine* sm, void* ud) {
+  (void)sm; (void)ud;
+  g_hook_basic_count++;
 }
 
 static int g_hook_remove_count = 0;
@@ -534,14 +547,12 @@ void test_hooks_basic(void) {
   SMTransition trans[] = { { S0, S1, NULL, NULL, 0 } };
   SMTemplate* t = make_tmpl("hooks", states, 2, trans, 1, S0);
 
-  int called = 0;
-  void hook_fn(StateMachine* sm, void* ud) { (void)sm; (void)ud; called++; }
-
+  g_hook_basic_count = 0;
   int owner = 0;
   StateMachine* sm = make_sm(&owner, t);
-  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_fn, NULL);
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_basic_fn, NULL);
   sm_transition(sm, S1);
-  assert(called == 1);
+  assert(g_hook_basic_count == 1);
 
   sm_destroy(sm);
   sm_template_destroy(t);
@@ -633,28 +644,25 @@ void test_hooks_removal(void) {
   SMTransition trans[] = { { S0, S1, NULL, NULL, 0 } };
   SMTemplate* t = make_tmpl("removal", states, 2, trans, 1, S0);
 
-  int called = 0;
-  void hook_a(StateMachine* sm, void* ud) { (void)sm; (void)ud; called++; }
-
   int owner = 0;
   StateMachine* sm = make_sm(&owner, t);
 
-  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_a, NULL);
+  sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_removal_fn, NULL);
   sm_add_hook(sm, SM_HOOK_POST_ACTION, hook_remove_test, NULL);
 
-  called = 0;
+  g_hook_removal_count = 0;
   g_hook_remove_count = 0;
   sm_transition(sm, S1);
-  assert(called == 1);
+  assert(g_hook_removal_count == 1);
   assert(g_hook_remove_count == 1);
 
   /* Remove one hook */
   sm_remove_hook(sm, SM_HOOK_POST_ACTION, hook_remove_test);
-  called = 0;
+  g_hook_removal_count = 0;
   g_hook_remove_count = 0;
   sm_raw_write(sm, S0);
   sm_transition(sm, S1);
-  assert(called == 1);
+  assert(g_hook_removal_count == 1);
   assert(g_hook_remove_count == 0); /* removed */
 
   sm_destroy(sm);
