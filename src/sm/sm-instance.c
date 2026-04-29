@@ -111,6 +111,16 @@ sm_create(void* owner, SMTemplate* template)
   /* Allocate hook lists for each phase */
   for (int i = 0; i < SM_HOOK_MAX; i++) {
     sm->hooks[i] = sm_hook_list_create();
+    if (sm->hooks[i] == NULL) {
+      LOG_ERROR("Failed to allocate hook list for phase %d", i);
+      /* Clean up any already-allocated hook lists */
+      for (int j = 0; j < i; j++) {
+        sm_hook_list_destroy(sm->hooks[j]);
+        sm->hooks[j] = NULL;
+      }
+      free(sm);
+      return NULL;
+    }
   }
 
   /* Call template init function if present */
@@ -188,15 +198,16 @@ sm_raw_write(StateMachine* sm, uint32_t new_state)
   if (sm == NULL)
     return;
 
+  uint32_t old_state = sm->current_state;
   LOG_DEBUG("sm_raw_write: %s: %u -> %u",
-            sm->name, sm->current_state, new_state);
+            sm->name, old_state, new_state);
 
   sm->current_state = new_state;
 
   /* Emit transition event if available */
   if (sm->template != NULL && sm->template->transitions != NULL) {
     SMTransition* t = sm_template_find_transition(
-        sm->template, sm->current_state, new_state);
+        sm->template, old_state, new_state);
     if (t != NULL && t->emit_event != 0) {
       /* Event emission would go through hub_emit() in full implementation */
       LOG_DEBUG("sm_raw_write: emitted event %u", t->emit_event);
@@ -249,6 +260,9 @@ sm_transition(StateMachine* sm, uint32_t target_state)
 
   /* Emit event */
   if (t->emit_event != 0) {
+    /* Run pre-emit hooks */
+    sm_hook_list_run(sm->hooks[SM_HOOK_PRE_EMIT], sm);
+
     LOG_DEBUG("sm_transition: emitted event %u for %s: %u -> %u",
               t->emit_event, sm->name, old_state, target_state);
     /* In full implementation, would call hub_emit() */

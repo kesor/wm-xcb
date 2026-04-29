@@ -1,11 +1,12 @@
 #define DEBUG 1
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 /* Mock running for LOG_FATAL */
-int running = 1;
+sig_atomic_t running = 1;
 
 #define LOG_DEBUG(pFormat, ...)                    \
   {                                                \

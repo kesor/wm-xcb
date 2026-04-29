@@ -49,8 +49,9 @@ struct StateMachine {
 
 /*
  * Create a new StateMachine instance.
- * Lazy allocation - creates the instance but doesn't initialize
- * template-owned resources until needed.
+ * Allocates and initializes the instance immediately, including
+ * hook-list storage and any template-specific initialization
+ * performed by the template's init function.
  * Returns NULL on allocation failure.
  */
 StateMachine* sm_create(void* owner, SMTemplate* template);
@@ -81,8 +82,8 @@ void sm_raw_write(StateMachine* sm, uint32_t new_state);
 bool sm_transition(StateMachine* sm, uint32_t target_state);
 
 /*
- * Check if a transition is valid (exists and would pass guard).
- * Does not execute the transition.
+ * Check if a transition exists from current state to target state.
+ * Does not evaluate guards or execute the transition.
  */
 bool sm_can_transition(StateMachine* sm, uint32_t target_state);
 

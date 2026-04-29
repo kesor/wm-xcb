@@ -55,8 +55,8 @@ SMTemplate* sm_template_create(
 
 /*
  * Destroy an SMTemplate.
- * Does not free the template itself (caller owns that).
- * Only frees internally allocated arrays (states, transitions).
+ * Frees the template struct. Note: the states and transitions arrays
+ * are owned by the caller and must be freed separately if needed.
  */
 void sm_template_destroy(SMTemplate* tmpl);
 
