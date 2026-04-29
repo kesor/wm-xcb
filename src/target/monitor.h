@@ -93,12 +93,14 @@ void monitor_destroy(Monitor* m);
  */
 
 /*
- * Initialize the monitor list (no-op, list is statically initialized).
+ * Initialize the monitor list.
+ * Clears any stale monitors from previous runs.
  */
 void monitor_list_init(void);
 
 /*
- * Shutdown the monitor list (no-op, list is cleaned up on program exit).
+ * Shutdown the monitor list.
+ * Destroys all monitors in the list and cleans up resources.
  */
 void monitor_list_shutdown(void);
 
@@ -146,7 +148,7 @@ void monitor_set_selected(Monitor* m);
  * Selection - selected monitor is always the most recently added one
  * (this is a simplification - can be updated later)
  */
-extern Monitor* _monitor_selected;
+extern Monitor* selected_monitor;
 
 /*
  * Tag operations

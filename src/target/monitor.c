@@ -22,7 +22,7 @@
  * Monitor list
  */
 static Monitor* monitor_list      = NULL;
-Monitor*        _monitor_selected = NULL;
+Monitor*        selected_monitor = NULL;
 
 /*
  * Initialize the monitor list.
@@ -41,7 +41,7 @@ monitor_list_init(void)
     monitor_list = next;
   }
   monitor_list      = NULL;
-  _monitor_selected = NULL;
+  selected_monitor = NULL;
 }
 
 /*
@@ -61,7 +61,7 @@ monitor_list_shutdown(void)
     monitor_list = next;
   }
   monitor_list      = NULL;
-  _monitor_selected = NULL;
+  selected_monitor = NULL;
 }
 
 /*
@@ -124,9 +124,6 @@ monitor_create(xcb_randr_output_t output)
   m->next      = monitor_list;
   monitor_list = m;
 
-  /* Always select the most recently added monitor */
-  _monitor_selected = m;
-
   /* Register with Hub */
   hub_register_target(&m->target);
 
@@ -144,6 +141,9 @@ monitor_create(xcb_randr_output_t output)
     free(m);
     return NULL;
   }
+
+  /* Only select after successful registration */
+  selected_monitor = m;
 
   LOG_DEBUG("Monitor created: output=%u", output);
   return m;
@@ -175,8 +175,8 @@ monitor_destroy(Monitor* m)
   m->stack_head   = XCB_NONE;
 
   /* If this was the selected monitor, select the first remaining */
-  if (_monitor_selected == m) {
-    _monitor_selected = monitor_list_get_first();
+  if (selected_monitor == m) {
+    selected_monitor = monitor_list_get_first();
   }
 
   /* Unregister from Hub */
@@ -223,7 +223,7 @@ monitor_list_add(Monitor* m)
   monitor_list = m;
 
   /* Always select the most recently added monitor */
-  _monitor_selected = m;
+  selected_monitor = m;
 }
 
 /*
@@ -251,8 +251,8 @@ monitor_list_remove(Monitor* m)
   m->next = NULL;
 
   /* If removed selected monitor, select first remaining */
-  if (_monitor_selected == m) {
-    _monitor_selected = monitor_list;
+  if (selected_monitor == m) {
+    selected_monitor = monitor_list;
   }
 }
 
@@ -275,7 +275,7 @@ monitor_get_by_output(xcb_randr_output_t output)
 Monitor*
 monitor_get_selected(void)
 {
-  return _monitor_selected;
+  return selected_monitor;
 }
 
 /*
@@ -284,7 +284,7 @@ monitor_get_selected(void)
 void
 monitor_set_selected(Monitor* m)
 {
-  _monitor_selected = m;
+  selected_monitor = m;
   if (m != NULL) {
     LOG_DEBUG("Selected monitor: output=%u", m->output);
   }
