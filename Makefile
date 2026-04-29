@@ -93,7 +93,8 @@ format:
 
 # Run clang-tidy on source files
 # Uses -p . to read compile_commands.json; adds glibc include path for nix
-tidy: compile-commands
+tidy:
+	@test -f compile_commands.json || (echo "Error: compile_commands.json not found. Run 'make compile-commands' first." && exit 1)
 	@clang-tidy -p . --quiet \
 		-extra-arg=-I$(GLIBC_DEV) \
 		-extra-arg=-I. \
