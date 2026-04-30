@@ -212,7 +212,7 @@ focus_get_sm(Client* c)
   if (c == NULL)
     return NULL;
 
-  StateMachine* sm = client_get_sm(c, "focus");
+  StateMachine* sm = client_get_sm(c, FOCUS_COMPONENT_NAME);
   if (sm != NULL)
     return sm;
 
@@ -233,7 +233,7 @@ focus_get_sm(Client* c)
   }
 
   /* Store in client */
-  client_set_sm(c, "focus", sm);
+  client_set_sm(c, FOCUS_COMPONENT_NAME, sm);
 
   LOG_DEBUG("Created focus SM for client window=%u", c->window);
   return sm;
@@ -264,7 +264,7 @@ focus_get_state(Client* c)
   if (c == NULL)
     return FOCUS_STATE_UNFOCUSED;
 
-  StateMachine* sm = client_get_sm(c, "focus");
+  StateMachine* sm = client_get_sm(c, FOCUS_COMPONENT_NAME);
   if (sm == NULL)
     return FOCUS_STATE_UNFOCUSED;
 
@@ -433,7 +433,7 @@ focus_on_leave_notify(void* event)
   }
 
   /* Get the SM */
-  StateMachine* sm = client_get_sm(c, "focus");
+  StateMachine* sm = client_get_sm(c, FOCUS_COMPONENT_NAME);
   if (sm == NULL) {
     /* SM not yet created, nothing to unfocus */
     return;

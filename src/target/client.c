@@ -32,23 +32,23 @@ static Client client_sentinel;
 static void
 client_properties_init(Client* c)
 {
-  c->title          = NULL;
-  c->class_name     = NULL;
-  c->x              = 0;
-  c->y              = 0;
-  c->width          = 0;
-  c->height         = 0;
-  c->border_width   = 0;
-  c->tags           = 0;
-  c->monitor        = NULL;
-  c->managed        = false;
-  c->urgent         = false;
-  c->focusable      = true;
-  c->mapped         = false;
-  c->stack_mode     = XCB_STACK_MODE_ABOVE;
+  c->title        = NULL;
+  c->class_name   = NULL;
+  c->x            = 0;
+  c->y            = 0;
+  c->width        = 0;
+  c->height       = 0;
+  c->border_width = 0;
+  c->tags         = 0;
+  c->monitor      = NULL;
+  c->managed      = false;
+  c->urgent       = false;
+  c->focusable    = true;
+  c->mapped       = false;
+  c->stack_mode   = XCB_STACK_MODE_ABOVE;
 
   /* Initialize SM storage */
-  c->sms.sms      = NULL;
+  c->sms.machines = NULL;
   c->sms.names    = NULL;
   c->sms.count    = 0;
   c->sms.capacity = 0;
@@ -74,6 +74,8 @@ client_sm_find(const Client* c, const char* sm_name)
 
 /*
  * Helper: add or update SM for a name.
+ * Takes ownership of `sm` - any previously registered SM for this name
+ * will be destroyed. The sm_name string is copied internally.
  */
 static void
 client_sm_set_internal(Client* c, const char* sm_name, StateMachine* sm)
@@ -81,31 +83,40 @@ client_sm_set_internal(Client* c, const char* sm_name, StateMachine* sm)
   int32_t idx = client_sm_find(c, sm_name);
 
   if (idx >= 0) {
-    /* Update existing */
-    if (c->sms.sms[idx] != NULL) {
-      sm_destroy(c->sms.sms[idx]);
+    /* Update existing - destroy old SM */
+    if (c->sms.machines[idx] != NULL) {
+      sm_destroy(c->sms.machines[idx]);
     }
-    c->sms.sms[idx] = sm;
+    c->sms.machines[idx] = sm;
     return;
   }
 
   /* Add new SM */
   if (c->sms.count >= c->sms.capacity) {
-    uint32_t new_capacity = c->sms.capacity == 0 ? 4 : c->sms.capacity * 2;
-    StateMachine** new_sms = realloc(c->sms.sms, new_capacity * sizeof(StateMachine*));
-    char** new_names = realloc(c->sms.names, new_capacity * sizeof(char*));
-    if (new_sms == NULL || new_names == NULL) {
-      free(new_sms);
-      free(new_names);
+    uint32_t       new_capacity = c->sms.capacity == 0 ? 4 : c->sms.capacity * 2;
+    StateMachine** new_machines = realloc(c->sms.machines, new_capacity * sizeof(StateMachine*));
+    char**         new_names    = NULL;
+
+    /* Check machines allocation first */
+    if (new_machines == NULL) {
       LOG_ERROR("Failed to expand SM storage for client");
       return;
     }
-    c->sms.sms      = new_sms;
+
+    new_names = realloc(c->sms.names, new_capacity * sizeof(char*));
+    if (new_names == NULL) {
+      free(new_machines);
+      LOG_ERROR("Failed to expand SM names storage for client");
+      return;
+    }
+
+    /* Both allocations succeeded, update both atomically */
+    c->sms.machines      = new_machines;
     c->sms.names    = new_names;
     c->sms.capacity = new_capacity;
   }
 
-  c->sms.sms[c->sms.count]   = sm;
+  c->sms.machines[c->sms.count]   = sm;
   c->sms.names[c->sms.count] = sm_name ? strdup(sm_name) : NULL;
   c->sms.count++;
 }
@@ -313,16 +324,16 @@ client_destroy(Client* c)
 
   /* Destroy all state machines */
   for (uint32_t i = 0; i < c->sms.count; i++) {
-    if (c->sms.sms[i] != NULL) {
-      sm_destroy(c->sms.sms[i]);
+    if (c->sms.machines[i] != NULL) {
+      sm_destroy(c->sms.machines[i]);
     }
     if (c->sms.names[i] != NULL) {
       free(c->sms.names[i]);
     }
   }
-  free(c->sms.sms);
+  free(c->sms.machines);
   free(c->sms.names);
-  c->sms.sms      = NULL;
+  c->sms.machines      = NULL;
   c->sms.names    = NULL;
   c->sms.count    = 0;
   c->sms.capacity = 0;
@@ -454,7 +465,7 @@ client_get_sm(Client* c, const char* sm_name)
   if (idx < 0)
     return NULL;
 
-  return c->sms.sms[idx];
+  return c->sms.machines[idx];
 }
 
 /*

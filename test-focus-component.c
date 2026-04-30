@@ -442,7 +442,7 @@ test_unmanaged_client_not_focusable(void)
   /* Create an un-managed client */
   Client* c = client_create(100);
   assert_or_abort(c != NULL);
-  client_set_managed(c, false); /* Not managed */
+  client_set_managed(c, false);  /* Not managed */
   client_set_focusable(c, true); /* But marked as focusable */
 
   /* Get focus SM */
