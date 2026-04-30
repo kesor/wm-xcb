@@ -20,6 +20,7 @@
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 
+#include "../components/pertag.h"
 #include "../sm/sm.h"
 #include "wm-hub.h"
 
@@ -68,6 +69,9 @@ typedef struct Monitor {
 
   /* Bar (optional) */
   void* bar;
+
+  /* Pertag component data */
+  Pertag* pertag;
 
   /* Next monitor in the list */
   struct Monitor* next;
