@@ -8,12 +8,12 @@
  * - Keybinding action execution (sending hub requests)
  */
 
+#include "src/components/keybinding.h"
+#include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-wm.h"
 #include "wm-hub.h"
 #include "wm-log.h"
-#include "src/xcb/xcb-handler.h"
-#include "src/components/keybinding.h"
 
 /*
  * Test: keybinding component registers with hub
@@ -111,13 +111,13 @@ test_keybinding_modifier_normalization(void)
   keybinding_init();
 
   /* Mod4 + lock modifier should still match Mod4 alone */
-  uint32_t mod_with_lock = XCB_MOD_MASK_4 | XCB_MOD_MASK_LOCK;
-  const KeyBinding* binding = keybinding_lookup(mod_with_lock, 36);
+  uint32_t          mod_with_lock = XCB_MOD_MASK_4 | XCB_MOD_MASK_LOCK;
+  const KeyBinding* binding       = keybinding_lookup(mod_with_lock, 36);
   assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
 
   /* Mod4 + NumLock (mode switch) should also match */
   uint32_t mod_with_numlock = XCB_MOD_MASK_4 | XCB_MOD_MASK_2;
-  binding = keybinding_lookup(mod_with_numlock, 36);
+  binding                   = keybinding_lookup(mod_with_numlock, 36);
   assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
 
   keybinding_shutdown();
@@ -139,14 +139,14 @@ test_keybinding_tag_bindings(void)
 
   /* Mod4 + 1-9 for tag view */
   for (int i = 1; i <= 9; i++) {
-    xcb_keycode_t keycode = 9 + i;  /* keycodes 10-18 */
+    xcb_keycode_t     keycode = 9 + i; /* keycodes 10-18 */
     const KeyBinding* binding = keybinding_lookup(XCB_MOD_MASK_4, keycode);
     assert(binding != NULL && binding->action == KEYBINDING_ACTION_TAG_VIEW && binding->arg == (uint32_t) i);
   }
 
   /* Mod4 + Shift + 1-9 for tag toggle */
   for (int i = 1; i <= 9; i++) {
-    xcb_keycode_t keycode = 9 + i;
+    xcb_keycode_t     keycode = 9 + i;
     const KeyBinding* binding = keybinding_lookup(
         XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, keycode);
     assert(binding != NULL && binding->action == KEYBINDING_ACTION_TAG_TOGGLE && binding->arg == (uint32_t) i);
@@ -207,7 +207,7 @@ test_keybinding_get_bindings(void)
   assert(bindings != NULL);
 
   uint32_t count = keybinding_get_count();
-  assert(count > 10);  /* At least 20 bindings: focus + tags */
+  assert(count > 10); /* At least 20 bindings: focus + tags */
 
   LOG_DEBUG("Got %" PRIu32 " keybindings via accessor", count);
 
@@ -237,8 +237,8 @@ test_keybinding_handle_key_press(void)
 
   /* Set required fields with correct types */
   fake_event->response_type = XCB_KEY_PRESS;
-  fake_event->detail        = 36;  /* Return key */
-  fake_event->state         = XCB_MOD_MASK_4;  /* Mod4 pressed */
+  fake_event->detail        = 36;             /* Return key */
+  fake_event->state         = XCB_MOD_MASK_4; /* Mod4 pressed */
 
   /* Call the handler directly */
   keybinding_handle_key_press(fake_event);
@@ -284,7 +284,7 @@ test_keybinding_shutdown_reinit(void)
   keybinding_init();
   HubComponent* comp3 = hub_get_component_by_name("keybinding");
   assert(comp3 != NULL);
-  assert(comp3 == comp1);  /* Same component struct */
+  assert(comp3 == comp1); /* Same component struct */
 
   keybinding_shutdown();
   xcb_handler_shutdown();

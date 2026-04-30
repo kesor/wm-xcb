@@ -22,6 +22,7 @@
 /*
  * Include all test headers to register their test groups
  */
+#include "test-client-list-component.h"
 #include "test-target-client.h"
 #include "test-wm-hub.h"
 #include "test-wm-monitor-manager.h"
@@ -29,7 +30,6 @@
 #include "test-wm-window-list.h"
 #include "test-wm-xcb-handler.h"
 #include "test-wm.h"
-#include "test-client-list-component.h"
 
 /*
  * Registry linked list

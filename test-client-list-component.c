@@ -101,10 +101,10 @@ test_create_notify_creates_client(void)
 
   /* Create a fake CREATE_NOTIFY event */
   xcb_create_notify_event_t event = {
-    .response_type      = 16,  /* XCB_CREATE_NOTIFY */
+    .response_type     = 16,  /* XCB_CREATE_NOTIFY */
     .sequence          = 1,
-    .parent            = 100,  /* root */
-    .window            = 200,  /* new window */
+    .parent            = 100, /* root */
+    .window            = 200, /* new window */
     .x                 = 10,
     .y                 = 20,
     .width             = 400,
@@ -157,7 +157,7 @@ test_create_notify_skips_override_redirect(void)
     .response_type     = 16,  /* XCB_CREATE_NOTIFY */
     .sequence          = 1,
     .parent            = 100,
-    .window            = 300,  /* popup window */
+    .window            = 300, /* popup window */
     .x                 = 50,
     .y                 = 50,
     .width             = 200,
@@ -192,7 +192,7 @@ test_destroy_notify_destroys_client(void)
 
   /* First create a client via CREATE_NOTIFY */
   xcb_create_notify_event_t create_event = {
-    .response_type     = 16,  /* XCB_CREATE_NOTIFY */
+    .response_type     = 16, /* XCB_CREATE_NOTIFY */
     .sequence          = 1,
     .parent            = 100,
     .window            = 400,
@@ -211,10 +211,10 @@ test_destroy_notify_destroys_client(void)
 
   /* Now send DESTROY_NOTIFY */
   xcb_destroy_notify_event_t destroy_event = {
-    .response_type = 17,  /* XCB_DESTROY_NOTIFY */
-    .sequence     = 2,
-    .event        = 400,
-    .window       = 400,
+    .response_type = 17, /* XCB_DESTROY_NOTIFY */
+    .sequence      = 2,
+    .event         = 400,
+    .window        = 400,
   };
   xcb_handler_dispatch(&destroy_event);
 
@@ -242,7 +242,7 @@ test_map_request_manages_client(void)
 
   /* First create client via CREATE_NOTIFY */
   xcb_create_notify_event_t create_event = {
-    .response_type     = 16,  /* XCB_CREATE_NOTIFY */
+    .response_type     = 16, /* XCB_CREATE_NOTIFY */
     .sequence          = 1,
     .parent            = 100,
     .window            = 500,
@@ -261,10 +261,10 @@ test_map_request_manages_client(void)
 
   /* Send MAP_REQUEST */
   xcb_map_request_event_t map_event = {
-    .response_type = 20,  /* XCB_MAP_REQUEST */
-    .sequence     = 2,
-    .parent       = 100,
-    .window       = 500,
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 2,
+    .parent        = 100,
+    .window        = 500,
   };
   xcb_handler_dispatch(&map_event);
 
@@ -293,10 +293,10 @@ test_map_request_creates_client_if_not_exists(void)
 
   /* Send MAP_REQUEST without prior CREATE_NOTIFY */
   xcb_map_request_event_t map_event = {
-    .response_type = 20,  /* XCB_MAP_REQUEST */
-    .sequence     = 1,
-    .parent       = 100,
-    .window       = 600,
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 1,
+    .parent        = 100,
+    .window        = 600,
   };
   xcb_handler_dispatch(&map_event);
 
@@ -326,7 +326,7 @@ test_unmap_notify_unmanages_client(void)
 
   /* Create and manage client */
   xcb_create_notify_event_t create_event = {
-    .response_type     = 16,  /* XCB_CREATE_NOTIFY */
+    .response_type     = 16, /* XCB_CREATE_NOTIFY */
     .sequence          = 1,
     .parent            = 100,
     .window            = 700,
@@ -340,10 +340,10 @@ test_unmap_notify_unmanages_client(void)
   xcb_handler_dispatch(&create_event);
 
   xcb_map_request_event_t map_event = {
-    .response_type = 20,  /* XCB_MAP_REQUEST */
-    .sequence     = 2,
-    .parent       = 100,
-    .window       = 700,
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 2,
+    .parent        = 100,
+    .window        = 700,
   };
   xcb_handler_dispatch(&map_event);
 
@@ -352,11 +352,11 @@ test_unmap_notify_unmanages_client(void)
 
   /* Send UNMAP_NOTIFY */
   xcb_unmap_notify_event_t unmap_event = {
-    .response_type   = 18,  /* XCB_UNMAP_NOTIFY */
-    .sequence        = 3,
-    .event           = 700,
-    .window          = 700,
-    .from_configure  = 0,
+    .response_type  = 18, /* XCB_UNMAP_NOTIFY */
+    .sequence       = 3,
+    .event          = 700,
+    .window         = 700,
+    .from_configure = 0,
   };
   xcb_handler_dispatch(&unmap_event);
 
@@ -387,7 +387,7 @@ test_multiple_clients(void)
   /* Create multiple clients */
   for (uint32_t i = 1; i <= 5; i++) {
     xcb_create_notify_event_t event = {
-      .response_type     = 16,  /* XCB_CREATE_NOTIFY */
+      .response_type     = 16, /* XCB_CREATE_NOTIFY */
       .sequence          = i,
       .parent            = 100,
       .window            = 1000 + i,
@@ -412,10 +412,10 @@ test_multiple_clients(void)
 
   /* Destroy middle client */
   xcb_destroy_notify_event_t destroy_event = {
-    .response_type = 17,  /* XCB_DESTROY_NOTIFY */
-    .sequence     = 10,
-    .event        = 1002,
-    .window       = 1002,
+    .response_type = 17, /* XCB_DESTROY_NOTIFY */
+    .sequence      = 10,
+    .event         = 1002,
+    .window        = 1002,
   };
   xcb_handler_dispatch(&destroy_event);
 
@@ -423,7 +423,7 @@ test_multiple_clients(void)
 
   /* Other clients should still exist */
   assert(client_get_by_window(1001) != NULL);
-  assert(client_get_by_window(1002) == NULL);  /* destroyed */
+  assert(client_get_by_window(1002) == NULL); /* destroyed */
   assert(client_get_by_window(1003) != NULL);
 
   /* Cleanup */
@@ -451,7 +451,7 @@ test_client_list_utility_functions(void)
 
   /* Create and manage client */
   xcb_create_notify_event_t create = {
-    .response_type     = 16,  /* XCB_CREATE_NOTIFY */
+    .response_type     = 16, /* XCB_CREATE_NOTIFY */
     .sequence          = 1,
     .parent            = 100,
     .window            = 3000,
@@ -460,10 +460,10 @@ test_client_list_utility_functions(void)
   xcb_handler_dispatch(&create);
 
   xcb_map_request_event_t map = {
-    .response_type = 20,  /* XCB_MAP_REQUEST */
+    .response_type = 20, /* XCB_MAP_REQUEST */
     .sequence      = 2,
-    .parent       = 100,
-    .window       = 3000,
+    .parent        = 100,
+    .window        = 3000,
   };
   xcb_handler_dispatch(&map);
 
@@ -476,11 +476,11 @@ test_client_list_utility_functions(void)
 
   /* Unmanage */
   xcb_unmap_notify_event_t unmap = {
-    .response_type    = 18,  /* XCB_UNMAP_NOTIFY */
-    .sequence         = 3,
-    .event            = 3000,
-    .window           = 3000,
-    .from_configure   = 0,
+    .response_type  = 18, /* XCB_UNMAP_NOTIFY */
+    .sequence       = 3,
+    .event          = 3000,
+    .window         = 3000,
+    .from_configure = 0,
   };
   xcb_handler_dispatch(&unmap);
 
@@ -507,7 +507,7 @@ test_client_adopts_components_on_creation(void)
 
   /* Create a client */
   xcb_create_notify_event_t event = {
-    .response_type     = 16,  /* XCB_CREATE_NOTIFY */
+    .response_type     = 16, /* XCB_CREATE_NOTIFY */
     .sequence          = 1,
     .parent            = 100,
     .window            = 4000,
@@ -543,13 +543,13 @@ test_shutdown_with_clients(void)
 
   /* Create some clients */
   xcb_create_notify_event_t e1 = {
-    .response_type = 16,  /* XCB_CREATE_NOTIFY */
+    .response_type = 16, /* XCB_CREATE_NOTIFY */
     .window        = 5001,
   };
   xcb_handler_dispatch(&e1);
 
   xcb_create_notify_event_t e2 = {
-    .response_type = 16,  /* XCB_CREATE_NOTIFY */
+    .response_type = 16, /* XCB_CREATE_NOTIFY */
     .window        = 5002,
   };
   xcb_handler_dispatch(&e2);
