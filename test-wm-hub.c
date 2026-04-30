@@ -1240,11 +1240,50 @@ test_get_components_for_target_type(void)
   hub_shutdown();
 }
 
+void
+test_unadoption_hooks_called_on_target_unregister(void)
+{
+  LOG_CLEAN("== Testing unadoption hooks called when target is unregistered");
+  hub_init();
+
+  /* Reset counters */
+  adopt_count_client    = 0;
+  adopt_count_monitor   = 0;
+  unadopt_count_client  = 0;
+  unadopt_count_monitor = 0;
+
+  /* Register components */
+  hub_register_component(&test_fullscreen);
+  hub_register_component(&test_focus);
+  hub_register_component(&test_monitor);
+
+  /* Register a client - adoption should happen */
+  hub_register_target(&test_client1);
+  assert(adopt_count_client == 2);
+  assert(unadopt_count_client == 0);
+
+  /* Unregister the client - unadoption should happen */
+  hub_unregister_target(test_client1.id);
+  assert(unadopt_count_client == 2);
+
+  /* Register a monitor */
+  hub_register_target(&test_monitor1);
+  assert(adopt_count_monitor == 1);
+  assert(unadopt_count_monitor == 0);
+
+  /* Unregister the monitor */
+  hub_unregister_target(test_monitor1.id);
+  assert(unadopt_count_monitor == 1);
+
+  hub_shutdown();
+}
+
 TEST_GROUP(HubComponentAdoption, {
   test_adoption_hooks_called_on_target_register();
   test_adoption_only_for_compatible_targets();
   test_adoption_for_multiple_targets_of_same_type();
   test_get_components_for_target_type();
+  test_unadoption_hooks_called_on_target_unregister();
 });
 
 TEST_GROUP(HubRegistry, {

@@ -239,7 +239,7 @@ hub_get_component_by_request_type(RequestType type)
 HubComponent**
 hub_get_components_for_target_type(TargetType type)
 {
-  static HubComponent* results[MAX_COMPONENTS];
+  static HubComponent* results[MAX_COMPONENTS + 1];
   static uint32_t      result_count = 0;
 
   if (type >= TARGET_TYPE_COUNT) {
@@ -247,7 +247,6 @@ hub_get_components_for_target_type(TargetType type)
   }
 
   result_count = 0;
-
 
   for (uint32_t i = 0; i < component_count; i++) {
     HubComponent* comp = components[i];
@@ -257,7 +256,9 @@ hub_get_components_for_target_type(TargetType type)
     /* Check if this component accepts the target type */
     for (uint32_t j = 0; comp->targets[j] != TARGET_TYPE_NONE; j++) {
       if (comp->targets[j] == type) {
-        results[result_count++] = comp;
+        if (result_count < MAX_COMPONENTS) {
+          results[result_count++] = comp;
+        }
         break;
       }
     }
@@ -286,8 +287,34 @@ hub_adopt_components_for_target(HubTarget* target)
     HubComponent* comp = comps[i];
     if (comp->on_adopt != NULL) {
       LOG_DEBUG("Adopting component '%s' for target id=%" PRIu64 "",
-                comp->name, (unsigned long) target->id);
+                comp->name, (uint64_t) target->id);
       comp->on_adopt(target);
+    }
+  }
+}
+
+/*
+ * Unadopt all compatible components for a target.
+ * Called when a target is unregistered from the hub.
+ * Each compatible component's on_unadopt hook is called.
+ */
+void
+hub_unadopt_components_for_target(HubTarget* target)
+{
+  if (target == NULL)
+    return;
+
+  HubComponent** comps = hub_get_components_for_target_type(target->type);
+  if (comps == NULL)
+    return;
+
+
+  for (uint32_t i = 0; comps[i] != NULL; i++) {
+    HubComponent* comp = comps[i];
+    if (comp->on_unadopt != NULL) {
+      LOG_DEBUG("Unadopting component '%s' for target id=%" PRIu64 "",
+                comp->name, (uint64_t) target->id);
+      comp->on_unadopt(target);
     }
   }
 }
@@ -373,6 +400,9 @@ hub_unregister_target(TargetID id)
       break;
     }
   }
+
+  /* Unadopt all compatible components before unregistering */
+  hub_unadopt_components_for_target(target);
 
   /* Remove from ID index */
   target_by_id_map_remove(id);

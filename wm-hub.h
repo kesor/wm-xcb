@@ -146,6 +146,7 @@ HubComponent* hub_get_component_by_request_type(RequestType type);
 /* Target adoption */
 HubComponent** hub_get_components_for_target_type(TargetType type);
 void           hub_adopt_components_for_target(HubTarget* target);
+void           hub_unadopt_components_for_target(HubTarget* target);
 
 /* Target registration */
 void        hub_register_target(HubTarget* target);
