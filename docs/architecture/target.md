@@ -283,7 +283,11 @@ The `pertag` component bridges monitors and tags:
 
 ## Target Adoption
 
+> ⚠️ **Implementation Note:** Early implementations incorrectly tried to hardcode SM references in targets. The correct approach uses a generic "adopted components" list with on-demand SM lookup. See "Anti-Pattern: Hardcoding SMs in Targets" in decisions.md.
+
 When a target is created, it adopts all compatible components from the registry.
+
+**Key insight:** Targets do NOT know about specific SMs. They only know which components they've adopted. SMs are looked up by name via `target_get_sm()`.
 
 ### Adoption Process
 ```c

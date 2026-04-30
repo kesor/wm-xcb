@@ -175,6 +175,123 @@ struct FullscreenComponent {
 
 ---
 
+## Implementation Anti-Patterns (Lessons Learned)
+
+### Anti-Pattern: Hardcoding SMs in Targets
+
+**What went wrong:** Early implementations tried to put state machine stubs directly in target structs (Client, Monitor), defeating the purpose of component-based SM templates.
+
+**Correct approach:**
+- Targets have a "list of adopted components"
+- Components provide SM templates via `get_sm_template()`
+- Targets call `target_get_sm(target, "fullscreen")` to lazily create SMs
+- Targets should NOT hardcode references to specific SMs like `FocusSM`, `FullscreenSM`
+
+**Wrong:**
+```c
+// WRONG - Client target hardcoding SMs
+struct Client {
+    // ...
+    StateMachine* fullscreen_sm;  // ❌ Hardcoded!
+    StateMachine* floating_sm;    // ❌ Hardcoded!
+    StateMachine* focus_sm;       // ❌ Hardcoded!
+    StateMachine* urgency_sm;     // ❌ Hardcoded!
+};
+```
+
+**Correct:**
+```c
+// RIGHT - Generic SM lookup
+struct Client {
+    Target target;  // Inherits SM array from base Target
+    // ...
+};
+
+// Get SM on-demand from adopted component:
+StateMachine* sm = client_get_sm(c, "fullscreen");  // ✅ Generic lookup
+```
+
+### Anti-Pattern: Components Hardcoding Keybindings
+
+**What went wrong:** The keybinding component hardcoded bindings for actions from other components (e.g., tag switching), violating the separation of concerns.
+
+**Correct approach:**
+- Keybinding component should only handle KEY_PRESS/KEY_RELEASE → dispatch
+- Component actions should be exposed as callable functions
+- A configuration mechanism should wire key combinations to component actions
+- Components should NOT know about other components' keybindings
+
+**Wrong:**
+```c
+// WRONG - Keybinding component knowing about tags
+void keybinding_init(void) {
+    // ❌ Hardcoded! TagManager should own this binding
+    register_keybinding(XK_1, tag_view, 1);
+    register_keybinding(XK_2, tag_view, 2);
+    // ...
+}
+```
+
+**Correct (TBD):**
+```c
+// Configuration component wires things together:
+void config_init(void) {
+    // ✅ Declarative configuration
+    keybinding_register("Mod+1", tag_manager_get_action("view", 1));
+    keybinding_register("Mod+f", fullscreen_get_action("toggle"));
+}
+```
+
+---
+
+## Pending Design: Actions and Wiring
+
+### Problem
+
+We don't yet have a defined mechanism for:
+1. Components to expose callable actions (e.g., `fullscreen.toggle()`, `tag_manager.view(1)`)
+2. Configuration to wire these actions to keybindings, pointer events, or other triggers
+3. Cross-component wiring (e.g., pointer drag → resize action in another component)
+
+### What We Need
+
+- **Actions API**: Components expose a registry of named actions with signatures
+- **Wiring mechanism**: How configuration binds triggers to actions
+- **Target resolution**: How actions receive the correct target (current client, current monitor, etc.)
+
+### Related Issues
+
+- See GitHub issue: **#83 Design: Actions and Wiring Architecture**
+
+---
+
+## Pending Design: Configuration System
+
+### Problem
+
+Currently:
+- Keybindings are hardcoded in the keybinding component
+- No way for users to configure component properties (gaps, colors, rules)
+- DWM-style `Rules` (auto-float certain windows) not implemented
+
+### What We Need
+
+1. **config.def.h style**: Compile-time configuration like dwm
+2. **Runtime config**: File-based or UI-based configuration
+3. **Configuration component**: Reads config and wires things up
+
+### Scope
+
+- Keybindings: `Mod+f` → `fullscreen.toggle(focused_client)`
+- Rules: `class=Steam` → `floating.enable()`, `tags=1`
+- Properties: `gaps=10`, `border_color=#333333`
+
+### Related Issues
+
+- See GitHub issue: **#84 Design: Configuration System for Keybindings, Rules, and Properties**
+
+---
+
 ## Target System
 
 ### Decision: Targets Own Properties, Not State

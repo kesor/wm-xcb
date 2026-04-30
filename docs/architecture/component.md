@@ -145,6 +145,50 @@ void handle_xcb_events() {
 - `src/xcb/xcb-handler.h` — public API and event type constants
 - `wm-xcb.c` — event loop integration (calls `xcb_handler_init()`, `xcb_handler_shutdown()`, `xcb_handler_dispatch()`)
 
+---
+
+## What Belongs in a Component
+
+### ✅ DO Put in Components
+
+- **Executor**: Handles requests for this component's domain
+- **Listener**: Handles XCB events and hub events relevant to this domain
+- **SM Template**: Defines the state machine for targets to adopt
+- **XCB Handler Registration**: Register handlers for events this component cares about
+
+### ❌ DON'T Put in Components
+
+| Anti-Pattern | Why It's Wrong | Correct Approach |
+|-------------|----------------|------------------|
+| Hardcoded keybindings | Components shouldn't know about each other's triggers | Keybinding component dispatches; config wires actions |
+| SM instances | SMs belong on targets via adoption | Targets call `target_get_sm(t, "fullscreen")` |
+| Other components' state | Violates single responsibility | Components communicate via hub events/requests |
+
+**Examples:**
+
+```c
+// ❌ WRONG - Target hardcoding SMs
+struct Client {
+    Target target;
+    StateMachine* fullscreen_sm;  // ❌ Hardcoded reference
+};
+
+// ✅ CORRECT - Generic SM lookup
+StateMachine* sm = client_get_sm(c, "fullscreen");
+
+// ❌ WRONG - Keybinding knowing about tags
+void keybinding_init(void) {
+    register_key(XK_1, tag_view, 1);  // ❌ Tags aren't keybinding's domain!
+}
+
+// ✅ CORRECT - Config wires key → action
+void config_init(void) {
+    keybinding_register("Mod+1", tag_manager.action("view", 1));
+}
+```
+
+---
+
 ## Lifecycle
 
 ```
@@ -428,8 +472,10 @@ SMTemplate* fullscreen_get_template(void) {
 
 | Component | Target Type | Requests | Events | SM |
 |-----------|------------|----------|--------|-----|
-| event-bus | (none) | (none) | all | (none) |
+| keybinding | (none) | dispatches to wired actions | - | (none) |
 | bar | MONITOR | REQ_BAR_UPDATE | (internal) | (none) |
+
+> **Note:** The keybinding component should NOT hardcode bindings. See "Actions and Wiring" pending design.
 
 ---
 
