@@ -206,13 +206,13 @@ tiling_get_sm(Monitor* m)
     return sm;
 
   /* Use cached template if available, otherwise create one */
+  if (cached_layout_template == NULL) {
+    cached_layout_template = layout_sm_template_create();
+  }
   SMTemplate* tmpl = cached_layout_template;
   if (tmpl == NULL) {
-    tmpl = layout_sm_template_create();
-    if (tmpl == NULL) {
-      LOG_ERROR("Failed to create layout SM template for monitor");
-      return NULL;
-    }
+    LOG_ERROR("Failed to create layout SM template for monitor");
+    return NULL;
   }
 
   sm = sm_create(m, tmpl, tiling_sm_emit, m);
@@ -341,7 +341,7 @@ tiling_get_mfact(Monitor* m)
 
 /*
  * Get nmaster for a monitor.
- * Uses monitor's nmaster if set, otherwise default.
+ * Note: Returns component default until Monitor struct supports per-monitor nmaster.
  */
 static int
 tiling_get_nmaster(Monitor* m)
@@ -505,20 +505,6 @@ tiling_tile_monitor(Monitor* m)
 
   LOG_DEBUG("Tiling monitor output=%u", m->output);
 
-  /* Get current layout state */
-  StateMachine* sm = tiling_get_sm(m);
-  if (sm == NULL) {
-    LOG_WARN("No layout SM for monitor, using default tile");
-    sm = tiling_get_sm(m);
-    if (sm == NULL)
-      return;
-  }
-
-  LayoutState state = (LayoutState) sm_get_state(sm);
-
-  (void) state; /* Suppress unused warning */
-
-  /* Always use tiled layout */
   int nmaster = tiling_get_nmaster(m);
 
   /* Collect clients */
@@ -634,9 +620,6 @@ tiling_executor(struct HubRequest* req)
 
   /* Just tile the monitor - this component handles tiling */
   tiling_tile_monitor(m);
-
-  LOG_DEBUG("tiling_executor: layout for monitor output=%u is now %u",
-            m->output, sm_get_state(sm));
 }
 
 /*

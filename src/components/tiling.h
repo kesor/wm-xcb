@@ -7,7 +7,6 @@
  * Component lifecycle:
  * - on_init(): register REQ_MONITOR_TILE executor
  * - executor: handle REQ_MONITOR_TILE request, tile windows on monitor
- * - listener: react to EVT_LAYOUT_CHANGED
  *
  * Layout Algorithm:
  * - Divides monitor into master area and stack
