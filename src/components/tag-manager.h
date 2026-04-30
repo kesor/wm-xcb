@@ -30,8 +30,8 @@
 #include "wm-hub.h"
 
 /* Forward declarations */
-typedef struct Monitor Monitor;
-typedef struct Client Client;
+typedef struct Monitor      Monitor;
+typedef struct Client       Client;
 typedef struct StateMachine StateMachine;
 
 /*
@@ -43,25 +43,25 @@ typedef struct StateMachine StateMachine;
  * Tag Manager request types
  */
 enum TagManagerRequestType {
-  REQ_TAG_VIEW            = 7,  /* View specific tag (1-9) */
-  REQ_TAG_TOGGLE          = 8,  /* Toggle tag visibility */
-  REQ_TAG_CLIENT_TOGGLE    = 9,  /* Move current client to/from tag */
+  REQ_TAG_VIEW          = 7, /* View specific tag (1-9) */
+  REQ_TAG_TOGGLE        = 8, /* Toggle tag visibility */
+  REQ_TAG_CLIENT_TOGGLE = 9, /* Move current client to/from tag */
 };
 
 /*
  * Tag Manager event types
  */
 enum TagManagerEventType {
-  EVT_TAG_CHANGED         = 20, /* Emitted when tag view state changes */
+  EVT_TAG_CHANGED = 20, /* Emitted when tag view state changes */
 };
 
 /*
  * Tag Manager SM states
  */
 enum TagViewState {
-  TAG_VIEW_NONE           = 0,  /* No tags visible (empty) */
-  TAG_VIEW_ONE            = 1,  /* Exactly one tag visible */
-  TAG_VIEW_MULTIPLE       = 2,  /* Multiple tags visible (all-tags view) */
+  TAG_VIEW_NONE     = 0, /* No tags visible (empty) */
+  TAG_VIEW_ONE      = 1, /* Exactly one tag visible */
+  TAG_VIEW_MULTIPLE = 2, /* Multiple tags visible (all-tags view) */
 };
 
 /*
@@ -74,7 +74,7 @@ enum TagViewState {
  */
 typedef struct TagManagerComponent {
   HubComponent base;
-  bool initialized;
+  bool         initialized;
 } TagManagerComponent;
 
 /*

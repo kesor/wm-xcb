@@ -16,6 +16,7 @@
 #include "src/components/keybinding.h"
 #include "src/components/monitor-manager.h"
 #include "src/components/pertag.h"
+#include "src/components/tiling.h"
 
 #include "wm.h"
 
@@ -38,6 +39,7 @@ main(int argc, char** argv)
   /* Initialize pertag BEFORE monitor_manager so monitors get adopted */
   pertag_component_init();
   monitor_manager_init();
+  tiling_component_init();
 
   /* Main event loop */
   while (running) {
@@ -46,6 +48,7 @@ main(int argc, char** argv)
 
   /* Shutdown in reverse order */
   monitor_manager_shutdown();
+  tiling_component_shutdown();
   client_list_component_shutdown();
   keybinding_shutdown();
   fullscreen_component_shutdown();
