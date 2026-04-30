@@ -116,21 +116,8 @@ tidy: compile-commands
 		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto xcb-errors 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
 		$(SRC) $(TEST_SRC)
 
-# Run clang static analyzer
-analyze: compile-commands
-	@clang-tidy -p . \
-		-extra-arg=-DWM_HUB_TESTING \
-		-extra-arg=-D_DEFAULT_SOURCE \
-		-extra-arg=-I$(GLIBC_DEV) \
-		-extra-arg=-I$(abspath .) \
-		-extra-arg=-I$(abspath src) \
-		-extra-arg=-I$(abspath vendor/xcb-errors-include) \
-		-extra-arg=-I$(abspath vendor/libxcb-errors/include) \
-		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto xcb-errors 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
-		$(SRC) $(TEST_SRC)
-
 # Run all development checks
-check: format tidy analyze
+check: format tidy
 
 # ---------------------------------------------------------------------------
 # Testing
@@ -167,4 +154,4 @@ container-build:
 
 # ---------------------------------------------------------------------------
 
-.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone check format tidy analyze
+.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone check format tidy

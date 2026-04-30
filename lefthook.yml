@@ -13,17 +13,13 @@ pre-commit:
       glob: "**/*.{c,h}"
       run: make tidy
 
-    analyze:
-      glob: "**/*.{c,h}"
-      run: make analyze
-
 pre-push:
   skip: [pre-commit]
   commands:
     format:
       glob: "**/*.{c,h}"
-      run: clang-format --style=file --dry-run --Werror {push_files}
+      run: make format
 
     tidy:
       glob: "**/*.{c,h}"
-      run: clang-tidy --quiet {push_files}
+      run: make tidy
