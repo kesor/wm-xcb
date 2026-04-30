@@ -72,7 +72,7 @@ typedef struct Monitor {
   struct {
     StateMachine** machines; /* array of SM pointers */
     char**         names;    /* corresponding names */
-    uint32_t       count;   /* number of entries */
+    uint32_t       count;    /* number of entries */
     uint32_t       capacity; /* allocated capacity */
   } sms;
 

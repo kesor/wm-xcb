@@ -32,16 +32,16 @@ pertag_init_internal(Pertag* pt, struct Monitor* m)
     return;
 
   pt->monitor = m;
-  pt->curtag   = 1; /* Default to tag 1 (index 1, mask = 1 << 1 = 2) */
-  pt->prevtag  = 0; /* No previous tag initially */
+  pt->curtag  = 1; /* Default to tag 1 (index 1, mask = 1 << 1 = 2) */
+  pt->prevtag = 0; /* No previous tag initially */
 
   /* Initialize arrays with defaults */
   for (int i = 0; i <= PERTAG_NUM_TAGS; i++) {
-    pt->mfacts[i]    = 0.5F; /* Default master factor */
+    pt->mfacts[i]   = 0.5F; /* Default master factor */
     pt->nmasters[i] = 1;    /* Default nmaster */
-    pt->sellts[i]    = 0;    /* Default layout slot */
-    pt->showbars[i]  = true; /* Bar visible by default */
-    pt->focused[i]   = TARGET_ID_NONE;
+    pt->sellts[i]   = 0;    /* Default layout slot */
+    pt->showbars[i] = true; /* Bar visible by default */
+    pt->focused[i]  = TARGET_ID_NONE;
 
     /* Layouts default to NULL (will be set by tiling component) */
     pt->layouts[i][0] = NULL;
@@ -49,9 +49,9 @@ pertag_init_internal(Pertag* pt, struct Monitor* m)
   }
 
   /* Index 0 is "all tags" - copy defaults from index 1 */
-  pt->mfacts[0]    = pt->mfacts[1];
-  pt->nmasters[0]  = pt->nmasters[1];
-  pt->sellts[0]    = pt->sellts[1];
+  pt->mfacts[0]   = pt->mfacts[1];
+  pt->nmasters[0] = pt->nmasters[1];
+  pt->sellts[0]   = pt->sellts[1];
 }
 
 /*
@@ -104,8 +104,8 @@ pertag_on_unadopt(HubTarget* target)
   if (target == NULL || target->type != TARGET_TYPE_MONITOR)
     return;
 
-  Monitor*  m  = (Monitor*) target;
-  Pertag*   pt = pertag_get_data(m);
+  Monitor* m  = (Monitor*) target;
+  Pertag*  pt = pertag_get_data(m);
 
   if (pt == NULL)
     return;
