@@ -2,10 +2,10 @@
  * keybinding-binding.h - Keybinding binding storage and lookup
  *
  * Manages the keybinding table that maps key events to action names.
- * Keybindings are defined in config.def.h and looked up at runtime.
+ * The keybinding component initializes this system and populates it
+ * with default bindings.
  *
  * This separates binding storage from action invocation:
- * - config.def.h wires key combos to action names
  * - keybinding component looks up action name on KEY_PRESS
  * - action-registry handles target resolution and invocation
  *

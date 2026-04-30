@@ -13,14 +13,9 @@
 #include "wm-log.h"
 
 /*
- * Maximum number of actions in the registry
+ * Action storage - extra slot for NULL terminator
  */
-#define MAX_ACTIONS 64
-
-/*
- * Action storage
- */
-static Action*  actions[MAX_ACTIONS];
+static Action*  actions[ACTION_REGISTRY_MAX_ACTIONS + 1];
 static uint32_t actions_allocated = 0;
 static bool     initialized       = false;
 
@@ -193,8 +188,8 @@ action_register(Action* action)
   }
 
   /* Check for space */
-  if (actions_allocated >= MAX_ACTIONS) {
-    LOG_ERROR("Action registry full (max %d)", MAX_ACTIONS);
+  if (actions_allocated >= ACTION_REGISTRY_MAX_ACTIONS) {
+    LOG_ERROR("Action registry full (max %d)", ACTION_REGISTRY_MAX_ACTIONS);
     return false;
   }
 
@@ -259,10 +254,8 @@ action_get_all(void)
     return NULL;
   }
 
-  /* Ensure NULL terminator */
-  if (actions_allocated < MAX_ACTIONS) {
-    actions[actions_allocated] = NULL;
-  }
+  /* Ensure NULL terminator (array has extra slot for this) */
+  actions[actions_allocated] = NULL;
 
   return actions;
 }

@@ -16,14 +16,9 @@
 #include "wm-log.h"
 
 /*
- * Maximum number of keybindings for runtime binding storage
+ * Keybinding storage - extra slot for NULL terminator
  */
-#define KEYBINDING_MAX_BINDINGS 64
-
-/*
- * Keybinding storage - stores pointers to KeyBinding structures
- */
-static const KeyBinding* bindings[KEYBINDING_MAX_BINDINGS];
+static const KeyBinding* bindings[KEYBINDING_MAX_BINDINGS + 1];
 static uint32_t          binding_count = 0;
 static bool              initialized   = false;
 
@@ -103,6 +98,11 @@ keybinding_binding_shutdown(void)
   }
 
   LOG_DEBUG("Shutting down keybinding binding system");
+
+  /* Free allocated bindings */
+  for (uint32_t i = 0; i < binding_count; i++) {
+    free((void*) bindings[i]);
+  }
 
   /* Clear bindings array */
   memset(bindings, 0, sizeof(bindings));
@@ -294,10 +294,8 @@ keybinding_binding_get_all(void)
     return NULL;
   }
 
-  /* Ensure NULL terminator */
-  if (binding_count < KEYBINDING_MAX_BINDINGS) {
-    bindings[binding_count] = NULL;
-  }
+  /* Ensure NULL terminator (array has extra slot for this) */
+  bindings[binding_count] = NULL;
 
   return bindings;
 }

@@ -78,6 +78,11 @@ struct Action {
 };
 
 /*
+ * Maximum number of actions in the registry
+ */
+#define ACTION_REGISTRY_MAX_ACTIONS 64
+
+/*
  * Built-in target resolvers
  */
 
@@ -111,7 +116,8 @@ void* action_get_current_monitor(void);
 
 /*
  * Initialize the action registry.
- * Called during hub initialization.
+ * Components typically call this from their init functions
+ * before registering actions.
  */
 void action_registry_init(void);
 

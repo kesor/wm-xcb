@@ -590,11 +590,10 @@ void config_pointer_init(void) {
 
 | File | Purpose |
 |------|---------|
-| `src/actions/action-registry.c/h` | Action registration and lookup |
-| `src/actions/action-invoke.c/h` | Action invocation with target resolution |
-| `src/components/keybinding.c` | Refactored to use action registry |
-| `src/components/keybinding-binding.c/h` | Binding storage and lookup |
-| `config.def.h` | Wiring configuration |
+| `src/actions/action-registry.c/h` | Action registration, lookup, and invocation |
+| `src/actions/keybinding-binding.c/h` | Runtime binding storage and lookup |
+| `src/components/keybinding.c` | Key event handling with action invocation |
+| `config.def.h` | Wiring configuration (future) |
 
 ---
 
