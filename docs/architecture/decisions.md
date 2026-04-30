@@ -83,7 +83,7 @@ int tags;  // bitmask, which is technically multi-state
 
 **Decision:** State machines accept two kinds of input:
 1. **Raw writes** — authoritative state changes (hardware, X events). No guards.
-2. **Transitions** — requested state changes (keybindings, plugins). Guards apply.
+2. **Transitions** — requested state changes (keybindings, components). Guards apply.
 
 **Rationale:**
 - Reality is authoritative: If X says the monitor is disconnected, the SM MUST reflect that.
@@ -308,12 +308,12 @@ struct FullscreenComponent {
 
 **Rationale:**
 - Simple operations are atomic: Send XCB request, get reply. No intermediate states.
-- Complex animations are extension territory: If a plugin wants animation states, it can implement its own.
+- Complex animations are extension territory: If a component wants animation states, it can implement its own.
 - Keeps core simple: Just request → X → result.
 
 **Trade-offs:**
 - Pro: Simple core
-- Con: Animations require plugin work
+- Con: Animations require component work
 
 ---
 

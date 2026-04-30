@@ -64,7 +64,7 @@ void randr_on_disconnect(xcb_randr_output_t output) {
 ### Request Writer
 **Authority:** Intent to change external reality — "please do this if you can"
 
-Used by keybindings, plugins, and other requesters:
+Used by keybindings, components, and other requesters:
 ```c
 // User presses keybinding for fullscreen
 void keybinding_fullscreen(void) {

@@ -64,7 +64,7 @@ typedef struct StateMachine {
     // Template reference
     SMTemplate* template;
     
-    // Hooks for plugins (optional)
+    // Hooks for components (optional)
     Hook* pre_guards;      // executed before guard
     Hook* post_actions;    // executed after action
     

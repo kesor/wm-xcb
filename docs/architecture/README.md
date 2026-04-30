@@ -35,7 +35,7 @@ This directory contains the authoritative documentation for the wm architecture.
 ### Two Types of Writers
 
 - **Raw Writer**: Authoritative state change (hardware events). No guards. Always succeeds.
-- **Request Writer**: Intent to change state (keybindings, plugins). May fail guards.
+- **Request Writer**: Intent to change state (keybindings, components). May fail guards.
 
 ### Event Flow
 
