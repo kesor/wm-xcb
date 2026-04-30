@@ -28,6 +28,9 @@ extern HubComponent monitor_manager_component;
  * - Discovers all currently connected RandR outputs
  * - Creates Monitor targets for each connected output
  *
+ * Note: RandR output discovery and Monitor creation from existing
+ * outputs is not yet implemented - requires working RandR support.
+ *
  * Called from wm initialization.
  */
 void monitor_manager_init(void);

@@ -15,6 +15,7 @@
 #include "src/components/fullscreen.h"
 #include "src/components/keybinding.h"
 #include "src/components/monitor-manager.h"
+#include "src/components/pertag.h"
 
 #include "wm.h"
 
@@ -35,6 +36,7 @@ main(int argc, char** argv)
   keybinding_init();
   client_list_component_init();
   monitor_manager_init();
+  pertag_component_init();
 
   /* Main event loop */
   while (running) {
@@ -46,6 +48,7 @@ main(int argc, char** argv)
   client_list_component_shutdown();
   keybinding_shutdown();
   fullscreen_component_shutdown();
+  pertag_component_shutdown();
 
   hub_shutdown();
 

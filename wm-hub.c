@@ -231,6 +231,67 @@ hub_get_component_by_request_type(RequestType type)
   return component_by_request_type[type];
 }
 
+/*
+ * Get all components that accept a specific target type.
+ * Returns a NULL-terminated array of components.
+ * The array is owned by the hub and should not be modified or freed.
+ */
+HubComponent**
+hub_get_components_for_target_type(TargetType type)
+{
+  static HubComponent* results[MAX_COMPONENTS];
+  static uint32_t      result_count = 0;
+
+  if (type >= TARGET_TYPE_COUNT) {
+    return NULL;
+  }
+
+  result_count = 0;
+
+
+  for (uint32_t i = 0; i < component_count; i++) {
+    HubComponent* comp = components[i];
+    if (comp == NULL || comp->targets == NULL)
+      continue;
+
+    /* Check if this component accepts the target type */
+    for (uint32_t j = 0; comp->targets[j] != TARGET_TYPE_NONE; j++) {
+      if (comp->targets[j] == type) {
+        results[result_count++] = comp;
+        break;
+      }
+    }
+  }
+  results[result_count] = NULL;
+  return results;
+}
+
+
+/*
+ * Adopt all compatible components for a target.
+ * Called when a target is registered with the hub.
+ * Each compatible component's on_adopt hook is called.
+ */
+void
+hub_adopt_components_for_target(HubTarget* target)
+{
+  if (target == NULL)
+    return;
+
+  HubComponent** comps = hub_get_components_for_target_type(target->type);
+  if (comps == NULL)
+    return;
+
+  for (uint32_t i = 0; comps[i] != NULL; i++) {
+    HubComponent* comp = comps[i];
+    if (comp->on_adopt != NULL) {
+      LOG_DEBUG("Adopting component '%s' for target id=%" PRIu64 "",
+                comp->name, (unsigned long) target->id);
+      comp->on_adopt(target);
+    }
+  }
+}
+
 void
 hub_register_target(HubTarget* target)
 {
@@ -282,6 +343,9 @@ hub_register_target(HubTarget* target)
   }
 
   LOG_DEBUG("Registered target: id=%" PRIu64 ", type=%u", target->id, target->type);
+
+  /* Adopt all compatible components */
+  hub_adopt_components_for_target(target);
 }
 
 void

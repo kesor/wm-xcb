@@ -73,6 +73,17 @@ typedef struct Pertag {
 
 /*
  * Initialize the pertag component.
+ * Registers with hub so it can be adopted by monitors.
+ */
+void pertag_component_init(void);
+
+/*
+ * Shutdown the pertag component.
+ */
+void pertag_component_shutdown(void);
+
+/*
+ * Initialize the pertag component for a monitor.
  * Allocates Pertag data for a monitor and stores it via monitor_set_sm().
  * @param target  Target that adopted this component (must be MONITOR)
  */

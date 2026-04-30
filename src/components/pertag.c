@@ -23,6 +23,55 @@
 #define PERTAG_SM_NAME "pertag"
 
 /*
+ * Pertag component - registered with hub for adoption
+ */
+static RequestType  pertag_requests[] = { 0 }; /* No requests */
+static TargetType   pertag_targets[]  = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
+static HubComponent pertag_component  = {
+   .name       = "pertag",
+   .requests   = pertag_requests,
+   .targets    = pertag_targets,
+   .executor   = NULL, /* No requests */
+   .on_adopt   = pertag_on_adopt,
+   .on_unadopt = pertag_on_unadopt,
+   .registered = false,
+};
+
+/*
+ * Pertag component lifecycle
+ */
+
+/*
+ * Initialize the pertag component.
+ * Registers with hub so it can be adopted by monitors.
+ */
+void
+pertag_component_init(void)
+{
+  if (pertag_component.registered) {
+    LOG_DEBUG("Pertag component already registered");
+    return;
+  }
+
+  hub_register_component(&pertag_component);
+  LOG_DEBUG("Pertag component registered with hub");
+}
+
+/*
+ * Shutdown the pertag component.
+ */
+void
+pertag_component_shutdown(void)
+{
+  if (!pertag_component.registered) {
+    return;
+  }
+
+  hub_unregister_component("pertag");
+  LOG_DEBUG("Pertag component unregistered from hub");
+}
+
+/*
  * Initialize default values for a pertag state.
  */
 static void
