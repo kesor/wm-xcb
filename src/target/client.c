@@ -32,24 +32,109 @@ static Client client_sentinel;
 static void
 client_properties_init(Client* c)
 {
-  c->title          = NULL;
-  c->class_name     = NULL;
-  c->x              = 0;
-  c->y              = 0;
-  c->width          = 0;
-  c->height         = 0;
-  c->border_width   = 0;
-  c->tags           = 0;
-  c->monitor        = NULL;
-  c->managed        = false;
-  c->urgent         = false;
-  c->focusable      = true;
-  c->mapped         = false;
-  c->stack_mode     = XCB_STACK_MODE_ABOVE;
-  c->sms.fullscreen = NULL;
-  c->sms.floating   = NULL;
-  c->sms.urgency    = NULL;
-  c->sms.focus      = NULL;
+  c->title        = NULL;
+  c->class_name   = NULL;
+  c->x            = 0;
+  c->y            = 0;
+  c->width        = 0;
+  c->height       = 0;
+  c->border_width = 0;
+  c->tags         = 0;
+  c->monitor      = NULL;
+  c->managed      = false;
+  c->urgent       = false;
+  c->focusable    = true;
+  c->mapped       = false;
+  c->stack_mode   = XCB_STACK_MODE_ABOVE;
+
+  /* Initialize SM storage */
+  c->sms.machines = NULL;
+  c->sms.names    = NULL;
+  c->sms.count    = 0;
+  c->sms.capacity = 0;
+}
+
+/*
+ * Helper: find SM index by name.
+ * Returns -1 if not found.
+ */
+static int32_t
+client_sm_find(const Client* c, const char* sm_name)
+{
+  if (c == NULL || sm_name == NULL)
+    return -1;
+
+  for (uint32_t i = 0; i < c->sms.count; i++) {
+    if (c->sms.names[i] != NULL && strcmp(c->sms.names[i], sm_name) == 0) {
+      return (int32_t) i;
+    }
+  }
+  return -1;
+}
+
+/*
+ * Helper: add or update SM for a name.
+ * Takes ownership of `sm` - any previously registered SM for this name
+ * will be destroyed (unless it's the same pointer to avoid self-destruction).
+ * The sm_name string is copied internally.
+ *
+ * Returns true on success, false on failure (OOM).
+ * On failure, the caller should handle cleanup of the passed SM.
+ */
+static bool
+client_sm_set_internal(Client* c, const char* sm_name, StateMachine* sm)
+{
+  int32_t idx = client_sm_find(c, sm_name);
+
+  if (idx >= 0) {
+    /* Update existing - destroy old SM if different from new one */
+    if (c->sms.machines[idx] != NULL && c->sms.machines[idx] != sm) {
+      sm_destroy(c->sms.machines[idx]);
+    }
+    c->sms.machines[idx] = sm;
+    return true;
+  }
+
+  /* Add new SM */
+  if (c->sms.count >= c->sms.capacity) {
+    uint32_t       new_capacity = c->sms.capacity == 0 ? 4 : c->sms.capacity * 2;
+    StateMachine** new_machines = NULL;
+    char**         new_names    = NULL;
+
+    /* Reallocate machines first */
+    new_machines = realloc(c->sms.machines, new_capacity * sizeof(StateMachine*));
+    if (new_machines == NULL) {
+      LOG_ERROR("Failed to expand SM machines storage for client");
+      return false;
+    }
+
+    /* Reallocate names */
+    new_names = realloc(c->sms.names, new_capacity * sizeof(char*));
+    if (new_names == NULL) {
+      free(new_machines);
+      LOG_ERROR("Failed to expand SM names storage for client");
+      return false;
+    }
+
+    /* Both allocations succeeded, update atomically */
+    c->sms.machines = new_machines;
+    c->sms.names    = new_names;
+    c->sms.capacity = new_capacity;
+  }
+
+  /* strdup the name - check for failure */
+  char* copied_name = sm_name ? strdup(sm_name) : NULL;
+  if (sm_name != NULL && copied_name == NULL) {
+    LOG_ERROR("Failed to copy SM name for client");
+    /* Don't add the SM if we can't store the name */
+    return false;
+  }
+
+  c->sms.machines[c->sms.count] = sm;
+  c->sms.names[c->sms.count]    = copied_name;
+  c->sms.count++;
+
+  return true;
 }
 
 /*
@@ -254,22 +339,20 @@ client_destroy(Client* c)
   client_list_remove(c);
 
   /* Destroy all state machines */
-  if (c->sms.fullscreen != NULL) {
-    sm_destroy(c->sms.fullscreen);
-    c->sms.fullscreen = NULL;
+  for (uint32_t i = 0; i < c->sms.count; i++) {
+    if (c->sms.machines[i] != NULL) {
+      sm_destroy(c->sms.machines[i]);
+    }
+    if (c->sms.names[i] != NULL) {
+      free(c->sms.names[i]);
+    }
   }
-  if (c->sms.floating != NULL) {
-    sm_destroy(c->sms.floating);
-    c->sms.floating = NULL;
-  }
-  if (c->sms.urgency != NULL) {
-    sm_destroy(c->sms.urgency);
-    c->sms.urgency = NULL;
-  }
-  if (c->sms.focus != NULL) {
-    sm_destroy(c->sms.focus);
-    c->sms.focus = NULL;
-  }
+  free(c->sms.machines);
+  free(c->sms.names);
+  c->sms.machines = NULL;
+  c->sms.names    = NULL;
+  c->sms.count    = 0;
+  c->sms.capacity = 0;
 
   /* Free X properties */
   if (c->title != NULL) {
@@ -385,7 +468,8 @@ client_get_prev(const Client* c)
 }
 
 /*
- * Get state machine by name (on-demand allocation).
+ * Get state machine by name.
+ * Returns NULL if no SM is registered for this name.
  */
 StateMachine*
 client_get_sm(Client* c, const char* sm_name)
@@ -393,58 +477,27 @@ client_get_sm(Client* c, const char* sm_name)
   if (c == NULL || sm_name == NULL)
     return NULL;
 
-  if (strcmp(sm_name, "fullscreen") == 0) {
-    if (c->sms.fullscreen == NULL) {
-      LOG_DEBUG("Fullscreen SM requested but not yet implemented");
-    }
-    return c->sms.fullscreen;
-  }
+  int32_t idx = client_sm_find(c, sm_name);
+  if (idx < 0)
+    return NULL;
 
-  if (strcmp(sm_name, "floating") == 0) {
-    if (c->sms.floating == NULL) {
-      LOG_DEBUG("Floating SM requested but not yet implemented");
-    }
-    return c->sms.floating;
-  }
-
-  if (strcmp(sm_name, "urgency") == 0) {
-    if (c->sms.urgency == NULL) {
-      LOG_DEBUG("Urgency SM requested but not yet implemented");
-    }
-    return c->sms.urgency;
-  }
-
-  if (strcmp(sm_name, "focus") == 0) {
-    if (c->sms.focus == NULL) {
-      LOG_DEBUG("Focus SM requested but not yet implemented");
-    }
-    return c->sms.focus;
-  }
-
-  LOG_WARN("Unknown state machine requested: %s", sm_name);
-  return NULL;
+  return c->sms.machines[idx];
 }
 
 /*
  * Set a state machine for this client.
+ * The SM is stored by name - components can retrieve it later via client_get_sm().
+ *
+ * Returns true on success, false on failure (OOM).
+ * On failure, the caller should destroy the SM to avoid leaks.
  */
-void
+bool
 client_set_sm(Client* c, const char* sm_name, StateMachine* sm)
 {
   if (c == NULL || sm_name == NULL)
-    return;
+    return false;
 
-  if (strcmp(sm_name, "fullscreen") == 0) {
-    c->sms.fullscreen = sm;
-  } else if (strcmp(sm_name, "floating") == 0) {
-    c->sms.floating = sm;
-  } else if (strcmp(sm_name, "urgency") == 0) {
-    c->sms.urgency = sm;
-  } else if (strcmp(sm_name, "focus") == 0) {
-    c->sms.focus = sm;
-  } else {
-    LOG_WARN("Cannot set unknown state machine: %s", sm_name);
-  }
+  return client_sm_set_internal(c, sm_name, sm);
 }
 
 /*
