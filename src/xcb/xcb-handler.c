@@ -10,7 +10,7 @@
  * Handler registry - array of arrays indexed by event type
  * XCB event types are 0-127 (standard) or extended types for GE events
  */
-#define MAX_EVENT_TYPES 256
+#define MAX_EVENT_TYPES       256
 #define MAX_HANDLERS_PER_TYPE 16
 
 /* Handler storage per event type */
@@ -20,7 +20,7 @@ typedef struct {
 } handler_bucket_t;
 
 static handler_bucket_t handlers[MAX_EVENT_TYPES];
-static uint32_t        total_handlers = 0;
+static uint32_t         total_handlers = 0;
 
 /*
  * Initialize the handler registry.
@@ -68,14 +68,14 @@ xcb_handler_register(XCBEventType event_type, HubComponent* component, void (*ha
   handler_bucket_t* bucket = &handlers[event_type];
   if (bucket->count >= MAX_HANDLERS_PER_TYPE) {
     LOG_ERROR("Too many handlers for event type %u (max %d)",
-               event_type, MAX_HANDLERS_PER_TYPE);
+              event_type, MAX_HANDLERS_PER_TYPE);
     return -1;
   }
 
   /* Add to array - no linked list management needed */
   XCBHandler* h = &bucket->handlers[bucket->count];
   h->event_type = event_type;
-  h->component   = component;
+  h->component  = component;
   h->handler    = handler;
   h->next       = NULL;
 
@@ -107,20 +107,8 @@ xcb_handler_lookup(XCBEventType event_type)
 
 /*
  * Get next handler in chain.
- * Handlers are stored in a flat array, so we search to find our position.
+ * Uses the event_type stored in the handler to directly access its bucket.
  */
-
-static int
-get_index_for_handler(handler_bucket_t* bucket, XCBHandler* handler)
-{
-  for (int i = 0; i < bucket->count; i++) {
-    if (&bucket->handlers[i] == handler) {
-      return i;
-    }
-  }
-  return -1;
-}
-
 XCBHandler*
 xcb_handler_next(XCBHandler* handler)
 {
@@ -128,12 +116,14 @@ xcb_handler_next(XCBHandler* handler)
     return NULL;
   }
 
-  /* Search all buckets to find this handler's position */
-  for (int i = 0; i < MAX_EVENT_TYPES; i++) {
-    handler_bucket_t* bucket = &handlers[i];
-    int idx = get_index_for_handler(bucket, handler);
-    if (idx >= 0 && idx + 1 < bucket->count) {
-      return &bucket->handlers[idx + 1];
+  /* Direct bucket lookup using event_type stored in handler */
+  XCBEventType event_type = handler->event_type;
+  handler_bucket_t* bucket = &handlers[event_type];
+
+  /* Find current position in bucket */
+  for (int i = 0; i < bucket->count; i++) {
+    if (&bucket->handlers[i] == handler && i + 1 < bucket->count) {
+      return &bucket->handlers[i + 1];
     }
   }
 
@@ -182,7 +172,7 @@ xcb_handler_dispatch(void* event)
 
 /*
  * Unregister all handlers for a component.
- * Simple O(n) removal: swap with last element and decrement count.
+ * Uses stable removal (shift tail) to maintain registration order.
  */
 void
 xcb_handler_unregister_component(HubComponent* component)
@@ -197,15 +187,17 @@ xcb_handler_unregister_component(HubComponent* component)
   for (int i = 0; i < MAX_EVENT_TYPES; i++) {
     handler_bucket_t* bucket = &handlers[i];
 
-    /* Scan bucket and remove matching handlers */
+    /* Scan bucket and remove matching handlers while preserving order */
     for (int j = 0; j < bucket->count; ) {
       if (bucket->handlers[j].component == component) {
-        /* Swap with last element and decrement */
-        bucket->handlers[j] = bucket->handlers[bucket->count - 1];
+        /* Stable removal: shift remaining handlers left */
+        memmove(&bucket->handlers[j],
+                &bucket->handlers[j + 1],
+                (bucket->count - j - 1) * sizeof(XCBHandler));
         bucket->count--;
         total_handlers--;
         removed++;
-        /* Don't increment j - check the swapped element */
+        /* Don't increment j - check the shifted element */
       } else {
         j++;
       }
