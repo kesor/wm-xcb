@@ -46,12 +46,12 @@ enum KeybindingRequestType {
  * Used internally to classify what action a keybinding should trigger
  */
 typedef enum {
-  KEYBINDING_ACTION_FOCUS_CLIENT, /* Focus current client */
-  KEYBINDING_ACTION_FOCUS_PREV,   /* Focus previous client */
-  KEYBINDING_ACTION_FOCUS_NEXT,   /* Focus next client */
-  KEYBINDING_ACTION_TAG_VIEW,     /* View specific tag (1-9) */
-  KEYBINDING_ACTION_TAG_TOGGLE,   /* Toggle tag visibility */
-  KEYBINDING_ACTION_CLOSE_CLIENT, /* Close current client */
+  KEYBINDING_ACTION_FOCUS_CLIENT,      /* Focus current client */
+  KEYBINDING_ACTION_FOCUS_PREV,        /* Focus previous client */
+  KEYBINDING_ACTION_FOCUS_NEXT,        /* Focus next client */
+  KEYBINDING_ACTION_TAG_VIEW,          /* View specific tag (1-9) */
+  KEYBINDING_ACTION_TAG_TOGGLE,        /* Toggle tag visibility */
+  KEYBINDING_ACTION_CLOSE_CLIENT,      /* Close current client */
   KEYBINDING_ACTION_TOGGLE_FULLSCREEN, /* Toggle fullscreen */
   KEYBINDING_ACTION_LAST,
 } KeybindingAction;

@@ -26,15 +26,15 @@
 #ifndef _COMPONENT_FULLSCREEN_H_
 #define _COMPONENT_FULLSCREEN_H_
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <xcb/xcb.h>
 
-#include "src/target/client.h"
-#include "src/xcb/xcb-handler.h"
-#include "src/sm/sm-template.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
+#include "src/sm/sm-template.h"
+#include "src/target/client.h"
+#include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
 
 /*
@@ -46,7 +46,7 @@
  * Fullscreen State Machine states
  */
 typedef enum FullscreenState {
-  FULLSCREEN_STATE_WINDOWED    = 0,
+  FULLSCREEN_STATE_WINDOWED   = 0,
   FULLSCREEN_STATE_FULLSCREEN = 1,
 } FullscreenState;
 
@@ -54,9 +54,9 @@ typedef enum FullscreenState {
  * Fullscreen events emitted on state transitions
  */
 typedef enum FullscreenEvent {
-  EVT_FULLSCREEN_ENTERED  = 200,
-  EVT_FULLSCREEN_EXITED  = 201,
-  EVT_FULLSCREEN_FAILED  = 202,
+  EVT_FULLSCREEN_ENTERED = 20,
+  EVT_FULLSCREEN_EXITED  = 21,
+  EVT_FULLSCREEN_FAILED  = 22,
 } FullscreenEvent;
 
 /*

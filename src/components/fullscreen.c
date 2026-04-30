@@ -15,11 +15,11 @@
 #include <string.h>
 
 #include "fullscreen.h"
-#include "src/target/client.h"
-#include "src/xcb/xcb-handler.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
+#include "src/target/client.h"
+#include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
 #include "wm-log.h"
 #include "wm-xcb-ewmh.h"
@@ -49,7 +49,7 @@ do_static_init(void)
 {
   if (static_init_done)
     return;
-  static_init_done = true;
+  static_init_done                     = true;
   fullscreen_component.initialized     = false;
   fullscreen_component.base.registered = false;
 }
@@ -85,6 +85,29 @@ bool
 fullscreen_component_is_initialized(void)
 {
   return fullscreen_component.initialized;
+}
+
+/*
+ * SM Event Emitter
+ *
+ * This function is passed to sm_create() to handle event emission.
+ * It emits events with the correct target (client window ID).
+ */
+static void
+fullscreen_sm_emit(StateMachine* sm, uint32_t from_state, uint32_t to_state, void* userdata)
+{
+  (void) sm;
+  (void) from_state;
+
+  Client* c = (Client*) userdata;
+  if (c == NULL)
+    return;
+
+  EventType event = (to_state == FULLSCREEN_STATE_FULLSCREEN)
+                        ? EVT_FULLSCREEN_ENTERED
+                        : EVT_FULLSCREEN_EXITED;
+
+  hub_emit(event, c->window, NULL);
 }
 
 /*
@@ -168,18 +191,18 @@ fullscreen_sm_template_create(void)
    */
   static SMTransition transitions[] = {
     {
-     .from_state  = FULLSCREEN_STATE_WINDOWED,
-     .to_state    = FULLSCREEN_STATE_FULLSCREEN,
-     .guard_fn    = "fs_guard_can_fullscreen",
-     .action_fn   = "fs_action_enter_fullscreen",
-     .emit_event  = EVT_FULLSCREEN_ENTERED,
+     .from_state = FULLSCREEN_STATE_WINDOWED,
+     .to_state   = FULLSCREEN_STATE_FULLSCREEN,
+     .guard_fn   = "fs_guard_can_fullscreen",
+     .action_fn  = "fs_action_enter_fullscreen",
+     .emit_event = EVT_FULLSCREEN_ENTERED,
      },
     {
-     .from_state  = FULLSCREEN_STATE_FULLSCREEN,
-     .to_state    = FULLSCREEN_STATE_WINDOWED,
-     .guard_fn    = "fs_guard_can_unfullscreen",
-     .action_fn   = "fs_action_exit_fullscreen",
-     .emit_event  = EVT_FULLSCREEN_EXITED,
+     .from_state = FULLSCREEN_STATE_FULLSCREEN,
+     .to_state   = FULLSCREEN_STATE_WINDOWED,
+     .guard_fn   = "fs_guard_can_unfullscreen",
+     .action_fn  = "fs_action_exit_fullscreen",
+     .emit_event = EVT_FULLSCREEN_EXITED,
      },
   };
 
@@ -223,7 +246,7 @@ fullscreen_get_sm(Client* c)
     return NULL;
   }
 
-  sm = sm_create(c, tmpl, NULL, NULL);
+  sm = sm_create(c, tmpl, fullscreen_sm_emit, c);
   if (sm == NULL) {
     LOG_ERROR("Failed to create fullscreen SM instance for client");
     return NULL;
@@ -315,12 +338,12 @@ fullscreen_update_x_property(Client* c, bool fullscreen)
         XCB_ATOM_NONE,
         0);
   } else {
-    /* Toggle/remove fullscreen atom */
+    /* Remove fullscreen atom - use REMOVE instead of TOGGLE to avoid sync issues */
     xcb_ewmh_request_change_wm_state(
         ewmh,
         0, /* screen number */
         c->window,
-        XCB_EWMH_WM_STATE_TOGGLE,
+        XCB_EWMH_WM_STATE_REMOVE,
         ewmh->_NET_WM_STATE_FULLSCREEN,
         XCB_ATOM_NONE,
         0);
@@ -394,18 +417,23 @@ fullscreen_on_property_notify(void* event)
   /* Check if _NET_WM_STATE contains _NET_WM_STATE_FULLSCREEN */
   bool is_fullscreen = ewmh_check_wm_state_fullscreen(ewmh, c->window);
 
+  /* Get or create the SM (on-demand) */
+  StateMachine* sm = fullscreen_get_sm(c);
+  if (sm == NULL) {
+    LOG_WARN("fullscreen listener: failed to get SM for client window=%u", c->window);
+    return;
+  }
+
   /* Get current SM state */
-  FullscreenState current = fullscreen_get_state(c);
+  FullscreenState current = (FullscreenState) sm_get_state(sm);
 
   /* Sync if different - external change happened */
   if (is_fullscreen && current == FULLSCREEN_STATE_WINDOWED) {
     LOG_DEBUG("fullscreen listener: external fullscreen change detected, syncing SM");
-    sm_raw_write(c->sms.fullscreen, FULLSCREEN_STATE_FULLSCREEN);
-    hub_emit(EVT_FULLSCREEN_ENTERED, c->window, NULL);
+    sm_raw_write(sm, FULLSCREEN_STATE_FULLSCREEN);
   } else if (!is_fullscreen && current == FULLSCREEN_STATE_FULLSCREEN) {
     LOG_DEBUG("fullscreen listener: external unfullscreen change detected, syncing SM");
-    sm_raw_write(c->sms.fullscreen, FULLSCREEN_STATE_WINDOWED);
-    hub_emit(EVT_FULLSCREEN_EXITED, c->window, NULL);
+    sm_raw_write(sm, FULLSCREEN_STATE_WINDOWED);
   }
 }
 
@@ -455,6 +483,10 @@ fullscreen_component_init(void)
 
   if (result != 0) {
     LOG_ERROR("Failed to register PROPERTY_NOTIFY handler for fullscreen component");
+    /* Unregister from hub since we're not fully initialized */
+    hub_unregister_component(FULLSCREEN_COMPONENT_NAME);
+    fullscreen_component_reset();
+    return false;
   }
 
   fullscreen_component.initialized = true;

@@ -21,7 +21,7 @@ typedef uint32_t EventType;
  * Request type constants
  * Used by components to handle requests via hub routing.
  */
-enum RequestType {
+enum {
   REQ_CLIENT_FULLSCREEN = 10,
 };
 

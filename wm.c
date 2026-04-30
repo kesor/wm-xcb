@@ -6,14 +6,14 @@
 #include "wm-running.h"
 #include "wm-signals.h"
 
+#include "wm-hub.h"
 #include "wm-states.h"
 #include "wm-xcb-ewmh.h"
 #include "wm-xcb.h"
-#include "wm-hub.h"
 
+#include "src/components/client-list.h"
 #include "src/components/fullscreen.h"
 #include "src/components/keybinding.h"
-#include "src/components/client-list.h"
 #include "src/components/monitor-manager.h"
 
 #include "wm.h"
