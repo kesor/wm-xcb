@@ -15,19 +15,6 @@
 #include "src/xcb/xcb-handler.h"
 #include "src/components/keybinding.h"
 
-/* Track which requests were sent to hub */
-static int      last_request_type   = 0;
-static TargetID last_request_target = TARGET_ID_NONE;
-static void*    last_request_data   = NULL;
-
-static void
-reset_request_tracking(void)
-{
-  last_request_type   = 0;
-  last_request_target = TARGET_ID_NONE;
-  last_request_data   = NULL;
-}
-
 /*
  * Test: keybinding component registers with hub
  */
@@ -199,20 +186,16 @@ test_keybinding_xcb_handler_registration(void)
   keybinding_init();
 
   /* After init, handlers should be registered */
-  /* Note: The keybinding component should register its handlers
-   * when keybinding_init() is called. For now, we check the component
-   * is registered with hub. */
   HubComponent* comp = hub_get_component_by_name("keybinding");
   assert(comp != NULL);
 
-  /* Get the keybinding component's registered request types */
-  RequestType* requests = (RequestType*) comp->requests;
-  int request_count = 0;
-  while (requests[request_count] != 0) {
-    request_count++;
-  }
-  LOG_DEBUG("Keybinding component handles %d request types", request_count);
-  assert(request_count >= 4);  /* At least FOCUS, TAG_VIEW, TAG_TOGGLE, CLOSE */
+  /* Verify XCB handlers were registered */
+  assert(xcb_handler_count_for_type(XCB_KEY_PRESS) > 0);
+  assert(xcb_handler_count_for_type(XCB_KEY_RELEASE) > 0);
+
+  LOG_DEBUG("Keybinding registered %u KEY_PRESS and %u KEY_RELEASE handlers",
+            xcb_handler_count_for_type(XCB_KEY_PRESS),
+            xcb_handler_count_for_type(XCB_KEY_RELEASE));
 
   keybinding_shutdown();
   xcb_handler_shutdown();
@@ -258,47 +241,21 @@ test_keybinding_handle_key_press(void)
   xcb_handler_init();
   keybinding_init();
 
-  /* Simulate a key press event: Mod+Enter (keycode 36) */
-  /* Create a fake event structure - first byte is response_type,
-   * then the xcb_key_press_event_t fields */
-  struct {
-    uint8_t  response_type;
-    uint8_t  detail;
-    uint16_t sequence;
-    uint32_t time;
-    uint32_t root;
-    uint32_t event;
-    uint32_t child;
-    int16_t  root_x;
-    int16_t  root_y;
-    int16_t  event_x;
-    int16_t  event_y;
-    uint32_t state;   /* modifier state */
-    uint16_t same_screen;
-  } fake_event = {
-    .response_type = XCB_KEY_PRESS,
-    .detail         = 36,  /* Return key */
-    .sequence       = 0,
-    .time           = 0,
-    .root           = 0,
-    .event          = 0,
-    .child          = 0,
-    .root_x         = 0,
-    .root_y         = 0,
-    .event_x        = 0,
-    .event_y        = 0,
-    .state          = XCB_MOD_MASK_4,  /* Mod4 pressed */
-    .same_screen    = 1,
-  };
+  /* Allocate and initialize a proper xcb_key_press_event_t structure */
+  xcb_key_press_event_t* fake_event = calloc(1, sizeof(xcb_key_press_event_t));
+  assert(fake_event != NULL);
 
-  /* Call the handler directly - this should look up the binding
-   * and send a hub request. Without a focus component providing
-   * the current client, the request will target NONE. */
-  keybinding_handle_key_press(&fake_event);
+  /* Set required fields with correct types */
+  fake_event->response_type = XCB_KEY_PRESS;
+  fake_event->detail        = 36;  /* Return key */
+  fake_event->state         = XCB_MOD_MASK_4;  /* Mod4 pressed */
 
-  /* The handler should have logged a debug message about no focused client
-   * since focus_get_current_client() returns TARGET_ID_NONE */
+  /* Call the handler directly */
+  keybinding_handle_key_press(fake_event);
+
   LOG_DEBUG("Key press handling completed (no focus component)");
+
+  free(fake_event);
 
   keybinding_shutdown();
   xcb_handler_shutdown();
@@ -321,16 +278,45 @@ test_keybinding_shutdown_reinit(void)
   HubComponent* comp1 = hub_get_component_by_name("keybinding");
   assert(comp1 != NULL);
 
+  /* Verify handlers registered */
+  uint32_t handlers_before = xcb_handler_count_for_type(XCB_KEY_PRESS);
+
   /* Shutdown */
   keybinding_shutdown();
   HubComponent* comp2 = hub_get_component_by_name("keybinding");
   assert(comp2 == NULL);
+
+  /* Handlers should be unregistered */
+  uint32_t handlers_after = xcb_handler_count_for_type(XCB_KEY_PRESS);
+  assert(handlers_after < handlers_before);
 
   /* Re-init should work */
   keybinding_init();
   HubComponent* comp3 = hub_get_component_by_name("keybinding");
   assert(comp3 != NULL);
   assert(comp3 == comp1);  /* Same component struct */
+
+  keybinding_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test: executor is NULL (keybinding doesn't handle requests)
+ */
+void
+test_keybinding_no_executor(void)
+{
+  LOG_CLEAN("== Testing keybinding component has no executor");
+
+  hub_init();
+  xcb_handler_init();
+  keybinding_init();
+
+  HubComponent* comp = hub_get_component_by_name("keybinding");
+  assert(comp != NULL);
+  assert(comp->requests == NULL);  /* We don't handle any requests */
+  assert(comp->executor == NULL); /* No executor function */
 
   keybinding_shutdown();
   xcb_handler_shutdown();
@@ -347,4 +333,5 @@ TEST_GROUP(KeybindingComponent, {
   test_keybinding_get_bindings();
   test_keybinding_handle_key_press();
   test_keybinding_shutdown_reinit();
+  test_keybinding_no_executor();
 });

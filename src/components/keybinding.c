@@ -2,7 +2,7 @@
  * keybinding.c - Keybinding component implementation
  *
  * Converts KEY_PRESS and KEY_RELEASE X events into hub requests.
- * Key bindings are configurable via the keybindings array.
+ * Key bindings are configurable via config.def.h.
  *
  * This component:
  * - Registers XCB handlers for KEY_PRESS and KEY_RELEASE on init
@@ -11,6 +11,9 @@
  * - Unregisters XCB handlers on shutdown
  *
  * The hub routes requests to the appropriate components (focus, tag, etc.)
+ *
+ * NOTE: This component SENDS requests but does NOT handle them.
+ * It should NOT be registered as a handler for request types.
  */
 
 #include <stdlib.h>
@@ -25,64 +28,14 @@
 #include "wm-signals.h"
 #include "wm-states.h"
 #include "src/target/monitor.h"
+#include "src/xcb/xcb-handler.h"
 
 /*
- * Request type constants for keybinding-generated requests
- * These are the request types sent to the hub when keybindings fire
+ * Active keybinding configuration
  *
- * Note: These are in the 100-199 range to avoid conflicts with
- * other component request types (focus=1, fullscreen=1,2, etc.)
- */
-enum KeybindingRequestType {
-  REQ_KEYBINDING_FOCUS        = 100,
-  REQ_KEYBINDING_FOCUS_PREV   = 101,
-  REQ_KEYBINDING_FOCUS_NEXT   = 102,
-  REQ_KEYBINDING_TAG_VIEW     = 103,
-  REQ_KEYBINDING_TAG_TOGGLE   = 104,
-  REQ_KEYBINDING_CLOSE        = 105,
-};
-
-/*
- * Key request data structure
- * Passed to hub for keybinding requests
- */
-typedef struct {
-  union {
-    uint32_t tag;           /* For tag requests: 1-indexed tag number */
-    uint32_t direction;     /* For focus requests: 0=next, 1=prev */
-  };
-  void* reserved;           /* For future extension */
-} KeybindingRequestData;
-
-/*
- * External dependencies - resolved at runtime
- */
-
-/* Current focused client - provided by focus component (stub for now) */
-__attribute__((weak)) TargetID
-focus_get_current_client(void)
-{
-  /* TODO: Implement focus component integration */
-  /* For now, return NONE - focus component will provide this */
-  return TARGET_ID_NONE;
-}
-
-/* Current selected monitor - provided by monitor system */
-extern Monitor* monitor_get_selected(void);
-extern TargetID monitor_get_current_monitor(void);
-
-/*
- * Default keybindings
- * Format: { modifiers, keycode, action, arg }
- *
- * Default bindings use Mod4 (Super/Windows key) as the modifier.
- * Keycodes are looked up at runtime from keysyms.
- *
- * Default bindings:
- *   Mod+Enter       -> Focus current client
- *   Mod+Shift+Enter -> Focus previous client
- *   Mod+1..9        -> View tags 1..9
- *   Mod+Shift+1..9  -> Toggle tags 1..9
+ * Keep this configuration private to this translation unit so the
+ * implementation owns the binding data instead of exporting globals
+ * that appear externally overridable.
  */
 static const KeyBinding default_keybindings[] = {
   /* Focus actions */
@@ -115,11 +68,8 @@ static const KeyBinding default_keybindings[] = {
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 18, KEYBINDING_ACTION_TAG_TOGGLE, 9 },
 };
 
-/*
- * Keybindings array - points to config or defaults
- */
-const KeyBinding* keybindings = default_keybindings;
-const uint32_t   num_keybindings = sizeof(default_keybindings) / sizeof(default_keybindings[0]);
+static const KeyBinding* keybindings = default_keybindings;
+static uint32_t          num_keybindings = sizeof(default_keybindings) / sizeof(default_keybindings[0]);
 
 /*
  * Internal state
@@ -127,73 +77,57 @@ const uint32_t   num_keybindings = sizeof(default_keybindings) / sizeof(default_
 static bool initialized = false;
 
 /*
- * Keybinding request types that this component can send
- * 0-terminated array as required by HubComponent
- */
-static const RequestType keybinding_requests[] = {
-  REQ_KEYBINDING_FOCUS,
-  REQ_KEYBINDING_FOCUS_PREV,
-  REQ_KEYBINDING_FOCUS_NEXT,
-  REQ_KEYBINDING_TAG_VIEW,
-  REQ_KEYBINDING_TAG_TOGGLE,
-  REQ_KEYBINDING_CLOSE,
-  0,  /* Terminator */
-};
-
-/*
- * Target types this component works with (for future extension)
- * Currently keybindings work with both clients and monitors
- */
-static const TargetType keybinding_targets[] = {
-  TARGET_TYPE_CLIENT,
-  TARGET_TYPE_MONITOR,
-  TARGET_TYPE_NONE,  /* Terminator */
-};
-
-/*
- * Request executor for keybinding requests
- * Currently unused - keybindings generate requests but don't handle them
- */
-static void
-keybinding_executor(struct HubRequest* req)
-{
-  /* Keybinding component generates requests, it doesn't handle them.
-   * This executor would only be called if something sends a request
-   * directly to the keybinding component (which shouldn't happen). */
-  LOG_DEBUG("keybinding_executor called with request type %" PRIu32, req->type);
-}
-
-/*
  * Keybinding component
- * Registered with hub to participate in the component ecosystem
+ *
+ * Note: requests is NULL because this component only SENDS requests,
+ * it does not handle them. The requests array in HubComponent is for
+ * requests that THIS component handles, not requests it sends.
  */
 HubComponent keybinding_component = {
   .name       = "keybinding",
-  .requests   = keybinding_requests,
-  .targets    = keybinding_targets,
-  .executor   = keybinding_executor,
+  .requests   = NULL,  /* We don't handle requests, we send them */
+  .targets    = NULL,  /* We don't adopt targets */
+  .executor   = NULL,  /* No executor - we only generate requests */
   .registered = false,
 };
 
 /*
+ * External dependencies - resolved at runtime
+ */
+
+/* Current focused client - provided by focus component (stub for now) */
+__attribute__((weak)) TargetID
+focus_get_current_client(void)
+{
+  /* TODO: Implement focus component integration */
+  /* For now, return NONE - focus component will provide this */
+  return TARGET_ID_NONE;
+}
+
+/* Current selected monitor - provided by monitor system */
+extern Monitor* monitor_get_selected(void);
+extern TargetID monitor_get_current_monitor(void);
+
+/*
  * Convert KeybindingAction to RequestType
+ * These request types match what the focus and tag components expect
  */
 static RequestType
 action_to_request_type(KeybindingAction action)
 {
   switch (action) {
     case KEYBINDING_ACTION_FOCUS_CLIENT:
-      return REQ_KEYBINDING_FOCUS;
+      return REQ_KEYBINDING_FOCUS;      /* = 1 = REQ_CLIENT_FOCUS */
     case KEYBINDING_ACTION_FOCUS_PREV:
-      return REQ_KEYBINDING_FOCUS_PREV;
+      return REQ_KEYBINDING_FOCUS_PREV; /* = 3 = REQ_CLIENT_FOCUS_PREV */
     case KEYBINDING_ACTION_FOCUS_NEXT:
-      return REQ_KEYBINDING_FOCUS_NEXT;
+      return REQ_KEYBINDING_FOCUS;      /* Use same as current for now */
     case KEYBINDING_ACTION_TAG_VIEW:
-      return REQ_KEYBINDING_TAG_VIEW;
+      return REQ_KEYBINDING_TAG_VIEW;    /* = 4 = REQ_MONITOR_TAG_VIEW */
     case KEYBINDING_ACTION_TAG_TOGGLE:
-      return REQ_KEYBINDING_TAG_TOGGLE;
+      return REQ_KEYBINDING_TAG_TOGGLE; /* = 5 = REQ_MONITOR_TAG_TOGGLE */
     case KEYBINDING_ACTION_CLOSE_CLIENT:
-      return REQ_KEYBINDING_CLOSE;
+      return REQ_KEYBINDING_CLOSE;      /* = 6 = REQ_CLIENT_CLOSE */
     default:
       return 0;
   }
@@ -208,7 +142,6 @@ get_target_for_request(RequestType type)
   /* For focus and close requests, use current client */
   if (type == REQ_KEYBINDING_FOCUS ||
       type == REQ_KEYBINDING_FOCUS_PREV ||
-      type == REQ_KEYBINDING_FOCUS_NEXT ||
       type == REQ_KEYBINDING_CLOSE) {
     return focus_get_current_client();
   }
@@ -223,6 +156,22 @@ get_target_for_request(RequestType type)
 }
 
 /*
+ * Log a debug message for focus request failures
+ */
+static const char*
+focus_action_name(RequestType type)
+{
+  switch (type) {
+    case REQ_KEYBINDING_FOCUS:
+      return "focus current client";
+    case REQ_KEYBINDING_FOCUS_PREV:
+      return "focus previous client";
+    default:
+      return "focus";
+  }
+}
+
+/*
  * Send a focus request to the hub
  */
 static void
@@ -234,8 +183,7 @@ send_focus_request(RequestType type)
     LOG_DEBUG("Keybinding sent focus request type=%" PRIu32 " target=%" PRIu64,
               type, target);
   } else {
-    LOG_DEBUG("Keybinding: no focused client to %s",
-              type == REQ_KEYBINDING_FOCUS_PREV ? "focus prev" : "focus next");
+    LOG_DEBUG("Keybinding: no focused client to %s", focus_action_name(type));
   }
 }
 
@@ -245,11 +193,9 @@ send_focus_request(RequestType type)
 static void
 send_tag_request(RequestType type, uint32_t tag)
 {
-  TargetID              target = get_target_for_request(type);
-  KeybindingRequestData data   = { .tag = tag };
-
+  TargetID target = get_target_for_request(type);
   if (target != TARGET_ID_NONE) {
-    hub_send_request_data(type, target, &data);
+    hub_send_request_data(type, target, &tag);
     LOG_DEBUG("Keybinding sent tag request type=%" PRIu32 " tag=%" PRIu32, type, tag);
   } else {
     LOG_DEBUG("Keybinding: no selected monitor for tag request");
@@ -301,6 +247,10 @@ keybinding_init(void)
   /* Register with hub */
   hub_register_component(&keybinding_component);
 
+  /* Register XCB handlers for KEY_PRESS and KEY_RELEASE */
+  xcb_handler_register(XCB_KEY_PRESS, &keybinding_component, keybinding_handle_key_press);
+  xcb_handler_register(XCB_KEY_RELEASE, &keybinding_component, keybinding_handle_key_release);
+
   initialized = true;
   LOG_DEBUG("Keybinding component initialized");
 }
@@ -316,6 +266,9 @@ keybinding_shutdown(void)
   }
 
   LOG_DEBUG("Shutting down keybinding component");
+
+  /* Unregister XCB handlers */
+  xcb_handler_unregister_component(&keybinding_component);
 
   /* Unregister from hub */
   hub_unregister_component("keybinding");

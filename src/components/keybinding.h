@@ -9,16 +9,14 @@
  * - on_shutdown(): unregister XCB handlers
  * - No target adoption needed (works with global target resolution)
  *
- * Request types handled:
+ * Request types sent:
  * - REQ_CLIENT_FOCUS: Mod+Enter focuses the current client
  * - REQ_CLIENT_FOCUS_PREV: Mod+Shift+Enter focuses previous client
- * - REQ_CLIENT_FOCUS_NEXT: Mod+Shift+Enter (via different path) focuses next client
  * - REQ_MONITOR_TAG_VIEW: Mod+1-9 switches to tag view (1-indexed)
  * - REQ_MONITOR_TAG_TOGGLE: Mod+Shift+1-9 toggles tag visibility
  *
- * Target resolution:
- * - TARGET_CURRENT_CLIENT: resolved to the currently focused client
- * - TARGET_CURRENT_MONITOR: resolved to the currently selected monitor
+ * Note: This component sends requests but does NOT handle them.
+ * It should not be registered as a handler for these request types.
  */
 
 #ifndef WM_KEYBINDING_H_
@@ -26,16 +24,22 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <xcb/xcb.h>
 
 #include "wm-hub.h"
 
 /*
- * Request types for keybindings
- * These are the requests that this component can send to the hub.
- *
- * Note: The keybinding component itself doesn't handle requests,
- * it only generates them by converting key events.
+ * Request type constants
+ * These match the request types expected by focus and tag components.
+ * The keybinding component uses these to send requests, not handle them.
  */
+enum KeybindingRequestType {
+  REQ_KEYBINDING_FOCUS      = 1,   /* Maps to REQ_CLIENT_FOCUS */
+  REQ_KEYBINDING_FOCUS_PREV = 3,   /* Maps to REQ_CLIENT_FOCUS_PREV */
+  REQ_KEYBINDING_TAG_VIEW   = 4,   /* Maps to REQ_MONITOR_TAG_VIEW */
+  REQ_KEYBINDING_TAG_TOGGLE = 5,   /* Maps to REQ_MONITOR_TAG_TOGGLE */
+  REQ_KEYBINDING_CLOSE      = 6,   /* Maps to REQ_CLIENT_CLOSE */
+};
 
 /*
  * Key binding action types
@@ -43,11 +47,11 @@
  */
 typedef enum {
   KEYBINDING_ACTION_FOCUS_CLIENT,     /* Focus current client */
-  KEYBINDING_ACTION_FOCUS_PREV,      /* Focus previous client */
+  KEYBINDING_ACTION_FOCUS_PREV,       /* Focus previous client */
   KEYBINDING_ACTION_FOCUS_NEXT,       /* Focus next client */
   KEYBINDING_ACTION_TAG_VIEW,         /* View specific tag (1-9) */
   KEYBINDING_ACTION_TAG_TOGGLE,       /* Toggle tag visibility */
-  KEYBINDING_ACTION_CLOSE_CLIENT,    /* Close current client */
+  KEYBINDING_ACTION_CLOSE_CLIENT,     /* Close current client */
   KEYBINDING_ACTION_LAST,
 } KeybindingAction;
 
@@ -67,9 +71,9 @@ typedef struct KeyBinding {
  */
 enum KeybindingTarget {
   TARGET_CURRENT_CLIENT  = 1,    /* Currently focused client */
-  TARGET_CURRENT_MONITOR  = 2,    /* Currently selected monitor */
-  TARGET_SELECTION_FIRST  = 3,    /* First client in selection order */
-  TARGET_SELECTION_LAST   = 4,    /* Last client in selection order */
+  TARGET_CURRENT_MONITOR = 2,    /* Currently selected monitor */
+  TARGET_SELECTION_FIRST = 3,    /* First client in selection order */
+  TARGET_SELECTION_LAST  = 4,    /* Last client in selection order */
 };
 
 /*
@@ -81,13 +85,6 @@ enum KeybindingTarget {
  * Number of available tags (standard dwm uses 9)
  */
 #define KEYBINDING_NUM_TAGS 9
-
-/*
- * External key binding configuration
- * Defined in config.def.h and referenced here
- */
-extern const KeyBinding* keybindings;
-extern const uint32_t   num_keybindings;
 
 /*
  * Common XCB modifier mask values
@@ -107,14 +104,18 @@ extern const uint32_t   num_keybindings;
  * These can be OR'd together for common combinations
  */
 #define KEYBINDING_MOD_ANY        0          /* Any modifiers (for testing) */
-#define KEYBINDING_MOD_SHIFT       (1 << 0)   /* Shift key */
-#define KEYBINDING_MOD_CONTROL     (1 << 2)   /* Control key */
-#define KEYBINDING_MOD_MOD1       (1 << 3)   /* Alt key */
-#define KEYBINDING_MOD_MOD4       (1 << 6)   /* Super/Windows key */
+#define KEYBINDING_MOD_SHIFT      (1 << 0)   /* Shift key */
+#define KEYBINDING_MOD_CONTROL    (1 << 2)   /* Control key */
+#define KEYBINDING_MOD_MOD1       (1 << 3)  /* Alt key */
+#define KEYBINDING_MOD_MOD4       (1 << 6)  /* Super/Windows key */
 
 /*
  * Keybinding component structure
  * Registered with the hub to handle event routing
+ *
+ * Note: requests is NULL because this component only SENDS requests,
+ * it does not handle them. The requests array in HubComponent is for
+ * requests that THIS component handles, not requests it sends.
  */
 extern HubComponent keybinding_component;
 
