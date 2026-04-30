@@ -44,16 +44,19 @@ SRC = \
 	src/sm/sm-registry.c \
 	src/sm/sm-instance.c \
 	src/target/client.c \
-	src/target/monitor.c
+	src/target/monitor.c \
+	src/components/keybinding.c
 
 OBJ = ${SRC:.c=.o}
 
 TEST_SRC = \
 	test-registry.c \
+	test-runner.c \
 	test-$(NAME)-hub.c \
 	test-$(NAME)-xcb-handler.c \
 	test-$(NAME)-monitor.c \
-	test-target-client.c
+	test-target-client.c \
+	test-$(NAME)-keybinding.c
 
 # Header dependencies
 TEST_HDR = test-registry.h test-wm.h test-wm-window-list.h test-wm-hub.h test-wm-monitor.h
@@ -76,6 +79,9 @@ src/xcb/%.o: src/xcb/%.c
 	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
 
 src/target/%.o: src/target/%.c
+	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
+
+src/components/%.o: src/components/%.c
 	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
 
 -include $(OBJ:.o=.d)
@@ -123,8 +129,8 @@ analyze:
 check: format tidy analyze
 
 # Unified test runner - builds and runs all tests in a single executable
-test: test-registry.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o $(filter-out $(NAME).o, ${OBJ})
-	${CC} -o $@ test-registry.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+test: test-registry.o test-runner.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o test-wm-keybinding.o $(filter-out $(NAME).o, ${OBJ})
+	${CC} -o $@ test-registry.o test-runner.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o test-wm-keybinding.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
 	./test
 
 clean:

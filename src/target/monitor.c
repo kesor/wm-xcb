@@ -279,6 +279,19 @@ monitor_get_selected(void)
 }
 
 /*
+ * Get the TargetID of the currently selected monitor.
+ * Returns TARGET_ID_NONE if no monitor is selected.
+ */
+TargetID
+monitor_get_current_monitor(void)
+{
+  if (selected_monitor == NULL) {
+    return TARGET_ID_NONE;
+  }
+  return selected_monitor->target.id;
+}
+
+/*
  * Set the currently selected monitor.
  */
 void
