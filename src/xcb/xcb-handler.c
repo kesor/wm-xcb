@@ -7,20 +7,20 @@
 #include "wm-log.h"
 
 /*
- * Handler registry - array of linked lists indexed by event type
+ * Handler registry - array of arrays indexed by event type
  * XCB event types are 0-127 (standard) or extended types for GE events
  */
 #define MAX_EVENT_TYPES 256
+#define MAX_HANDLERS_PER_TYPE 16
 
-/* Handler storage */
-typedef struct handler_entry {
-  XCBHandler            handler;
-  struct handler_entry* next;
-} handler_entry_t;
+/* Handler storage per event type */
+typedef struct {
+  XCBHandler handlers[MAX_HANDLERS_PER_TYPE];
+  int        count;
+} handler_bucket_t;
 
-static handler_entry_t* handlers[MAX_EVENT_TYPES];
-static uint32_t         handler_counts[MAX_EVENT_TYPES];
-static uint32_t         total_handlers = 0;
+static handler_bucket_t handlers[MAX_EVENT_TYPES];
+static uint32_t        total_handlers = 0;
 
 /*
  * Initialize the handler registry.
@@ -29,7 +29,6 @@ void
 xcb_handler_init(void)
 {
   memset(handlers, 0, sizeof(handlers));
-  memset(handler_counts, 0, sizeof(handler_counts));
   total_handlers = 0;
   LOG_DEBUG("XCB handler registry initialized");
 }
@@ -40,18 +39,7 @@ xcb_handler_init(void)
 void
 xcb_handler_shutdown(void)
 {
-  /* Free all handler entries */
-  for (int i = 0; i < MAX_EVENT_TYPES; i++) {
-    handler_entry_t* entry = handlers[i];
-    while (entry != NULL) {
-      handler_entry_t* next = entry->next;
-      free(entry);
-      entry = next;
-    }
-    handlers[i] = NULL;
-  }
-
-  memset(handler_counts, 0, sizeof(handler_counts));
+  memset(handlers, 0, sizeof(handlers));
   total_handlers = 0;
   LOG_DEBUG("XCB handler registry shutdown");
 }
@@ -77,33 +65,21 @@ xcb_handler_register(XCBEventType event_type, HubComponent* component, void (*ha
     return -1;
   }
 
-  /* Allocate and initialize handler entry */
-  handler_entry_t* entry = malloc(sizeof(handler_entry_t));
-  if (entry == NULL) {
-    LOG_ERROR("Failed to allocate handler entry for event type %u", event_type);
+  handler_bucket_t* bucket = &handlers[event_type];
+  if (bucket->count >= MAX_HANDLERS_PER_TYPE) {
+    LOG_ERROR("Too many handlers for event type %u (max %d)",
+               event_type, MAX_HANDLERS_PER_TYPE);
     return -1;
   }
-  memset(entry, 0, sizeof(handler_entry_t));
-  entry->handler.event_type = event_type;
-  entry->handler.component  = component;
-  entry->handler.handler    = handler;
-  entry->handler.next       = NULL;
 
-  /* Add to linked list for this event type */
-  if (handlers[event_type] == NULL) {
-    handlers[event_type] = entry;
-  } else {
-    /* Find end of list and append */
-    handler_entry_t* curr = handlers[event_type];
-    while (curr->next != NULL) {
-      curr = curr->next;
-    }
-    curr->next = entry;
-    /* Also link handler chain for xcb_handler_next() iteration */
-    curr->handler.next = &entry->handler;
-  }
+  /* Add to array - no linked list management needed */
+  XCBHandler* h = &bucket->handlers[bucket->count];
+  h->event_type = event_type;
+  h->component   = component;
+  h->handler    = handler;
+  h->next       = NULL;
 
-  handler_counts[event_type]++;
+  bucket->count++;
   total_handlers++;
 
   LOG_DEBUG("Registered handler for event type %u (component: %p)",
@@ -122,16 +98,29 @@ xcb_handler_lookup(XCBEventType event_type)
     return NULL;
   }
 
-  if (handlers[event_type] == NULL) {
+  if (handlers[event_type].count == 0) {
     return NULL;
   }
 
-  return &handlers[event_type]->handler;
+  return &handlers[event_type].handlers[0];
 }
 
 /*
  * Get next handler in chain.
+ * Handlers are stored in a flat array, so we search to find our position.
  */
+
+static int
+get_index_for_handler(handler_bucket_t* bucket, XCBHandler* handler)
+{
+  for (int i = 0; i < bucket->count; i++) {
+    if (&bucket->handlers[i] == handler) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 XCBHandler*
 xcb_handler_next(XCBHandler* handler)
 {
@@ -139,7 +128,16 @@ xcb_handler_next(XCBHandler* handler)
     return NULL;
   }
 
-  return handler->next;
+  /* Search all buckets to find this handler's position */
+  for (int i = 0; i < MAX_EVENT_TYPES; i++) {
+    handler_bucket_t* bucket = &handlers[i];
+    int idx = get_index_for_handler(bucket, handler);
+    if (idx >= 0 && idx + 1 < bucket->count) {
+      return &bucket->handlers[idx + 1];
+    }
+  }
+
+  return NULL;
 }
 
 /*
@@ -184,6 +182,7 @@ xcb_handler_dispatch(void* event)
 
 /*
  * Unregister all handlers for a component.
+ * Simple O(n) removal: swap with last element and decrement count.
  */
 void
 xcb_handler_unregister_component(HubComponent* component)
@@ -194,36 +193,22 @@ xcb_handler_unregister_component(HubComponent* component)
 
   int removed = 0;
 
-  /* Iterate through all event types */
+  /* Iterate through all event type buckets */
   for (int i = 0; i < MAX_EVENT_TYPES; i++) {
-    handler_entry_t** prev = &handlers[i];
-    handler_entry_t*  curr = handlers[i];
+    handler_bucket_t* bucket = &handlers[i];
 
-    while (curr != NULL) {
-      if (curr->handler.component == component) {
-        /* Remove this entry */
-        handler_entry_t* next = curr->next;
-        *prev                 = next;
-        free(curr);
-        curr = next;
-        handler_counts[i]--;
+    /* Scan bucket and remove matching handlers */
+    for (int j = 0; j < bucket->count; ) {
+      if (bucket->handlers[j].component == component) {
+        /* Swap with last element and decrement */
+        bucket->handlers[j] = bucket->handlers[bucket->count - 1];
+        bucket->count--;
         total_handlers--;
         removed++;
-        /* Note: prev is still valid as it points to the slot we just updated */
+        /* Don't increment j - check the swapped element */
       } else {
-        prev = &curr->next;
-        curr = curr->next;
+        j++;
       }
-    }
-
-    /* Rebuild handler chain for remaining entries */
-    handler_entry_t* chain_curr = handlers[i];
-    while (chain_curr != NULL && chain_curr->next != NULL) {
-      chain_curr->handler.next = &chain_curr->next->handler;
-      chain_curr               = chain_curr->next;
-    }
-    if (chain_curr != NULL) {
-      chain_curr->handler.next = NULL;
     }
   }
 
@@ -251,5 +236,5 @@ xcb_handler_count_for_type(XCBEventType event_type)
     return 0;
   }
 
-  return handler_counts[event_type];
+  return (uint32_t) handlers[event_type].count;
 }
