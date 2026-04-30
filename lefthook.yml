@@ -16,9 +16,8 @@ pre-commit:
 pre-push:
   skip: [pre-commit]
   commands:
-    format:
-      glob: "**/*.{c,h}"
-      run: make format
+    format-check:
+      run: clang-format --dry-run --Werror $(git ls-files '*.c' '*.h' | grep -v '^vendor/')
 
     tidy:
       glob: "**/*.{c,h}"
