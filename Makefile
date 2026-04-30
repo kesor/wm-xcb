@@ -29,44 +29,49 @@ else
 	LDFLAGS += -Os
 endif
 
-SRC = \
-	$(NAME)-log.c \
-	$(NAME)-signals.c \
-	$(NAME)-running.c \
-	$(NAME)-hub.c \
-	$(NAME)-xcb-ewmh.c \
-	$(NAME)-xcb-events.c \
-	$(NAME)-states.c \
-	$(NAME)-xcb.c \
-	$(NAME).c \
-	src/xcb/xcb-handler.c \
-	src/sm/sm-template.c \
-	src/sm/sm-registry.c \
-	src/sm/sm-instance.c \
-	src/target/client.c \
-	src/target/monitor.c \
-	src/components/client-list.c \
-	src/components/keybinding.c \
-	src/components/connection-sm.c \
-	src/components/monitor-manager.c
+# ---------------------------------------------------------------------------
+# Source file lists - grouped by module for easy extension
+# ---------------------------------------------------------------------------
 
-OBJ = ${SRC:.c=.o}
+# Root-level source files
+ROOT_SRC = \
+	wm-log.c \
+	wm-signals.c \
+	wm-running.c \
+	wm-hub.c \
+	wm-xcb-ewmh.c \
+	wm-xcb-events.c \
+	wm-states.c \
+	wm-xcb.c \
+	wm.c
 
+# Subdirectory sources (use wildcards for easy extension)
+SRC_SM      = $(wildcard src/sm/*.c)
+SRC_XCB     = $(wildcard src/xcb/*.c)
+SRC_TARGET  = $(wildcard src/target/*.c)
+SRC_COMP    = $(wildcard src/components/*.c)
+
+# All main source files
+SRC = $(ROOT_SRC) $(SRC_SM) $(SRC_XCB) $(SRC_TARGET) $(SRC_COMP)
+OBJ = $(SRC:.c=.o)
+
+# Test source files
 TEST_SRC = \
 	test-registry.c \
 	test-runner.c \
-	test-$(NAME)-hub.c \
-	test-$(NAME)-xcb-handler.c \
-	test-$(NAME)-monitor.c \
+	test-wm-hub.c \
+	test-wm-xcb-handler.c \
+	test-wm-monitor.c \
 	test-target-client.c \
 	test-client-list-component.c \
-	test-$(NAME)-keybinding.c \
-	test-$(NAME)-monitor-manager.c
+	test-wm-keybinding.c \
+	test-wm-monitor-manager.c
 
-# Header dependencies
-TEST_HDR = test-registry.h test-wm.h test-wm-window-list.h test-wm-hub.h test-wm-monitor.h test-client-list-component.h
+TEST_OBJ = $(TEST_SRC:.c=.o)
 
-TEST_OBJ = ${TEST_SRC:.c=.o}
+# ---------------------------------------------------------------------------
+# Build rules
+# ---------------------------------------------------------------------------
 
 all: compile_flags.txt $(NAME)
 	@echo "Build complete."
@@ -74,38 +79,29 @@ all: compile_flags.txt $(NAME)
 compile_flags.txt:
 	@echo "${CFLAGS}" > compile_flags.txt
 
+# Generic pattern rule for all .c -> .o
 %.o: %.c
-	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
-
-src/sm/%.o: src/sm/%.c
-	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
-
-src/xcb/%.o: src/xcb/%.c
-	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
-
-src/target/%.o: src/target/%.c
-	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
-
-src/components/%.o: src/components/%.c
 	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
 
 -include $(OBJ:.o=.d)
 -include $(TEST_OBJ:.o=.d)
 
-$(NAME): ${OBJ} $(NAME).o
-	${CC} -o $@ ${OBJ} ${LDFLAGS}
+$(NAME): $(OBJ)
+	${CC} -o $@ $(OBJ) ${LDFLAGS}
+
+# ---------------------------------------------------------------------------
+# Development tools
+# ---------------------------------------------------------------------------
 
 # Generate compile_commands.json for clang tools
-# Forces recompilation with clang so clang-tidy can understand the flags
 compile-commands: clean
 	@bear -- $(MAKE) -k CC=clang all
 
 # Format source files with clang-format
 format:
-	clang-format --style=file -i ${SRC} ${TEST_SRC}
+	clang-format --style=file -i $(SRC) $(TEST_SRC)
 
 # Run clang-tidy on source files
-# Uses -p . to read compile_commands.json; adds glibc include path for nix
 tidy: compile-commands
 	@clang-tidy -p . --quiet \
 		-extra-arg=-DWM_HUB_TESTING \
@@ -116,8 +112,9 @@ tidy: compile-commands
 		-extra-arg=-I$(abspath vendor/xcb-errors-include) \
 		-extra-arg=-I$(abspath vendor/libxcb-errors/include) \
 		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto xcb-errors 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
-		${SRC} ${TEST_SRC}
-# Run clang static analyzer (requires compile_commands.json from bear)
+		$(SRC) $(TEST_SRC)
+
+# Run clang static analyzer
 analyze:
 	@clang-tidy -p . --quiet \
 		-extra-arg=-DWM_HUB_TESTING \
@@ -128,18 +125,32 @@ analyze:
 		-extra-arg=-I$(abspath vendor/xcb-errors-include) \
 		-extra-arg=-I$(abspath vendor/libxcb-errors/include) \
 		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto xcb-errors 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
-		${SRC} ${TEST_SRC}
+		$(SRC) $(TEST_SRC)
 
 # Run all development checks
 check: format tidy analyze
 
-# Unified test runner - builds and runs all tests in a single executable
-test: test-registry.o test-runner.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o test-client-list-component.o test-wm-monitor-manager.o test-wm-keybinding.o $(filter-out $(NAME).o, ${OBJ})
-	${CC} -o $@ test-registry.o test-runner.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o test-client-list-component.o test-wm-monitor-manager.o test-wm-keybinding.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+# ---------------------------------------------------------------------------
+# Testing
+# ---------------------------------------------------------------------------
+
+test: $(TEST_OBJ) $(filter-out wm.o,$(OBJ))
+	${CC} -o $@ $^ ${LDFLAGS}
 	./test
 
 clean:
-	rm -f $(NAME) ${OBJ} ${TEST_OBJ} test compile_commands.json compile_flags.txt test-window-list test-hub test-xcb-handler
+	rm -f $(NAME) $(OBJ) $(TEST_OBJ) test compile_commands.json compile_flags.txt
+
+# Standalone test (no XCB dependencies required)
+test-standalone: wm-hub.o test-wm-hub-standalone.c
+	$(CC) $(CFLAGS) -o $@ $^
+
+test-sm-standalone: wm-hub.o wm-log.o $(SRC_SM) test-sm-standalone.c
+	$(CC) $(CFLAGS) -o $@ $^
+
+# ---------------------------------------------------------------------------
+# Docker helpers
+# ---------------------------------------------------------------------------
 
 container-start:
 	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc
@@ -150,14 +161,6 @@ container-exec:
 container-build:
 	docker build -t x11vnc .
 
-# Standalone test (no XCB dependencies required)
-test-standalone: wm-hub.o test-wm-hub-standalone.c
-	$(CC) $(CFLAGS) -o $@ test-wm-hub-standalone.c wm-hub.o
-	./test-standalone
+# ---------------------------------------------------------------------------
 
-# State Machine standalone test (no XCB dependencies required)
-test-sm-standalone: wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-registry.o src/sm/sm-instance.o test-sm-standalone.c
-	$(CC) $(CFLAGS) -o $@ wm-hub.o wm-log.o src/sm/sm-template.o src/sm/sm-registry.o src/sm/sm-instance.o test-sm-standalone.c
-	./test-sm-standalone
-
-.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone
+.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone check format tidy analyze
