@@ -9,6 +9,7 @@
  * - Geometry (position and resolution)
  * - Tag state (which tags this monitor is viewing)
  * - Target registration with the Hub
+ * - State machine storage (for components to attach their data)
  *
  * Note: Tag state is stored here because it's specific to monitor-view
  * semantics (a monitor "views" certain tags). The actual tag management
@@ -26,10 +27,8 @@
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 
+#include "../sm/sm.h"
 #include "wm-hub.h"
-
-/* Forward declarations */
-struct Pertag;
 
 /*
  * Number of available tags (bits in tag mask)
@@ -48,6 +47,7 @@ struct Pertag;
  * Represents a physical display managed by the window manager.
  *
  * Core only - layout, bar, and client tracking are separate components.
+ * State machines are allocated on demand by components.
  */
 typedef struct Monitor {
   /* Base target for Hub registration */
@@ -67,9 +67,14 @@ typedef struct Monitor {
   uint32_t tagset;     /* currently visible tags */
   uint32_t prevtagset; /* previous tagset for switching */
 
-
-  /* Pertag component data (optional, for per-tag state on this monitor) */
-  struct Pertag* pertag;
+  /* Adopted state machines - dynamically allocated on demand by components.
+   * Components store their data here, keyed by name (e.g., "pertag"). */
+  struct {
+    StateMachine** machines; /* array of SM pointers */
+    char**         names;    /* corresponding names */
+    uint32_t       count;   /* number of entries */
+    uint32_t       capacity; /* allocated capacity */
+  } sms;
 
   /* Next monitor in the linked list */
   struct Monitor* next;
@@ -202,5 +207,33 @@ void monitor_set_geometry(Monitor* m, int16_t x, int16_t y, uint16_t width, uint
  * Get monitor geometry.
  */
 void monitor_get_geometry(const Monitor* m, int16_t* x, int16_t* y, uint16_t* width, uint16_t* height);
+
+/*
+ * State Machine / Component Data Management
+ *
+ * Components attach their data to monitors using this storage.
+ * Data is stored by name - components retrieve it later via monitor_get_sm().
+ *
+ * Example: pertag stores Pertag* as monitor_set_sm(m, "pertag", (SM*)pt)
+ */
+
+/*
+ * Get component data attached to this monitor by name.
+ *
+ * Returns the data pointer stored via monitor_set_sm(), or
+ * NULL if no data has been attached for the given name.
+ */
+StateMachine* monitor_get_sm(Monitor* m, const char* sm_name);
+
+/*
+ * Set component data for this monitor.
+ * Used by components to attach their data (e.g., Pertag*, layout state, etc.).
+ *
+ * If sm is NULL, removes any existing entry for that name.
+ *
+ * Returns true on success, false on failure (OOM).
+ * On failure, the caller should free the data to avoid leaks.
+ */
+bool monitor_set_sm(Monitor* m, const char* sm_name, StateMachine* sm);
 
 #endif /* _MONITOR_H_ */

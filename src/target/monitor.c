@@ -8,6 +8,7 @@
  * - Geometry (position and resolution)
  * - Tag state (which tags this monitor is viewing)
  * - Hub registration
+ * - State machine storage for components
  *
  * Features like tiling, bar display, and client associations are
  * implemented as separate components that query monitors via the Hub.
@@ -16,7 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../components/pertag.h"
 #include "monitor.h"
 #include "wm-hub.h"
 #include "wm-log.h"
@@ -26,6 +26,146 @@
  */
 static Monitor* monitor_list     = NULL;
 Monitor*        selected_monitor = NULL;
+
+/*
+ * Monitor initialization helper
+ */
+static void
+monitor_properties_init(Monitor* m, xcb_randr_output_t output)
+{
+  /* Initialize RandR properties */
+  m->output = output;
+  m->crtc   = XCB_NONE;
+
+  /* Initialize geometry */
+  m->x      = 0;
+  m->y      = 0;
+  m->width  = 0;
+  m->height = 0;
+
+  /* Initialize tag state */
+  m->tagset     = MONITOR_TAG_MASK(0); /* tag 0 */
+  m->prevtagset = MONITOR_TAG_MASK(0);
+
+  /* Initialize SM storage */
+  m->sms.machines = NULL;
+  m->sms.names    = NULL;
+  m->sms.count    = 0;
+  m->sms.capacity = 0;
+}
+
+/*
+ * Helper: find SM index by name.
+ * Returns -1 if not found.
+ */
+static int32_t
+monitor_sm_find(const Monitor* m, const char* sm_name)
+{
+  if (m == NULL || sm_name == NULL)
+    return -1;
+
+  for (uint32_t i = 0; i < m->sms.count; i++) {
+    if (m->sms.names[i] != NULL && strcmp(m->sms.names[i], sm_name) == 0) {
+      return (int32_t) i;
+    }
+  }
+  return -1;
+}
+
+/*
+ * Helper: add or update SM for a name.
+ * Takes ownership of `sm` - any previously registered SM for this name
+ * will be destroyed (unless it's the same pointer to avoid self-destruction).
+ * The sm_name string is copied internally.
+ *
+ * Returns true on success, false on failure (OOM).
+ * On failure, the caller should handle cleanup of the passed SM.
+ */
+static bool
+monitor_sm_set_internal(Monitor* m, const char* sm_name, StateMachine* sm)
+{
+  int32_t idx = monitor_sm_find(m, sm_name);
+
+  if (idx >= 0) {
+    /* Update existing - destroy old SM if different from new one */
+    if (m->sms.machines[idx] != NULL && m->sms.machines[idx] != sm) {
+      sm_destroy(m->sms.machines[idx]);
+    }
+    m->sms.machines[idx] = sm;
+    /* Clear name if setting to NULL (data cleanup case) */
+    if (sm == NULL && m->sms.names[idx] != NULL) {
+      free(m->sms.names[idx]);
+      m->sms.names[idx] = NULL;
+    }
+    return true;
+  }
+
+  /* Add new SM */
+  if (m->sms.count >= m->sms.capacity) {
+    uint32_t       new_capacity = m->sms.capacity == 0 ? 4 : m->sms.capacity * 2;
+    StateMachine** new_machines = NULL;
+    char**         new_names    = NULL;
+
+    /* Reallocate machines first */
+    new_machines = realloc(m->sms.machines, new_capacity * sizeof(StateMachine*));
+    if (new_machines == NULL) {
+      LOG_ERROR("Failed to expand SM machines storage for monitor");
+      return false;
+    }
+
+    /* Reallocate names */
+    new_names = realloc(m->sms.names, new_capacity * sizeof(char*));
+    if (new_names == NULL) {
+      free(new_machines);
+      LOG_ERROR("Failed to expand SM names storage for monitor");
+      return false;
+    }
+
+    /* Both allocations succeeded, update atomically */
+    m->sms.machines = new_machines;
+    m->sms.names    = new_names;
+    m->sms.capacity = new_capacity;
+  }
+
+  /* strdup the name - check for failure */
+  char* copied_name = sm_name ? strdup(sm_name) : NULL;
+  if (sm_name != NULL && copied_name == NULL) {
+    LOG_ERROR("Failed to copy SM name for monitor");
+    /* Don't add the SM if we can't store the name */
+    return false;
+  }
+
+  m->sms.machines[m->sms.count] = sm;
+  m->sms.names[m->sms.count]    = copied_name;
+  m->sms.count++;
+
+  return true;
+}
+
+/*
+ * Helper: free all SM storage (names and machines array)
+ * Handles component data cleanup for non-SM data (like Pertag).
+ */
+static void
+monitor_sm_storage_free(Monitor* m)
+{
+  for (uint32_t i = 0; i < m->sms.count; i++) {
+    if (m->sms.names[i] != NULL) {
+      /* Check for component data that needs freeing */
+      /* Pertag stores Pertag* as void* in machines[i] - free it */
+      if (strcmp(m->sms.names[i], "pertag") == 0 && m->sms.machines[i] != NULL) {
+        free(m->sms.machines[i]);
+      }
+      free(m->sms.names[i]);
+    }
+  }
+  free(m->sms.machines);
+  free(m->sms.names);
+  m->sms.machines = NULL;
+  m->sms.names    = NULL;
+  m->sms.count    = 0;
+  m->sms.capacity = 0;
+}
 
 /*
  * Initialize the monitor list.
@@ -97,25 +237,8 @@ monitor_create(xcb_randr_output_t output)
   m->target.type       = TARGET_TYPE_MONITOR;
   m->target.registered = false;
 
-  /* Initialize RandR properties */
-  m->output = output;
-  m->crtc   = XCB_NONE;
-
-  /* Initialize geometry */
-  m->x      = 0;
-  m->y      = 0;
-  m->width  = 0;
-  m->height = 0;
-
-  /* Initialize tag state */
-  m->tagset     = MONITOR_TAG_MASK(0); /* tag 0 */
-  m->prevtagset = MONITOR_TAG_MASK(0);
-
-  /* Initialize pertag component (optional per-tag state) */
-  m->pertag = malloc(sizeof(Pertag));
-  if (m->pertag != NULL) {
-    pertag_init_defaults(m->pertag, m);
-  }
+  /* Initialize properties */
+  monitor_properties_init(m, output);
 
   /* Add to list */
   m->next      = monitor_list;
@@ -135,10 +258,8 @@ monitor_create(xcb_randr_output_t output)
     if (*prev == m) {
       *prev = m->next;
     }
-    /* Free pertag before freeing monitor */
-    if (m->pertag != NULL) {
-      free(m->pertag);
-    }
+    /* Free SM storage */
+    monitor_sm_storage_free(m);
     free(m);
     return NULL;
   }
@@ -175,11 +296,8 @@ monitor_destroy(Monitor* m)
     selected_monitor = monitor_list_get_first();
   }
 
-  /* Free pertag data if allocated */
-  if (m->pertag != NULL) {
-    free(m->pertag);
-    m->pertag = NULL;
-  }
+  /* Free SM storage */
+  monitor_sm_storage_free(m);
 
   /* Unregister from Hub */
   if (m->target.registered) {
@@ -406,4 +524,39 @@ monitor_get_geometry(const Monitor* m, int16_t* x, int16_t* y, uint16_t* width, 
     *width = m->width;
   if (height != NULL)
     *height = m->height;
+}
+
+/*
+ * Get state machine by name.
+ * Returns NULL if no SM is registered for this name.
+ */
+StateMachine*
+monitor_get_sm(Monitor* m, const char* sm_name)
+{
+  if (m == NULL || sm_name == NULL)
+    return NULL;
+
+  int32_t idx = monitor_sm_find(m, sm_name);
+  if (idx < 0)
+    return NULL;
+
+  return m->sms.machines[idx];
+}
+
+/*
+ * Set a state machine for this monitor.
+ * The SM is stored by name - components can retrieve it later via monitor_get_sm().
+ *
+ * If sm is NULL, removes any existing entry for that name.
+ *
+ * Returns true on success, false on failure (OOM).
+ * On failure, the caller should destroy the SM to avoid leaks.
+ */
+bool
+monitor_set_sm(Monitor* m, const char* sm_name, StateMachine* sm)
+{
+  if (m == NULL || sm_name == NULL)
+    return false;
+
+  return monitor_sm_set_internal(m, sm_name, sm);
 }
