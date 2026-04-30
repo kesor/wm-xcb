@@ -45,6 +45,7 @@ SRC = \
 	src/sm/sm-instance.c \
 	src/target/client.c \
 	src/target/monitor.c \
+	src/components/client-list.c \
 	src/components/keybinding.c \
 	src/components/connection-sm.c \
 	src/components/monitor-manager.c
@@ -132,8 +133,8 @@ analyze:
 check: format tidy analyze
 
 # Unified test runner - builds and runs all tests in a single executable
-test: test-registry.o test-runner.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o test-wm-monitor-manager.o test-wm-keybinding.o $(filter-out $(NAME).o, ${OBJ})
-	${CC} -o $@ test-registry.o test-runner.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o test-wm-keybinding.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
+test: test-registry.o test-runner.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o test-client-list-component.o test-wm-monitor-manager.o test-wm-keybinding.o $(filter-out $(NAME).o, ${OBJ})
+	${CC} -o $@ test-registry.o test-runner.o test-wm-hub.o test-wm-xcb-handler.o test-wm-monitor.o test-target-client.o test-client-list-component.o test-wm-monitor-manager.o test-wm-keybinding.o $(filter-out $(NAME).o, ${OBJ}) ${LDFLAGS}
 	./test
 
 clean:

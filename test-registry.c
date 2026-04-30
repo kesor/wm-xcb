@@ -29,6 +29,7 @@
 #include "test-wm-window-list.h"
 #include "test-wm-xcb-handler.h"
 #include "test-wm.h"
+#include "test-client-list-component.h"
 
 /*
  * Registry linked list
