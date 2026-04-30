@@ -26,8 +26,8 @@ extern xcb_connection_t* dpy;
  * RandR constants for connection state
  * (these are defined in X protocol, not xcb/randr.h)
  */
-#define RANDR_CONNECTED   0
-#define RANDR_DISCONNECTED  1
+#define RANDR_CONNECTED    0
+#define RANDR_DISCONNECTED 1
 #define RANDR_UNKNOWN      2
 
 /* Forward declarations */
@@ -35,13 +35,13 @@ static void monitor_manager_executor(struct HubRequest* req);
 static void monitor_manager_xcb_handler(void* event);
 
 /* Internal helper functions */
-static void     monitor_manager_discover_outputs(void);
-static Monitor*  monitor_manager_create_for_output(xcb_randr_output_t output);
-static void      monitor_manager_destroy_for_output(xcb_randr_output_t output);
-static void      monitor_manager_update_output_geometry(xcb_randr_output_t output, xcb_randr_crtc_t crtc);
-static void      monitor_manager_update_crtc_geometry(xcb_randr_crtc_t crtc, xcb_timestamp_t timestamp);
-static bool      monitor_manager_get_output_info(xcb_randr_output_t output, xcb_randr_crtc_t* crtc_out, char** name_out);
-static bool      monitor_manager_get_crtc_info(xcb_randr_crtc_t crtc, int16_t* x, int16_t* y, uint16_t* width, uint16_t* height, xcb_randr_mode_t* mode);
+static void                monitor_manager_discover_outputs(void);
+static Monitor*            monitor_manager_create_for_output(xcb_randr_output_t output);
+static void                monitor_manager_destroy_for_output(xcb_randr_output_t output);
+static void                monitor_manager_update_output_geometry(xcb_randr_output_t output, xcb_randr_crtc_t crtc);
+static void                monitor_manager_update_crtc_geometry(xcb_randr_crtc_t crtc, xcb_timestamp_t timestamp);
+static bool                monitor_manager_get_output_info(xcb_randr_output_t output, xcb_randr_crtc_t* crtc_out, char** name_out);
+static bool                monitor_manager_get_crtc_info(xcb_randr_crtc_t crtc, int16_t* x, int16_t* y, uint16_t* width, uint16_t* height, xcb_randr_mode_t* mode);
 static xcb_randr_output_t* monitor_manager_get_screen_outputs(xcb_window_t root, int* count);
 
 /*
@@ -106,6 +106,23 @@ monitor_manager_init(void)
   if (result != 0) {
     LOG_ERROR("Failed to register RandR handler");
     return;
+  }
+
+  /* Select RandR notify events on the root window so we receive them.
+   * Without this, the X server won't deliver RandR notify events to us.
+   * We select for all notify types we handle: output change, CRTC change,
+   * and resource change. Provider/lease events are not selected.
+   */
+  extern xcb_window_t root;
+  if (dpy != NULL && root != XCB_NONE) {
+    uint32_t notify_mask =
+        XCB_RANDR_NOTIFY_MASK_CRTC_CHANGE |
+        XCB_RANDR_NOTIFY_MASK_OUTPUT_CHANGE |
+        XCB_RANDR_NOTIFY_MASK_RESOURCE_CHANGE;
+    xcb_randr_select_input(dpy, root, notify_mask);
+    xcb_flush(dpy);
+  } else {
+    LOG_DEBUG("Monitor manager: Cannot select RandR input - no X connection");
   }
 
   /* Discover existing monitors via RandR
@@ -254,8 +271,8 @@ monitor_manager_discover_outputs(void)
     return;
   }
 
-  int                output_count = 0;
-  xcb_randr_output_t* outputs = monitor_manager_get_screen_outputs(root, &output_count);
+  int                 output_count = 0;
+  xcb_randr_output_t* outputs      = monitor_manager_get_screen_outputs(root, &output_count);
 
   if (outputs == NULL || output_count == 0) {
     LOG_DEBUG("Monitor manager: No RandR outputs found");
@@ -266,16 +283,10 @@ monitor_manager_discover_outputs(void)
 
   for (int i = 0; i < output_count; i++) {
     xcb_randr_output_t output = outputs[i];
-    xcb_randr_crtc_t  crtc   = XCB_NONE;
 
-    /* Get output info to check connection status */
-    if (!monitor_manager_get_output_info(output, &crtc, NULL)) {
-      continue;
-    }
-
-    /* Check if output is connected */
+    /* Query output info once - get connection state and CRTC */
     xcb_randr_get_output_info_cookie_t cookie = xcb_randr_get_output_info(dpy, output, XCB_CURRENT_TIME);
-    xcb_randr_get_output_info_reply_t* reply = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
+    xcb_randr_get_output_info_reply_t* reply  = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
 
     if (reply == NULL) {
       continue;
@@ -286,7 +297,7 @@ monitor_manager_discover_outputs(void)
       /* Only create if monitor doesn't already exist */
       if (monitor_get_by_output(output) == NULL) {
         Monitor* m = monitor_manager_create_for_output(output);
-        if (m != NULL && reply->crtc != XCB_NONE) {
+        if (m != NULL) {
           monitor_manager_update_output_geometry(output, reply->crtc);
         }
       }
@@ -315,23 +326,23 @@ monitor_manager_get_screen_outputs(xcb_window_t root, int* count)
   }
 
   xcb_randr_get_screen_resources_cookie_t cookie = xcb_randr_get_screen_resources(dpy, root);
-  xcb_randr_get_screen_resources_reply_t* reply = xcb_randr_get_screen_resources_reply(dpy, cookie, NULL);
+  xcb_randr_get_screen_resources_reply_t* reply  = xcb_randr_get_screen_resources_reply(dpy, cookie, NULL);
 
   if (reply == NULL) {
     *count = 0;
     return NULL;
   }
 
-  xcb_randr_output_t* outputs = NULL;
+  xcb_randr_output_t* outputs     = NULL;
   int                 outputs_len = 0;
 
   /* Get the outputs array from the reply */
-  xcb_randr_output_t* reply_outputs = xcb_randr_get_screen_resources_outputs(reply);
+  xcb_randr_output_t* reply_outputs     = xcb_randr_get_screen_resources_outputs(reply);
   int                 reply_outputs_len = xcb_randr_get_screen_resources_outputs_length(reply);
 
   if (reply_outputs_len > 0) {
     outputs_len = reply_outputs_len;
-    outputs = malloc((size_t) outputs_len * sizeof(xcb_randr_output_t));
+    outputs     = malloc((size_t) outputs_len * sizeof(xcb_randr_output_t));
     if (outputs != NULL) {
       memcpy(outputs, reply_outputs, (size_t) outputs_len * sizeof(xcb_randr_output_t));
     } else {
@@ -386,7 +397,10 @@ monitor_manager_destroy_for_output(xcb_randr_output_t output)
 
   LOG_INFO("Monitor manager: Destroying monitor for output %u", output);
 
-  /* Unregister from hub and free - this handles hub unregistration */
+  /* Unregister from hub before destroying - monitor_destroy() also unregisters
+   * but we do it here to ensure the target is removed before we free the Monitor.
+   * monitor_destroy() will skip unregistration if already unregistered.
+   */
   if (m->target.registered) {
     hub_unregister_target(m->target.id);
   }
@@ -409,16 +423,16 @@ monitor_manager_update_output_geometry(xcb_randr_output_t output, xcb_randr_crtc
   m->crtc = crtc;
 
   /* Get CRTC geometry */
-  int16_t      x      = 0;
-  int16_t      y      = 0;
-  uint16_t     width  = 0;
-  uint16_t     height = 0;
-  xcb_randr_mode_t mode = 0;
+  int16_t          x      = 0;
+  int16_t          y      = 0;
+  uint16_t         width  = 0;
+  uint16_t         height = 0;
+  xcb_randr_mode_t mode   = 0;
 
   if (monitor_manager_get_crtc_info(crtc, &x, &y, &width, &height, &mode)) {
     monitor_set_geometry(m, x, y, width, height);
-    LOG_DEBUG("Monitor manager: Updated output %u geometry to %dx%u+%d+%d",
-              output, width, height, x, y);
+    LOG_DEBUG("Monitor manager: Updated output %u geometry to %ux%u+%d+%d",
+              output, (unsigned int) width, (unsigned int) height, x, y);
   }
 }
 
@@ -439,8 +453,8 @@ monitor_manager_update_crtc_geometry(xcb_randr_crtc_t crtc, xcb_timestamp_t time
   extern xcb_window_t root;
 
   /* Find the output that uses this CRTC */
-  int                output_count = 0;
-  xcb_randr_output_t* outputs = monitor_manager_get_screen_outputs(root, &output_count);
+  int                 output_count = 0;
+  xcb_randr_output_t* outputs      = monitor_manager_get_screen_outputs(root, &output_count);
 
   if (outputs == NULL) {
     return;
@@ -448,7 +462,7 @@ monitor_manager_update_crtc_geometry(xcb_randr_crtc_t crtc, xcb_timestamp_t time
 
   for (int i = 0; i < output_count; i++) {
     xcb_randr_get_output_info_cookie_t cookie = xcb_randr_get_output_info(dpy, outputs[i], timestamp);
-    xcb_randr_get_output_info_reply_t* reply = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
+    xcb_randr_get_output_info_reply_t* reply  = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
 
     if (reply != NULL && reply->crtc == crtc) {
       Monitor* m = monitor_get_by_output(outputs[i]);
@@ -479,7 +493,7 @@ monitor_manager_get_output_info(xcb_randr_output_t output, xcb_randr_crtc_t* crt
   }
 
   xcb_randr_get_output_info_cookie_t cookie = xcb_randr_get_output_info(dpy, output, XCB_CURRENT_TIME);
-  xcb_randr_get_output_info_reply_t* reply = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
+  xcb_randr_get_output_info_reply_t* reply  = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
 
   if (reply == NULL) {
     return false;
@@ -490,12 +504,12 @@ monitor_manager_get_output_info(xcb_randr_output_t output, xcb_randr_crtc_t* crt
   }
 
   if (name_out != NULL) {
-    int name_len = xcb_randr_get_output_info_name_length(reply);
-    char* name = malloc((size_t) name_len + 1);
+    int   name_len = xcb_randr_get_output_info_name_length(reply);
+    char* name     = malloc((size_t) name_len + 1);
     if (name != NULL) {
       memcpy(name, xcb_randr_get_output_info_name(reply), (size_t) name_len);
       name[name_len] = '\0';
-      *name_out = name;
+      *name_out      = name;
     }
   }
 
@@ -524,7 +538,7 @@ monitor_manager_get_crtc_info(xcb_randr_crtc_t crtc, int16_t* x, int16_t* y,
   }
 
   xcb_randr_get_crtc_info_cookie_t cookie = xcb_randr_get_crtc_info(dpy, crtc, XCB_CURRENT_TIME);
-  xcb_randr_get_crtc_info_reply_t* reply = xcb_randr_get_crtc_info_reply(dpy, cookie, NULL);
+  xcb_randr_get_crtc_info_reply_t* reply  = xcb_randr_get_crtc_info_reply(dpy, cookie, NULL);
 
   if (reply == NULL) {
     return false;
