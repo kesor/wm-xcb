@@ -1,7 +1,9 @@
 # State Machine Framework
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
+
+> **💡 Paradigm Shift:** State machines are the only authority on state mutations. No direct manipulation. No hidden state. Every state change goes through a SM with guards and events.
 
 ---
 

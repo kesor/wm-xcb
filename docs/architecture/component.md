@@ -1,7 +1,9 @@
 # Component Design
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
+
+> **💡 Paradigm Shift:** Components don't patch core code. They register with the Hub, provide state machine templates, and handle requests/events. Everything is additive.
 
 ---
 

@@ -1,7 +1,9 @@
 # Hub Design
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
+
+> **💡 Paradigm Shift:** Components never talk to each other directly. They always go through the Hub. This decouples everything and enables true hot-plugging.
 
 ---
 

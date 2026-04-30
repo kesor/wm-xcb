@@ -1,9 +1,11 @@
 # Architecture Documentation
 
 *Status: Authoritative*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
 
-This directory contains the authoritative documentation for the wm architecture, derived from the grill-me design session.
+> **The Paradigm Shift:** State machines are the only authority on state mutations. Components never patch core code. The Hub connects everything. Read [VISION.md](../VISION.md) for the inspiration.
+
+This directory contains the authoritative documentation for the wm architecture.
 
 ---
 
@@ -16,7 +18,8 @@ This directory contains the authoritative documentation for the wm architecture,
 | **[state-machine.md](state-machine.md)** | State machine framework: templates, transitions, guards, hooks |
 | **[component.md](component.md)** | Component design: executors, listeners, SM templates, lifecycle |
 | **[target.md](target.md)** | Target design: Client, Monitor, adoption, on-demand SM allocation |
-| **[decisions.md](decisions.md)** | Decision log with rationale for all major choices |
+| **[xcb-integration.md](xcb-integration.md)** | XCB event bridge: raw events → component handlers → Hub |
+| **[decisions.md](decisions.md)** | ⭐ Decision log with rationale for all major choices |
 
 ---
 

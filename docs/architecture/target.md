@@ -1,7 +1,9 @@
 # Target Design
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
+
+> **💡 Paradigm Shift:** State machines live on targets. Not on components, not global. Each Client has its own FullscreenSM. Each Monitor has its own ConnectionSM.
 
 ---
 

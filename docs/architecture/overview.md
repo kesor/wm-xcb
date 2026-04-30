@@ -1,7 +1,9 @@
 # Architecture Overview
 
 *Document status: Authoritative — reflects design decisions from grill-me session*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
+
+> **💡 Paradigm Shift:** This is not dwm with extra steps. This is a new paradigm where extensions coexist without conflict. Read [VISION.md](../VISION.md) for the inspiration.
 
 ---
 
@@ -10,10 +12,10 @@
 In dwm, patches modify the same source code. Apply patch A then patch B and they conflict. We want extensions that "just work" by subscribing to events, not by patching code.
 
 The solution is an event-driven architecture with state machines at the core, where:
-1. Extensions (plugins) never modify core code
-2. Extensions subscribe to events, emit requests
+1. **Components** never modify core code — they are the extensions
+2. Components subscribe to events, emit requests
 3. State machines are the only authority on state mutations
-4. Everything is decoupled via a central hub
+4. Everything is decoupled via the central **Hub**
 
 ---
 
@@ -97,6 +99,19 @@ The central orchestrator that connects everything.
 - Maintain target type → target ID mappings
 - Route events to subscribed components
 - Provide target resolution (symbolic → concrete IDs)
+
+---
+
+## Key Principles
+
+| Principle | Description |
+|-----------|-------------|
+| **SMs live on Targets** | State machines belong to targets (Client, Monitor), not components |
+| **Reality is Authoritative** | XCB hardware events raw-write to SMs; guards are bypassed |
+| **Components Provide Templates** | Components define SM templates; targets own and allocate instances |
+| **Components Don't Call Each Other** | All communication goes through the Hub |
+| **Requests Are Fire-and-Forget** | Send a request; optionally listen for events |
+| **Events Flow One Way** | State machines emit; components subscribe |
 
 ---
 
@@ -384,36 +399,10 @@ wm/
 
 ---
 
-## Decision Log
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| SM granularity | Per-domain per-target | Small, testable; allows plugins to subscribe to specific domains |
-| SM lives on | Target | Client owns its FullscreenSM, not a global component |
-| SMs are | Mutually exclusive per SM | Client is FULLSCREEN OR WINDOWED, never both |
-| SMs include | Raw writers + request writers | Hardware events are authoritative; user requests need execution |
-| Target resolution | In hub | Components get concrete IDs; don't need to know resolution logic |
-| SM allocation | On-demand | Targets call sm_create() when first needed |
-| Component adoption | Based on target type | Component declares accepted_targets[] |
-| Requests | Fire-and-forget by default | Can listen to events for confirmation |
-| Executor SMs | Not needed for v1 | Simple request-reply; executor doesn't need intermediate states |
-
----
-
-## Next Steps
-
-1. Implement the Hub (registry, router, event bus)
-2. Implement the State Machine framework
-3. Implement Target infrastructure (base, client, monitor)
-4. Implement built-in components
-5. Wire up XCB listener
-6. Basic tiling and focus
-7. Extensions
-
----
-
 *See also:*
 - `architecture/state-machine.md` — SM framework details
 - `architecture/hub.md` — Hub implementation details
 - `architecture/component.md` — Component interface
-- `architecture/decisions.md` — Full decision log with rationale
+- `architecture/decisions.md` — ⭐ Full decision log with rationale
+- `architecture/xcb-integration.md` — XCB event bridge
+- `IMPLEMENTATION-ROADMAP.md` — Implementation order

@@ -1,6 +1,19 @@
-# Extension Registry — ./wm/docs/extensions/
+# Extension Registry
 
-This directory contains design documents for all planned extensions/plugins for the `./wm/` window manager.
+*Last updated: 2026-04-30*
+
+This directory contains design documents for all planned extensions for the `./wm/` window manager. Each extension is a **Component** that registers with the Hub.
+
+## Standardized Format
+
+Each extension document follows this structure:
+- **Overview** — What it does
+- **DWM Reference** — Corresponding dwm patch/function
+- **State Machine Events** — Events subscribed to and emitted
+- **Component Design** — Target type, SM template, Hub registration
+- **Hooks** — Event subscription callbacks
+- **Configuration** — Config struct and keybindings
+- **Interactions with Other Components** — How it works with other extensions
 
 ## Extension Index
 
@@ -103,33 +116,7 @@ Each extension uses specific events. Here's the coverage:
 | `EVT_RESIZE_START/UPDATE/END` | resizecorners |
 | `EVT_SCRATCHPAD_*` | scratchpad |
 
-## Extension Template
-
-To add a new extension, create a `.md` file with:
-
-```markdown
-# Extension: [Name]
-
-## Overview
-One paragraph description.
-
-## DWM Reference
-Which dwm patch/function this corresponds to.
-
-## State Machine Events
-Table of events this extension subscribes to.
-
-## Hook Points
-Code examples showing hook callbacks.
-
-## Configuration
-Config struct and keybindings.
-
-## Interactions
-How it interacts with other extensions.
-```
-
 ---
 
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
 *Total extensions: 13*
