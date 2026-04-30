@@ -12,34 +12,25 @@
 
 /*
  * Guard functions
+ *
+ * Guard functions must match the SMGuardFn signature:
+ * bool (*)(StateMachine* sm, void* data)
  */
 static bool
-guard_disconnect_allowed(
-    StateMachine* sm,
-    uint32_t      from_state,
-    uint32_t      to_state,
-    void*         userdata)
+guard_disconnect_allowed(StateMachine* sm, void* data)
 {
   /* Always allow disconnect */
   (void) sm;
-  (void) from_state;
-  (void) to_state;
-  (void) userdata;
+  (void) data;
   return true;
 }
 
 static bool
-guard_connect_allowed(
-    StateMachine* sm,
-    uint32_t      from_state,
-    uint32_t      to_state,
-    void*         userdata)
+guard_connect_allowed(StateMachine* sm, void* data)
 {
   /* Always allow connect/reconnect */
   (void) sm;
-  (void) from_state;
-  (void) to_state;
-  (void) userdata;
+  (void) data;
   return true;
 }
 
@@ -58,21 +49,25 @@ connection_sm_template_create(void)
   /* Define transitions:
    * CONNECTED → DISCONNECTED (on output disconnect)
    * DISCONNECTED → CONNECTED (on output reconnect)
+   *
+   * Note: guard_fn is set to NULL since we always allow these transitions.
+   * The SM registry's sm_run_guard() returns true for NULL guards (failsafe).
+   * If guards are needed later, register them with sm_register_guard().
    */
   static SMTransition transitions[] = {
     {
      .from_state = CONNECTION_STATE_CONNECTED,
      .to_state   = CONNECTION_STATE_DISCONNECTED,
-     .guard_fn   = "guard_disconnect_allowed",
-     .action_fn  = NULL,                       /* no action needed, state is authoritative */
-        .emit_event = EVT_MONITOR_DISCONNECTED,
+     .guard_fn   = NULL, /* always allowed */
+     .action_fn  = NULL,
+     .emit_event  = EVT_MONITOR_DISCONNECTED,
      },
     {
      .from_state = CONNECTION_STATE_DISCONNECTED,
      .to_state   = CONNECTION_STATE_CONNECTED,
-     .guard_fn   = "guard_connect_allowed",
+     .guard_fn   = NULL, /* always allowed */
      .action_fn  = NULL,
-     .emit_event = EVT_MONITOR_CONNECTED,
+     .emit_event  = EVT_MONITOR_CONNECTED,
      },
   };
 

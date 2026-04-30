@@ -59,20 +59,28 @@ monitor_manager_get_component(void)
  * Initialize the monitor manager.
  * - Registers XCB handler for RANDR events
  * - Queries existing RandR outputs and creates Monitor targets
+ *
+ * This function is idempotent - multiple calls are safe.
  */
 void
 monitor_manager_init(void)
 {
   LOG_INFO("Initializing monitor manager component");
 
-  /* Register with hub */
+  /* Register with hub (idempotent - no-op if already registered) */
   hub_register_component(&monitor_manager_component);
 
   /* Register XCB handler for RandR notify events.
+   *
+   * RandR events are extension events. The response_type sent by the X
+   * server for RandR events is the base event type from
+   * xcb_randr_get_selected_output_reply()->your_event_mask.
+   * We register for XCB_RANDR_NOTIFY which is defined as value 1 in
+   * xcb/randr.h.
+   *
    * Note: In a full implementation, we would query existing RandR
    * outputs here and create Monitor targets for each connected output.
-   * For now, we just register the handler - output discovery is
-   * handled by the XCB RandR extension initialization in wm-xcb.c.
+   * TODO: Add output discovery here once RandR initialization is complete.
    *
    * XCB_RANDR_NOTIFY is defined in xcb/randr.h as value 1
    */
