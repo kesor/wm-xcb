@@ -23,6 +23,9 @@
 #include <xcb/xcb_keysyms.h>
 
 #include "keybinding.h"
+#include "src/components/focus.h"
+#include "src/components/tag-manager.h"
+#include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
@@ -66,6 +69,17 @@ static const KeyBinding default_keybindings[] = {
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 16, KEYBINDING_ACTION_TAG_TOGGLE,        7 },
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 17, KEYBINDING_ACTION_TAG_TOGGLE,        8 },
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 18, KEYBINDING_ACTION_TAG_TOGGLE,        9 },
+
+  /* Tag client toggle - Mod+Shift+Alt+1 through Mod+Shift+Alt+9 (move focused client to tag) */
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 10, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 1 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 11, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 2 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 12, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 3 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 13, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 4 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 14, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 5 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 15, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 6 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 16, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 7 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 17, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 8 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 18, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 9 },
 
   /* Fullscreen toggle - Mod+f (keycode 41 = f) */
   { XCB_MOD_MASK_4,                      41, KEYBINDING_ACTION_TOGGLE_FULLSCREEN, 0 },
@@ -129,6 +143,8 @@ action_to_request_type(KeybindingAction action)
     return REQ_KEYBINDING_TAG_VIEW;   /* = 4 = REQ_MONITOR_TAG_VIEW */
   case KEYBINDING_ACTION_TAG_TOGGLE:
     return REQ_KEYBINDING_TAG_TOGGLE; /* = 5 = REQ_MONITOR_TAG_TOGGLE */
+  case KEYBINDING_ACTION_TAG_CLIENT_TOGGLE:
+    return REQ_TAG_CLIENT_TOGGLE;     /* Move client to tag */
   case KEYBINDING_ACTION_CLOSE_CLIENT:
     return REQ_KEYBINDING_CLOSE;      /* = 6 = REQ_CLIENT_CLOSE */
   case KEYBINDING_ACTION_TOGGLE_FULLSCREEN:
@@ -225,6 +241,21 @@ execute_keybinding(const KeyBinding* binding)
   case KEYBINDING_ACTION_TAG_VIEW:
   case KEYBINDING_ACTION_TAG_TOGGLE:
     send_tag_request(req_type, binding->arg);
+    break;
+
+  case KEYBINDING_ACTION_TAG_CLIENT_TOGGLE:
+    /* Move focused client to/from tag - sends to current client */
+    {
+      Client* c = focus_get_focused_client();
+      if (c != NULL) {
+        uint32_t tag_data = binding->arg;
+        hub_send_request_data(req_type, c->target.id, &tag_data);
+        LOG_DEBUG("Keybinding sent client tag toggle type=%" PRIu32 " target=%" PRIu64 " tag=%" PRIu32,
+                  req_type, (uint64_t) c->target.id, tag_data);
+      } else {
+        LOG_DEBUG("Keybinding: no focused client for tag client toggle");
+      }
+    }
     break;
 
   case KEYBINDING_ACTION_CLOSE_CLIENT:
