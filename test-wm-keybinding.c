@@ -58,19 +58,15 @@ test_keybinding_lookup_exact(void)
 
   /* Mod4 + keycode 36 (Return) -> KEYBINDING_ACTION_FOCUS_CLIENT */
   const KeyBinding* binding = keybinding_lookup(XCB_MOD_MASK_4, 36);
-  assert(binding != NULL);
-  assert(binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
+  assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
 
   /* Mod4 + Shift + keycode 36 -> KEYBINDING_ACTION_FOCUS_PREV */
   binding = keybinding_lookup(XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 36);
-  assert(binding != NULL);
-  assert(binding->action == KEYBINDING_ACTION_FOCUS_PREV);
+  assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_PREV);
 
   /* Mod4 + keycode 10 (1) -> KEYBINDING_ACTION_TAG_VIEW with arg=1 */
   binding = keybinding_lookup(XCB_MOD_MASK_4, 10);
-  assert(binding != NULL);
-  assert(binding->action == KEYBINDING_ACTION_TAG_VIEW);
-  assert(binding->arg == 1);
+  assert(binding != NULL && binding->action == KEYBINDING_ACTION_TAG_VIEW && binding->arg == 1);
 
   keybinding_shutdown();
   xcb_handler_shutdown();
@@ -117,14 +113,12 @@ test_keybinding_modifier_normalization(void)
   /* Mod4 + lock modifier should still match Mod4 alone */
   uint32_t mod_with_lock = XCB_MOD_MASK_4 | XCB_MOD_MASK_LOCK;
   const KeyBinding* binding = keybinding_lookup(mod_with_lock, 36);
-  assert(binding != NULL);
-  assert(binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
+  assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
 
   /* Mod4 + NumLock (mode switch) should also match */
   uint32_t mod_with_numlock = XCB_MOD_MASK_4 | XCB_MOD_MASK_2;
   binding = keybinding_lookup(mod_with_numlock, 36);
-  assert(binding != NULL);
-  assert(binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
+  assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
 
   keybinding_shutdown();
   xcb_handler_shutdown();
@@ -147,9 +141,7 @@ test_keybinding_tag_bindings(void)
   for (int i = 1; i <= 9; i++) {
     xcb_keycode_t keycode = 9 + i;  /* keycodes 10-18 */
     const KeyBinding* binding = keybinding_lookup(XCB_MOD_MASK_4, keycode);
-    assert(binding != NULL);
-    assert(binding->action == KEYBINDING_ACTION_TAG_VIEW);
-    assert(binding->arg == (uint32_t) i);
+    assert(binding != NULL && binding->action == KEYBINDING_ACTION_TAG_VIEW && binding->arg == (uint32_t) i);
   }
 
   /* Mod4 + Shift + 1-9 for tag toggle */
@@ -157,9 +149,7 @@ test_keybinding_tag_bindings(void)
     xcb_keycode_t keycode = 9 + i;
     const KeyBinding* binding = keybinding_lookup(
         XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, keycode);
-    assert(binding != NULL);
-    assert(binding->action == KEYBINDING_ACTION_TAG_TOGGLE);
-    assert(binding->arg == (uint32_t) i);
+    assert(binding != NULL && binding->action == KEYBINDING_ACTION_TAG_TOGGLE && binding->arg == (uint32_t) i);
   }
 
   keybinding_shutdown();
@@ -222,8 +212,8 @@ test_keybinding_get_bindings(void)
   LOG_DEBUG("Got %" PRIu32 " keybindings via accessor", count);
 
   /* Verify first binding is Mod+Enter for focus */
-  assert(bindings[0].action == KEYBINDING_ACTION_FOCUS_CLIENT);
-  assert(bindings[0].keycode == 36);
+  const KeyBinding* first = keybinding_get_bindings();
+  assert(first != NULL && first->action == KEYBINDING_ACTION_FOCUS_CLIENT && first->keycode == 36);
 
   keybinding_shutdown();
   hub_shutdown();
@@ -314,9 +304,8 @@ test_keybinding_no_executor(void)
   keybinding_init();
 
   HubComponent* comp = hub_get_component_by_name("keybinding");
-  assert(comp != NULL);
-  assert(comp->requests == NULL);  /* We don't handle any requests */
-  assert(comp->executor == NULL); /* No executor function */
+  /* Verify component has no executor (sends requests only) */
+  assert(comp != NULL && comp->requests == NULL && comp->executor == NULL);
 
   keybinding_shutdown();
   xcb_handler_shutdown();
