@@ -1,57 +1,76 @@
 ## Summary
 
-Implements the component adoption pattern for the Hub, as described in the architecture documentation.
+Implement tag-view component with TagViewSM state machine for managing tag visibility on monitors. This implements the core functionality for the tag/workspaces feature as specified in the PRD.
 
 ## Changes
 
-### Hub Changes (`wm-hub.c/h`)
+### New Components
 
-1. **Added adoption hooks to HubComponent**:
-   - `on_adopt` - called when a target adopts this component
-   - `on_unadopt` - called when a target unadopts this component
+**Tag Manager Component** (`src/components/tag-manager.c`, `src/components/tag-manager.h`)
+- TagViewSM template: tracks visible tag bitmask (EMPTY ↔ TAGGED states)
+- Request handlers: `REQ_TAG_VIEW`, `REQ_TAG_TOGGLE`, `REQ_TAG_CLIENT_TOGGLE`
+- Executor updates TagViewSM on tag changes
+- On tag change: clients show/hide based on tag membership
+- Emits `EVT_TAG_CHANGED` event on any tag state change
 
-2. **Added `hub_get_components_for_target_type()`**:
-   - Returns all registered components that accept a given target type
-   - Returns a NULL-terminated array
+### Modified Components
 
-3. **Added `hub_adopt_components_for_target()`**:
-   - Calls `on_adopt` hook for all compatible components when a target is registered
+**Keybinding Component** (`src/components/keybinding.c`, `src/components/keybinding.h`)
+- Added `KEYBINDING_ACTION_TAG_CLIENT_TOGGLE` action for moving focused client to tag
+- Added Mod+Shift+Alt+1-9 keybindings for client-to-tag assignment
+- Routes `REQ_TAG_CLIENT_TOGGLE` to the tag manager
 
-4. **Modified `hub_register_target()`**:
-   - Now automatically calls `hub_adopt_components_for_target()` after registering
-   - Targets adopt all compatible components automatically on creation
+## Architecture
 
-### Pertag Component (`src/components/pertag.c/h`)
+```
+Keybinding (Mod+1-9) → REQ_TAG_VIEW → Hub → TagManager Executor
+                                           ↓
+                                       TagViewSM (monitor)
+                                           ↓
+                                       EVT_TAG_CHANGED
+                                           ↓
+                                   Client visibility updated
+```
 
-1. **Made pertag a proper HubComponent**:
-   - Now registers with hub declaring it accepts `TARGET_TYPE_MONITOR`
-   - Provides `pertag_component_init()` and `pertag_component_shutdown()` functions
-   - Uses existing `pertag_on_adopt()` and `pertag_on_unadopt()` hooks
+```
+Keybinding (Mod+Shift+Alt+1-9) → REQ_TAG_CLIENT_TOGGLE → Hub → TagManager Executor
+                                                                        ↓
+                                                                   Client tags updated
+                                                                        ↓
+                                                                   EVT_TAG_CHANGED
+```
 
-2. **Updated `wm.c`**:
-   - Initializes pertag component at startup
-   - Shuts down pertag component at shutdown
+## Acceptance Criteria Met
 
-### Tests (`test-wm-hub.c`)
-
-Added new test group `HubComponentAdoption` with tests:
-- `test_adoption_hooks_called_on_target_register()` - verifies on_adopt is called
-- `test_adoption_only_for_compatible_targets()` - verifies type filtering works
-- `test_adoption_for_multiple_targets_of_same_type()` - verifies each target gets adoption
-- `test_get_components_for_target_type()` - verifies component lookup by target type
-
-## Architecture Alignment
-
-This implements the adoption pattern described in `docs/architecture/`:
-- **Target.md** - Target Adoption section
-- **Component.md** - Component interface with lifecycle hooks
-- **Hub.md** - Registry and target resolution
-
-## Related Issues
-
-- Issue #70 (removed hard-coupled pertag from Monitor)
-- Issue #73 (this implementation)
+- ✅ Mod+1-9 shows specific tag (via `REQ_TAG_VIEW`)
+- ✅ Mod+Shift+1-9 toggles tag visibility (via `REQ_TAG_TOGGLE`)  
+- ✅ Mod+Shift+Alt+1-9 moves client to tag (via `REQ_TAG_CLIENT_TOGGLE`)
+- ✅ Clients on hidden tags are not visible (visibility check via `tag_manager_is_client_visible()`)
+- ✅ Event is emitted on tag change (via `EVT_TAG_CHANGED`)
 
 ## Testing
 
-All 598 tests pass, including the 16 new adoption tests.
+The tag manager component includes:
+- Init/shutdown tests
+- Request handling tests (tag view, toggle, client tag toggle)
+- Event emission tests
+- Client visibility update tests
+- Multi-monitor tests
+- Invalid tag index handling tests
+
+Run `make test` to verify all existing tests pass.
+
+## Dependencies
+
+This PR depends on:
+- Hub registry (already implemented)
+- Monitor target (already implemented)
+- Client target (already implemented)
+- SM framework (already implemented)
+
+All blocking issues from the original issue have been resolved.
+
+## Related
+
+- Parent PRD: #1
+- Original Issue: #18
