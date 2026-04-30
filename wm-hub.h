@@ -1,9 +1,9 @@
 #ifndef _WM_HUB_H_
 #define _WM_HUB_H_
 
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <inttypes.h>
 
 /* Forward declarations */
 typedef struct HubComponent HubComponent;
@@ -42,9 +42,9 @@ enum {
  */
 struct HubRequest {
   RequestType type;
-  TargetID   target;
-  void*      data;
-  uint64_t   correlation_id; /* for async response correlation */
+  TargetID    target;
+  void*       data;
+  uint64_t    correlation_id; /* for async response correlation */
 };
 
 /* Forward declaration for executor type */
@@ -52,11 +52,11 @@ typedef void (*RequestExecutor)(struct HubRequest* req);
 
 /* Component structure */
 struct HubComponent {
-  const char*      name;
-  RequestType*     requests; /* 0-terminated array of request types handled */
-  TargetType*      targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
-  RequestExecutor  executor; /* called when this component receives a request */
-  bool             registered;
+  const char*     name;
+  RequestType*    requests; /* 0-terminated array of request types handled */
+  TargetType*     targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
+  RequestExecutor executor; /* called when this component receives a request */
+  bool            registered;
 };
 
 /* Target structure */

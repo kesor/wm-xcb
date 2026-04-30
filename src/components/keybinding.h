@@ -34,11 +34,11 @@
  * The keybinding component uses these to send requests, not handle them.
  */
 enum KeybindingRequestType {
-  REQ_KEYBINDING_FOCUS      = 1,   /* Maps to REQ_CLIENT_FOCUS */
-  REQ_KEYBINDING_FOCUS_PREV = 3,   /* Maps to REQ_CLIENT_FOCUS_PREV */
-  REQ_KEYBINDING_TAG_VIEW   = 4,   /* Maps to REQ_MONITOR_TAG_VIEW */
-  REQ_KEYBINDING_TAG_TOGGLE = 5,   /* Maps to REQ_MONITOR_TAG_TOGGLE */
-  REQ_KEYBINDING_CLOSE      = 6,   /* Maps to REQ_CLIENT_CLOSE */
+  REQ_KEYBINDING_FOCUS      = 1, /* Maps to REQ_CLIENT_FOCUS */
+  REQ_KEYBINDING_FOCUS_PREV = 3, /* Maps to REQ_CLIENT_FOCUS_PREV */
+  REQ_KEYBINDING_TAG_VIEW   = 4, /* Maps to REQ_MONITOR_TAG_VIEW */
+  REQ_KEYBINDING_TAG_TOGGLE = 5, /* Maps to REQ_MONITOR_TAG_TOGGLE */
+  REQ_KEYBINDING_CLOSE      = 6, /* Maps to REQ_CLIENT_CLOSE */
 };
 
 /*
@@ -46,12 +46,12 @@ enum KeybindingRequestType {
  * Used internally to classify what action a keybinding should trigger
  */
 typedef enum {
-  KEYBINDING_ACTION_FOCUS_CLIENT,     /* Focus current client */
-  KEYBINDING_ACTION_FOCUS_PREV,       /* Focus previous client */
-  KEYBINDING_ACTION_FOCUS_NEXT,       /* Focus next client */
-  KEYBINDING_ACTION_TAG_VIEW,         /* View specific tag (1-9) */
-  KEYBINDING_ACTION_TAG_TOGGLE,       /* Toggle tag visibility */
-  KEYBINDING_ACTION_CLOSE_CLIENT,     /* Close current client */
+  KEYBINDING_ACTION_FOCUS_CLIENT, /* Focus current client */
+  KEYBINDING_ACTION_FOCUS_PREV,   /* Focus previous client */
+  KEYBINDING_ACTION_FOCUS_NEXT,   /* Focus next client */
+  KEYBINDING_ACTION_TAG_VIEW,     /* View specific tag (1-9) */
+  KEYBINDING_ACTION_TAG_TOGGLE,   /* Toggle tag visibility */
+  KEYBINDING_ACTION_CLOSE_CLIENT, /* Close current client */
   KEYBINDING_ACTION_LAST,
 } KeybindingAction;
 
@@ -59,10 +59,10 @@ typedef enum {
  * Key binding configuration entry
  */
 typedef struct KeyBinding {
-  uint32_t        modifiers;   /* XCB modifier mask (Shift, Control, Mod1, etc.) */
-  xcb_keycode_t   keycode;     /* X11 keycode */
-  KeybindingAction action;     /* Action to perform */
-  uint32_t        arg;         /* Action argument (tag number for tag actions) */
+  uint32_t         modifiers; /* XCB modifier mask (Shift, Control, Mod1, etc.) */
+  xcb_keycode_t    keycode;   /* X11 keycode */
+  KeybindingAction action;    /* Action to perform */
+  uint32_t         arg;       /* Action argument (tag number for tag actions) */
 } KeyBinding;
 
 /*
@@ -70,10 +70,10 @@ typedef struct KeyBinding {
  * These special values are resolved at runtime to actual targets
  */
 enum KeybindingTarget {
-  TARGET_CURRENT_CLIENT  = 1,    /* Currently focused client */
-  TARGET_CURRENT_MONITOR = 2,    /* Currently selected monitor */
-  TARGET_SELECTION_FIRST = 3,    /* First client in selection order */
-  TARGET_SELECTION_LAST  = 4,    /* Last client in selection order */
+  TARGET_CURRENT_CLIENT  = 1, /* Currently focused client */
+  TARGET_CURRENT_MONITOR = 2, /* Currently selected monitor */
+  TARGET_SELECTION_FIRST = 3, /* First client in selection order */
+  TARGET_SELECTION_LAST  = 4, /* Last client in selection order */
 };
 
 /*
@@ -84,7 +84,7 @@ enum KeybindingTarget {
 /*
  * Number of available tags (standard dwm uses 9)
  */
-#define KEYBINDING_NUM_TAGS 9
+#define KEYBINDING_NUM_TAGS     9
 
 /*
  * Common XCB modifier mask values
@@ -103,11 +103,11 @@ enum KeybindingTarget {
  * Common modifier combinations
  * These can be OR'd together for common combinations
  */
-#define KEYBINDING_MOD_ANY        0          /* Any modifiers (for testing) */
-#define KEYBINDING_MOD_SHIFT      (1 << 0)   /* Shift key */
-#define KEYBINDING_MOD_CONTROL    (1 << 2)   /* Control key */
-#define KEYBINDING_MOD_MOD1       (1 << 3)  /* Alt key */
-#define KEYBINDING_MOD_MOD4       (1 << 6)  /* Super/Windows key */
+#define KEYBINDING_MOD_ANY      0        /* Any modifiers (for testing) */
+#define KEYBINDING_MOD_SHIFT    (1 << 0) /* Shift key */
+#define KEYBINDING_MOD_CONTROL  (1 << 2) /* Control key */
+#define KEYBINDING_MOD_MOD1     (1 << 3) /* Alt key */
+#define KEYBINDING_MOD_MOD4     (1 << 6) /* Super/Windows key */
 
 /*
  * Keybinding component structure

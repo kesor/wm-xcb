@@ -23,6 +23,20 @@ void test_monitor_double_create(void);
 void test_monitor_null_destroy(void);
 void test_monitor_with_hub_integration(void);
 
-#define TEST_GROUP_Monitor \\\n  test_monitor_create_destroy(); \\\n  test_monitor_list_init_shutdown(); \\\n  test_monitor_list_add_remove(); \\\n  test_monitor_list_iteration(); \\\n  test_monitor_find_by_output(); \\\n  test_monitor_selection(); \\\n  test_monitor_tag_operations(); \\\n  test_monitor_geometry(); \\\n  test_monitor_tiling_params(); \\\n  test_monitor_client_list(); \\\n  test_monitor_multiple_monitors(); \\\n  test_monitor_double_create(); \\\n  test_monitor_null_destroy(); \\\n  test_monitor_with_hub_integration();
+#define TEST_GROUP_Monitor                  \
+  \\\n test_monitor_create_destroy();       \
+  \\\n test_monitor_list_init_shutdown();   \
+  \\\n test_monitor_list_add_remove();      \
+  \\\n test_monitor_list_iteration();       \
+  \\\n test_monitor_find_by_output();       \
+  \\\n test_monitor_selection();            \
+  \\\n test_monitor_tag_operations();       \
+  \\\n test_monitor_geometry();             \
+  \\\n test_monitor_tiling_params();        \
+  \\\n test_monitor_client_list();          \
+  \\\n test_monitor_multiple_monitors();    \
+  \\\n test_monitor_double_create();        \
+  \\\n test_monitor_null_destroy();         \
+  \\\n test_monitor_with_hub_integration();
 
 #endif /* _TEST_WM_MONITOR_H_ */

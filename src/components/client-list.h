@@ -31,9 +31,9 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
-#include "wm-hub.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
+#include "wm-hub.h"
 
 /*
  * Component name
