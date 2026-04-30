@@ -25,33 +25,33 @@ XCB (X C Bindings) is the X server communication layer. This document explains h
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       Event Loop                                    │
-│   xcb_poll_for_event() → xcb_generic_event_t*                      │
+│   xcb_poll_for_event() → xcb_generic_event_t*                       │
 └─────────────────────────────────────────────────────────────────────┘
                               │
                               │ Dispatch
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    XCB Handler Registry                             │
-│   Components register handlers at init via xcb_handler_register()  │
-│   Multiple handlers can be registered for the same event type      │
+│   Components register handlers at init via xcb_handler_register()   │
+│   Multiple handlers can be registered for the same event type       │
 └─────────────────────────────────────────────────────────────────────┘
                               │
                               │ Per-handler dispatch
                               ▼
 ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐
-│  Keybinding Comp   │  │   Focus Comp      │  │  Monitor-Manager  │
-│                    │  │                   │  │       Comp        │
-│ KEY_PRESS handler  │  │ ENTER_NOTIFY       │  │ RANDR handler     │
-│        │           │  │        │           │  │        │         │
-│        ▼           │  │        ▼           │  │        ▼         │
-│ hub_send_request() │  │ sm_raw_write()     │  │ sm_raw_write()    │
+│  Keybinding Comp   │  │   Focus Comp       │  │  Monitor-Manager   │
+│                    │  │                    │  │       Comp         │
+│ KEY_PRESS handler  │  │ ENTER_NOTIFY       │  │ RANDR handler      │
+│        │           │  │        │           │  │        │           │
+│        ▼           │  │        ▼           │  │        ▼           │
+│ hub_send_request() │  │ sm_raw_write()     │  │ sm_raw_write()     │
 └────────────────────┘  └────────────────────┘  └────────────────────┘
          │                      │                      │
          ▼                      ▼                      ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                              HUB                                    │
-│   - Requests go to routers → component executors                     │
-│   - Raw writes cause SM transitions → events emitted                 │
+│   - Requests go to routers → component executors                    │
+│   - Raw writes cause SM transitions → events emitted                │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -107,19 +107,19 @@ Once a handler receives an event, it decides:
 X Event arrives
        │
        ▼
-┌──────────────────┐
-│ Is this user     │
+┌───────────────────┐
+│ Is this user      │
 │ intent? (key/btn) │
-└──────────────────┘
+└───────────────────┘
        │
    ┌───┴───┐
    │ YES   │ NO
    ▼       ▼
-┌──────┐ ┌──────────────────────┐
-│Send  │ │Raw-write to SM      │
+┌───────┐ ┌──────────────────────┐
+│Send   │ │Raw-write to SM       │
 │request│ │(reality is authority)│
-│to Hub│ └──────────────────────┘
-└──────┘
+│to Hub │ └──────────────────────┘
+└───────┘
 ```
 
 ### Example: Key Press

@@ -23,23 +23,23 @@ Components do not call each other directly. They communicate exclusively through
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                              HUB                                    │
-│                                                                     │
-│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │
-│  │  REGISTRY    │  │   ROUTER      │  │  EVENT BUS    │           │
-│  │              │  │               │  │               │           │
-│  │ components[] │  │ request →     │  │ subscribe()   │           │
-│  │ targets[]    │  │ component     │  │ emit()        │           │
-│  │              │  │               │  │               │           │
-│  │ by_name      │  │ by_request_   │  │ by_event_     │           │
-│  │ by_type      │  │ type          │  │ type          │           │
-│  │              │  │               │  │               │           │
-│  │ by_target    │  │ by_target_    │  │               │           │
-│  │              │  │ id            │  │               │           │
-│  └───────────────┘  └───────────────┘  └───────────────┘           │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                              HUB                         │
+│                                                          │
+│  ┌──────────────┐  ┌───────────────┐  ┌───────────────┐  │
+│  │  REGISTRY    │  │   ROUTER      │  │  EVENT BUS    │  │
+│  │              │  │               │  │               │  │
+│  │ components[] │  │ request →     │  │ subscribe()   │  │
+│  │ targets[]    │  │ component     │  │ emit()        │  │
+│  │              │  │               │  │               │  │
+│  │ by_name      │  │ by_request_   │  │ by_event_     │  │
+│  │ by_type      │  │ type          │  │ type          │  │
+│  │              │  │               │  │               │  │
+│  │ by_target    │  │ by_target_    │  │               │  │
+│  │              │  │ id            │  │               │  │
+│  └──────────────┘  └───────────────┘  └───────────────┘  │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
