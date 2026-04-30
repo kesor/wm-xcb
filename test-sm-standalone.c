@@ -180,15 +180,6 @@ hook_post_emit(StateMachine* sm, void* ud)
   g_hook_order[g_hook_order_count++] = SM_HOOK_POST_EMIT;
 }
 
-static int g_hook_removal_count = 0;
-static void
-hook_removal_fn(StateMachine* sm, void* ud)
-{
-  (void) sm;
-  (void) ud;
-  g_hook_removal_count++;
-}
-
 static void
 hook_with_userdata(StateMachine* sm, void* userdata)
 {
