@@ -87,8 +87,9 @@ monitor_sm_set_internal(Monitor* m, const char* sm_name, StateMachine* sm)
   int32_t idx = monitor_sm_find(m, sm_name);
 
   if (idx >= 0) {
-    /* Update existing - destroy old SM if different from new one */
-    if (m->sms.machines[idx] != NULL && m->sms.machines[idx] != sm) {
+    /* Update existing - destroy old SM if different from new one
+     * Only destroy when replacing with a non-NULL SM */
+    if (sm != NULL && m->sms.machines[idx] != NULL && m->sms.machines[idx] != sm) {
       sm_destroy(m->sms.machines[idx]);
     }
     m->sms.machines[idx] = sm;
@@ -102,28 +103,22 @@ monitor_sm_set_internal(Monitor* m, const char* sm_name, StateMachine* sm)
 
   /* Add new SM */
   if (m->sms.count >= m->sms.capacity) {
-    uint32_t       new_capacity = m->sms.capacity == 0 ? 4 : m->sms.capacity * 2;
-    StateMachine** new_machines = NULL;
-    char**         new_names    = NULL;
+    uint32_t new_capacity = m->sms.capacity == 0 ? 4 : m->sms.capacity * 2;
 
-    /* Reallocate machines first */
-    new_machines = realloc(m->sms.machines, new_capacity * sizeof(StateMachine*));
-    if (new_machines == NULL) {
+    /* Use temp pointers to avoid corrupting state on failure */
+    StateMachine** tmp_machines = realloc(m->sms.machines, new_capacity * sizeof(StateMachine*));
+    if (tmp_machines == NULL) {
       LOG_ERROR("Failed to expand SM machines storage for monitor");
       return false;
     }
+    m->sms.machines = tmp_machines;
 
-    /* Reallocate names */
-    new_names = realloc(m->sms.names, new_capacity * sizeof(char*));
-    if (new_names == NULL) {
-      free(new_machines);
+    char** tmp_names = realloc(m->sms.names, new_capacity * sizeof(char*));
+    if (tmp_names == NULL) {
       LOG_ERROR("Failed to expand SM names storage for monitor");
       return false;
     }
-
-    /* Both allocations succeeded, update atomically */
-    m->sms.machines = new_machines;
-    m->sms.names    = new_names;
+    m->sms.names    = tmp_names;
     m->sms.capacity = new_capacity;
   }
 
