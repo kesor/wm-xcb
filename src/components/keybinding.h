@@ -51,7 +51,7 @@ typedef enum {
   KEYBINDING_ACTION_FOCUS_NEXT,        /* Focus next client */
   KEYBINDING_ACTION_TAG_VIEW,          /* View specific tag (1-9) */
   KEYBINDING_ACTION_TAG_TOGGLE,        /* Toggle tag visibility */
-  KEYBINDING_ACTION_TAG_CLIENT_TOGGLE,  /* Move current client to tag */
+  KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, /* Move current client to tag */
   KEYBINDING_ACTION_CLOSE_CLIENT,      /* Close current client */
   KEYBINDING_ACTION_TOGGLE_FULLSCREEN, /* Toggle fullscreen */
   KEYBINDING_ACTION_TILE_MONITOR,      /* Tile all clients on current monitor */

@@ -25,6 +25,7 @@
 #include "keybinding.h"
 #include "src/components/focus.h"
 #include "src/components/tag-manager.h"
+#include "src/components/tiling.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
@@ -43,32 +44,32 @@
 static const KeyBinding default_keybindings[] = {
   /* Focus actions */
   /* Mod+Enter: focus current client */
-  { XCB_MOD_MASK_4,                      36, KEYBINDING_ACTION_FOCUS_CLIENT,      0 }, /* keycode 36 = Return */
+  { XCB_MOD_MASK_4,                                       36, KEYBINDING_ACTION_FOCUS_CLIENT,      0 }, /* keycode 36 = Return */
 
   /* Mod+Shift+Enter: focus previous client */
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 36, KEYBINDING_ACTION_FOCUS_PREV,        0 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  36, KEYBINDING_ACTION_FOCUS_PREV,        0 },
 
   /* Tag view actions - Mod+1 through Mod+9 */
-  { XCB_MOD_MASK_4,                      10, KEYBINDING_ACTION_TAG_VIEW,          1 }, /* keycode 10 = 1 */
-  { XCB_MOD_MASK_4,                      11, KEYBINDING_ACTION_TAG_VIEW,          2 }, /* keycode 11 = 2 */
-  { XCB_MOD_MASK_4,                      12, KEYBINDING_ACTION_TAG_VIEW,          3 }, /* keycode 12 = 3 */
-  { XCB_MOD_MASK_4,                      13, KEYBINDING_ACTION_TAG_VIEW,          4 }, /* keycode 13 = 4 */
-  { XCB_MOD_MASK_4,                      14, KEYBINDING_ACTION_TAG_VIEW,          5 }, /* keycode 14 = 5 */
-  { XCB_MOD_MASK_4,                      15, KEYBINDING_ACTION_TAG_VIEW,          6 }, /* keycode 15 = 6 */
-  { XCB_MOD_MASK_4,                      16, KEYBINDING_ACTION_TAG_VIEW,          7 }, /* keycode 16 = 7 */
-  { XCB_MOD_MASK_4,                      17, KEYBINDING_ACTION_TAG_VIEW,          8 }, /* keycode 17 = 8 */
-  { XCB_MOD_MASK_4,                      18, KEYBINDING_ACTION_TAG_VIEW,          9 }, /* keycode 18 = 9 */
+  { XCB_MOD_MASK_4,                                       10, KEYBINDING_ACTION_TAG_VIEW,          1 }, /* keycode 10 = 1 */
+  { XCB_MOD_MASK_4,                                       11, KEYBINDING_ACTION_TAG_VIEW,          2 }, /* keycode 11 = 2 */
+  { XCB_MOD_MASK_4,                                       12, KEYBINDING_ACTION_TAG_VIEW,          3 }, /* keycode 12 = 3 */
+  { XCB_MOD_MASK_4,                                       13, KEYBINDING_ACTION_TAG_VIEW,          4 }, /* keycode 13 = 4 */
+  { XCB_MOD_MASK_4,                                       14, KEYBINDING_ACTION_TAG_VIEW,          5 }, /* keycode 14 = 5 */
+  { XCB_MOD_MASK_4,                                       15, KEYBINDING_ACTION_TAG_VIEW,          6 }, /* keycode 15 = 6 */
+  { XCB_MOD_MASK_4,                                       16, KEYBINDING_ACTION_TAG_VIEW,          7 }, /* keycode 16 = 7 */
+  { XCB_MOD_MASK_4,                                       17, KEYBINDING_ACTION_TAG_VIEW,          8 }, /* keycode 17 = 8 */
+  { XCB_MOD_MASK_4,                                       18, KEYBINDING_ACTION_TAG_VIEW,          9 }, /* keycode 18 = 9 */
 
   /* Tag toggle actions - Mod+Shift+1 through Mod+Shift+9 */
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 10, KEYBINDING_ACTION_TAG_TOGGLE,        1 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 11, KEYBINDING_ACTION_TAG_TOGGLE,        2 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 12, KEYBINDING_ACTION_TAG_TOGGLE,        3 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 13, KEYBINDING_ACTION_TAG_TOGGLE,        4 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 14, KEYBINDING_ACTION_TAG_TOGGLE,        5 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 15, KEYBINDING_ACTION_TAG_TOGGLE,        6 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 16, KEYBINDING_ACTION_TAG_TOGGLE,        7 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 17, KEYBINDING_ACTION_TAG_TOGGLE,        8 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 18, KEYBINDING_ACTION_TAG_TOGGLE,        9 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  10, KEYBINDING_ACTION_TAG_TOGGLE,        1 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  11, KEYBINDING_ACTION_TAG_TOGGLE,        2 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  12, KEYBINDING_ACTION_TAG_TOGGLE,        3 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  13, KEYBINDING_ACTION_TAG_TOGGLE,        4 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  14, KEYBINDING_ACTION_TAG_TOGGLE,        5 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  15, KEYBINDING_ACTION_TAG_TOGGLE,        6 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  16, KEYBINDING_ACTION_TAG_TOGGLE,        7 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  17, KEYBINDING_ACTION_TAG_TOGGLE,        8 },
+  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  18, KEYBINDING_ACTION_TAG_TOGGLE,        9 },
 
   /* Tag client toggle - Mod+Shift+Alt+1 through Mod+Shift+Alt+9 (move focused client to tag) */
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 10, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 1 },
@@ -82,10 +83,10 @@ static const KeyBinding default_keybindings[] = {
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 18, KEYBINDING_ACTION_TAG_CLIENT_TOGGLE, 9 },
 
   /* Fullscreen toggle - Mod+f (keycode 41 = f) */
-  { XCB_MOD_MASK_4,                      41, KEYBINDING_ACTION_TOGGLE_FULLSCREEN, 0 },
+  { XCB_MOD_MASK_4,                                       41, KEYBINDING_ACTION_TOGGLE_FULLSCREEN, 0 },
 
   /* Tile toggle - Mod+i (keycode 31 = i) */
-  { XCB_MOD_MASK_4,                      31, KEYBINDING_ACTION_TILE_MONITOR,      0 },
+  { XCB_MOD_MASK_4,                                       31, KEYBINDING_ACTION_TILE_MONITOR,      0 },
 };
 
 static const KeyBinding* keybindings     = default_keybindings;
