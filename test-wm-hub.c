@@ -8,11 +8,52 @@ static RequestType fullscreen_requests[] = { 1, 2, 0 }; /* REQ_FULLSCREEN_ENTER 
 static TargetType  client_targets[]      = { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE };
 static TargetType  monitor_targets[]     = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
 
+/* Track adoption calls */
+static int      adopt_count_client    = 0;
+static int      adopt_count_monitor   = 0;
+static int      unadopt_count_client  = 0;
+static int      unadopt_count_monitor = 0;
+static TargetID last_adopted_target   = TARGET_ID_NONE;
+
+/* Adoption hooks for testing */
+static void
+on_adopt_client(HubTarget* target)
+{
+  adopt_count_client++;
+  last_adopted_target = target->id;
+  LOG_CLEAN("  on_adopt_client called: target=%" PRIu64, target->id);
+}
+
+static void
+on_adopt_monitor(HubTarget* target)
+{
+  adopt_count_monitor++;
+  last_adopted_target = target->id;
+  LOG_CLEAN("  on_adopt_monitor called: target=%" PRIu64, target->id);
+}
+
+static void
+on_unadopt_client(HubTarget* target)
+{
+  unadopt_count_client++;
+  LOG_CLEAN("  on_unadopt_client called: target=%" PRIu64, target->id);
+}
+
+static void
+on_unadopt_monitor(HubTarget* target)
+{
+  unadopt_count_monitor++;
+  LOG_CLEAN("  on_unadopt_monitor called: target=%" PRIu64, target->id);
+}
+
+/* Test components that accept CLIENT targets */
 static HubComponent test_fullscreen = {
   .name       = "fullscreen",
   .requests   = fullscreen_requests,
   .targets    = client_targets,
   .registered = false,
+  .on_adopt   = on_adopt_client,
+  .on_unadopt = on_unadopt_client,
 };
 
 /* test_focus handles request type 1 AND 3 (for override/fallback testing) */
@@ -22,6 +63,8 @@ static HubComponent test_focus       = {
         .requests   = focus_requests,
         .targets    = client_targets,
         .registered = false,
+        .on_adopt   = on_adopt_client,
+        .on_unadopt = on_unadopt_client,
 };
 
 static HubComponent test_monitor = {
@@ -29,6 +72,8 @@ static HubComponent test_monitor = {
   .requests   = (RequestType[]) { 4, 5, 0 }, /* REQ_MONITOR_* = 4, 5 */
   .targets    = monitor_targets,
   .registered = false,
+  .on_adopt   = on_adopt_monitor,
+  .on_unadopt = on_unadopt_monitor,
 };
 
 static HubTarget test_client1 = {
@@ -1052,6 +1097,194 @@ test_fullscreen_toggle_flow(void)
 
   hub_shutdown();
 }
+
+/*
+ * Component Adoption Tests
+ */
+
+void
+test_adoption_hooks_called_on_target_register(void)
+{
+  LOG_CLEAN("== Testing adoption hooks called when target is registered");
+  hub_init();
+
+
+  /* Reset counters */
+  adopt_count_client  = 0;
+  adopt_count_monitor = 0;
+  last_adopted_target = TARGET_ID_NONE;
+
+  /* Register components FIRST so they're available when target is registered */
+  hub_register_component(&test_fullscreen);
+  hub_register_component(&test_focus);
+  hub_register_component(&test_monitor);
+
+  /* Register a client - should trigger on_adopt for client-compatible components */
+  LOG_CLEAN("  Registering test_client1 (CLIENT)...");
+  hub_register_target(&test_client1);
+
+  assert(adopt_count_client == 2);  /* fullscreen + focus both handle CLIENT */
+  assert(adopt_count_monitor == 0); /* monitor doesn't handle CLIENT */
+  assert(last_adopted_target == test_client1.id);
+
+  /* Reset and register a monitor - should trigger on_adopt for monitor-compatible components */
+  adopt_count_monitor = 0;
+  last_adopted_target = TARGET_ID_NONE;
+  LOG_CLEAN("  Registering test_monitor1 (MONITOR)...");
+  hub_register_target(&test_monitor1);
+
+
+  assert(adopt_count_client == 2);  /* Should not change */
+  assert(adopt_count_monitor == 1); /* monitor handles MONITOR */
+  assert(last_adopted_target == test_monitor1.id);
+
+
+  hub_shutdown();
+}
+
+void
+test_adoption_only_for_compatible_targets(void)
+{
+  LOG_CLEAN("== Testing adoption only for compatible target types");
+  hub_init();
+
+
+  adopt_count_client  = 0;
+  adopt_count_monitor = 0;
+
+  /* Register only the client component */
+  hub_register_component(&test_fullscreen);
+
+
+  /* Register a client - should trigger adoption */
+  hub_register_target(&test_client1);
+  assert(adopt_count_client == 1);
+
+  /* Register a monitor - client component should NOT adopt it */
+  hub_register_target(&test_monitor1);
+  assert(adopt_count_client == 1); /* Should not increase */
+
+
+  hub_shutdown();
+}
+
+
+void
+test_adoption_for_multiple_targets_of_same_type(void)
+{
+  LOG_CLEAN("== Testing adoption called for each registered target");
+  hub_init();
+
+  adopt_count_client = 0;
+
+  hub_register_component(&test_fullscreen);
+
+
+  /* Register first client */
+  hub_register_target(&test_client1);
+  assert(adopt_count_client == 1);
+
+
+  /* Register second client */
+  hub_register_target(&test_client2);
+  assert(adopt_count_client == 2);
+
+
+  hub_shutdown();
+}
+
+void
+test_get_components_for_target_type(void)
+{
+  LOG_CLEAN("== Testing hub_get_components_for_target_type");
+  hub_init();
+
+  hub_register_component(&test_fullscreen);
+  hub_register_component(&test_focus);
+  hub_register_component(&test_monitor);
+
+  /* Get components for CLIENT type */
+  HubComponent** client_comps = hub_get_components_for_target_type(TARGET_TYPE_CLIENT);
+  assert(client_comps != NULL);
+
+
+  int client_count = 0;
+  for (int i = 0; client_comps[i] != NULL; i++) {
+    client_count++;
+  }
+  assert(client_count == 2); /* fullscreen + focus */
+
+
+  /* Get components for MONITOR type */
+  HubComponent** monitor_comps = hub_get_components_for_target_type(TARGET_TYPE_MONITOR);
+  assert(monitor_comps != NULL);
+
+
+  int monitor_count = 0;
+  for (int i = 0; monitor_comps[i] != NULL; i++) {
+    monitor_count++;
+  }
+  assert(monitor_count == 1); /* monitor */
+
+  /* Get components for KEYBOARD type (none registered) */
+  HubComponent** empty_comps = hub_get_components_for_target_type(TARGET_TYPE_KEYBOARD);
+  assert(empty_comps != NULL);
+  /* Verify it's NULL-terminated with no entries */
+  int empty_count = 0;
+  for (int i = 0; empty_comps[i] != NULL; i++) {
+    empty_count++;
+  }
+  assert(empty_count == 0); /* No components for KEYBOARD type */
+
+
+  hub_shutdown();
+}
+
+void
+test_unadoption_hooks_called_on_target_unregister(void)
+{
+  LOG_CLEAN("== Testing unadoption hooks called when target is unregistered");
+  hub_init();
+
+  /* Reset counters */
+  adopt_count_client    = 0;
+  adopt_count_monitor   = 0;
+  unadopt_count_client  = 0;
+  unadopt_count_monitor = 0;
+
+  /* Register components */
+  hub_register_component(&test_fullscreen);
+  hub_register_component(&test_focus);
+  hub_register_component(&test_monitor);
+
+  /* Register a client - adoption should happen */
+  hub_register_target(&test_client1);
+  assert(adopt_count_client == 2);
+  assert(unadopt_count_client == 0);
+
+  /* Unregister the client - unadoption should happen */
+  hub_unregister_target(test_client1.id);
+  assert(unadopt_count_client == 2);
+
+  /* Register a monitor */
+  hub_register_target(&test_monitor1);
+  assert(adopt_count_monitor == 1);
+  assert(unadopt_count_monitor == 0);
+
+  /* Unregister the monitor */
+  hub_unregister_target(test_monitor1.id);
+  assert(unadopt_count_monitor == 1);
+
+  hub_shutdown();
+}
+
+TEST_GROUP(HubComponentAdoption, {
+  test_adoption_hooks_called_on_target_register();
+  test_adoption_only_for_compatible_targets();
+  test_adoption_for_multiple_targets_of_same_type();
+  test_get_components_for_target_type();
+  test_unadoption_hooks_called_on_target_unregister();
+});
 
 TEST_GROUP(HubRegistry, {
   test_hub_init_shutdown();

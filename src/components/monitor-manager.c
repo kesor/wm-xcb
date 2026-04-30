@@ -176,7 +176,7 @@ monitor_manager_executor(struct HubRequest* req)
 }
 
 /*
- * Parse and handle a RandR notify event.
+ * Handle a RandR notify event.
  * Called when RandR notifies us of output changes.
  */
 void

@@ -58,12 +58,17 @@ struct HubRequest {
 /* Forward declaration for executor type */
 typedef void (*RequestExecutor)(struct HubRequest* req);
 
+/* Forward declarations for adoption hooks */
+typedef void (*AdoptionHook)(struct HubTarget* target);
+
 /* Component structure */
 struct HubComponent {
   const char*     name;
-  RequestType*    requests; /* 0-terminated array of request types handled */
-  TargetType*     targets;  /* TARGET_TYPE_NONE-terminated array of accepted types */
-  RequestExecutor executor; /* called when this component receives a request */
+  RequestType*    requests;   /* 0-terminated array of request types handled */
+  TargetType*     targets;    /* TARGET_TYPE_NONE-terminated array of accepted types */
+  RequestExecutor executor;   /* called when this component receives a request */
+  AdoptionHook    on_adopt;   /* called when a target adopts this component */
+  AdoptionHook    on_unadopt; /* called when a target unadopts this component */
   bool            registered;
 };
 
@@ -137,6 +142,11 @@ void          hub_register_component(HubComponent* comp);
 void          hub_unregister_component(const char* name);
 HubComponent* hub_get_component_by_name(const char* name);
 HubComponent* hub_get_component_by_request_type(RequestType type);
+
+/* Target adoption */
+HubComponent** hub_get_components_for_target_type(TargetType type);
+void           hub_adopt_components_for_target(HubTarget* target);
+void           hub_unadopt_components_for_target(HubTarget* target);
 
 /* Target registration */
 void        hub_register_target(HubTarget* target);
