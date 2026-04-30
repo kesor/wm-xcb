@@ -8,14 +8,14 @@
  * XCB Events Handled:
  * - XCB_CREATE_NOTIFY - create Client, register with hub
  * - XCB_DESTROY_NOTIFY - destroy Client, unregister from hub
- * - XCB_MAP_REQUEST - manage window, add to client list
- * - XCB_UNMAP_NOTIFY - unmanage window, remove from list
+ * - XCB_MAP_REQUEST - toggle managed flag on Client
+ * - XCB_UNMAP_NOTIFY - toggle managed flag on Client
  *
  * Events Emitted:
  * - EVT_CLIENT_CREATED - emitted after client creation
  * - EVT_CLIENT_DESTROYED - emitted after client destruction
- * - EVT_CLIENT_MANAGED - emitted when client is managed (added to list)
- * - EVT_CLIENT_UNMANAGED - emitted when client is unmanaged (removed from list)
+ * - EVT_CLIENT_MANAGED - emitted when client is managed
+ * - EVT_CLIENT_UNMANAGED - emitted when client is unmanaged
  *
  * Acceptance Criteria:
  * [x] New window appears -> Client created -> added to list
@@ -45,10 +45,10 @@
  * Components subscribe to these to react to client changes.
  */
 enum ClientListEventType {
-  EVT_CLIENT_CREATED = 0x200,  /* Client was created and registered with hub */
-  EVT_CLIENT_DESTROYED,         /* Client was destroyed and unregistered from hub */
-  EVT_CLIENT_MANAGED,           /* Client was added to the managed client list */
-  EVT_CLIENT_UNMANAGED,         /* Client was removed from the managed client list */
+  EVT_CLIENT_CREATED,   /* Client was created and registered with hub */
+  EVT_CLIENT_DESTROYED, /* Client was destroyed and unregistered from hub */
+  EVT_CLIENT_MANAGED,   /* Client was added to the managed client list */
+  EVT_CLIENT_UNMANAGED, /* Client was removed from the managed client list */
 };
 
 /*
@@ -94,10 +94,9 @@ bool client_list_component_is_initialized(void);
  */
 bool client_list_component_init(void);
 
-/*
+/**
  * Shutdown the client list component.
- * Unregisters XCB handlers and cleans up component state.
- * Does NOT destroy existing clients - call client_list_shutdown first.
+ * Unregisters XCB handlers, destroys all clients, and cleans up component state.
  */
 void client_list_component_shutdown(void);
 

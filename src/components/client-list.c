@@ -102,11 +102,9 @@ client_list_component_init(void)
       LOG_DEBUG("Client list component already initialized and registered");
       return true;
     }
-    /* Hub has component but we're not initialized - recover.
-     * We cannot safely resume without re-initializing all state.
-     * For now, we just set our flag and return. The test scenario
-     * (calling init multiple times) works because hub is shared. */
+    /* Hub has component but we're not initialized - complete initialization */
     LOG_DEBUG("Component registered with hub, completing initialization");
+    client_list_init();
     client_list_component.initialized = true;
     return true;
   }
@@ -198,7 +196,7 @@ client_list_on_create_notify(void* event)
 {
   xcb_create_notify_event_t* e = (xcb_create_notify_event_t*) event;
 
-  LOG_CLEAN("CREATE_NOTIFY: window=%u, parent=%u, override_redirect=%d",
+  LOG_DEBUG("CREATE_NOTIFY: window=%u, parent=%u, override_redirect=%d",
             e->window, e->parent, e->override_redirect);
 
   /* Skip override-redirect windows (e.g., popups, menus) */

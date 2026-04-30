@@ -62,8 +62,8 @@ test_client_list_component_shutdown(void)
   xcb_handler_init();
   client_list_component_init();
 
-  /* Should have handlers registered */
-  uint32_t handler_count_before = xcb_handler_count();
+  /* Verify handlers are registered */
+  assert(xcb_handler_count_for_type(XCB_CREATE_NOTIFY) >= 1);
 
   client_list_component_shutdown();
 

@@ -58,12 +58,13 @@ TEST_SRC = \
 	test-$(NAME)-hub.c \
 	test-$(NAME)-xcb-handler.c \
 	test-$(NAME)-monitor.c \
-	test-$(NAME)-keybinding.c
-	test-$(NAME)-monitor-manager.c \
-	test-target-client.c
+	test-target-client.c \
+	test-client-list-component.c \
+	test-$(NAME)-keybinding.c \
+	test-$(NAME)-monitor-manager.c
 
 # Header dependencies
-TEST_HDR = test-registry.h test-wm.h test-wm-window-list.h test-wm-hub.h test-wm-monitor.h
+TEST_HDR = test-registry.h test-wm.h test-wm-window-list.h test-wm-hub.h test-wm-monitor.h test-client-list-component.h
 
 TEST_OBJ = ${TEST_SRC:.c=.o}
 
