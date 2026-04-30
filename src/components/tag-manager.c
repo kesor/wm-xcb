@@ -30,8 +30,8 @@
  * Tag Manager SM states
  */
 enum {
-  TAG_VIEW_EMPTY         = 0,  /* No tags visible */
-  TAG_VIEW_TAGGED        = 1,  /* One or more tags visible */
+  TAG_VIEW_EMPTY  = 0, /* No tags visible */
+  TAG_VIEW_TAGGED = 1, /* One or more tags visible */
 };
 
 /*
@@ -43,7 +43,7 @@ static SMTemplate* cached_tag_view_template = NULL;
  * Internal event tracking for testing
  */
 typedef struct {
-  bool tag_changed_received;
+  bool     tag_changed_received;
   TargetID tag_changed_target;
   uint32_t old_mask;
   uint32_t new_mask;
@@ -60,26 +60,27 @@ void tag_manager_on_unadopt(HubTarget* target);
  */
 static TagManagerComponent tag_manager_component_instance = {
   .base = {
-           .name       = TAG_MANAGER_COMPONENT_NAME,
-           .requests   = (RequestType[]) {
-             REQ_TAG_VIEW,
-             REQ_TAG_TOGGLE,
-             REQ_TAG_CLIENT_TOGGLE,
-             0,
-           },
-           .targets    = (TargetType[]) {
-             TARGET_TYPE_MONITOR,
-             TARGET_TYPE_NONE,
-           },
+           .name     = TAG_MANAGER_COMPONENT_NAME,
+           .requests = (RequestType[]) {
+          REQ_TAG_VIEW,
+          REQ_TAG_TOGGLE,
+          REQ_TAG_CLIENT_TOGGLE,
+          0,
+      },
+           .targets = (TargetType[]) {
+          TARGET_TYPE_MONITOR,
+          TARGET_TYPE_NONE,
+      },
            .executor   = NULL, /* Set below */
-           .on_adopt   = tag_manager_on_adopt,
+      .on_adopt   = tag_manager_on_adopt,
            .on_unadopt = tag_manager_on_unadopt,
            .registered = false,
            },
   .initialized = false,
 };
 
-static HubComponent* tag_manager_component(void)
+static HubComponent*
+tag_manager_component(void)
 {
   return &tag_manager_component_instance.base;
 }
@@ -94,11 +95,11 @@ do_static_init(void)
 {
   if (static_init_done)
     return;
-  static_init_done                     = true;
-  tag_manager_component_instance.initialized = false;
+  static_init_done                               = true;
+  tag_manager_component_instance.initialized     = false;
   tag_manager_component_instance.base.registered = false;
-  tag_manager_test_events.tag_changed_received = false;
-  tag_manager_test_events.tag_changed_target = TARGET_ID_NONE;
+  tag_manager_test_events.tag_changed_received   = false;
+  tag_manager_test_events.tag_changed_target     = TARGET_ID_NONE;
 }
 
 __attribute__((constructor)) static void
@@ -124,16 +125,16 @@ tag_view_sm_emit(StateMachine* sm, uint32_t from_state, uint32_t to_state, void*
 
   /* Get the tag mask from the SM data (stored as void*) */
   uint32_t* tag_mask_ptr = (uint32_t*) sm->data;
-  uint32_t new_mask = tag_mask_ptr ? *tag_mask_ptr : 0;
+  uint32_t  new_mask     = tag_mask_ptr ? *tag_mask_ptr : 0;
 
   LOG_DEBUG("Tag view changed for monitor %lu: mask=0x%x",
             (unsigned long) m->target.id, new_mask);
 
   /* Track events for testing */
   tag_manager_test_events.tag_changed_received = true;
-  tag_manager_test_events.tag_changed_target = m->target.id;
-  tag_manager_test_events.old_mask = from_state == TAG_VIEW_EMPTY ? 0 : TAG_ALL_TAGS;
-  tag_manager_test_events.new_mask = new_mask;
+  tag_manager_test_events.tag_changed_target   = m->target.id;
+  tag_manager_test_events.old_mask             = from_state == TAG_VIEW_EMPTY ? 0 : TAG_ALL_TAGS;
+  tag_manager_test_events.new_mask             = new_mask;
 
   /* Emit the event */
   hub_emit(EVT_TAG_CHANGED, m->target.id, &new_mask);
@@ -149,9 +150,9 @@ void
 tag_manager_reset_test_events(void)
 {
   tag_manager_test_events.tag_changed_received = false;
-  tag_manager_test_events.tag_changed_target = TARGET_ID_NONE;
-  tag_manager_test_events.old_mask = 0;
-  tag_manager_test_events.new_mask = 0;
+  tag_manager_test_events.tag_changed_target   = TARGET_ID_NONE;
+  tag_manager_test_events.old_mask             = 0;
+  tag_manager_test_events.new_mask             = 0;
 }
 
 /*
@@ -184,23 +185,23 @@ tag_view_sm_template_create(void)
     {
      .from_state = TAG_VIEW_EMPTY,
      .to_state   = TAG_VIEW_TAGGED,
-     .guard_fn   = NULL, /* Always allowed */
-     .action_fn  = NULL,
-        .emit_event = EVT_TAG_CHANGED,
+     .guard_fn   = NULL,            /* Always allowed */
+        .action_fn  = NULL,
+     .emit_event = EVT_TAG_CHANGED,
      },
     {
      .from_state = TAG_VIEW_TAGGED,
      .to_state   = TAG_VIEW_EMPTY,
      .guard_fn   = NULL, /* Allowed - can deselect all tags */
-     .action_fn  = NULL,
-        .emit_event = EVT_TAG_CHANGED,
+        .action_fn  = NULL,
+     .emit_event = EVT_TAG_CHANGED,
      },
     {
      .from_state = TAG_VIEW_TAGGED,
      .to_state   = TAG_VIEW_TAGGED,
-     .guard_fn   = NULL, /* Always allowed - tag switching within same state */
-     .action_fn  = NULL,
-        .emit_event = EVT_TAG_CHANGED,
+     .guard_fn   = NULL,                             /* Always allowed - tag switching within same state */
+        .action_fn  = NULL,
+     .emit_event = EVT_TAG_CHANGED,
      },
   };
 
@@ -469,7 +470,7 @@ tag_manager_handle_toggle_request(RequestType type, TargetID target, void* data)
 
   /* Get current visible tags */
   uint32_t current_mask = tag_manager_get_visible_tags(m);
-  uint32_t tag_mask = TAG_MASK(tag_index);
+  uint32_t tag_mask     = TAG_MASK(tag_index);
 
   /* Toggle the tag */
   if ((current_mask & tag_mask) != 0) {
@@ -496,7 +497,7 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
   (void) target;
 
   /* Get the currently focused client */
-  Client* c = NULL;
+  Client*        c = NULL;
   extern Client* focus_get_focused_client(void);
   c = focus_get_focused_client();
 
@@ -517,7 +518,7 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
     return;
   }
 
-  tag_index = tag_index - 1; /* Convert to 0-based */
+  tag_index         = tag_index - 1; /* Convert to 0-based */
   uint32_t tag_mask = TAG_MASK(tag_index);
 
   /* Toggle the tag on the client */
@@ -536,8 +537,8 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
   Monitor* m = client_get_monitor(c);
   if (m != NULL) {
     /* Check if client should be visible on this monitor */
-    uint32_t visible_tags = tag_manager_get_visible_tags(m);
-    bool should_be_visible = (c->tags & visible_tags) != 0;
+    uint32_t visible_tags      = tag_manager_get_visible_tags(m);
+    bool     should_be_visible = (c->tags & visible_tags) != 0;
 
     if (should_be_visible && !c->mapped) {
       client_show(c->window);

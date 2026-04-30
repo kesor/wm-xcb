@@ -117,8 +117,8 @@ xcb_handler_next(XCBHandler* handler)
   }
 
   /* Direct bucket lookup using event_type stored in handler */
-  XCBEventType event_type = handler->event_type;
-  handler_bucket_t* bucket = &handlers[event_type];
+  XCBEventType      event_type = handler->event_type;
+  handler_bucket_t* bucket     = &handlers[event_type];
 
   /* Find current position in bucket */
   for (int i = 0; i < bucket->count; i++) {
@@ -188,7 +188,7 @@ xcb_handler_unregister_component(HubComponent* component)
     handler_bucket_t* bucket = &handlers[i];
 
     /* Scan bucket and remove matching handlers while preserving order */
-    for (int j = 0; j < bucket->count; ) {
+    for (int j = 0; j < bucket->count;) {
       if (bucket->handlers[j].component == component) {
         /* Stable removal: shift remaining handlers left */
         memmove(&bucket->handlers[j],

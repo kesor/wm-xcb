@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/components/tag-manager.h"
 #include "src/components/focus.h"
+#include "src/components/tag-manager.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
@@ -22,7 +22,7 @@
  * Track events received during tests
  */
 static struct {
-  bool tag_changed_received;
+  bool     tag_changed_received;
   TargetID tag_changed_target;
   uint32_t new_tag_mask;
 } test_events;
@@ -31,15 +31,15 @@ static void
 reset_test_events(void)
 {
   test_events.tag_changed_received = false;
-  test_events.tag_changed_target = TARGET_ID_NONE;
-  test_events.new_tag_mask = 0;
+  test_events.tag_changed_target   = TARGET_ID_NONE;
+  test_events.new_tag_mask         = 0;
 }
 
 static void
 tag_change_listener(Event e)
 {
   test_events.tag_changed_received = true;
-  test_events.tag_changed_target = e.target;
+  test_events.tag_changed_target   = e.target;
   if (e.data != NULL) {
     test_events.new_tag_mask = *(uint32_t*) e.data;
   }
