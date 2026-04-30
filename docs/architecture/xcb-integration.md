@@ -68,8 +68,8 @@ Components register their own XCB event handlers. The registry (`src/xcb/xcb-han
 
 // Register a handler for an XCB event type
 int xcb_handler_register(
-    xcb_event_handler_t event_type,  // e.g., XCB_KEY_PRESS
-    Component* component,
+    XCBEventType event_type,    // e.g., XCB_KEY_PRESS
+    HubComponent* component,     // component owning this handler
     void (*handler)(void* event)
 );
 
@@ -84,8 +84,8 @@ void keybinding_on_init(void) {
 
 ```c
 typedef struct XCBHandler {
-    xcb_event_handler_t event_type;
-    Component* component;
+    XCBEventType  event_type;
+    HubComponent* component;
     void (*handler)(void* event);
     struct XCBHandler* next;  // chain for multiple handlers
 } XCBHandler;
@@ -190,26 +190,23 @@ void monitor_manager_randr_handler(void* event) {
 ### Public API
 
 ```c
-#ifndef XCB_HANDLER_H
-#define XCB_HANDLER_H
+#ifndef _WM_XCB_HANDLER_H_
+#define _WM_XCB_HANDLER_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <xcb/xcb.h>
 
-typedef uint32_t xcb_event_handler_t;
+typedef struct HubComponent HubComponent;
+typedef uint8_t XCBEventType;
 
-// Handler registration
-int xcb_handler_register(xcb_event_handler_t type, void* component, void (*handler)(void*));
-void xcb_handler_unregister_component(void* component);
-
-// Dispatch
-void xcb_handler_dispatch(xcb_generic_event_t* event);
-
-// Lifecycle
+int xcb_handler_register(XCBEventType event_type, HubComponent* component, void (*handler)(void*));
+void xcb_handler_unregister_component(HubComponent* component);
+void xcb_handler_dispatch(void* event);
 void xcb_handler_init(void);
 void xcb_handler_shutdown(void);
 
-#endif // XCB_HANDLER_H
+#endif // _WM_XCB_HANDLER_H_
 ```
 
 ### Event Loop Integration
@@ -221,7 +218,7 @@ void handle_xcb_events(xcb_connection_t* conn) {
     
     // Handle XCB errors (response_type == 0)
     if (event->response_type == 0) {
-        xcb_handle_error((xcb_generic_error_t*)event);
+        error_details((xcb_generic_error_t*)event);
         free(event);
         return;
     }
@@ -326,7 +323,7 @@ void focus_handler(void* event) {
     uint8_t type = ((xcb_generic_event_t*)event)->response_type & ~0x80;
     
     if (type == XCB_ENTER_NOTIFY) {
-        xcb_enter_notity_event_t* e = (void*)event;
+        xcb_enter_notify_event_t* e = (void*)event;
         Client* c = client_by_window(e->event);
         if (!c) return;
         
@@ -346,7 +343,7 @@ Without a real X server:
 ```c
 void test_focus_handler_enter_notify(void) {
     // Create mock event
-    xcb_enter_notity_event_t event = {
+    xcb_enter_notify_event_t event = {
         .response_type = XCB_ENTER_NOTIFY,
         .event = mock_window_id,
     };

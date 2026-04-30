@@ -26,7 +26,7 @@ This component **subscribes to events** — it does not emit state machine event
 
 **Target type:** `TARGET_TYPE_MONITOR`
 
-**Provides:** No state machine (modifies monitor properties directly)
+**Provides:** GapSM (tracks gap size per monitor). The SM stores configuration; the tiling component reads `Monitor.gap_size` when arranging windows.
 
 **Subscribes to:** `EVT_TILING_PARAM_CHANGED`, `EVT_LAYOUT_CHANGED`, `EVT_TAG_VIEW_CHANGED`
 
@@ -53,8 +53,11 @@ void gap_on_init(void) {
 
 void on_tiling_param_changed(const Event* evt, void* userdata) {
     GapConfig* cfg = userdata;
-    Monitor* mon = hub_get_monitor(evt->target);
-    mon->gap_size = cfg->gap_size;
+    HubTarget* target = hub_get_target_by_id(evt->target);
+    if (target && target->type == TARGET_TYPE_MONITOR) {
+        Monitor* mon = (Monitor*)target;
+        mon->gap_size = cfg->gap_size;
+    }
 }
 ```
 

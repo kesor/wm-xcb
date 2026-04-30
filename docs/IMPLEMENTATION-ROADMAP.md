@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-*Replaces: `PRE-WORK_CHECKLIST.md` (moved to archive)*
+*Replaces: `PRE-WORK_CHECKLIST.md` (superseded by architecture decisions)*
 *Last updated: 2026-04-30*
 
 ---

@@ -25,7 +25,7 @@ Based on `view.md`, `setmfact.md`, `setlayout.md`, `focus.md` analysis:
 
 ## Component Design
 
-**Target type:** `TARGET_TYPE_MONITOR`, `TARGET_TYPE_TAG`
+**Target type:** `TARGET_TYPE_MONITOR` (adopted by monitors, references TAG targets)
 
 **Provides:** PertagSM (stores per-tag arrays per monitor)
 
@@ -57,7 +57,9 @@ void pertag_on_init(void) {
 // Hook: Called when tag changes — save old and restore new
 void pertag_on_tag_view_changed(const Event* evt, void* userdata) {
     PertagContext* ctx = userdata;
-    Monitor* mon = hub_get_monitor(evt->target);
+    HubTarget* target = hub_get_target_by_id(evt->target);
+    if (!target || target->type != TARGET_TYPE_MONITOR) return;
+    Monitor* mon = (Monitor*)target;
     
     // Save current settings to prevtag
     ctx->layouts[ctx->prevtag][mon->sellt] = mon->lt[mon->sellt];

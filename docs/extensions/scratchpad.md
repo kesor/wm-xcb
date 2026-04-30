@@ -72,6 +72,12 @@ void on_tag_view_changed(const Event* evt, void* userdata) {
 
 ```c
 typedef struct {
+    int center_on_show;     // Center floating scratchpads when shown
+    int follow_monitor;      // Move scratchpad to current monitor on show
+    int auto_hide;          // Auto-hide when moving to different tag
+} ScratchpadConfig;
+
+typedef struct {
     char key;                    // Scratchpad identifier
     const char** cmd;           // Command to spawn (argv-style)
     int floating;               // Scratchpad is floating
