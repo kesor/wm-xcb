@@ -25,13 +25,11 @@ extern HubComponent monitor_manager_component;
 /*
  * Initialize the monitor manager.
  * - Registers XCB handler for RANDR events
- * - Discovers all currently connected RandR outputs
+ * - Discovers all currently connected RandR outputs (best-effort; skipped
+ *   without X connection or root window)
  * - Creates Monitor targets for each connected output
  *
- * Note: RandR output discovery and Monitor creation from existing
- * outputs is not yet implemented - requires working RandR support.
- *
- * Called from wm initialization.
+ * This function is idempotent - multiple calls are safe.
  */
 void monitor_manager_init(void);
 

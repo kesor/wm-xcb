@@ -54,7 +54,13 @@ pertag_component_init(void)
   }
 
   hub_register_component(&pertag_component);
-  LOG_DEBUG("Pertag component registered with hub");
+
+  /* Check if registration succeeded */
+  if (pertag_component.registered) {
+    LOG_DEBUG("Pertag component registered with hub");
+  } else {
+    LOG_WARN("Pertag component registration failed");
+  }
 }
 
 /*

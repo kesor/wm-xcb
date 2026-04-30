@@ -97,9 +97,6 @@ monitor_manager_init(void)
    *
    * RandR events are extension events. The response_type sent by the X
    * server for RandR events is XCB_RANDR_NOTIFY (value 1).
-   *
-   * Note: RandR output discovery and initial Monitor creation from existing
-   * outputs is not yet implemented - requires working RandR support.
    */
   int result = xcb_handler_register(
       XCB_RANDR_NOTIFY,

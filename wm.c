@@ -35,8 +35,9 @@ main(int argc, char** argv)
   fullscreen_component_init();
   keybinding_init();
   client_list_component_init();
-  monitor_manager_init();
+  /* Initialize pertag BEFORE monitor_manager so monitors get adopted */
   pertag_component_init();
+  monitor_manager_init();
 
   /* Main event loop */
   while (running) {
@@ -48,9 +49,9 @@ main(int argc, char** argv)
   client_list_component_shutdown();
   keybinding_shutdown();
   fullscreen_component_shutdown();
-  pertag_component_shutdown();
-
+  /* pertag shutdown happens after monitor_manager because monitors unregister first */
   hub_shutdown();
+  pertag_component_shutdown();
 
   /* Cleanup core systems */
   destruct_state_machine();
