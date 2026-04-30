@@ -5,10 +5,6 @@
  * - Registers XCB handler for RANDR_NOTIFY events
  * - Creates/destroys Monitor targets based on output connect/disconnect
  * - Manages Monitor lifecycle and Hub registration
- *
- * Blocked by:
- * - #9 (XCB handler registration) - already implemented in src/xcb/xcb-handler.c
- * - #15 (Monitor target) - already implemented in src/target/monitor.c
  */
 
 #ifndef _MONITOR_MANAGER_H_

@@ -1,19 +1,22 @@
 /*
  * Monitor Target Implementation
  *
- * A Monitor represents a physical display (RandR output). It owns:
+ * A Monitor represents a physical display (RandR output).
+ *
+ * Core responsibilities:
  * - RandR properties (output, crtc)
  * - Geometry (position and resolution)
- * - Adopted state machines
- * - Tag state and layout configuration
+ * - Tag state (which tags this monitor is viewing)
+ * - Hub registration
  *
- * Note: Client associations are decoupled - use hub or client_list
- * to query clients by monitor, rather than storing Client pointers.
+ * Features like tiling, bar display, and client associations are
+ * implemented as separate components that query monitors via the Hub.
  */
 
 #include <stdlib.h>
 #include <string.h>
 
+#include "../components/pertag.h"
 #include "monitor.h"
 #include "wm-hub.h"
 #include "wm-log.h"
@@ -108,35 +111,11 @@ monitor_create(xcb_randr_output_t output)
   m->tagset     = MONITOR_TAG_MASK(0); /* tag 0 */
   m->prevtagset = MONITOR_TAG_MASK(0);
 
-  /* Initialize layout configuration */
-  m->mfact   = 0.5F;
-  m->nmaster = 1;
-
-  /* Initialize client associations (decoupled - use hub to query) */
-  m->client_count = 0;
-  m->sel_window   = XCB_NONE;
-  m->stack_head   = XCB_NONE;
-
-  /* Initialize bar */
-  m->bar = NULL;
-
-  /* Initialize pertag component */
+  /* Initialize pertag component (optional per-tag state) */
   m->pertag = malloc(sizeof(Pertag));
-  if (m->pertag == NULL) {
-    LOG_ERROR("Failed to allocate Pertag for monitor");
-    /* Remove from list before returning NULL */
-    Monitor** prev = &monitor_list;
-    while (*prev != NULL && *prev != m) {
-      prev = &(*prev)->next;
-    }
-    if (*prev == m) {
-      *prev = m->next;
-    }
-    free(m);
-    return NULL;
+  if (m->pertag != NULL) {
+    pertag_init_defaults(m->pertag, m);
   }
-  /* Initialize with defaults */
-  pertag_init_defaults(m->pertag, m);
 
   /* Add to list */
   m->next      = monitor_list;
@@ -187,21 +166,15 @@ monitor_destroy(Monitor* m)
     *prev = m->next;
   }
 
-  /* Clear client associations (clients detach via client_destroy) */
-  m->client_count = 0;
-  m->sel_window   = XCB_NONE;
-  m->stack_head   = XCB_NONE;
-
-
-  /* Free pertag data */
-  if (m->pertag != NULL) {
-    free(m->pertag);
-    m->pertag = NULL;
-  }
-
   /* If this was the selected monitor, select the first remaining */
   if (selected_monitor == m) {
     selected_monitor = monitor_list_get_first();
+  }
+
+  /* Free pertag data if allocated */
+  if (m->pertag != NULL) {
+    free(m->pertag);
+    m->pertag = NULL;
   }
 
   /* Unregister from Hub */
@@ -383,28 +356,6 @@ monitor_tag_toggle(Monitor* m, int tag)
   if (m == NULL || tag < 0 || tag >= MONITOR_NUM_TAGS)
     return;
   m->tagset ^= MONITOR_TAG_MASK(tag);
-}
-
-/*
- * Check if a monitor has any clients.
- */
-bool
-monitor_has_clients(Monitor* m)
-{
-  if (m == NULL)
-    return false;
-  return m->client_count > 0;
-}
-
-/*
- * Get the number of clients on a monitor.
- */
-uint32_t
-monitor_client_count(Monitor* m)
-{
-  if (m == NULL)
-    return 0;
-  return m->client_count;
 }
 
 /*

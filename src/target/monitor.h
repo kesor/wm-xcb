@@ -4,12 +4,18 @@
  * A Monitor represents a physical display (RandR output). This header
  * provides the Monitor type definition and its public API declarations.
  *
- * It owns:
+ * Core responsibilities:
  * - RandR properties (output, crtc)
  * - Geometry (position and resolution)
- * - Adopted state machines
- * - Tag state and layout configuration
- * - Client list associations (decoupled via window IDs)
+ * - Tag state (which tags this monitor is viewing)
+ * - Target registration with the Hub
+ *
+ * Note: Tag state is stored here because it's specific to monitor-view
+ * semantics (a monitor "views" certain tags). The actual tag management
+ * is handled by the tag-manager component.
+ *
+ * Features like tiling, bar display, and client associations are implemented
+ * as separate components that query monitors via the Hub.
  */
 
 #ifndef _MONITOR_H_
@@ -20,9 +26,10 @@
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 
-#include "../components/pertag.h"
-#include "../sm/sm.h"
 #include "wm-hub.h"
+
+/* Forward declarations */
+struct Pertag;
 
 /*
  * Number of available tags (bits in tag mask)
@@ -39,6 +46,8 @@
 /*
  * Monitor structure
  * Represents a physical display managed by the window manager.
+ *
+ * Core only - layout, bar, and client tracking are separate components.
  */
 typedef struct Monitor {
   /* Base target for Hub registration */
@@ -54,26 +63,15 @@ typedef struct Monitor {
   uint16_t width;
   uint16_t height;
 
-  /* Tag state */
+  /* Tag state - which tags this monitor is viewing */
   uint32_t tagset;     /* currently visible tags */
   uint32_t prevtagset; /* previous tagset for switching */
 
-  /* Layout configuration */
-  float mfact;   /* master factor (0.0 - 1.0) */
-  int   nmaster; /* number of clients in master area */
 
-  /* Client tracking - decoupled design (use hub to query) */
-  uint32_t     client_count;
-  xcb_window_t sel_window; /* window ID of selected client */
-  xcb_window_t stack_head; /* window ID of bottom of stack */
+  /* Pertag component data (optional, for per-tag state on this monitor) */
+  struct Pertag* pertag;
 
-  /* Bar (optional) */
-  void* bar;
-
-  /* Pertag component data */
-  Pertag* pertag;
-
-  /* Next monitor in the list */
+  /* Next monitor in the linked list */
   struct Monitor* next;
 
 } Monitor;
@@ -189,21 +187,6 @@ void monitor_tag_remove(Monitor* m, int tag);
  * Toggle a tag in the visible set.
  */
 void monitor_tag_toggle(Monitor* m, int tag);
-
-/*
- * Utility functions
- */
-
-/*
- * Check if a monitor has any clients.
- * Note: This checks the counter - actual client query goes through hub.
- */
-bool monitor_has_clients(Monitor* m);
-
-/*
- * Get the number of clients on a monitor.
- */
-uint32_t monitor_client_count(Monitor* m);
 
 /*
  * Iterate over all monitors.
