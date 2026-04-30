@@ -10,11 +10,11 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "test-wm.h"
-#include "wm-hub.h"
-#include "src/xcb/xcb-handler.h"
 #include "src/components/monitor-manager.h"
 #include "src/target/monitor.h"
+#include "src/xcb/xcb-handler.h"
+#include "test-wm.h"
+#include "wm-hub.h"
 
 void
 test_monitor_manager_component_init_shutdown(void)
@@ -63,7 +63,7 @@ test_monitor_manager_handler_registration(void)
   }
 
   /* Should be able to find our handler */
-  bool found = false;
+  bool        found = false;
   XCBHandler* h;
   for (h = handlers; h != NULL; h = xcb_handler_next(h)) {
     if (h->component == &monitor_manager_component) {

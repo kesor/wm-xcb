@@ -8,8 +8,8 @@
 #include <stdlib.h>
 
 #include "client-list.h"
-#include "wm-log.h"
 #include "src/xcb/xcb-handler.h"
+#include "wm-log.h"
 
 /*
  * Global component instance - static initialization ensures clean state
@@ -17,12 +17,12 @@
  */
 static ClientListComponent client_list_component = {
   .base = {
-    .name       = CLIENT_LIST_COMPONENT_NAME,
-    .requests   = NULL,
-    .targets    = (TargetType[]) { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE },
-    .executor   = NULL,
-    .registered = false,
-  },
+           .name       = CLIENT_LIST_COMPONENT_NAME,
+           .requests   = NULL,
+           .targets    = (TargetType[]) { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE },
+           .executor   = NULL,
+           .registered = false,
+           },
   .initialized = false,
 };
 
@@ -33,10 +33,11 @@ static void
 do_static_init(void)
 {
   /* Only run once */
-  if (static_init_done) return;
+  if (static_init_done)
+    return;
   static_init_done = true;
   /* Ensure component is in clean state */
-  client_list_component.initialized = false;
+  client_list_component.initialized     = false;
   client_list_component.base.registered = false;
 }
 
@@ -124,8 +125,8 @@ client_list_component_init(void)
   client_list_init();
 
   /* Register XCB event handlers for client lifecycle events */
-  HubComponent* base = client_list_component_base();
-  int result = 0;
+  HubComponent* base   = client_list_component_base();
+  int           result = 0;
 
   result |= xcb_handler_register(
       XCB_CREATE_NOTIFY,
