@@ -24,7 +24,7 @@ pre-push:
   skip: [pre-commit]
   commands:
     format-check:
-      run: clang-format --dry-run --Werror $(git ls-files | grep -E '\.(c|h)$' | grep -v '^vendor/')
+      run: make format
 
     tidy:
       glob: "**/*.{c,h}"

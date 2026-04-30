@@ -102,7 +102,7 @@ compile-commands: clean
 # Format source files with clang-format
 format:
 	clang-format --style=file -i $(SRC) $(TEST_SRC)
-	clang-format --style=file -i $(shell find . -name '*.h' -not -path './vendor/*')
+	clang-format --style=file -i $(shell find . -name '*.c' -o -name '*.h' -not -path './vendor/*')
 
 # Run clang-tidy on source files
 tidy: compile-commands
