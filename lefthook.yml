@@ -5,12 +5,10 @@ config:
   output:
     - meta           # Print lefthook version
     - summary        # Print summary block
-    - empty_summary   # Print summary when no steps to run
+    - empty_summary  # Print summary when no steps to run
     - success        # Print successful steps
     - failure        # Print failed steps
-    - execution_info # Print `EXECUTE > ...` logging
     - skips          # Print "skip" messages
-    # Don't print execution output on success (show only on failure)
 
 pre-commit:
   commands:
@@ -27,3 +25,7 @@ pre-push:
   commands:
     format-check:
       run: clang-format --dry-run --Werror $(git ls-files | grep -E '\.(c|h)$' | grep -v '^vendor/')
+
+    tidy:
+      glob: "**/*.{c,h}"
+      run: make tidy
