@@ -64,6 +64,7 @@ TEST_SRC = \
 	test-wm-hub.c \
 	test-wm-xcb-handler.c \
 	test-wm-monitor.c \
+	test-wm-tag.c \
 	test-target-client.c \
 	test-client-list-component.c \
 	test-wm-keybinding.c \

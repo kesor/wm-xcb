@@ -120,6 +120,24 @@ monitor_create(xcb_randr_output_t output)
   /* Initialize bar */
   m->bar = NULL;
 
+  /* Initialize pertag component */
+  m->pertag = malloc(sizeof(Pertag));
+  if (m->pertag == NULL) {
+    LOG_ERROR("Failed to allocate Pertag for monitor");
+    /* Remove from list before returning NULL */
+    Monitor** prev = &monitor_list;
+    while (*prev != NULL && *prev != m) {
+      prev = &(*prev)->next;
+    }
+    if (*prev == m) {
+      *prev = m->next;
+    }
+    free(m);
+    return NULL;
+  }
+  /* Initialize with defaults */
+  pertag_init_defaults(m->pertag, m);
+
   /* Add to list */
   m->next      = monitor_list;
   monitor_list = m;
@@ -173,6 +191,13 @@ monitor_destroy(Monitor* m)
   m->client_count = 0;
   m->sel_window   = XCB_NONE;
   m->stack_head   = XCB_NONE;
+
+
+  /* Free pertag data */
+  if (m->pertag != NULL) {
+    free(m->pertag);
+    m->pertag = NULL;
+  }
 
   /* If this was the selected monitor, select the first remaining */
   if (selected_monitor == m) {
