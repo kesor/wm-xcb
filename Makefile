@@ -51,6 +51,9 @@ SRC_XCB     = $(wildcard src/xcb/*.c)
 SRC_TARGET  = $(wildcard src/target/*.c)
 SRC_COMP    = $(wildcard src/components/*.c)
 
+# Main executable object (must be excluded from test link)
+MAIN_OBJ = $(NAME).o
+
 # All main source files
 SRC = $(ROOT_SRC) $(SRC_SM) $(SRC_XCB) $(SRC_TARGET) $(SRC_COMP)
 OBJ = $(SRC:.c=.o)
@@ -115,7 +118,7 @@ tidy: compile-commands
 		$(SRC) $(TEST_SRC)
 
 # Run clang static analyzer
-analyze:
+analyze: compile-commands
 	@clang-tidy -p . --quiet \
 		-extra-arg=-DWM_HUB_TESTING \
 		-extra-arg=-D_DEFAULT_SOURCE \
@@ -134,7 +137,7 @@ check: format tidy analyze
 # Testing
 # ---------------------------------------------------------------------------
 
-test: $(TEST_OBJ) $(filter-out wm.o,$(OBJ))
+test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 	${CC} -o $@ $^ ${LDFLAGS}
 	./test
 
@@ -144,9 +147,11 @@ clean:
 # Standalone test (no XCB dependencies required)
 test-standalone: wm-hub.o test-wm-hub-standalone.c
 	$(CC) $(CFLAGS) -o $@ $^
+	./test-standalone
 
-test-sm-standalone: wm-hub.o wm-log.o $(SRC_SM) test-sm-standalone.c
+test-sm-standalone: wm-hub.o wm-log.o $(filter-out %.c,$(SRC_SM:.c=.o)) test-sm-standalone.c
 	$(CC) $(CFLAGS) -o $@ $^
+	./test-sm-standalone
 
 # ---------------------------------------------------------------------------
 # Docker helpers
