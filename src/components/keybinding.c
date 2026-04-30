@@ -83,6 +83,9 @@ static const KeyBinding default_keybindings[] = {
 
   /* Fullscreen toggle - Mod+f (keycode 41 = f) */
   { XCB_MOD_MASK_4,                      41, KEYBINDING_ACTION_TOGGLE_FULLSCREEN, 0 },
+
+  /* Tile toggle - Mod+i (keycode 31 = i) */
+  { XCB_MOD_MASK_4,                      31, KEYBINDING_ACTION_TILE_MONITOR,      0 },
 };
 
 static const KeyBinding* keybindings     = default_keybindings;
@@ -265,6 +268,17 @@ execute_keybinding(const KeyBinding* binding)
   case KEYBINDING_ACTION_TOGGLE_FULLSCREEN:
     send_focus_request(REQ_CLIENT_FULLSCREEN);
     break;
+
+  case KEYBINDING_ACTION_TILE_MONITOR: {
+    TargetID target = monitor_get_current_monitor();
+    if (target != TARGET_ID_NONE) {
+      hub_send_request(REQ_MONITOR_TILE, target);
+      LOG_DEBUG("Keybinding sent tile request to monitor target=%" PRIu64, target);
+    } else {
+      LOG_DEBUG("Keybinding: no selected monitor for tile request");
+    }
+  } break;
+
 
   default:
     LOG_DEBUG("Keybinding: unhandled action %d", binding->action);
