@@ -38,4 +38,9 @@ void logger(FILE* io, const char* fmt, ...);
     logger(stdout, pFormat, ##__VA_ARGS__); \
   }
 
+#define LOG_INFO(pFormat, ...)                        \
+  {                                                   \
+    logger(stdout, "INFO:  " pFormat, ##__VA_ARGS__); \
+  }
+
 #endif
