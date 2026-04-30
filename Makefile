@@ -49,12 +49,13 @@ SRC_SM      = $(wildcard src/sm/*.c)
 SRC_XCB     = $(wildcard src/xcb/*.c)
 SRC_TARGET  = $(wildcard src/target/*.c)
 SRC_COMP    = $(wildcard src/components/*.c)
+SRC_ACTIONS = $(wildcard src/actions/*.c)
 
 # Main executable object (must be excluded from test link)
 MAIN_OBJ = $(NAME).o
 
 # All main source files
-SRC = $(ROOT_SRC) $(SRC_SM) $(SRC_XCB) $(SRC_TARGET) $(SRC_COMP)
+SRC = $(ROOT_SRC) $(SRC_SM) $(SRC_XCB) $(SRC_TARGET) $(SRC_COMP) $(SRC_ACTIONS)
 OBJ = $(SRC:.c=.o)
 
 # Test source files
