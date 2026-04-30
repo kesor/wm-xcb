@@ -233,7 +233,11 @@ focus_get_sm(Client* c)
   }
 
   /* Store in client */
-  client_set_sm(c, FOCUS_COMPONENT_NAME, sm);
+  if (!client_set_sm(c, FOCUS_COMPONENT_NAME, sm)) {
+    LOG_ERROR("Failed to store focus SM for client");
+    sm_destroy(sm);
+    return NULL;
+  }
 
   LOG_DEBUG("Created focus SM for client window=%u", c->window);
   return sm;
@@ -248,7 +252,7 @@ focus_is_focused(Client* c)
   if (c == NULL)
     return false;
 
-  StateMachine* sm = client_get_sm(c, "focus");
+  StateMachine* sm = client_get_sm(c, FOCUS_COMPONENT_NAME);
   if (sm == NULL)
     return false;
 
@@ -296,7 +300,7 @@ focus_set_state(Client* c, FocusState state)
         focus_component.focused_window != c->window) {
       Client* prev = client_get_by_window(focus_component.focused_window);
       if (prev != NULL && prev != c) {
-        StateMachine* prev_sm = client_get_sm(prev, "focus");
+        StateMachine* prev_sm = client_get_sm(prev, FOCUS_COMPONENT_NAME);
         if (prev_sm != NULL) {
           sm_raw_write(prev_sm, FOCUS_STATE_UNFOCUSED);
         }
@@ -383,7 +387,7 @@ focus_on_enter_notify(void* event)
         focus_component.focused_window != c->window) {
       Client* prev = client_get_by_window(focus_component.focused_window);
       if (prev != NULL && prev != c) {
-        StateMachine* prev_sm = client_get_sm(prev, "focus");
+        StateMachine* prev_sm = client_get_sm(prev, FOCUS_COMPONENT_NAME);
         if (prev_sm != NULL) {
           FocusState prev_state = (FocusState) sm_get_state(prev_sm);
           if (prev_state == FOCUS_STATE_FOCUSED) {

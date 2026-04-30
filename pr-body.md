@@ -17,9 +17,9 @@ Refactored the Client target's state machine storage from hardcoded fields to a 
    - Changed `sms` struct from fixed fields to dynamic storage:
      ```c
      struct {
-       StateMachine** sms;     /* array of SM pointers */
-       char**         names;   /* corresponding SM names */
-       uint32_t       count;   /* number of SMs */
+       StateMachine** machines; /* array of SM pointers */
+       char**         names;    /* corresponding SM names */
+       uint32_t       count;    /* number of SMs */
        uint32_t       capacity; /* allocated capacity */
      } sms;
      ```

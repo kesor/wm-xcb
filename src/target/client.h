@@ -189,8 +189,11 @@ StateMachine* client_get_sm(Client* c, const char* sm_name);
 /*
  * Set a state machine for this client.
  * Used by components to attach their SM templates.
+ *
+ * Returns true on success, false on failure (OOM).
+ * On failure, the caller should destroy the SM to avoid leaks.
  */
-void client_set_sm(Client* c, const char* sm_name, StateMachine* sm);
+bool client_set_sm(Client* c, const char* sm_name, StateMachine* sm);
 
 /*
  * Client Property Accessors

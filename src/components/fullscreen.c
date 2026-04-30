@@ -253,7 +253,11 @@ fullscreen_get_sm(Client* c)
   }
 
   /* Store in client */
-  client_set_sm(c, FULLSCREEN_COMPONENT_NAME, sm);
+  if (!client_set_sm(c, FULLSCREEN_COMPONENT_NAME, sm)) {
+    LOG_ERROR("Failed to store fullscreen SM for client");
+    sm_destroy(sm);
+    return NULL;
+  }
 
   LOG_DEBUG("Created fullscreen SM for client window=%u", c->window);
   return sm;
