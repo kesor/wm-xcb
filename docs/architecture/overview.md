@@ -1,104 +1,26 @@
 # Architecture Overview
 
-*Document status: Authoritative — reflects design decisions from grill-me session*
+*Document status: Authoritative*
 *Last updated: 2026-04-30*
 
-> **💡 Paradigm Shift:** This is not dwm with extra steps. This is a new paradigm where extensions coexist without conflict. Read [VISION.md](../VISION.md) for the inspiration.
-
----
-
-## The Problem We're Solving
-
-In dwm, patches modify the same source code. Apply patch A then patch B and they conflict. We want extensions that "just work" by subscribing to events, not by patching code.
-
-The solution is an event-driven architecture with state machines at the core, where:
-1. **Components** never modify core code — they are the extensions
-2. Components subscribe to events, emit requests
-3. State machines are the only authority on state mutations
-4. Everything is decoupled via the central **Hub**
+> **TL;DR:** Extensions coexist without conflict by subscribing to events instead of patching code. Read [VISION.md](../VISION.md) for the inspiration and [decisions.md](decisions.md) for the rationale.
 
 ---
 
 ## Core Concepts
 
-### 1. Target
-An entity that exists in the system and can be the subject of state transitions.
+| Concept | Description |
+|---------|-------------|
+| **Target** | Entity that owns state machines (Client, Monitor, Tag) |
+| **State Machine** | Tracks mutually exclusive state; lives on a target |
+| **Component** | Driver with executor (requests), listener (events), SM template |
+| **Hub** | Central orchestrator: registry, router, event bus |
 
-| Target Type | Examples | Properties |
-|-------------|----------|------------|
-| CLIENT | Windows | window ID, geometry, title |
-| MONITOR | Displays | output ID, resolution, position |
-| KEYBOARD | Input devices | (future) |
-| TAG | Virtual workspace | index, name |
-
-**A target owns:**
-- Its properties (which can change but are not state-machine-tracked)
-- Adopted state machines (on-demand allocation)
-- Adopted component listeners
-
-### 2. State Machine
-A finite state machine that tracks mutually exclusive state.
-
-**Key properties:**
-- **Mutually exclusive states** — a client is either FULLSCREEN or WINDOWED, never both
-- **Guards** — conditions that must be true for a transition to be allowed
-- **Actions** — side effects that execute during transitions
-- **Events emitted on transition** — other components can subscribe
-
-**A state machine tracks:**
-- Current state
-- Available transitions from current state
-- Template (states, transitions, guards, actions)
-
-**State machines live on targets**, not on components.
-
-### 3. Component
-A driver that can act upon targets. Composed of:
-- **Executor** — handles requests, mutates external reality (X server)
-- **Listener/Raw Writer** — handles external events, raw-writes to target's SM
-- **SM Template** — defines what state machine this component provides
-
-**Key property:** Components do NOT own state machines. They provide templates that targets adopt.
-
-```c
-struct Component {
-    const char* name;
-    TargetType* accepted_targets;  // which target types this works with
-    RequestType* requests;         // requests this component can execute
-    EventType* events;            // events this component emits
-    
-    void (*on_adopt)(Target* t);      // called when adopted by target
-    void (*on_unadopt)(Target* t);    // called when unadopted
-    void (*listener_callback)(Target* t, Event* e);  // event handler
-    SM* (*get_sm_template)(void);     // returns SM template
-};
-```
-
-### 4. Hub
-The central orchestrator that connects everything.
-
-```
-┌───────────────────────────────────────────────────────┐
-│                              HUB                      │
-│                                                       │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐  │
-│  │  Registry   │   │  Router     │   │  Event Bus  │  │
-│  │             │   │             │   │             │  │
-│  │ Components  │   │ Routes      │   │ All comps   │  │
-│  │ Targets     │   │ requests    │   │ emit/       │  │
-│  │             │   │ to comps    │   │ subscribe   │  │
-│  └─────────────┘   └─────────────┘   └─────────────┘  │
-│                                                       │
-└───────────────────────────────────────────────────────┘
-```
-
-**Responsibilities:**
-- Register and track components
-- Register and track targets
-- Route requests to appropriate components (by request type + target)
-- Maintain target type → target ID mappings
-- Route events to subscribed components
-- Provide target resolution (symbolic → concrete IDs)
+See the detailed docs for each:
+- [target.md](target.md) — Target design
+- [state-machine.md](state-machine.md) — SM framework
+- [component.md](component.md) — Component design
+- [hub.md](hub.md) — Hub implementation
 
 ---
 
