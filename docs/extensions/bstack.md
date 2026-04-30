@@ -116,7 +116,7 @@ static Key keys[] = {
 - Uses `nmaster` and `mfact` like `tile()`
 - Respects `cfact` (client factor) for relative sizing
 - Works with `pertag` (layout saved per tag)
-- Works with `gap` plugin (gaps applied in resize calls)
+- Works with `gap` component (gaps applied in resize calls)
 - Floating clients excluded from tiling (`nexttiled()`)
 
 ---

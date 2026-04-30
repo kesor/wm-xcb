@@ -1,7 +1,9 @@
 # Component Design
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
+
+> **💡 Paradigm Shift:** Components don't patch core code. They register with the Hub, provide state machine templates, and handle requests/events. Everything is additive.
 
 ---
 
@@ -147,32 +149,32 @@ void handle_xcb_events() {
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         COMPONENT LIFECYCLE                          │
+│                         COMPONENT LIFECYCLE                         │
 │                                                                     │
-│  ┌─────────┐                                                        │
-│  │ INIT   │ ← hub_init() calls component->on_init() for all        │
-│  │         │    and xcb_handler_register() for X events            │
-│  └────┬───┘                                                        │
-│       ▼                                                           │
-│  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐     │
-│  │ ADOPTED │ ←── │ TARGET  │ ←── │ hub_    │ ←── │ EVENT   │     │
-│  │         │     │ CREATED │     │ register│     │ LISTENER│     │
-│  └────┬───┘     └─────────┘     │ _target │     │ ADDED   │     │
-│       │                           └─────────┘     └─────────┘     │
-│       ▼                                                           │
+│  ┌────────┐                                                         │
+│  │ INIT   │ ← hub_init() calls component->on_init() for all         │
+│  │        │    and xcb_handler_register() for X events              │
+│  └────┬───┘                                                         │
+│       ▼                                                             │
+│  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐        │
+│  │ ADOPTED │ ←── │ TARGET  │ ←── │ hub_    │ ←── │ EVENT   │        │
+│  │         │     │ CREATED │     │ register│     │ LISTENER│        │
+│  └─────┬───┘     └─────────┘     │ _target │     │ ADDED   │        │
+│        │                         └─────────┘     └─────────┘        │
+│        ▼                                                            │
 │  ┌─────────┐                                                        │
 │  │ ACTIVE  │ ← component handles requests/events for this target    │
-│  └────┬───┘                                                        │
-│       │                                                           │
-│       ▼                                                           │
-│  ┌─────────┐     ┌─────────┐     ┌─────────┐                     │
-│  │UNADOPTED│ ←── │ TARGET  │ ←── │ hub_    │                     │
-│  │         │     │ DESTROYED│     │ unregister_target │           │
-│  └────┬───┘     └─────────┘     └─────────┘                     │
-│       │                                                           │
-│       ▼                                                           │
+│  └─────┬───┘                                                        │
+│        │                                                            │
+│        ▼                                                            │
+│  ┌─────────┐     ┌──────────┐     ┌───────────────────┐             │
+│  │UNADOPTED│ ←── │ TARGET   │ ←── │ hub_              │             │
+│  │         │     │ DESTROYED│     │ unregister_target │             │
+│  └─────┬───┘     └──────────┘     └───────────────────┘             │
+│        │                                                            │
+│        ▼                                                            │
 │  ┌─────────┐                                                        │
-│  │SHUTDOWN│ ← hub_shutdown() calls component->on_shutdown()       │
+│  │SHUTDOWN │ ← hub_shutdown() calls component->on_shutdown()        │
 │  └─────────┘                                                        │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘

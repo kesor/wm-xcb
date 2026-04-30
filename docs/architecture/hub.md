@@ -1,7 +1,9 @@
 # Hub Design
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
+
+> **💡 Paradigm Shift:** Components never talk to each other directly. They always go through the Hub. This decouples everything and enables true hot-plugging.
 
 ---
 
@@ -21,23 +23,23 @@ Components do not call each other directly. They communicate exclusively through
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                              HUB                                    │
-│                                                                     │
-│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │
-│  │  REGISTRY    │  │   ROUTER      │  │  EVENT BUS    │           │
-│  │              │  │               │  │               │           │
-│  │ components[] │  │ request →     │  │ subscribe()   │           │
-│  │ targets[]    │  │ component     │  │ emit()        │           │
-│  │              │  │               │  │               │           │
-│  │ by_name      │  │ by_request_   │  │ by_event_     │           │
-│  │ by_type      │  │ type          │  │ type          │           │
-│  │              │  │               │  │               │           │
-│  │ by_target    │  │ by_target_    │  │               │           │
-│  │              │  │ id            │  │               │           │
-│  └───────────────┘  └───────────────┘  └───────────────┘           │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                              HUB                         │
+│                                                          │
+│  ┌──────────────┐  ┌───────────────┐  ┌───────────────┐  │
+│  │  REGISTRY    │  │   ROUTER      │  │  EVENT BUS    │  │
+│  │              │  │               │  │               │  │
+│  │ components[] │  │ request →     │  │ subscribe()   │  │
+│  │ targets[]    │  │ component     │  │ emit()        │  │
+│  │              │  │               │  │               │  │
+│  │ by_name      │  │ by_request_   │  │ by_event_     │  │
+│  │ by_type      │  │ type          │  │ type          │  │
+│  │              │  │               │  │               │  │
+│  │ by_target    │  │ by_target_    │  │               │  │
+│  │              │  │ id            │  │               │  │
+│  └──────────────┘  └───────────────┘  └───────────────┘  │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---

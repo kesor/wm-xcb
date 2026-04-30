@@ -15,35 +15,51 @@ Based on `view.md`, `setmfact.md`, `setlayout.md`, `focus.md` analysis:
 
 ## State Machine Events
 
-| Event | Description | Payload |
-|-------|-------------|---------|
-| `EVT_TAG_VIEW_CHANGED` | View/tag switched | `Monitor*`, `old_tag`, `new_tag`, `old_tagset`, `new_tagset` |
-| `EVT_LAYOUT_CHANGED` | Layout changed | `Monitor*`, `slot`, `new_layout` |
-| `EVT_TILING_PARAM_CHANGED` | mfact or nmaster changed | `Monitor*`, `param`, `value` |
-| `EVT_CLIENT_FOCUS_GAIN` | Client gained focus | `Client*`, `Monitor*` |
-| `EVT_BAR_SHOWN/HIDDEN` | Bar visibility changed | `Monitor*` |
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `EVT_TAG_VIEW_CHANGED` | Subscribes + Emits | View/tag switched |
+| `EVT_LAYOUT_CHANGED` | Subscribes | Layout changed |
+| `EVT_TILING_PARAM_CHANGED` | Subscribes | mfact or nmaster changed |
+| `EVT_CLIENT_FOCUS_GAIN` | Subscribes | Client gained focus |
+| `EVT_BAR_SHOWN/HIDDEN` | Subscribes | Bar visibility changed |
 
-## Hook Points
+## Component Design
+
+**Target type:** `TARGET_TYPE_MONITOR` (adopted by monitors, references TAG targets)
+
+**Provides:** PertagSM (stores per-tag arrays per monitor)
+
+**Subscribes to:** `EVT_LAYOUT_CHANGED`, `EVT_TILING_PARAM_CHANGED`, `EVT_CLIENT_FOCUS_GAIN`
+
+**Emits:** `EVT_TAG_VIEW_CHANGED`
 
 ```c
-typedef struct {
-    // Per-tag state (index 0 = all tags, 1..N = specific tags)
-    Layout* layouts[NUM_TAGS + 1][2];      // Two layout pointers per tag
-    float mfacts[NUM_TAGS + 1];           // mfact per tag
-    int nmasters[NUM_TAGS + 1];           // nmaster per tag
-    uint8_t sellts[NUM_TAGS + 1];         // sellt (layout slot) per tag
-    int showbars[NUM_TAGS + 1];           // bar visibility per tag
-    Client* focused[NUM_TAGS + 1];        // focused client per tag
-    
-    // Current state
-    int curtag;                           // Current tag index (0 = all)
-    int prevtag;                          // Previous tag for toggle
-} PertagContext;
+Component pertag_component = {
+    .name = "pertag",
+    .accepted_targets = (TargetType[]){ TARGET_TYPE_MONITOR },
+    .requests = (RequestType[]){ REQ_TAG_VIEW },
+    .events = (EventType[]){ EVT_TAG_VIEW_CHANGED },
+    .on_init = pertag_on_init,
+    .executor = pertag_executor,
+    .get_sm_template = pertag_get_template,
+};
+```
+
+## Hooks
+
+```c
+void pertag_on_init(void) {
+    hub_subscribe(EVT_LAYOUT_CHANGED, on_layout_changed, NULL);
+    hub_subscribe(EVT_TILING_PARAM_CHANGED, on_tiling_param_changed, NULL);
+    hub_subscribe(EVT_CLIENT_FOCUS_GAIN, on_client_focus_gain, NULL);
+}
 
 // Hook: Called when tag changes — save old and restore new
-void on_tag_view_changed(const Event* evt, void* userdata) {
+void pertag_on_tag_view_changed(const Event* evt, void* userdata) {
     PertagContext* ctx = userdata;
-    Monitor* mon = evt->source;
+    HubTarget* target = hub_get_target_by_id(evt->target);
+    if (!target || target->type != TARGET_TYPE_MONITOR) return;
+    Monitor* mon = (Monitor*)target;
     
     // Save current settings to prevtag
     ctx->layouts[ctx->prevtag][mon->sellt] = mon->lt[mon->sellt];
@@ -77,7 +93,7 @@ typedef struct {
 } PertagConfig;
 ```
 
-## Keybindings (from dwm config)
+## Keybindings
 
 ```c
 // view() is called with specific tag bits → saved to that tag
@@ -92,22 +108,19 @@ typedef struct {
 {MODKEY | ControlMask, XK_1, toggleview, {.ui = 1 << 0}},
 ```
 
-## Implementation Notes
+## Interactions with Other Components
 
-- Tag 0 is special: "all tags" mode (`curtag == 0`)
-- Arrays are sized `LENGTH(tags) + 1` to accommodate index 0
-- `curtag = 0` means no specific tag (view all)
-- When `arg->ui == ~0` (view all), `curtag = 0`
-- The core `view()` function handles tag switching; pertag hooks into the transition
-
-## Interactions
-
-- Works with all layouts (tile, float, monocle, bstack)
-- Works with gap plugin (pertag also stores gap settings)
-- When client is destroyed, `pertag->sel[]` must be cleared for that client
+| Component | Interaction |
+|-----------|-------------|
+| **Tiling layouts** | Restores `mon->lt[]`, `mon->mfact`, `mon->nmaster` per tag |
+| **Focus** | Restores `mon->sel` (focused client) per tag |
+| **Bar** | Restores bar visibility per tag |
+| **Gap** | Stores gap settings in pertag arrays |
+| **EWMH desktop** | Responds to `EVT_TAG_VIEW_CHANGED` for `_NET_CURRENT_DESKTOP` |
 
 ---
 
 *Extension ID: pertag*
 *Priority: High (dwm staple feature)*
 *DWM patch equivalent: dwmpertag*
+*Hub: Registers with Hub, subscribes to events, emits EVT_TAG_VIEW_CHANGED*

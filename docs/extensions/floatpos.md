@@ -89,7 +89,7 @@ void on_client_managed(const Event* evt, void* userdata) {
         // Apply position
         apply_floatpos(c, rule->position);
         
-        // Emit event for other plugins to react
+        // Emit event for other components to react
         Event rule_evt = {
             .type = EVT_RULE_APPLIED,
             .subject = c,

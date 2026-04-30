@@ -1,7 +1,9 @@
 # Target Design
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-28*
+*Last updated: 2026-04-30*
+
+> **💡 Paradigm Shift:** State machines live on targets. Not on components, not global. Each Client has its own FullscreenSM. Each Monitor has its own ConnectionSM.
 
 ---
 
@@ -449,11 +451,11 @@ When a target is created, it immediately adopts all compatible components. This 
 
 ### Future: Plugin Adoption
 
-For plugins loaded at runtime, adoption should be optional:
+For components loaded at runtime, adoption should be optional:
 
 ```c
 // Option 1: Plugin specifies what to adopt by default
-// In plugin registration
+// In component registration
 PluginConfig gap_config = {
     .default_adoption = TARGET_TYPE_MONITOR,
 };
@@ -465,7 +467,7 @@ target "monitor" adopt: gap, bar, connection, ...
 
 ### Unadoption
 
-Targets can unadopt components (when plugins are unloaded):
+Targets can unadopt components (when components are unloaded):
 
 ```c
 void target_unadopt(Target* t, Component* c) {
