@@ -157,12 +157,12 @@ test_focus_sm_for_client(void)
   assert(c->window == 100);
 
   /* Initially no focus SM */
-  assert(c->sms.focus == NULL);
+  assert(client_get_sm(c, "focus") == NULL);
 
   /* Get focus SM - should create it on demand */
   StateMachine* sm = focus_get_sm(c);
   assert_or_abort(sm != NULL);
-  assert(c->sms.focus == sm);
+  assert(client_get_sm(c, "focus") == sm);
 
   /* Check initial state is UNFOCUSED */
   assert(focus_get_state(c) == FOCUS_STATE_UNFOCUSED);

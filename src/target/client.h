@@ -62,10 +62,10 @@ typedef struct Client {
 
   /* Adopted state machines - dynamically allocated on demand */
   struct {
-    StateMachine* fullscreen;
-    StateMachine* floating;
-    StateMachine* urgency;
-    StateMachine* focus;
+    StateMachine** sms;     /* array of SM pointers */
+    char**         names;   /* corresponding SM names */
+    uint32_t       count;   /* number of SMs */
+    uint32_t       capacity; /* allocated capacity */
   } sms;
 
   /* Linked list links (sentinel-based circular list) */

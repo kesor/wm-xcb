@@ -212,7 +212,7 @@ focus_get_sm(Client* c)
   if (c == NULL)
     return NULL;
 
-  StateMachine* sm = c->sms.focus;
+  StateMachine* sm = client_get_sm(c, "focus");
   if (sm != NULL)
     return sm;
 
@@ -233,7 +233,7 @@ focus_get_sm(Client* c)
   }
 
   /* Store in client */
-  c->sms.focus = sm;
+  client_set_sm(c, "focus", sm);
 
   LOG_DEBUG("Created focus SM for client window=%u", c->window);
   return sm;
@@ -248,7 +248,7 @@ focus_is_focused(Client* c)
   if (c == NULL)
     return false;
 
-  StateMachine* sm = c->sms.focus;
+  StateMachine* sm = client_get_sm(c, "focus");
   if (sm == NULL)
     return false;
 
@@ -264,7 +264,7 @@ focus_get_state(Client* c)
   if (c == NULL)
     return FOCUS_STATE_UNFOCUSED;
 
-  StateMachine* sm = c->sms.focus;
+  StateMachine* sm = client_get_sm(c, "focus");
   if (sm == NULL)
     return FOCUS_STATE_UNFOCUSED;
 
@@ -295,8 +295,11 @@ focus_set_state(Client* c, FocusState state)
     if (focus_component.focused_window != 0 &&
         focus_component.focused_window != c->window) {
       Client* prev = client_get_by_window(focus_component.focused_window);
-      if (prev != NULL && prev != c && prev->sms.focus != NULL) {
-        sm_raw_write(prev->sms.focus, FOCUS_STATE_UNFOCUSED);
+      if (prev != NULL && prev != c) {
+        StateMachine* prev_sm = client_get_sm(prev, "focus");
+        if (prev_sm != NULL) {
+          sm_raw_write(prev_sm, FOCUS_STATE_UNFOCUSED);
+        }
       }
     }
     focus_component.focused_window = c->window;
@@ -380,7 +383,7 @@ focus_on_enter_notify(void* event)
         focus_component.focused_window != c->window) {
       Client* prev = client_get_by_window(focus_component.focused_window);
       if (prev != NULL && prev != c) {
-        StateMachine* prev_sm = prev->sms.focus;
+        StateMachine* prev_sm = client_get_sm(prev, "focus");
         if (prev_sm != NULL) {
           FocusState prev_state = (FocusState) sm_get_state(prev_sm);
           if (prev_state == FOCUS_STATE_FOCUSED) {
@@ -430,7 +433,7 @@ focus_on_leave_notify(void* event)
   }
 
   /* Get the SM */
-  StateMachine* sm = c->sms.focus;
+  StateMachine* sm = client_get_sm(c, "focus");
   if (sm == NULL) {
     /* SM not yet created, nothing to unfocus */
     return;

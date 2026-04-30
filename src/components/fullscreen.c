@@ -235,7 +235,7 @@ fullscreen_get_sm(Client* c)
   if (c == NULL)
     return NULL;
 
-  StateMachine* sm = c->sms.fullscreen;
+  StateMachine* sm = client_get_sm(c, "fullscreen");
   if (sm != NULL)
     return sm;
 
@@ -253,7 +253,7 @@ fullscreen_get_sm(Client* c)
   }
 
   /* Store in client */
-  c->sms.fullscreen = sm;
+  client_set_sm(c, "fullscreen", sm);
 
   LOG_DEBUG("Created fullscreen SM for client window=%u", c->window);
   return sm;
@@ -268,7 +268,7 @@ fullscreen_is_fullscreen(Client* c)
   if (c == NULL)
     return false;
 
-  StateMachine* sm = c->sms.fullscreen;
+  StateMachine* sm = client_get_sm(c, "fullscreen");
   if (sm == NULL)
     return false;
 
@@ -284,7 +284,7 @@ fullscreen_get_state(Client* c)
   if (c == NULL)
     return FULLSCREEN_STATE_WINDOWED;
 
-  StateMachine* sm = c->sms.fullscreen;
+  StateMachine* sm = client_get_sm(c, "fullscreen");
   if (sm == NULL)
     return FULLSCREEN_STATE_WINDOWED;
 
