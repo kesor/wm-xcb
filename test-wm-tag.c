@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "src/components/pertag.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "test-wm-tag.h"
@@ -335,6 +336,10 @@ test_tag_iterate_by_mask(void)
 /*
  * Test: tag_multiple_monitors_reference
  * Tests that multiple monitors can reference tags.
+ *
+ * Note: This test explicitly adopts the pertag component for each monitor.
+ * In the new design, pertag is a separate component that components
+ * need to adopt before use.
  */
 void
 test_tag_multiple_monitors_reference(void)
@@ -351,6 +356,10 @@ test_tag_multiple_monitors_reference(void)
 
   assert(m1 != NULL);
   assert(m2 != NULL);
+
+  /* Adopt pertag component for each monitor */
+  pertag_on_adopt(&m1->target);
+  pertag_on_adopt(&m2->target);
 
   /* Verify each monitor has pertag data */
   assert(pertag_has_data(m1) == true);
@@ -374,7 +383,10 @@ test_tag_multiple_monitors_reference(void)
     assert(tag_is_tag_target(tag_id) == true);
   }
 
-  /* Clean up */
+  /* Clean up - monitors destroy pertag data on destroy */
+  monitor_destroy(m1);
+  monitor_destroy(m2);
+
   monitor_list_shutdown();
   tag_list_shutdown();
   hub_shutdown();

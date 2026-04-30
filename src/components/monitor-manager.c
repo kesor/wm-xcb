@@ -6,12 +6,12 @@
  * - Creates/destroys Monitor targets based on output connect/disconnect
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../target/monitor.h"
 #include "../xcb/xcb-handler.h"
-#include "connection-sm.h"
 #include "monitor-manager.h"
 #include "wm-hub.h"
 #include "wm-log.h"
@@ -58,7 +58,6 @@ monitor_manager_get_component(void)
 /*
  * Initialize the monitor manager.
  * - Registers XCB handler for RANDR events
- * - Queries existing RandR outputs and creates Monitor targets
  *
  * This function is idempotent - multiple calls are safe.
  */
@@ -78,11 +77,8 @@ monitor_manager_init(void)
    * We register for XCB_RANDR_NOTIFY which is defined as value 1 in
    * xcb/randr.h.
    *
-   * Note: In a full implementation, we would query existing RandR
-   * outputs here and create Monitor targets for each connected output.
-   * TODO: Add output discovery here once RandR initialization is complete.
-   *
-   * XCB_RANDR_NOTIFY is defined in xcb/randr.h as value 1
+   * Note: RandR output discovery and initial Monitor creation from existing
+   * outputs is not yet implemented - requires working RandR support.
    */
   int result = xcb_handler_register(
       XCB_RANDR_NOTIFY,
@@ -139,7 +135,7 @@ monitor_manager_executor(struct HubRequest* req)
 }
 
 /*
- * XCB RandR notify handler.
+ * Handle a RandR notify event.
  * Called when RandR notifies us of output changes.
  *
  * For a full implementation, this would:
@@ -185,18 +181,18 @@ monitor_manager_handle_randr_notify(void* event)
 
   switch (randr_subtype) {
   case 2: /* RRNotify_OutputChange - output connected/disconnected */
-    LOG_DEBUG("Monitor manager: Output change notification");
     /* TODO: Parse output change event and create/destroy Monitor */
+    LOG_DEBUG("Monitor manager: Output change notification");
     break;
 
   case 1: /* RRNotify_CrtcChange - crtc configuration changed */
-    LOG_DEBUG("Monitor manager: CRTC change notification");
     /* TODO: Update monitor geometry based on CRTC change */
+    LOG_DEBUG("Monitor manager: CRTC change notification");
     break;
 
   case 6: /* RRNotify_ResourceChange - resource changes */
-    LOG_DEBUG("Monitor manager: Resource change notification");
     /* TODO: Handle resource changes */
+    LOG_DEBUG("Monitor manager: Resource change notification");
     break;
 
   default:

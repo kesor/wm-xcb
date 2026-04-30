@@ -3,6 +3,9 @@
  *
  * Bridges MONITOR → TAG targets by storing per-tag state.
  * When a monitor switches between tags, saves/restores monitor state.
+ *
+ * Design: Pertag allocates and owns its own data, stored in the monitor's
+ * SM storage by name "pertag". This keeps Monitor decoupled from pertag.
  */
 
 #include <stdlib.h>
@@ -15,25 +18,30 @@
 #include "wm-log.h"
 
 /*
+ * Name used to store Pertag data in monitor's SM storage
+ */
+#define PERTAG_SM_NAME "pertag"
+
+/*
  * Initialize default values for a pertag state.
  */
-void
-pertag_init_defaults(Pertag* pt, struct Monitor* m)
+static void
+pertag_init_internal(Pertag* pt, struct Monitor* m)
 {
   if (pt == NULL)
     return;
 
   pt->monitor = m;
-  pt->curtag  = 1; /* Default to tag 1 (index 1, mask = 1 << 1 = 2) */
-  pt->prevtag = 0; /* No previous tag initially */
+  pt->curtag   = 1; /* Default to tag 1 (index 1, mask = 1 << 1 = 2) */
+  pt->prevtag  = 0; /* No previous tag initially */
 
   /* Initialize arrays with defaults */
   for (int i = 0; i <= PERTAG_NUM_TAGS; i++) {
-    pt->mfacts[i]   = 0.5F; /* Default master factor */
+    pt->mfacts[i]    = 0.5F; /* Default master factor */
     pt->nmasters[i] = 1;    /* Default nmaster */
-    pt->sellts[i]   = 0;    /* Default layout slot */
-    pt->showbars[i] = true; /* Bar visible by default */
-    pt->focused[i]  = TARGET_ID_NONE;
+    pt->sellts[i]    = 0;    /* Default layout slot */
+    pt->showbars[i]  = true; /* Bar visible by default */
+    pt->focused[i]   = TARGET_ID_NONE;
 
     /* Layouts default to NULL (will be set by tiling component) */
     pt->layouts[i][0] = NULL;
@@ -41,15 +49,14 @@ pertag_init_defaults(Pertag* pt, struct Monitor* m)
   }
 
   /* Index 0 is "all tags" - copy defaults from index 1 */
-  pt->mfacts[0]   = pt->mfacts[1];
-  pt->nmasters[0] = pt->nmasters[1];
-  pt->sellts[0]   = pt->sellts[1];
+  pt->mfacts[0]    = pt->mfacts[1];
+  pt->nmasters[0]  = pt->nmasters[1];
+  pt->sellts[0]    = pt->sellts[1];
 }
 
 /*
  * Initialize the pertag component for a monitor.
- * Note: Pertag data is already allocated in monitor_create().
- * This callback is for any additional per-adoption setup needed.
+ * Allocates Pertag data and stores it in the monitor's SM storage.
  */
 void
 pertag_on_adopt(HubTarget* target)
@@ -58,18 +65,56 @@ pertag_on_adopt(HubTarget* target)
     LOG_ERROR("pertag_on_adopt: invalid target");
     return;
   }
+
+  Monitor* m = (Monitor*) target;
+
+  /* Check if pertag already exists */
+  if (pertag_has_data(m)) {
+    LOG_DEBUG("Pertag already exists for monitor");
+    return;
+  }
+
+  /* Allocate Pertag data */
+  Pertag* pt = malloc(sizeof(Pertag));
+  if (pt == NULL) {
+    LOG_ERROR("Failed to allocate Pertag for monitor");
+    return;
+  }
+
+  /* Initialize with defaults */
+  pertag_init_internal(pt, m);
+
+  /* Store in monitor's SM storage */
+  if (!monitor_set_sm(m, PERTAG_SM_NAME, (StateMachine*) pt)) {
+    LOG_ERROR("Failed to store Pertag in monitor SM storage");
+    free(pt);
+    return;
+  }
+
   LOG_DEBUG("Pertag component adopted by monitor: %lu", (unsigned long) target->id);
 }
 
 /*
  * Cleanup pertag component data.
- * Note: Pertag data is freed in monitor_destroy() via monitor->pertag.
+ * Frees the Pertag data stored in monitor's SM storage.
  */
 void
 pertag_on_unadopt(HubTarget* target)
 {
   if (target == NULL || target->type != TARGET_TYPE_MONITOR)
     return;
+
+  Monitor*  m  = (Monitor*) target;
+  Pertag*   pt = pertag_get_data(m);
+
+  if (pt == NULL)
+    return;
+
+  /* Clear from monitor's SM storage (this destroys the "SM") */
+  monitor_set_sm(m, PERTAG_SM_NAME, NULL);
+
+  /* Free Pertag data */
+  free(pt);
 
   LOG_DEBUG("Pertag component unadopted by monitor: %lu", (unsigned long) target->id);
 }
@@ -82,7 +127,13 @@ pertag_get_data(const struct Monitor* monitor)
 {
   if (monitor == NULL)
     return NULL;
-  return monitor->pertag;
+
+  /* Look up in monitor's SM storage by name */
+  StateMachine* sm = monitor_get_sm((Monitor*) monitor, PERTAG_SM_NAME);
+  if (sm == NULL)
+    return NULL;
+
+  return (Pertag*) sm;
 }
 
 /*
@@ -332,5 +383,5 @@ pertag_reset(struct Monitor* monitor)
     return;
 
   /* Reinitialize defaults */
-  pertag_init_defaults(pt, monitor);
+  pertag_init_internal(pt, monitor);
 }

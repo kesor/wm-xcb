@@ -4,12 +4,19 @@
  * A Monitor represents a physical display (RandR output). This header
  * provides the Monitor type definition and its public API declarations.
  *
- * It owns:
+ * Core responsibilities:
  * - RandR properties (output, crtc)
  * - Geometry (position and resolution)
- * - Adopted state machines
- * - Tag state and layout configuration
- * - Client list associations (decoupled via window IDs)
+ * - Tag state (which tags this monitor is viewing)
+ * - Target registration with the Hub
+ * - State machine storage (for components to attach their data)
+ *
+ * Note: Tag state is stored here because it's specific to monitor-view
+ * semantics (a monitor "views" certain tags). The actual tag management
+ * is handled by the tag-manager component.
+ *
+ * Features like tiling, bar display, and client associations are implemented
+ * as separate components that query monitors via the Hub.
  */
 
 #ifndef _MONITOR_H_
@@ -20,7 +27,6 @@
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 
-#include "../components/pertag.h"
 #include "../sm/sm.h"
 #include "wm-hub.h"
 
@@ -39,6 +45,9 @@
 /*
  * Monitor structure
  * Represents a physical display managed by the window manager.
+ *
+ * Core only - layout, bar, and client tracking are separate components.
+ * State machines are allocated on demand by components.
  */
 typedef struct Monitor {
   /* Base target for Hub registration */
@@ -54,26 +63,20 @@ typedef struct Monitor {
   uint16_t width;
   uint16_t height;
 
-  /* Tag state */
+  /* Tag state - which tags this monitor is viewing */
   uint32_t tagset;     /* currently visible tags */
   uint32_t prevtagset; /* previous tagset for switching */
 
-  /* Layout configuration */
-  float mfact;   /* master factor (0.0 - 1.0) */
-  int   nmaster; /* number of clients in master area */
+  /* Adopted state machines - dynamically allocated on demand by components.
+   * Components store their data here, keyed by name (e.g., "pertag"). */
+  struct {
+    StateMachine** machines; /* array of SM pointers */
+    char**         names;    /* corresponding names */
+    uint32_t       count;   /* number of entries */
+    uint32_t       capacity; /* allocated capacity */
+  } sms;
 
-  /* Client tracking - decoupled design (use hub to query) */
-  uint32_t     client_count;
-  xcb_window_t sel_window; /* window ID of selected client */
-  xcb_window_t stack_head; /* window ID of bottom of stack */
-
-  /* Bar (optional) */
-  void* bar;
-
-  /* Pertag component data */
-  Pertag* pertag;
-
-  /* Next monitor in the list */
+  /* Next monitor in the linked list */
   struct Monitor* next;
 
 } Monitor;
@@ -191,21 +194,6 @@ void monitor_tag_remove(Monitor* m, int tag);
 void monitor_tag_toggle(Monitor* m, int tag);
 
 /*
- * Utility functions
- */
-
-/*
- * Check if a monitor has any clients.
- * Note: This checks the counter - actual client query goes through hub.
- */
-bool monitor_has_clients(Monitor* m);
-
-/*
- * Get the number of clients on a monitor.
- */
-uint32_t monitor_client_count(Monitor* m);
-
-/*
  * Iterate over all monitors.
  */
 void monitor_foreach(void (*callback)(Monitor* m));
@@ -219,5 +207,33 @@ void monitor_set_geometry(Monitor* m, int16_t x, int16_t y, uint16_t width, uint
  * Get monitor geometry.
  */
 void monitor_get_geometry(const Monitor* m, int16_t* x, int16_t* y, uint16_t* width, uint16_t* height);
+
+/*
+ * State Machine / Component Data Management
+ *
+ * Components attach their data to monitors using this storage.
+ * Data is stored by name - components retrieve it later via monitor_get_sm().
+ *
+ * Example: pertag stores Pertag* as monitor_set_sm(m, "pertag", (SM*)pt)
+ */
+
+/*
+ * Get component data attached to this monitor by name.
+ *
+ * Returns the data pointer stored via monitor_set_sm(), or
+ * NULL if no data has been attached for the given name.
+ */
+StateMachine* monitor_get_sm(Monitor* m, const char* sm_name);
+
+/*
+ * Set component data for this monitor.
+ * Used by components to attach their data (e.g., Pertag*, layout state, etc.).
+ *
+ * If sm is NULL, removes any existing entry for that name.
+ *
+ * Returns true on success, false on failure (OOM).
+ * On failure, the caller should free the data to avoid leaks.
+ */
+bool monitor_set_sm(Monitor* m, const char* sm_name, StateMachine* sm);
 
 #endif /* _MONITOR_H_ */

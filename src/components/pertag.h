@@ -7,9 +7,9 @@
  * 2. Restores the state for the new tag (or uses defaults if first visit)
  *
  * Design principles:
- * - Monitors "view" tags via this component
- * - Each tag on a monitor has its own layout settings
- * - Switching tags restores all settings; switching back restores them
+ * - Pertag allocates and owns its own data
+ * - Data is stored in the monitor's state machine storage by name "pertag"
+ * - Components query pertag data via pertag_get_data()
  *
  * Architecture:
  * - pertag component is adopted by each Monitor
@@ -73,13 +73,14 @@ typedef struct Pertag {
 
 /*
  * Initialize the pertag component.
- * Creates Pertag data for each monitor when adopted.
+ * Allocates Pertag data for a monitor and stores it via monitor_set_sm().
  * @param target  Target that adopted this component (must be MONITOR)
  */
 void pertag_on_adopt(HubTarget* target);
 
 /*
  * Cleanup pertag component data.
+ * Frees the Pertag data allocated in pertag_on_adopt().
  * @param target  Target that is unadopting this component
  */
 void pertag_on_unadopt(HubTarget* target);
@@ -193,6 +194,7 @@ TargetID pertag_get_focused(const struct Monitor* monitor, int tag);
 
 /*
  * Get or create Pertag data for a monitor.
+ * Looks up in monitor's SM storage by "pertag" key.
  * @param monitor  Monitor pointer
  * @return         Pertag data or NULL
  */
