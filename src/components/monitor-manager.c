@@ -6,9 +6,9 @@
  * - Creates/destroys Monitor targets based on output connect/disconnect
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 
 #include "../target/monitor.h"
 #include "../xcb/xcb-handler.h"
@@ -58,7 +58,6 @@ monitor_manager_get_component(void)
 /*
  * Initialize the monitor manager.
  * - Registers XCB handler for RANDR events
- * - Queries existing RandR outputs and creates Monitor targets
  *
  * This function is idempotent - multiple calls are safe.
  */
@@ -78,8 +77,8 @@ monitor_manager_init(void)
    * We register for XCB_RANDR_NOTIFY which is defined as value 1 in
    * xcb/randr.h.
    *
-   * Note: RandR output discovery and initial Monitor creation would
-   * be done here in a full implementation with working RandR support.
+   * Note: RandR output discovery and initial Monitor creation from existing
+   * outputs is not yet implemented - requires working RandR support.
    */
   int result = xcb_handler_register(
       XCB_RANDR_NOTIFY,
@@ -182,18 +181,18 @@ monitor_manager_handle_randr_notify(void* event)
 
   switch (randr_subtype) {
   case 2: /* RRNotify_OutputChange - output connected/disconnected */
+    /* TODO: Parse output change event and create/destroy Monitor */
     LOG_DEBUG("Monitor manager: Output change notification");
-    /* Parse output change event and create/destroy Monitor */
     break;
 
   case 1: /* RRNotify_CrtcChange - crtc configuration changed */
+    /* TODO: Update monitor geometry based on CRTC change */
     LOG_DEBUG("Monitor manager: CRTC change notification");
-    /* Update monitor geometry based on CRTC change */
     break;
 
   case 6: /* RRNotify_ResourceChange - resource changes */
+    /* TODO: Handle resource changes */
     LOG_DEBUG("Monitor manager: Resource change notification");
-    /* Handle resource changes */
     break;
 
   default:

@@ -23,9 +23,10 @@ extern HubComponent monitor_manager_component;
 
 /*
  * Initialize the monitor manager.
- * - Queries existing RandR outputs
- * - Creates Monitor targets for connected outputs
  * - Registers XCB handler for RANDR events
+ *
+ * Note: RandR output discovery and Monitor creation from existing
+ * outputs is not yet implemented - requires working RandR support.
  *
  * Called from wm initialization.
  */
@@ -34,14 +35,15 @@ void monitor_manager_init(void);
 /*
  * Shutdown the monitor manager.
  * - Unregisters XCB handler
- * - Destroys all Monitor targets
- * - Cleans up resources
+ *
+ * Note: Monitor destruction is handled by monitor_list_shutdown()
+ * which is called separately during WM shutdown.
  */
 void monitor_manager_shutdown(void);
 
 /*
  * Handle a RandR notify event.
- * Called by the XCB handler dispatcher.
+ * Called by the XCB handler dispatcher when RandR events occur.
  */
 void monitor_manager_handle_randr_notify(void* event);
 

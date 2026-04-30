@@ -135,6 +135,10 @@ monitor_create(xcb_randr_output_t output)
     if (*prev == m) {
       *prev = m->next;
     }
+    /* Free pertag before freeing monitor */
+    if (m->pertag != NULL) {
+      free(m->pertag);
+    }
     free(m);
     return NULL;
   }
