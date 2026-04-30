@@ -25,8 +25,7 @@ ifeq ($(strip $(DEBUG)),1)
 	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG
 	LDFLAGS += -g
 else
-	CFLAGS += -Os -flto -fuse-linker-plugin
-	LDFLAGS += -Os
+	CFLAGS += -Os
 endif
 
 # ---------------------------------------------------------------------------
@@ -106,7 +105,7 @@ format:
 
 # Run clang-tidy on source files
 tidy: compile-commands
-	@clang-tidy -p . --quiet \
+	@clang-tidy -p . \
 		-extra-arg=-DWM_HUB_TESTING \
 		-extra-arg=-D_DEFAULT_SOURCE \
 		-extra-arg=-I$(GLIBC_DEV) \
@@ -119,7 +118,7 @@ tidy: compile-commands
 
 # Run clang static analyzer
 analyze: compile-commands
-	@clang-tidy -p . --quiet \
+	@clang-tidy -p . \
 		-extra-arg=-DWM_HUB_TESTING \
 		-extra-arg=-D_DEFAULT_SOURCE \
 		-extra-arg=-I$(GLIBC_DEV) \
