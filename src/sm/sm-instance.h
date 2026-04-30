@@ -149,8 +149,7 @@ const char* sm_get_name(StateMachine* sm);
 
 /*
  * Set instance-specific data.
- * This is intended for use in tests to set sm->data
- * without direct struct member access.
+ * This is supported public API for setting sm->data.
  */
 void sm_set_data(StateMachine* sm, void* data);
 
