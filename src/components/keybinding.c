@@ -66,6 +66,9 @@ static const KeyBinding default_keybindings[] = {
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 16, KEYBINDING_ACTION_TAG_TOGGLE,   7 },
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 17, KEYBINDING_ACTION_TAG_TOGGLE,   8 },
   { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 18, KEYBINDING_ACTION_TAG_TOGGLE,   9 },
+
+  /* Fullscreen toggle - Mod+f (keycode 41 = f) */
+  { XCB_MOD_MASK_4,                      41, KEYBINDING_ACTION_TOGGLE_FULLSCREEN, 0 },
 };
 
 static const KeyBinding* keybindings     = default_keybindings;
@@ -128,6 +131,8 @@ action_to_request_type(KeybindingAction action)
     return REQ_KEYBINDING_TAG_TOGGLE; /* = 5 = REQ_MONITOR_TAG_TOGGLE */
   case KEYBINDING_ACTION_CLOSE_CLIENT:
     return REQ_KEYBINDING_CLOSE;      /* = 6 = REQ_CLIENT_CLOSE */
+  case KEYBINDING_ACTION_TOGGLE_FULLSCREEN:
+    return REQ_CLIENT_FULLSCREEN;     /* Fullscreen request */
   default:
     return 0;
   }
@@ -224,6 +229,10 @@ execute_keybinding(const KeyBinding* binding)
 
   case KEYBINDING_ACTION_CLOSE_CLIENT:
     send_focus_request(REQ_KEYBINDING_CLOSE);
+    break;
+
+  case KEYBINDING_ACTION_TOGGLE_FULLSCREEN:
+    send_focus_request(REQ_CLIENT_FULLSCREEN);
     break;
 
   default:

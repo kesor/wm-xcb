@@ -52,6 +52,7 @@ typedef enum {
   KEYBINDING_ACTION_TAG_VIEW,     /* View specific tag (1-9) */
   KEYBINDING_ACTION_TAG_TOGGLE,   /* Toggle tag visibility */
   KEYBINDING_ACTION_CLOSE_CLIENT, /* Close current client */
+  KEYBINDING_ACTION_TOGGLE_FULLSCREEN, /* Toggle fullscreen */
   KEYBINDING_ACTION_LAST,
 } KeybindingAction;
 

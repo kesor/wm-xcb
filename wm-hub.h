@@ -17,6 +17,14 @@ typedef uint32_t TargetType;
 typedef uint32_t RequestType;
 typedef uint32_t EventType;
 
+/*
+ * Request type constants
+ * Used by components to handle requests via hub routing.
+ */
+enum RequestType {
+  REQ_CLIENT_FULLSCREEN = 10,
+};
+
 /* Target types */
 enum {
   TARGET_TYPE_CLIENT,

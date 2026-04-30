@@ -42,3 +42,54 @@ print_atom_name(xcb_atom_t atom)
 
   free(reply);
 }
+
+/*
+ * Check if _NET_WM_STATE contains _NET_WM_STATE_FULLSCREEN for a window.
+ *
+ * Uses xcb_get_property directly to get the raw atom list.
+ */
+bool
+ewmh_check_wm_state_fullscreen(xcb_ewmh_connection_t* ewmh, xcb_window_t window)
+{
+  if (ewmh == NULL)
+    return false;
+
+  /* Get the _NET_WM_STATE property directly */
+  xcb_get_property_cookie_t cookie = xcb_get_property_unchecked(
+      dpy, 0, window, ewmh->_NET_WM_STATE, XCB_GET_PROPERTY_TYPE_ANY, 0, 1024);
+
+  xcb_get_property_reply_t* reply = xcb_get_property_reply(dpy, cookie, NULL);
+  if (reply == NULL)
+    return false;
+
+  /* Check format (should be 32 bits for atoms) */
+  if (reply->format != 32) {
+    free(reply);
+    return false;
+  }
+
+  /* Get length in atoms (format * length / 32 = number of atoms) */
+  uint32_t length = xcb_get_property_value_length(reply);
+  if (length == 0) {
+    free(reply);
+    return false;
+  }
+
+  xcb_atom_t* atoms = (xcb_atom_t*) xcb_get_property_value(reply);
+  if (atoms == NULL) {
+    free(reply);
+    return false;
+  }
+
+  /* Check if _NET_WM_STATE_FULLSCREEN is in the list */
+  uint32_t count = length / sizeof(xcb_atom_t);
+  for (uint32_t i = 0; i < count; i++) {
+    if (atoms[i] == ewmh->_NET_WM_STATE_FULLSCREEN) {
+      free(reply);
+      return true;
+    }
+  }
+
+  free(reply);
+  return false;
+}
