@@ -58,16 +58,16 @@ connection_sm_template_create(void)
     {
      .from_state = CONNECTION_STATE_CONNECTED,
      .to_state   = CONNECTION_STATE_DISCONNECTED,
-     .guard_fn   = NULL, /* always allowed */
-     .action_fn  = NULL,
-     .emit_event  = EVT_MONITOR_DISCONNECTED,
+     .guard_fn   = NULL,                          /* always allowed */
+        .action_fn  = NULL,
+     .emit_event = EVT_MONITOR_DISCONNECTED,
      },
     {
      .from_state = CONNECTION_STATE_DISCONNECTED,
      .to_state   = CONNECTION_STATE_CONNECTED,
      .guard_fn   = NULL, /* always allowed */
-     .action_fn  = NULL,
-     .emit_event  = EVT_MONITOR_CONNECTED,
+        .action_fn  = NULL,
+     .emit_event = EVT_MONITOR_CONNECTED,
      },
   };
 

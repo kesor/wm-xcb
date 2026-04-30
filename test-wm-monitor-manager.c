@@ -10,11 +10,11 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "src/components/monitor-manager.h"
-#include "src/target/monitor.h"
-#include "src/xcb/xcb-handler.h"
 #include "test-wm.h"
 #include "wm-hub.h"
+#include "src/xcb/xcb-handler.h"
+#include "src/components/monitor-manager.h"
+#include "src/target/monitor.h"
 
 void
 test_monitor_manager_component_init_shutdown(void)
@@ -28,10 +28,15 @@ test_monitor_manager_component_init_shutdown(void)
   /* Should be able to init the monitor manager */
   monitor_manager_init();
 
-  /* Component should be registered with hub */
+  /* Component should be registered with hub.
+   * Use local variable to help static analyzer track non-NULL state. */
   HubComponent* comp = hub_get_component_by_name("monitor-manager");
-  assert(comp != NULL);
-  assert(comp->registered == true);
+  if (comp == NULL) {
+    abort();
+  }
+  if (!comp->registered) {
+    abort();
+  }
 
   /* Should be able to shutdown */
   monitor_manager_shutdown();
@@ -53,10 +58,12 @@ test_monitor_manager_handler_registration(void)
 
   /* Verify RandR handler is registered */
   XCBHandler* handlers = xcb_handler_lookup(XCB_RANDR_NOTIFY);
-  assert(handlers != NULL);
+  if (handlers == NULL) {
+    abort();
+  }
 
   /* Should be able to find our handler */
-  bool        found = false;
+  bool found = false;
   XCBHandler* h;
   for (h = handlers; h != NULL; h = xcb_handler_next(h)) {
     if (h->component == &monitor_manager_component) {
@@ -64,7 +71,9 @@ test_monitor_manager_handler_registration(void)
       break;
     }
   }
-  assert(found == true);
+  if (!found) {
+    abort();
+  }
 
   /* Shutdown */
   monitor_manager_shutdown();
@@ -85,12 +94,19 @@ test_monitor_manager_multiple_init(void)
   /* Init once */
   monitor_manager_init();
   HubComponent* comp1 = hub_get_component_by_name("monitor-manager");
-  assert(comp1 != NULL);
+  if (comp1 == NULL) {
+    abort();
+  }
 
   /* Second init should be idempotent or safe */
   monitor_manager_init();
   HubComponent* comp2 = hub_get_component_by_name("monitor-manager");
-  assert(comp2 == comp1); /* Same component */
+  if (comp2 == NULL) {
+    abort();
+  }
+  if (comp2 != comp1) {
+    abort();
+  }
 
   /* Shutdown once */
   monitor_manager_shutdown();
@@ -116,9 +132,16 @@ test_monitor_manager_no_requests(void)
 
   /* Monitor manager should have empty requests array (no requests handled) */
   HubComponent* comp = hub_get_component_by_name("monitor-manager");
-  assert(comp != NULL);
-  assert(comp->requests != NULL);
-  assert(comp->requests[0] == 0); /* 0-terminated, empty */
+  if (comp == NULL) {
+    abort();
+  }
+  RequestType* req = comp->requests;
+  if (req == NULL) {
+    abort();
+  }
+  if (req[0] != 0) {
+    abort();
+  }
 
   /* Sending a request should be handled gracefully */
   hub_send_request(999, 100); /* Non-existent request type */
@@ -143,17 +166,24 @@ test_monitor_manager_accepts_monitor_target(void)
 
   /* Verify component accepts MONITOR target type */
   HubComponent* comp = hub_get_component_by_name("monitor-manager");
-  assert(comp != NULL);
-  assert(comp->targets != NULL);
+  if (comp == NULL) {
+    abort();
+  }
+  TargetType* targets = comp->targets;
+  if (targets == NULL) {
+    abort();
+  }
 
   bool found_mon = false;
-  for (int i = 0; comp->targets[i] != TARGET_TYPE_NONE; i++) {
-    if (comp->targets[i] == TARGET_TYPE_MONITOR) {
+  for (int i = 0; targets[i] != TARGET_TYPE_NONE; i++) {
+    if (targets[i] == TARGET_TYPE_MONITOR) {
       found_mon = true;
       break;
     }
   }
-  assert(found_mon == true);
+  if (!found_mon) {
+    abort();
+  }
 
   /* Shutdown */
   monitor_manager_shutdown();
@@ -174,18 +204,30 @@ test_monitor_manager_with_monitors(void)
 
   /* Create a monitor */
   Monitor* m = monitor_create(100);
-  assert(m != NULL);
-  assert(hub_get_target_by_id(100) != NULL);
+  if (m == NULL) {
+    abort();
+  }
+  if (hub_get_target_by_id(100) == NULL) {
+    abort();
+  }
 
   /* Verify it's a monitor target */
   HubTarget* t = hub_get_target_by_id(100);
-  assert(t->type == TARGET_TYPE_MONITOR);
+  if (t->type != TARGET_TYPE_MONITOR) {
+    abort();
+  }
 
   /* Get all monitors */
   HubTarget** monitors = hub_get_targets_by_type(TARGET_TYPE_MONITOR);
-  assert(monitors != NULL);
-  assert(monitors[0] != NULL);
-  assert(monitors[1] == NULL); /* NULL-terminated */
+  if (monitors == NULL) {
+    abort();
+  }
+  if (monitors[0] == NULL) {
+    abort();
+  }
+  if (monitors[1] != NULL) {
+    abort();
+  }
 
   /* Shutdown */
   monitor_destroy(m);
