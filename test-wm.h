@@ -30,12 +30,12 @@ extern int tests_failed;
  * Use this for preconditions that must be true for subsequent code to be safe.
  * The analyzer understands that this aborts, so it can properly track null pointers.
  */
-#define assert_or_abort(EXPRESSION)                                    \
-  do {                                                                \
-    if (!(EXPRESSION)) {                                              \
+#define assert_or_abort(EXPRESSION)                                                      \
+  do {                                                                                   \
+    if (!(EXPRESSION)) {                                                                 \
       LOG_CLEAN("%s:%d: %s - CRITICAL FAIL, aborting", __FILE__, __LINE__, #EXPRESSION); \
-      abort();                                                        \
-    }                                                                 \
+      abort();                                                                           \
+    }                                                                                    \
   } while (0)
 
 

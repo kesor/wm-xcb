@@ -5,9 +5,9 @@
  * Tests the sentinel-based circular doubly-linked list.
  */
 
+#include "src/target/client.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "src/target/client.h"
 
 static int count = 0;
 

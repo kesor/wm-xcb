@@ -25,8 +25,7 @@ ifeq ($(strip $(DEBUG)),1)
 	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG
 	LDFLAGS += -g
 else
-	CFLAGS += -Os -flto -fuse-linker-plugin
-	LDFLAGS += -Os
+	CFLAGS += -Os
 endif
 
 # ---------------------------------------------------------------------------
@@ -103,23 +102,11 @@ compile-commands: clean
 # Format source files with clang-format
 format:
 	clang-format --style=file -i $(SRC) $(TEST_SRC)
+	clang-format --style=file -i $(shell find . -name '*.c' -o -name '*.h' -not -path './vendor/*')
 
 # Run clang-tidy on source files
 tidy: compile-commands
-	@clang-tidy -p . --quiet \
-		-extra-arg=-DWM_HUB_TESTING \
-		-extra-arg=-D_DEFAULT_SOURCE \
-		-extra-arg=-I$(GLIBC_DEV) \
-		-extra-arg=-I$(abspath .) \
-		-extra-arg=-I$(abspath src) \
-		-extra-arg=-I$(abspath vendor/xcb-errors-include) \
-		-extra-arg=-I$(abspath vendor/libxcb-errors/include) \
-		$(shell pkg-config --cflags xcb xcb-util xcb-randr xcb-ewmh xcb-keysyms xproto xcb-errors 2>/dev/null | tr " " "\n" | grep "^-I" | sed "s/^-I/-extra-arg=-I/") \
-		$(SRC) $(TEST_SRC)
-
-# Run clang static analyzer
-analyze: compile-commands
-	@clang-tidy -p . --quiet \
+	@clang-tidy -p . \
 		-extra-arg=-DWM_HUB_TESTING \
 		-extra-arg=-D_DEFAULT_SOURCE \
 		-extra-arg=-I$(GLIBC_DEV) \
@@ -131,7 +118,7 @@ analyze: compile-commands
 		$(SRC) $(TEST_SRC)
 
 # Run all development checks
-check: format tidy analyze
+check: format tidy
 
 # ---------------------------------------------------------------------------
 # Testing
@@ -168,4 +155,4 @@ container-build:
 
 # ---------------------------------------------------------------------------
 
-.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone check format tidy analyze
+.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone check format tidy

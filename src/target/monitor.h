@@ -20,8 +20,8 @@
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 
-#include "wm-hub.h"
 #include "../sm/sm.h"
+#include "wm-hub.h"
 
 /*
  * Number of available tags (bits in tag mask)
