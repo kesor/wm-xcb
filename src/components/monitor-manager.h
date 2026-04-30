@@ -5,6 +5,7 @@
  * - Registers XCB handler for RANDR_NOTIFY events
  * - Creates/destroys Monitor targets based on output connect/disconnect
  * - Manages Monitor lifecycle and Hub registration
+ * - Performs initial RandR output discovery on startup
  */
 
 #ifndef _MONITOR_MANAGER_H_
@@ -24,9 +25,8 @@ extern HubComponent monitor_manager_component;
 /*
  * Initialize the monitor manager.
  * - Registers XCB handler for RANDR events
- *
- * Note: RandR output discovery and Monitor creation from existing
- * outputs is not yet implemented - requires working RandR support.
+ * - Discovers all currently connected RandR outputs
+ * - Creates Monitor targets for each connected output
  *
  * Called from wm initialization.
  */
