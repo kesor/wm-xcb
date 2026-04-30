@@ -147,4 +147,11 @@ SMTemplate* sm_get_template(StateMachine* sm);
  */
 const char* sm_get_name(StateMachine* sm);
 
+/*
+ * Set instance-specific data.
+ * This is intended for use in tests to set sm->data
+ * without direct struct member access.
+ */
+void sm_set_data(StateMachine* sm, void* data);
+
 #endif /* _SM_INSTANCE_H_ */

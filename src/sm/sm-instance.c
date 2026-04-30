@@ -350,3 +350,11 @@ sm_set_emitter(StateMachine* sm, EventEmitter emit, void* emit_userdata)
   sm->emit          = emit;
   sm->emit_userdata = emit_userdata;
 }
+
+void
+sm_set_data(StateMachine* sm, void* data)
+{
+  if (sm == NULL)
+    return;
+  sm->data = data;
+}

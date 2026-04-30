@@ -588,7 +588,7 @@ test_complete_flow(void)
   int           owner = 0;
   int           count = 0;
   StateMachine* sm    = make_sm(&owner, t);
-  sm->data            = &count;
+  sm_set_data(sm, &count);
 
   /* Valid transition with guard + action */
   g_raw_write_events = 0;
@@ -600,7 +600,7 @@ test_complete_flow(void)
   /* Transition without guard */
   count = 0;
   sm_raw_write(sm, S0);
-  sm->data = &count;
+  sm_set_data(sm, &count);
   assert(sm_transition(sm, S1) == true);
   assert(count == 1);
 
