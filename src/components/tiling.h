@@ -5,7 +5,7 @@
  * Manages the LayoutSM state machine and XCB window positioning.
  *
  * Component lifecycle:
- * - on_init(): register REQ_MONITOR_TILE executor, register guards/actions
+ * - on_init(): register REQ_MONITOR_TILE executor
  * - executor: handle REQ_MONITOR_TILE request, tile windows on monitor
  * - listener: react to EVT_LAYOUT_CHANGED
  *
@@ -17,12 +17,6 @@
  *
  * Events Emitted:
  * - EVT_LAYOUT_CHANGED - emitted after layout changes
- *
- * Acceptance Criteria:
- * [ ] Mod+Enter tiles current client in master area
- * [ ] Layout correctly divides monitor between master and stack
- * [ ] Window positions update via X ConfigureRequest
- * [ ] Event is emitted on layout change
  */
 
 #ifndef _COMPONENT_TILING_H_
@@ -49,19 +43,14 @@
  * Layout State Machine states
  */
 typedef enum LayoutState {
-  LAYOUT_STATE_TILE     = 0,
-  LAYOUT_STATE_MONOCLE  = 1,
-  LAYOUT_STATE_FLOATING = 2,
+  LAYOUT_STATE_TILE = 0,
 } LayoutState;
 
 /*
  * Layout events emitted on state transitions
  */
 typedef enum LayoutEvent {
-  EVT_LAYOUT_TILE_CHANGED     = 40,
-  EVT_LAYOUT_MONOCLE_CHANGED  = 41,
-  EVT_LAYOUT_FLOATING_CHANGED = 42,
-  EVT_LAYOUT_CHANGED          = 43,
+  EVT_LAYOUT_CHANGED = 40,
 } LayoutEvent;
 
 /*

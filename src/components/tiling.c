@@ -5,7 +5,7 @@
  * Manages the LayoutSM state machine and XCB window positioning.
  *
  * The component provides:
- * - LayoutSM template: TILE ↔ MONOCLE ↔ FLOATING
+ * - Tiled layout for window arrangement
  * - Executor that handles REQ_MONITOR_TILE requests
  * - Tiling algorithm that divides monitor into master and stack
  * - XCB ConfigureRequest to position windows
@@ -103,28 +103,14 @@ static void
 tiling_sm_emit(StateMachine* sm, uint32_t from_state, uint32_t to_state, void* userdata)
 {
   (void) sm;
+  (void) from_state;
 
   Monitor* m = (Monitor*) userdata;
   if (m == NULL)
     return;
 
-  EventType event;
-  switch (to_state) {
-  case LAYOUT_STATE_TILE:
-    event = EVT_LAYOUT_TILE_CHANGED;
-    break;
-  case LAYOUT_STATE_MONOCLE:
-    event = EVT_LAYOUT_MONOCLE_CHANGED;
-    break;
-  case LAYOUT_STATE_FLOATING:
-    event = EVT_LAYOUT_FLOATING_CHANGED;
-    break;
-  default:
-    return;
-  }
-
-  hub_emit(event, m->target.id, NULL);
   hub_emit(EVT_LAYOUT_CHANGED, m->target.id, NULL);
+  (void) to_state;
 }
 
 /*
@@ -171,79 +157,27 @@ tiling_action_on_layout_change(StateMachine* sm, void* data)
 
 /*
  * State Machine Template
+ *
+ * Provides a simple TILE state for tiling layout.
+ * The action function tiles all clients when the state machine is active.
  */
 SMTemplate*
 layout_sm_template_create(void)
 {
-  /* Define states */
+  /* Define single TILE state */
   static uint32_t states[] = {
     LAYOUT_STATE_TILE,
-    LAYOUT_STATE_MONOCLE,
-    LAYOUT_STATE_FLOATING,
   };
 
-  /* Define transitions:
-   * TILE ↔ MONOCLE
-   * TILE ↔ FLOATING
-   * MONOCLE ↔ FLOATING
-   */
-  static SMTransition transitions[] = {
-    /* TILE → MONOCLE */
-    {
-     .from_state = LAYOUT_STATE_TILE,
-     .to_state   = LAYOUT_STATE_MONOCLE,
-     .guard_fn   = "tiling_guard_can_change_layout",
-     .action_fn  = "tiling_action_on_layout_change",
-     .emit_event = EVT_LAYOUT_MONOCLE_CHANGED,
-     },
-    /* MONOCLE → TILE */
-    {
-     .from_state = LAYOUT_STATE_MONOCLE,
-     .to_state   = LAYOUT_STATE_TILE,
-     .guard_fn   = "tiling_guard_can_change_layout",
-     .action_fn  = "tiling_action_on_layout_change",
-     .emit_event = EVT_LAYOUT_TILE_CHANGED,
-     },
-    /* TILE → FLOATING */
-    {
-     .from_state = LAYOUT_STATE_TILE,
-     .to_state   = LAYOUT_STATE_FLOATING,
-     .guard_fn   = "tiling_guard_can_change_layout",
-     .action_fn  = "tiling_action_on_layout_change",
-     .emit_event = EVT_LAYOUT_FLOATING_CHANGED,
-     },
-    /* FLOATING → TILE */
-    {
-     .from_state = LAYOUT_STATE_FLOATING,
-     .to_state   = LAYOUT_STATE_TILE,
-     .guard_fn   = "tiling_guard_can_change_layout",
-     .action_fn  = "tiling_action_on_layout_change",
-     .emit_event = EVT_LAYOUT_TILE_CHANGED,
-     },
-    /* MONOCLE → FLOATING */
-    {
-     .from_state = LAYOUT_STATE_MONOCLE,
-     .to_state   = LAYOUT_STATE_FLOATING,
-     .guard_fn   = "tiling_guard_can_change_layout",
-     .action_fn  = "tiling_action_on_layout_change",
-     .emit_event = EVT_LAYOUT_FLOATING_CHANGED,
-     },
-    /* FLOATING → MONOCLE */
-    {
-     .from_state = LAYOUT_STATE_FLOATING,
-     .to_state   = LAYOUT_STATE_MONOCLE,
-     .guard_fn   = "tiling_guard_can_change_layout",
-     .action_fn  = "tiling_action_on_layout_change",
-     .emit_event = EVT_LAYOUT_MONOCLE_CHANGED,
-     },
-  };
+  /* No transitions needed - single state */
+  static SMTransition transitions[] = {};
 
   SMTemplate* tmpl = sm_template_create(
       "layout",
       states,
-      3,
+      1,
       transitions,
-      6,
+      0,
       LAYOUT_STATE_TILE);
 
   if (tmpl == NULL) {
@@ -447,7 +381,7 @@ tiling_collect_clients(Monitor* m, uint32_t* count)
     return NULL;
 
   uint32_t capacity = *count;
-  Client** clients = malloc(capacity * sizeof(Client*));
+  Client** clients  = malloc(capacity * sizeof(Client*));
   if (clients == NULL)
     return NULL;
 
@@ -457,7 +391,7 @@ tiling_collect_clients(Monitor* m, uint32_t* count)
   }
 
   uint32_t idx = 0;
-  Client* c     = client_list_sentinel()->next;
+  Client*  c   = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
     if (c->managed && c->monitor == m) {
@@ -582,54 +516,9 @@ tiling_tile_monitor(Monitor* m)
 
   LayoutState state = (LayoutState) sm_get_state(sm);
 
-  if (state == LAYOUT_STATE_MONOCLE) {
-    /* Monocle: only show the first managed client, full screen */
-    Client* sel = NULL;
-    Client* c   = client_list_sentinel()->next;
-    while (c != client_list_sentinel()) {
-      if (c->managed && c->monitor == m) {
-        sel = c;
-        break;
-      }
-      c = c->next;
-    }
+  (void) state; /* Suppress unused warning */
 
-    if (sel != NULL) {
-      sel->x            = m->x;
-      sel->y            = m->y;
-      sel->width        = m->width;
-      sel->height       = m->height;
-      sel->border_width = 0;
-      client_configure_from_struct(sel);
-
-      /* Hide all other clients on this monitor */
-      c = client_list_sentinel()->next;
-      while (c != client_list_sentinel()) {
-        if (c != sel && c->managed && c->monitor == m) {
-          client_hide(c->window);
-        }
-        c = c->next;
-      }
-
-      /* Show the selected client */
-      client_show(sel->window);
-    }
-    return;
-  }
-
-  if (state == LAYOUT_STATE_FLOATING) {
-    /* Floating: don't tile, restore stored positions */
-    Client* c = client_list_sentinel()->next;
-    while (c != client_list_sentinel()) {
-      if (c->managed && c->monitor == m) {
-        client_configure_from_struct(c);
-      }
-      c = c->next;
-    }
-    return;
-  }
-
-  /* TILE state - use tiled layout */
+  /* Always use tiled layout */
   int nmaster = tiling_get_nmaster(m);
 
   /* Collect clients */
@@ -743,37 +632,8 @@ tiling_executor(struct HubRequest* req)
     return;
   }
 
-  /* Get or create SM */
-  StateMachine* sm = tiling_get_sm(m);
-  if (sm == NULL) {
-    LOG_ERROR("tiling_executor: failed to get layout SM");
-    return;
-  }
-
-  /* Get current state */
-  uint32_t current = sm_get_state(sm);
-
-  /* If data indicates a specific layout, use it; otherwise toggle */
-  LayoutState target;
-  if (req->data != NULL) {
-    target = *(LayoutState*) req->data;
-  } else {
-    /* Default: toggle between TILE and MONOCLE */
-    target = (current == LAYOUT_STATE_TILE)
-                 ? LAYOUT_STATE_MONOCLE
-                 : LAYOUT_STATE_TILE;
-  }
-
-  /* Check if we need to transition */
-  if (current != target) {
-    /* Transition to new state - this will trigger action which tiles */
-    sm_transition(sm, target);
-  } else {
-    /* Already in target state, just re-tile */
-    if (target == LAYOUT_STATE_TILE) {
-      tiling_tile_monitor(m);
-    }
-  }
+  /* Just tile the monitor - this component handles tiling */
+  tiling_tile_monitor(m);
 
   LOG_DEBUG("tiling_executor: layout for monitor output=%u is now %u",
             m->output, sm_get_state(sm));
