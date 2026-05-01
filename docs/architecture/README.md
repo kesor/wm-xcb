@@ -20,6 +20,7 @@ This directory contains the authoritative documentation for the wm architecture.
 | **[target.md](target.md)** | Target design: Client, Monitor, adoption, on-demand SM allocation |
 | **[xcb-integration.md](xcb-integration.md)** | XCB event bridge: raw events → component handlers → Hub |
 | **[decisions.md](decisions.md)** | ⭐ Decision log with rationale for all major choices |
+| **[pipeline-composition.md](pipeline-composition.md)** | Pipeline composition for actions: wires, data flow, component responsibilities |
 
 ---
 
