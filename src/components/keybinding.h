@@ -1,19 +1,18 @@
 /*
  * keybinding.h - Keybinding component for the window manager
  *
- * Converts KEY_PRESS and KEY_RELEASE X events into hub requests.
- * Key bindings are configurable via config.def.h.
+ * Converts KEY_PRESS and KEY_RELEASE X events into action invocations.
+ * Uses the action registry for target resolution and action execution.
  *
  * Component lifecycle:
- * - on_init(): register XCB handlers for KEY_PRESS and KEY_RELEASE
- * - on_shutdown(): unregister XCB handlers
- * - No target adoption needed (works with global target resolution)
+ * - on_init(): initialize action registry, register keybindings, register XCB handlers
+ * - on_shutdown(): unregister XCB handlers, shutdown systems
+ * - No target adoption needed (uses global target resolution)
  *
- * Request types sent:
- * - REQ_CLIENT_FOCUS: Mod+Enter focuses the current client
- * - REQ_CLIENT_FOCUS_PREV: Mod+Shift+Enter focuses previous client
- * - REQ_MONITOR_TAG_VIEW: Mod+1-9 switches to tag view (1-indexed)
- * - REQ_MONITOR_TAG_TOGGLE: Mod+Shift+1-9 toggles tag visibility
+ * Key bindings are defined as action name strings:
+ * - "focus.focus-current": Mod+Enter focuses the current client
+ * - "tag-manager.view": Mod+1-9 switches to tag view (1-indexed)
+ * - "fullscreen.toggle": Mod+f toggles fullscreen
  *
  * Note: This component sends requests but does NOT handle them.
  * It should not be registered as a handler for these request types.
@@ -29,21 +28,8 @@
 #include "wm-hub.h"
 
 /*
- * Request type constants
- * These match the request types expected by focus and tag components.
- * The keybinding component uses these to send requests, not handle them.
- */
-enum KeybindingRequestType {
-  REQ_KEYBINDING_FOCUS      = 1, /* Maps to REQ_CLIENT_FOCUS */
-  REQ_KEYBINDING_FOCUS_PREV = 3, /* Maps to REQ_CLIENT_FOCUS_PREV */
-  REQ_KEYBINDING_TAG_VIEW   = 4, /* Maps to REQ_MONITOR_TAG_VIEW */
-  REQ_KEYBINDING_TAG_TOGGLE = 5, /* Maps to REQ_MONITOR_TAG_TOGGLE */
-  REQ_KEYBINDING_CLOSE      = 6, /* Maps to REQ_CLIENT_CLOSE */
-};
-
-/*
- * Key binding action types
- * Used internally to classify what action a keybinding should trigger
+ * Key binding action types (legacy enum for backward compatibility)
+ * New code should use action name strings directly.
  */
 typedef enum {
   KEYBINDING_ACTION_FOCUS_CLIENT,      /* Focus current client */
@@ -60,12 +46,17 @@ typedef enum {
 
 /*
  * Key binding configuration entry
+ *
+ * Maps a key combination to an action name.
+ * The action name is looked up in the action registry at runtime.
  */
 typedef struct KeyBinding {
-  uint32_t         modifiers; /* XCB modifier mask (Shift, Control, Mod1, etc.) */
-  xcb_keycode_t    keycode;   /* X11 keycode */
-  KeybindingAction action;    /* Action to perform */
-  uint32_t         arg;       /* Action argument (tag number for tag actions) */
+  uint32_t      modifiers; /* XCB modifier mask (Shift, Control, Mod1, etc.) */
+  xcb_keycode_t keycode;   /* X11 keycode */
+  const char*   action;    /* Action name to invoke (e.g., "fullscreen.toggle") */
+  uint32_t      arg;       /* Integer argument (e.g., tag number) */
+  void*         userdata;  /* Binding-specific userdata */
+  bool          has_arg;   /* Whether arg should be passed to action */
 } KeyBinding;
 
 /*
@@ -129,7 +120,7 @@ extern HubComponent keybinding_component;
 
 /*
  * Handle KEY_PRESS events
- * Looks up the keybinding in config, then sends the appropriate hub request
+ * Looks up the keybinding, then invokes the action from the action registry
  */
 void keybinding_handle_key_press(void* event);
 
@@ -166,5 +157,11 @@ void keybinding_init(void);
  * Called during cleanup
  */
 void keybinding_shutdown(void);
+
+/*
+ * Convert KeybindingAction enum to action name string
+ * Used for backward compatibility with tests
+ */
+const char* keybinding_action_to_name(KeybindingAction action);
 
 #endif /* WM_KEYBINDING_H_ */

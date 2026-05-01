@@ -8,6 +8,7 @@
  * - Keybinding action execution (sending hub requests)
  */
 
+#include <string.h>
 #include "src/components/keybinding.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
@@ -56,17 +57,17 @@ test_keybinding_lookup_exact(void)
   xcb_handler_init();
   keybinding_init();
 
-  /* Mod4 + keycode 36 (Return) -> KEYBINDING_ACTION_FOCUS_CLIENT */
+  /* Mod4 + keycode 36 (Return) -> focus.focus-current */
   const KeyBinding* binding = keybinding_lookup(XCB_MOD_MASK_4, 36);
-  assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
+  assert(binding != NULL && strcmp(binding->action, "focus.focus-current") == 0);
 
-  /* Mod4 + Shift + keycode 36 -> KEYBINDING_ACTION_FOCUS_PREV */
+  /* Mod4 + Shift + keycode 36 -> focus.focus-prev */
   binding = keybinding_lookup(XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 36);
-  assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_PREV);
+  assert(binding != NULL && strcmp(binding->action, "focus.focus-prev") == 0);
 
-  /* Mod4 + keycode 10 (1) -> KEYBINDING_ACTION_TAG_VIEW with arg=1 */
+  /* Mod4 + keycode 10 (1) -> tag-manager.view with arg=1 */
   binding = keybinding_lookup(XCB_MOD_MASK_4, 10);
-  assert(binding != NULL && binding->action == KEYBINDING_ACTION_TAG_VIEW && binding->arg == 1);
+  assert(binding != NULL && strcmp(binding->action, "tag-manager.view") == 0 && binding->arg == 1);
 
   keybinding_shutdown();
   xcb_handler_shutdown();
@@ -113,12 +114,12 @@ test_keybinding_modifier_normalization(void)
   /* Mod4 + lock modifier should still match Mod4 alone */
   uint32_t          mod_with_lock = XCB_MOD_MASK_4 | XCB_MOD_MASK_LOCK;
   const KeyBinding* binding       = keybinding_lookup(mod_with_lock, 36);
-  assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
+  assert(binding != NULL && strcmp(binding->action, "focus.focus-current") == 0);
 
   /* Mod4 + NumLock (mode switch) should also match */
   uint32_t mod_with_numlock = XCB_MOD_MASK_4 | XCB_MOD_MASK_2;
   binding                   = keybinding_lookup(mod_with_numlock, 36);
-  assert(binding != NULL && binding->action == KEYBINDING_ACTION_FOCUS_CLIENT);
+  assert(binding != NULL && strcmp(binding->action, "focus.focus-current") == 0);
 
   keybinding_shutdown();
   xcb_handler_shutdown();
@@ -141,7 +142,7 @@ test_keybinding_tag_bindings(void)
   for (int i = 1; i <= 9; i++) {
     xcb_keycode_t     keycode = 9 + i; /* keycodes 10-18 */
     const KeyBinding* binding = keybinding_lookup(XCB_MOD_MASK_4, keycode);
-    assert(binding != NULL && binding->action == KEYBINDING_ACTION_TAG_VIEW && binding->arg == (uint32_t) i);
+    assert(binding != NULL && strcmp(binding->action, "tag-manager.view") == 0 && binding->arg == (uint32_t) i);
   }
 
   /* Mod4 + Shift + 1-9 for tag toggle */
@@ -149,7 +150,7 @@ test_keybinding_tag_bindings(void)
     xcb_keycode_t     keycode = 9 + i;
     const KeyBinding* binding = keybinding_lookup(
         XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, keycode);
-    assert(binding != NULL && binding->action == KEYBINDING_ACTION_TAG_TOGGLE && binding->arg == (uint32_t) i);
+    assert(binding != NULL && strcmp(binding->action, "tag-manager.toggle") == 0 && binding->arg == (uint32_t) i);
   }
 
   keybinding_shutdown();
@@ -213,7 +214,7 @@ test_keybinding_get_bindings(void)
 
   /* Verify first binding is Mod+Enter for focus */
   const KeyBinding* first = keybinding_get_bindings();
-  assert(first != NULL && first->action == KEYBINDING_ACTION_FOCUS_CLIENT && first->keycode == 36);
+  assert(first != NULL && strcmp(first->action, "focus.focus-current") == 0 && first->keycode == 36);
 
   keybinding_shutdown();
   hub_shutdown();
