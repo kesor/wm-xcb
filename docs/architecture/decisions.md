@@ -235,10 +235,11 @@ void keybinding_init(void) {
 **Correct (RESOLVED - PR #80):**
 ```c
 // keybindings.h - User-configurable keybindings
-const KeyBinding keybindings[] = {
+static const KeyBinding keybindings[] = {
     { MODKEY, 10, KEYBINDING_ACTION_TAG_VIEW, 1 },  // Mod+1
     { MODKEY, 11, KEYBINDING_ACTION_TAG_VIEW, 2 },  // Mod+2
     // ... add more as needed
+    { 0, 0, 0, 0 }  // terminator
 };
 ```
 
