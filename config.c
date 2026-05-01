@@ -1,8 +1,12 @@
 /*
- * config.c - Configuration implementation
+ * config.c - Configuration system
  *
- * Read-only configuration access at runtime.
+ * Provides read-only access to configuration values.
  * Configuration is compile-time only (config.def.h).
+ *
+ * Note: Keybindings are NOT handled here. They're registered
+ * directly via keybinding_binding_register() calls in config.wm.def.h,
+ * keeping this module generic and decoupled from input handling.
  */
 
 #include <stdbool.h>
@@ -12,15 +16,19 @@
 #include <string.h>
 
 #include "config.def.h"
+#include "config.wm.def.h"
 #include "wm-log.h"
 
 /*
- * Configuration keybinding storage
- *
- * Uses the default_keybindings from config.def.h.
+ * Initialize the configuration system.
+ * This wires keybindings from config.wm.def.h.
  */
-static const KeyBinding* keybindings      = default_keybindings;
-static uint32_t          keybinding_count = DEFAULT_KEYBINDING_COUNT;
+void
+config_init(void)
+{
+  LOG_DEBUG("Initializing configuration");
+  config_wire_keybindings();
+}
 
 /*
  * Check if a string matches a pattern (substring match).
@@ -75,18 +83,6 @@ rule_matches(
  * Configuration Access Functions
  * ============================================================================
  */
-
-const KeyBinding*
-config_get_keybindings(void)
-{
-  return keybindings;
-}
-
-uint32_t
-config_get_keybinding_count(void)
-{
-  return keybinding_count;
-}
 
 const FloatRule*
 config_get_float_rules(void)

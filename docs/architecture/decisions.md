@@ -245,53 +245,102 @@ static const KeyBinding keybindings[] = {
 
 **Implementation:** Keybindings are now configurable via `src/components/keybindings.h`. Users modify this header and recompile.
 
+**Better (RESOLVED - PR #92):**
+```c
+// config.wm.def.h - Decoupled keybinding wiring
+static void config_wire_keybindings(void) {
+    KB(MODKEY, 36, "focus.focus-current");        // Mod+Enter
+    KB(MODKEY, 41, "fullscreen.toggle");        // Mod+f
+    KB_TAG(MODKEY, 10, "tag-manager.view", 1);   // Mod+1
+}
+```
+
+**Implementation:** Keybindings are wired in `config.wm.def.h` using action name strings. The keybinding component has no hardcoded bindings. Config does the wiring.
+
 ---
 
 ## Pending Design: Actions and Wiring
 
-### Problem
+### Problem (RESOLVED)
 
-We don't yet have a defined mechanism for:
+We now have a defined mechanism for:
 1. Components to expose callable actions (e.g., `fullscreen.toggle()`, `tag_manager.view(1)`)
-2. Configuration to wire these actions to keybindings, pointer events, or other triggers
-3. Cross-component wiring (e.g., pointer drag → resize action in another component)
+2. Configuration to wire these actions to keybindings via action name strings
+3. Target resolution: How actions receive the correct target (current client, current monitor, etc.)
 
-### What We Need
+### Implementation (RESOLVED - PR #88)
 
-- **Actions API**: Components expose a registry of named actions with signatures
-- **Wiring mechanism**: How configuration binds triggers to actions
-- **Target resolution**: How actions receive the correct target (current client, current monitor, etc.)
+**Actions API:**
+- Components register named actions with `action_register()`
+- Action names follow pattern: `"component.action"` (e.g., `"fullscreen.toggle"`)
+- Actions are looked up by name and invoked with resolved targets
+
+**Wiring mechanism:**
+- `config.wm.def.h` contains `config_wire_keybindings()` function
+- Uses `keybinding_binding_register()` to map key combinations to action names
+- `config_init()` calls this function at startup
+
+**Target resolution:**
+- Built-in resolvers: `action_resolve_current_client()`, `action_resolve_current_monitor()`
+- Actions declare `target_type` hint: `ACTION_TARGET_CLIENT`, `ACTION_TARGET_MONITOR`
+- Target is resolved at invocation time, not binding time
+
+**Example:**
+```c
+// config.wm.def.h - User configures keybindings here
+static void config_wire_keybindings(void) {
+  KB(MODKEY, 36, "focus.focus-current");        // Mod+Enter
+  KB(MODKEY, 41, "fullscreen.toggle");        // Mod+f
+  KB_TAG(MODKEY, 10, "tag-manager.view", 1);     // Mod+1
+}
+```
 
 ### Related Issues
 
-- See GitHub issue: **#83 Design: Actions and Wiring Architecture**
+- See GitHub issue: **#83 Design: Actions and Wiring Architecture** — IMPLEMENTED
 
 ---
 
 ## Pending Design: Configuration System
 
-### Problem
+### Problem (RESOLVED)
 
-Currently:
-- Keybindings are hardcoded in the keybinding component
-- No way for users to configure component properties (gaps, colors, rules)
-- DWM-style `Rules` (auto-float certain windows) not implemented
+Configuration has been decoupled from components:
+- `config.def.h` provides generic config (rules, gaps, borders, transitions)
+- `config.wm.def.h` wires keybindings to action names
+- Neither config nor keybinding component hardcodes the wiring
 
-### What We Need
+### Implementation (RESOLVED - PR #92)
 
-1. **config.def.h style**: Compile-time configuration like dwm
-2. **Runtime config**: File-based or UI-based configuration
-3. **Configuration component**: Reads config and wires things up
+**Generic config system (`config.def.h`):**
+- Provides `FloatRule`, `TagRule`, `GapConfig`, `BorderConfig`
+- State machine transitions for mouse/keyboard interactions
+- No knowledge of keybindings or specific action types
 
-### Scope
+**WM-specific wiring (`config.wm.def.h`):**
+- Includes `config.def.h` for base config
+- Includes `keybinding-binding.h` for binding registration API
+- Defines `config_wire_keybindings()` to register default keybindings
+- Uses action NAME strings (e.g., `"fullscreen.toggle"`), not enum values
 
-- Keybindings: `Mod+f` → `fullscreen.toggle(focused_client)`
-- Rules: `class=Steam` → `floating.enable()`, `tags=1`
-- Properties: `gaps=10`, `border_color=#333333`
+**Keybinding component decoupling:**
+- `keybinding.c` no longer has hardcoded bindings
+- `keybinding_init()` calls `config_init()` which calls `config_wire_keybindings()`
+- Component only handles KEY_PRESS → action lookup and invocation
+
+**Scope (IMPLEMENTED):**
+- ✅ Keybindings: `Mod+f` → `"fullscreen.toggle"`
+- ✅ Rules: `class=Steam` → floating (via `config_should_float()`)
+- ✅ Tags: `class=Firefox` → tag 2 (via `config_get_tags()`)
+- ✅ Properties: gaps, borders (via `config_get_gaps()`, `config_get_borders()`)
+
+**Key design principle:**
+> The config system is an enabler, not a coupler. Config files do the wiring; components don't hardcode it.
 
 ### Related Issues
 
-- See GitHub issue: **#84 Design: Configuration System for Keybindings, Rules, and Properties**
+- See GitHub issue: **#84 Design: Configuration System for Keybindings, Rules, and Properties** — IMPLEMENTED (partial)
+- See GitHub issue: **#92 Decouple config from component details** — IMPLEMENTED
 
 ---
 

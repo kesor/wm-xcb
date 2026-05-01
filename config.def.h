@@ -4,13 +4,27 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <xcb/xcb.h>
+
 #include "wm-states.h"
 
-#include <X11/keysymdef.h>
+/* Forward declarations */
+typedef struct KeyBinding KeyBinding;
+
+/*
+ * Configuration API
+ *
+ * The config system provides read-only access to configuration values.
+ * Configuration values are defined in config.def.h and accessed via
+ * config_get_*() functions.
+ *
+ * Keybindings are NOT accessed here - they're registered directly
+ * via keybinding_binding_register() in config.wm.def.h, keeping the
+ * config system generic and decoupled from the keybinding component.
+ */
 
 /*
  * ============================================================================
- * STATE MACHINE TRANSITIONS (existing config)
+ * STATE MACHINE TRANSITIONS
  * ============================================================================
  *
  * State machine transitions for mouse/keyboard interactions.
@@ -31,100 +45,7 @@ static struct StateTransition transitions[] = {
 
 /*
  * ============================================================================
- * KEYBINDING CONFIGURATION (new)
- * ============================================================================
- *
- * Keybindings are defined as an array of KeyBinding structures.
- * Each binding specifies:
- * - modifiers: XCB modifier mask (XCB_MOD_MASK_*)
- * - keycode: X11 keycode
- * - action: Action to perform (see KeyBindingAction enum)
- * - arg: Argument for the action (e.g., tag number for tag actions)
- */
-
-/*
- * Key binding action types
- * Used internally to classify what action a keybinding should trigger.
- */
-typedef enum KeyBindingAction {
-  KEYBINDING_ACTION_NONE              = 0,  /* No action */
-  KEYBINDING_ACTION_FOCUS_CLIENT      = 1,  /* Focus current client */
-  KEYBINDING_ACTION_FOCUS_PREV        = 2,  /* Focus previous client */
-  KEYBINDING_ACTION_FOCUS_NEXT        = 3,  /* Focus next client */
-  KEYBINDING_ACTION_TAG_VIEW          = 4,  /* View specific tag (arg = tag 1-9) */
-  KEYBINDING_ACTION_TAG_TOGGLE        = 5,  /* Toggle tag visibility (arg = tag 1-9) */
-  KEYBINDING_ACTION_TAG_CLIENT_MOVE   = 6,  /* Move client to tag (arg = tag 1-9) */
-  KEYBINDING_ACTION_CLOSE_CLIENT      = 7,  /* Close current client */
-  KEYBINDING_ACTION_TOGGLE_FULLSCREEN = 8,  /* Toggle fullscreen */
-  KEYBINDING_ACTION_TILE_MONITOR      = 9,  /* Tile all clients on monitor */
-  KEYBINDING_ACTION_SPAWN_TERMINAL    = 11, /* Spawn terminal */
-  KEYBINDING_ACTION_LAST,
-} KeyBindingAction;
-
-/*
- * Key binding configuration entry
- */
-typedef struct KeyBinding {
-  uint32_t         modifiers; /* XCB modifier mask */
-  uint8_t          keycode;   /* X11 keycode */
-  KeyBindingAction action;    /* Action to perform */
-  uint32_t         arg;       /* Action argument */
-} KeyBinding;
-
-/*
- * Default keybindings
- * These follow dwm conventions using Mod4 (Super/Windows key)
- */
-static const KeyBinding default_keybindings[] = {
-  /* Focus actions */
-  { XCB_MOD_MASK_4,                                       36, KEYBINDING_ACTION_FOCUS_CLIENT,      0 }, /* Mod+Enter */
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  36, KEYBINDING_ACTION_FOCUS_PREV,        0 }, /* Mod+Shift+Enter */
-
-  /* Tag view actions - Mod+1 through Mod+9 */
-  { XCB_MOD_MASK_4,                                       10, KEYBINDING_ACTION_TAG_VIEW,          1 },
-  { XCB_MOD_MASK_4,                                       11, KEYBINDING_ACTION_TAG_VIEW,          2 },
-  { XCB_MOD_MASK_4,                                       12, KEYBINDING_ACTION_TAG_VIEW,          3 },
-  { XCB_MOD_MASK_4,                                       13, KEYBINDING_ACTION_TAG_VIEW,          4 },
-  { XCB_MOD_MASK_4,                                       14, KEYBINDING_ACTION_TAG_VIEW,          5 },
-  { XCB_MOD_MASK_4,                                       15, KEYBINDING_ACTION_TAG_VIEW,          6 },
-  { XCB_MOD_MASK_4,                                       16, KEYBINDING_ACTION_TAG_VIEW,          7 },
-  { XCB_MOD_MASK_4,                                       17, KEYBINDING_ACTION_TAG_VIEW,          8 },
-  { XCB_MOD_MASK_4,                                       18, KEYBINDING_ACTION_TAG_VIEW,          9 },
-
-  /* Tag toggle actions - Mod+Shift+1 through Mod+Shift+9 */
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  10, KEYBINDING_ACTION_TAG_TOGGLE,        1 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  11, KEYBINDING_ACTION_TAG_TOGGLE,        2 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  12, KEYBINDING_ACTION_TAG_TOGGLE,        3 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  13, KEYBINDING_ACTION_TAG_TOGGLE,        4 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  14, KEYBINDING_ACTION_TAG_TOGGLE,        5 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  15, KEYBINDING_ACTION_TAG_TOGGLE,        6 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  16, KEYBINDING_ACTION_TAG_TOGGLE,        7 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  17, KEYBINDING_ACTION_TAG_TOGGLE,        8 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  18, KEYBINDING_ACTION_TAG_TOGGLE,        9 },
-
-  /* Move client to tag - Mod+Shift+Alt+1 through Mod+Shift+Alt+9 */
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 10, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   1 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 11, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   2 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 12, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   3 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 13, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   4 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 14, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   5 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 15, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   6 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 16, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   7 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 17, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   8 },
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 18, KEYBINDING_ACTION_TAG_CLIENT_MOVE,   9 },
-
-  /* Fullscreen toggle - Mod+f */
-  { XCB_MOD_MASK_4,                                       41, KEYBINDING_ACTION_TOGGLE_FULLSCREEN, 0 },
-
-  /* Tile monitor - Mod+Shift+BackSpace */
-  { XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4,                  22, KEYBINDING_ACTION_TILE_MONITOR,      0 },
-};
-
-#define DEFAULT_KEYBINDING_COUNT (sizeof(default_keybindings) / sizeof(default_keybindings[0]))
-
-/*
- * ============================================================================
- * WINDOW RULES CONFIGURATION (new)
+ * WINDOW RULES CONFIGURATION
  * ============================================================================
  */
 
@@ -171,7 +92,7 @@ static const TagRule default_tag_rules[] = {
 
 /*
  * ============================================================================
- * COMPONENT PROPERTIES CONFIGURATION (new)
+ * COMPONENT PROPERTIES CONFIGURATION
  * ============================================================================
  */
 
@@ -225,8 +146,6 @@ static const BorderConfig default_borders = {
  * ============================================================================
  */
 
-const KeyBinding*   config_get_keybindings(void);
-uint32_t            config_get_keybinding_count(void);
 const FloatRule*    config_get_float_rules(void);
 uint32_t            config_get_float_rule_count(void);
 const TagRule*      config_get_tag_rules(void);

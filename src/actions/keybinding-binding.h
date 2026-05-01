@@ -98,8 +98,9 @@ KeyBindingLookup keybinding_binding_lookup_with_invocation(uint32_t modifiers, x
 /*
  * Get all registered bindings.
  * Returns a NULL-terminated array of KeyBinding pointers.
+ * The returned pointer itself is const (cannot modify the array).
  */
-const KeyBinding** keybinding_binding_get_all(void);
+const KeyBinding* const* keybinding_binding_get_all(void);
 
 /*
  * Get the number of registered bindings.
