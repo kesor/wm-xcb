@@ -22,14 +22,12 @@
 
 #include <xcb/xcb.h>
 
+#include "config.h"
 #include "keybinding.h"
 #include "src/actions/keybinding-binding.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
 #include "wm-log.h"
-
-/* Config system initialization */
-extern void config_init(void);
 
 /*
  * Action name constants for backward compatibility
@@ -92,7 +90,8 @@ keybinding_init(void)
   xcb_handler_register(XCB_KEY_RELEASE, &keybinding_component, keybinding_handle_key_release);
 
   initialized = true;
-  LOG_DEBUG("Keybinding component initialized with %" PRIu32 " bindings", num_keybindings);
+  LOG_DEBUG("Keybinding component initialized with %" PRIu32 " bindings",
+            keybinding_binding_get_count());
 }
 
 /*
@@ -134,8 +133,9 @@ keybinding_lookup(uint32_t modifiers, xcb_keycode_t keycode)
 
 /*
  * Get the configured key bindings array
+ * Returns: pointer to internal array (do not modify)
  */
-const KeyBinding**
+const KeyBinding* const*
 keybinding_get_bindings(void)
 {
   return keybinding_binding_get_all();

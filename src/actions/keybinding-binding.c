@@ -287,7 +287,7 @@ keybinding_binding_lookup_with_invocation(uint32_t modifiers, xcb_keycode_t keyc
   return result;
 }
 
-const KeyBinding**
+const KeyBinding* const*
 keybinding_binding_get_all(void)
 {
   if (!initialized) {

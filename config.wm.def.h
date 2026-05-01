@@ -1,14 +1,16 @@
 /*
- * config.def.h - Default configuration for the window manager
+ * config.wm.def.h - Default configuration for the window manager
  *
- * This is the dwm-style configuration file. Users customize this file
- * and recompile the window manager.
+ * This is the WM-specific wiring layer. Users customize keybindings
+ * in this file and recompile the window manager.
  *
  * This file:
- * 1. Includes the base config (config.def.h) for rules, gaps, borders
- * 2. Registers keybindings via keybinding_binding_register()
+ * 1. Includes wm-states.h for StateTransition types
+ * 2. Includes keybinding-binding.h for binding registration API
+ * 3. Defines config_wire_keybindings() to register default keybindings
  *
- * The config system is generic - it doesn't know about specific components.
+ * The config system is decoupled - config.def.h provides generic config
+ * (rules, gaps, borders) while this file handles WM-specific wiring.
  * Keybindings are wired here using action names from the action registry.
  */
 
