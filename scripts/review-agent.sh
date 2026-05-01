@@ -84,16 +84,6 @@ get_changed_files() {
     git diff "origin/${base}...origin/${branch}" --name-only 2>/dev/null | grep -E '\.(c|h)$' || true
 }
 
-# Check if architecture docs exist
-check_docs() {
-    local doc_path="$1"
-    if [ -f "${MAIN_REPO}/${doc_path}" ]; then
-        echo "1"
-    else
-        echo "0"
-    fi
-}
-
 # Create review task file
 create_review_task() {
     local pr_num="$1"
@@ -305,27 +295,27 @@ fi
 # Copy task file
 cp "${REPO_DIR}/review-task-${PR_NUM}.txt" "../${WORKTREE_NAME}/review-task-${PR_NUM}.txt" 2>/dev/null || true
 
-# Create or reuse review tmux session
-if tmux has-session -t ${SESSION_NAME} 2>/dev/null; then
-    tmux kill-window -t "${SESSION_NAME}:review" 2>/dev/null || true
-    tmux new-window -t ${SESSION_NAME} -n "review" -c "/home/evgeny/src/suckless/${WORKTREE_NAME}"
-else
-    tmux new-session -d -s ${SESSION_NAME} -n "review" -c "/home/evengy/src/suckless/${WORKTREE_NAME}"
-fi
-
 # Send commands to run the review
-REVIEW_DIR="$REPO_DIR"
 NIX_CMD="cd /home/evgeny/src/suckless && nix develop --command sh -c 'cd ${WORKTREE_NAME} && pi @review-task-${PR_NUM}.txt Review PR #${PR_NUM} architectural violations'"
 
 SESSION_NAME="wm-issues"
 WINDOW_NAME="review-${PR_NUM}"
+
+# Ensure session exists with correct window
+if ! tmux has-session -t ${SESSION_NAME} 2>/dev/null; then
+    tmux new-session -d -s ${SESSION_NAME} -n "main" -c "/home/evgeny/src/suckless/${WORKTREE_NAME}"
+fi
+
+# Kill old review window if exists and create new one
+tmux kill-window -t "${SESSION_NAME}:${WINDOW_NAME}" 2>/dev/null || true
+tmux new-window -t ${SESSION_NAME} -n "${WINDOW_NAME}" -c "/home/evgeny/src/suckless/${WORKTREE_NAME}"
 
 tmux send-keys -t "${SESSION_NAME}:${WINDOW_NAME}" "git fetch origin" Enter
 tmux send-keys -t "${SESSION_NAME}:${WINDOW_NAME}" "${NIX_CMD}" Enter
 
 echo ""
 echo "Architectural review agent spawned for PR #${PR_NUM}"
-echo "Worktree: ${REVIEW_DIR}"
+echo "Worktree: /home/evgeny/src/suckless/${WORKTREE_NAME}"
 echo "Session: ${SESSION_NAME}"
 echo "Window: ${WINDOW_NAME}"
 echo ""
