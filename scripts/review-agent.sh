@@ -125,7 +125,7 @@ Read these files to understand the architecture:
 
 ### 1. Read the changes
 
-Run: \`git fetch origin && git diff origin/master...origin/${branch} -- '*.c' '*.h'\`
+Run: \`git fetch origin && git diff origin/${BASE}...origin/${BRANCH} -- '*.c' '*.h'\`
 
 Analyze each changed file for architectural violations.
 
@@ -300,7 +300,13 @@ fi
 cp "${REPO_DIR}/review-task-${PR_NUM}.txt" "../${WORKTREE_NAME}/review-task-${PR_NUM}.txt" 2>/dev/null || true
 
 # Create worktree path
-WORKTREE_PATH="${SUCKLESS_ROOT}/${WORKTREE_NAME}"
+if [ "${WORKTREE_NAME}" == "suckless/wm" ]; then
+    # Fallback: use current repo
+    WORKTREE_PATH="${REPO_DIR}"
+    WORKTREE_NAME="wm"
+else
+    WORKTREE_PATH="${SUCKLESS_ROOT}/${WORKTREE_NAME}"
+fi
 
 # Send commands to run the review
 NIX_CMD="cd ${SUCKLESS_ROOT} && nix develop --command sh -c 'cd ${WORKTREE_NAME} && pi @review-task-${PR_NUM}.txt Review PR #${PR_NUM} architectural violations'"

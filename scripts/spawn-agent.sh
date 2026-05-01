@@ -273,9 +273,14 @@ else
     # For new issues, copy template and fill in issue-specific details
     TASK_FILE="task-issue-${ISSUE_NUM}.txt"
     cp "${MAIN_REPO}/scripts/task-template.md" "${MAIN_REPO}/${TASK_FILE}"
-    sed -i "s/{TITLE}/Issue #${ISSUE_NUM}: ${ISSUE_TITLE}/g" "${MAIN_REPO}/${TASK_FILE}"
+    
+    # Escape special characters for sed replacement
+    ESCAPED_TITLE=$(printf '%s' "Issue #${ISSUE_NUM}: ${ISSUE_TITLE}" | sed 's/[&/\\]/\\&/g')
+    ESCAPED_BRANCH=$(printf '%s' "${BRANCH_NAME}" | sed 's/[&/\\]/\\&/g')
+    
+    sed -i "s/{TITLE}/${ESCAPED_TITLE}/g" "${MAIN_REPO}/${TASK_FILE}"
     sed -i "s/{ISSUE}/${ISSUE_NUM}/g" "${MAIN_REPO}/${TASK_FILE}"
-    sed -i "s/{BRANCH_NAME}/${BRANCH_NAME}/g" "${MAIN_REPO}/${TASK_FILE}"
+    sed -i "s/{BRANCH_NAME}/${ESCAPED_BRANCH}/g" "${MAIN_REPO}/${TASK_FILE}"
     # Copy to worktree
     cp "${MAIN_REPO}/${TASK_FILE}" "../${WORKTREE_NAME}/${TASK_FILE}"
 
