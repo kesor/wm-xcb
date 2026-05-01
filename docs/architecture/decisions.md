@@ -232,15 +232,18 @@ void keybinding_init(void) {
 }
 ```
 
-**Correct (TBD):**
+**Correct (RESOLVED - PR #80):**
 ```c
-// Configuration component wires things together:
-void config_init(void) {
-    // ✅ Declarative configuration
-    keybinding_register("Mod+1", tag_manager_get_action("view", 1));
-    keybinding_register("Mod+f", fullscreen_get_action("toggle"));
-}
+// keybindings.h - User-configurable keybindings
+static const KeyBinding keybindings[] = {
+    { MODKEY, 10, KEYBINDING_ACTION_TAG_VIEW, 1 },  // Mod+1
+    { MODKEY, 11, KEYBINDING_ACTION_TAG_VIEW, 2 },  // Mod+2
+    // ... add more as needed
+    { 0, 0, 0, 0 }  // terminator
+};
 ```
+
+**Implementation:** Keybindings are now configurable via `src/components/keybindings.h`. Users modify this header and recompile.
 
 ---
 
