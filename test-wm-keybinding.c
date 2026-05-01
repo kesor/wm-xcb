@@ -204,7 +204,7 @@ test_keybinding_get_bindings(void)
   hub_init();
   keybinding_init();
 
-  const KeyBinding* bindings = keybinding_get_bindings();
+  const KeyBinding** bindings = keybinding_get_bindings();
   assert(bindings != NULL);
 
   uint32_t count = keybinding_get_count();
@@ -213,7 +213,7 @@ test_keybinding_get_bindings(void)
   LOG_DEBUG("Got %" PRIu32 " keybindings via accessor", count);
 
   /* Verify first binding is Mod+Enter for focus */
-  const KeyBinding* first = keybinding_get_bindings();
+  const KeyBinding* first = bindings[0];
   assert(first != NULL && strcmp(first->action, "focus.focus-current") == 0 && first->keycode == 36);
 
   keybinding_shutdown();

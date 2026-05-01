@@ -139,7 +139,7 @@ const KeyBinding* keybinding_lookup(uint32_t modifiers, xcb_keycode_t keycode);
 /*
  * Get the configured key bindings array
  */
-const KeyBinding* keybinding_get_bindings(void);
+const KeyBinding** keybinding_get_bindings(void);
 
 /*
  * Get the number of configured key bindings

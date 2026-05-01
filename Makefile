@@ -34,6 +34,7 @@ endif
 
 # Root-level source files
 ROOT_SRC = \
+	config.c \
 	wm-log.c \
 	wm-signals.c \
 	wm-running.c \
