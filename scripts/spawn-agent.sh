@@ -18,7 +18,9 @@ set -e
 ISSUE_NUM=""
 MODE="new"  # "new", "fix", or "continue"
 GITHUB_REPO="kesor/wm-xcb"
-MAIN_REPO="/home/evgeny/src/suckless/wm"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MAIN_REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+SUCKLESS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 usage() {
     echo "Usage: $0 <issue_number|PR_number> [--fix|--continue]"
@@ -44,8 +46,11 @@ ISSUE_NUM="$1"
 shift
 
 # Check for mode flags
-if [ "$1" == "--fix" ] || [ "$1" == "--continue" ]; then
+if [ "$1" == "--fix" ]; then
     MODE="fix"
+    shift
+elif [ "$1" == "--continue" ]; then
+    MODE="continue"
     shift
 elif [ "$1" == "--new" ]; then
     MODE="new"
@@ -96,8 +101,9 @@ create_fix_task() {
     local pr_num="$1"
     local title="$2"
     local comments=$(fetch_pr_comments "$pr_num")
+    local task_file="${MAIN_REPO}/${TASK_FILE}"
 
-    cat > "${MAIN_REPO}/${TASK_FILE}" << FIXEOF
+    cat > "${task_file}" << FIXEOF
 # Task: Fix Code Review Comments (PR #${pr_num})
 
 You are fixing code review comments on PR #${pr_num}: ${title}
@@ -188,7 +194,7 @@ if [ "$MODE" == "fix" ] || [ "$MODE" == "continue" ]; then
     # Create fix task with comments (only for fix mode)
     if [ "$MODE" == "fix" ]; then
         create_fix_task "$PR_NUM" "$PR_TITLE"
-    else
+    elif [ "$MODE" == "continue" ]; then
         # --continue mode: use existing task file if available
         if [ -f "${MAIN_REPO}/task-issue-${ISSUE_NUM}.txt" ]; then
             cp "${MAIN_REPO}/task-issue-${ISSUE_NUM}.txt" "../${WORKTREE_NAME}/"
@@ -238,21 +244,22 @@ else
 fi
 
 # Use or create the wm-issues session
+WORKTREE_PATH="${SUCKLESS_ROOT}/${WORKTREE_NAME}"
 if tmux has-session -t wm-issues 2>/dev/null; then
     # Kill existing window with same name if it exists, ignore errors
     tmux kill-window -t "wm-issues:$WINDOW_NAME" 2>/dev/null || true
-    tmux new-window -t wm-issues -n "$WINDOW_NAME" -c "/home/evgeny/src/suckless/${WORKTREE_NAME}"
+    tmux new-window -t wm-issues -n "$WINDOW_NAME" -c "${WORKTREE_PATH}"
 else
-    tmux new-session -d -s wm-issues -n "$WINDOW_NAME" -c "/home/evgeny/src/suckless/${WORKTREE_NAME}"
+    tmux new-session -d -s wm-issues -n "$WINDOW_NAME" -c "${WORKTREE_PATH}"
 fi
 
 # Send commands to the new window
 tmux send-keys -t "wm-issues:$WINDOW_NAME" "git fetch origin && git pull --rebase origin ${BRANCH_NAME}" Enter
 
 # Build pi command - run inside nix develop environment
-# nix develop needs ~/src/suckless (has flake.nix), but worktree is ~/src/suckless/wm-issue-N
+# nix develop needs the root (has flake.nix), but worktree is in subdirectory
 # Use nix develop from parent, then cd to worktree for pi
-NIX_CMD="cd /home/evgeny/src/suckless && nix develop --command sh -c 'cd ${WORKTREE_NAME} && pi "
+NIX_CMD="cd ${SUCKLESS_ROOT} && nix develop --command sh -c 'cd ${WORKTREE_NAME} && pi "
 
 if [ "$MODE" == "fix" ]; then
     # For fixes, use existing task file
@@ -266,7 +273,7 @@ else
     # For new issues, copy template and fill in issue-specific details
     TASK_FILE="task-issue-${ISSUE_NUM}.txt"
     cp "${MAIN_REPO}/scripts/task-template.md" "${MAIN_REPO}/${TASK_FILE}"
-    sed -i "s/{TITLE}/Issue #${ISSUE_NUM}/g" "${MAIN_REPO}/${TASK_FILE}"
+    sed -i "s/{TITLE}/Issue #${ISSUE_NUM}: ${ISSUE_TITLE}/g" "${MAIN_REPO}/${TASK_FILE}"
     sed -i "s/{ISSUE}/${ISSUE_NUM}/g" "${MAIN_REPO}/${TASK_FILE}"
     sed -i "s/{BRANCH_NAME}/${BRANCH_NAME}/g" "${MAIN_REPO}/${TASK_FILE}"
     # Copy to worktree
@@ -282,7 +289,7 @@ else
     echo "Agent spawned for issue #${ISSUE_NUM}"
 fi
 
-echo "Worktree: /home/evgeny/src/suckless/${WORKTREE_NAME}"
+echo "Worktree: ${WORKTREE_PATH}"
 echo "Tmux session: wm-issues"
 echo "Tmux window: $WINDOW_NAME"
 echo ""

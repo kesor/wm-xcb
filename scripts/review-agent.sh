@@ -26,6 +26,7 @@ MODE="review"  # "review" or "fix"
 GITHUB_REPO="kesor/wm-xcb"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SUCKLESS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 usage() {
     echo "Usage: $0 <PR_number> [--fix]"
@@ -66,13 +67,14 @@ get_pr_info() {
     }' 2>/dev/null
 }
 
-# Get diff between PR branch and master
+# Get diff between PR branch and base branch
 get_diff() {
     local branch="$1"
     local base="$2"
     
-    # Get commits on this branch that differ from master
-    git fetch origin "${base}:refs/remotes/origin/master" 2>/dev/null || true
+    # Fetch the base branch and PR branch to compare
+    git fetch origin "${base}:refs/remotes/origin/${base}" 2>/dev/null || true
+    git fetch origin "${branch}" 2>/dev/null || true
     git diff "origin/${base}...origin/${branch}" -- '*.c' '*.h' 2>/dev/null
 }
 
@@ -81,6 +83,8 @@ get_changed_files() {
     local branch="$1"
     local base="$2"
     
+    git fetch origin "${base}" 2>/dev/null || true
+    git fetch origin "${branch}" 2>/dev/null || true
     git diff "origin/${base}...origin/${branch}" --name-only 2>/dev/null | grep -E '\.(c|h)$' || true
 }
 
@@ -248,8 +252,8 @@ echo "Branch: ${BRANCH} → ${BASE}"
 
 # Fetch branches
 echo "Fetching branches..."
-git fetch origin "${BRANCH}:origin/${BRANCH}" 2>/dev/null || true
-git fetch origin "${BASE}:origin/master" 2>/dev/null || true
+git fetch origin "${BRANCH}" 2>/dev/null || true
+git fetch origin "${BASE}" 2>/dev/null || true
 
 # Get changed files
 CHANGED_FILES=$(get_changed_files "$BRANCH" "$BASE")
@@ -295,27 +299,31 @@ fi
 # Copy task file
 cp "${REPO_DIR}/review-task-${PR_NUM}.txt" "../${WORKTREE_NAME}/review-task-${PR_NUM}.txt" 2>/dev/null || true
 
-# Send commands to run the review
-NIX_CMD="cd /home/evgeny/src/suckless && nix develop --command sh -c 'cd ${WORKTREE_NAME} && pi @review-task-${PR_NUM}.txt Review PR #${PR_NUM} architectural violations'"
+# Create worktree path
+WORKTREE_PATH="${SUCKLESS_ROOT}/${WORKTREE_NAME}"
 
+# Send commands to run the review
+NIX_CMD="cd ${SUCKLESS_ROOT} && nix develop --command sh -c 'cd ${WORKTREE_NAME} && pi @review-task-${PR_NUM}.txt Review PR #${PR_NUM} architectural violations'"
+
+# Create or reuse review tmux session
 SESSION_NAME="wm-issues"
 WINDOW_NAME="review-${PR_NUM}"
 
 # Ensure session exists with correct window
 if ! tmux has-session -t ${SESSION_NAME} 2>/dev/null; then
-    tmux new-session -d -s ${SESSION_NAME} -n "main" -c "/home/evgeny/src/suckless/${WORKTREE_NAME}"
+    tmux new-session -d -s ${SESSION_NAME} -n "main" -c "${WORKTREE_PATH}"
 fi
 
 # Kill old review window if exists and create new one
 tmux kill-window -t "${SESSION_NAME}:${WINDOW_NAME}" 2>/dev/null || true
-tmux new-window -t ${SESSION_NAME} -n "${WINDOW_NAME}" -c "/home/evgeny/src/suckless/${WORKTREE_NAME}"
+tmux new-window -t ${SESSION_NAME} -n "${WINDOW_NAME}" -c "${WORKTREE_PATH}"
 
 tmux send-keys -t "${SESSION_NAME}:${WINDOW_NAME}" "git fetch origin" Enter
 tmux send-keys -t "${SESSION_NAME}:${WINDOW_NAME}" "${NIX_CMD}" Enter
 
 echo ""
 echo "Architectural review agent spawned for PR #${PR_NUM}"
-echo "Worktree: /home/evgeny/src/suckless/${WORKTREE_NAME}"
+echo "Worktree: ${WORKTREE_PATH}"
 echo "Session: ${SESSION_NAME}"
 echo "Window: ${WINDOW_NAME}"
 echo ""
