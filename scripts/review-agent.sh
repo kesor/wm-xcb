@@ -2,8 +2,8 @@
 # review-agent.sh - Review PR changes against documented architecture
 #
 # Usage:
-#   ./review-agent.sh <PR_number>        # Review PR, leave comments
-#   ./review-agent.sh <PR_number> --fix # Review and attempt auto-fix
+#   ./scripts/review-agent.sh <PR_number>        # Review PR, leave comments
+#   ./scripts/review-agent.sh <PR_number> --fix # Review and attempt auto-fix
 #
 # This script:
 # 1. Gets the diff between PR branch and master
@@ -24,7 +24,8 @@ set -e
 PR_NUM=""
 MODE="review"  # "review" or "fix"
 GITHUB_REPO="kesor/wm-xcb"
-MAIN_REPO="/home/evgeny/src/suckless/wm"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 usage() {
     echo "Usage: $0 <PR_number> [--fix]"
@@ -102,7 +103,7 @@ create_review_task() {
     local changed_files="$5"
     local mode="$6"
     
-    cat > "${MAIN_REPO}/review-task-${pr_num}.txt" << REVEOF
+    cat > "${REPO_DIR}/review-task-${pr_num}.txt" << REVEOF
 # Task: Architectural Review of PR #${pr_num}
 
 You are reviewing PR #${pr_num}: ${title}
@@ -117,6 +118,8 @@ Read these files to understand the architecture:
 - docs/architecture/target.md — target ownership model
 - docs/architecture/component.md — component design rules
 - docs/architecture/decisions.md — recorded decisions (don't conflict with these)
+- docs/architecture/state-machine.md — SM framework rules
+- docs/architecture/hub.md — hub communication rules
 
 ## PR Information
 
@@ -210,6 +213,20 @@ Produce a JSON summary at the end:
 }
 \`\`\`
 
+## Example Violation Comment
+
+When a violation is found, post a GitHub PR comment with this format:
+
+\`\`\`markdown
+## Architecture Violation: [violation type]
+
+**File:** src/components/example.c:42
+**Rule violated:** docs/architecture/[doc].md — "[brief rule summary]"
+**What the code does:** [brief description]
+**Why it violates:** [explanation of the architectural problem]
+**Suggested fix:** [concrete code change or approach]
+\`\`\`
+
 ## Rules
 
 - Be thorough but constructive
@@ -223,7 +240,7 @@ REVEOF
 }
 
 # Main
-cd "$MAIN_REPO"
+cd "$REPO_DIR"
 
 echo "Fetching PR #${PR_NUM} information..."
 PR_INFO=$(get_pr_info)
@@ -286,7 +303,7 @@ if [ -d "../${WORKTREE_NAME}" ]; then
 fi
 
 # Copy task file
-cp "${MAIN_REPO}/review-task-${PR_NUM}.txt" "../${WORKTREE_NAME}/review-task-${PR_NUM}.txt" 2>/dev/null || true
+cp "${REPO_DIR}/review-task-${PR_NUM}.txt" "../${WORKTREE_NAME}/review-task-${PR_NUM}.txt" 2>/dev/null || true
 
 # Create or reuse review tmux session
 if tmux has-session -t ${SESSION_NAME} 2>/dev/null; then
@@ -297,16 +314,20 @@ else
 fi
 
 # Send commands to run the review
-REVIEW_DIR="/home/evgeny/src/suckless/${WORKTREE_NAME}"
+REVIEW_DIR="$REPO_DIR"
 NIX_CMD="cd /home/evgeny/src/suckless && nix develop --command sh -c 'cd ${WORKTREE_NAME} && pi @review-task-${PR_NUM}.txt Review PR #${PR_NUM} architectural violations'"
 
-tmux send-keys -t "${SESSION_NAME}:review" "git fetch origin" Enter
-tmux send-keys -t "${SESSION_NAME}:review" "${NIX_CMD}" Enter
+SESSION_NAME="wm-issues"
+WINDOW_NAME="review-${PR_NUM}"
+
+tmux send-keys -t "${SESSION_NAME}:${WINDOW_NAME}" "git fetch origin" Enter
+tmux send-keys -t "${SESSION_NAME}:${WINDOW_NAME}" "${NIX_CMD}" Enter
 
 echo ""
 echo "Architectural review agent spawned for PR #${PR_NUM}"
 echo "Worktree: ${REVIEW_DIR}"
 echo "Session: ${SESSION_NAME}"
+echo "Window: ${WINDOW_NAME}"
 echo ""
 echo "To attach and monitor: tmux attach -t ${SESSION_NAME}"
 echo "To see results: gh pr view ${PR_NUM} --comments"
