@@ -1,4 +1,4 @@
-# Task: Work on GitHub issue #{ISSUE}
+# Task: {TITLE}
 
 ## IMPORTANT
 
