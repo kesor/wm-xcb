@@ -161,9 +161,9 @@ test-sm-standalone: wm-hub.o wm-log.o $(filter-out %.c,$(SRC_SM:.c=.o)) test-sm-
 container-build:
 	docker build -t $(NAME):test .
 
-# Run the container (starts Xvfb and wm)
+# Run the container with VNC exposed on port 5900
 container-run:
-	docker run --rm $(NAME):test
+	docker run --rm -p 5900:5900 $(NAME):test
 
 # Test container build by running tests
 container-test: container-build
