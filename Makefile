@@ -19,7 +19,15 @@ PKG_CFLAGS += -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
 CPPFLAGS = -DVERSION=\"${VERSION}\" -DWM_HUB_TESTING -D_DEFAULT_SOURCE
 CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
+# ---------------------------------------------------------------------------
+# Static build for portable binary (works with glibc and musl)
+#
+# Use: make LDFLAGS_STATIC=-static (Alpine/musl)
+# For dynamic build: make LDFLAGS_STATIC= (default)
+#
+LDFLAGS_STATIC =
 LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
+LDFLAGS += $(LDFLAGS_STATIC)
 
 ifeq ($(strip $(DEBUG)),1)
 	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG

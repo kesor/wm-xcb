@@ -1,22 +1,26 @@
-FROM alpine
+# Build and run wm using Nix
+FROM nixos/nix:latest
 
-RUN apk add --no-cache \
-      bash \
-      gcompat \
-      libstdc++ \
-      x11vnc \
-      xcb-util-wm \
-      xclock \
-      xeyes \
-      xprop \
-      xvfb
+# Enable flakes
+RUN mkdir -p /etc/nix && \
+    echo 'experimental-features = nix-command flakes' >> /etc/nix/nix.conf
 
-RUN mkdir ~/.vnc \
- && x11vnc -storepasswd secret ~/.vnc/passwd \
- && echo -e "#!/bin/bash\nx11vnc -forever -usepw -create" > /run.sh \
- && echo -e "#!/bin/bash\nwhile true; do sleep 100; done" > ~/.xinitrc \
- && chmod +x /run.sh ~/.xinitrc
+WORKDIR /src
 
-EXPOSE 5900
+# Copy source files
+COPY . ./
 
-CMD ["/run.sh"]
+# Remove any parent git references and init fresh repo
+RUN rm -rf .git && \
+    git init --initial-branch=main && \
+    git config user.email "build@container" && \
+    git config user.name "Build" && \
+    git add . && \
+    git commit -m "init"
+
+# Build using nix develop shell environment (dynamic linking)
+RUN nix develop --command make clean && \
+    nix develop --command make LDFLAGS_STATIC=
+
+# Run for testing
+CMD ["sh", "-c", "Xvfb :0 -screen 0 1024x768x24 & sleep 2 && ./wm"]
