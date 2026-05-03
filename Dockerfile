@@ -38,4 +38,4 @@ COPY --from=builder /tmp/nix-store-closure /nix/store
 COPY --from=builder /tmp/build/result /wm
 
 # Run with Xvfb for headless testing
-CMD ["sh", "-c", "Xvfb :0 -screen 0 1024x768x24 & sleep 1 && /wm/bin/wm"]
+CMD ["sh", "-c", "Xvfb :0 -screen 0 1024x768x24 & sleep 1 && DISPLAY=:0 /wm/bin/wm"]

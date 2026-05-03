@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <xcb/errors.h>
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
@@ -35,20 +36,23 @@ error_details(xcb_generic_error_t* error)
 static void
 connect_to_x_display(xcb_connection_t** dpy)
 {
-  char* displayname    = NULL;
+  char* displayname    = getenv("DISPLAY");
   char* hostname       = NULL;
   int   display_number = 0;
   int   screen_number  = 0;
 
+  if (displayname == NULL)
+    LOG_FATAL("wm: DISPLAY environment variable not set");
+
   if (xcb_parse_display(displayname, &hostname, &display_number, &screen_number) == 0)
-    LOG_FATAL("dwm: failed to parse display name");
+    LOG_FATAL("wm: failed to parse display name: %s", displayname);
 
   /* connecting to remote hosts not really supported here with a simple xcb_connect() */
   free(hostname);
 
   *dpy = xcb_connect(displayname, &screen_number);
   if (xcb_connection_has_error(*dpy))
-    LOG_FATAL("dwm: failed to open display");
+    LOG_FATAL("wm: failed to open display");
 }
 
 void
