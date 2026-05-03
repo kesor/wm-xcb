@@ -154,18 +154,24 @@ test-sm-standalone: wm-hub.o wm-log.o $(filter-out %.c,$(SRC_SM:.c=.o)) test-sm-
 	./test-sm-standalone
 
 # ---------------------------------------------------------------------------
-# Docker helpers
-# ---------------------------------------------------------------------------
+# Docker build and test targets
+# ----------------------------------------------------------------------------
 
-container-start:
-	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc
-
-container-exec:
-	docker exec -ti x11vnc /bin/bash
-
+# Build Docker image (multi-stage: Nix builder -> scratch runtime)
 container-build:
-	docker build -t x11vnc .
+	docker build -t $(NAME):test .
 
-# ---------------------------------------------------------------------------
+# Run the container (starts Xvfb and wm)
+container-run:
+	docker run --rm $(NAME):test
 
-.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone check format tidy
+# Test container build by running tests
+container-test: container-build
+	@echo "Checking binary exists in container..."
+	@docker run --rm $(NAME):test sh -c "ls -la /wm/bin/wm && file /wm/bin/wm"
+
+# Clean up Docker image
+container-clean:
+	docker rmi $(NAME):test
+
+.PHONY: all clean test test-standalone test-sm-standalone check format tidy container-build container-run container-test container-clean
