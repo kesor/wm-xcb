@@ -168,7 +168,7 @@ container-run:
 # Test container build by running tests
 container-test: container-build
 	@echo "Checking binary exists in container..."
-	@docker run --rm $(NAME):test sh -c "ls -la /wm/bin/wm && file /wm/bin/wm"
+	@docker run --rm wm:test ls -la /wm/bin/wm
 
 # Clean up Docker image
 container-clean:
