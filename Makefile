@@ -25,9 +25,10 @@ CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
 # Use: make LDFLAGS_STATIC=-static (Alpine/musl)
 # For dynamic build: make LDFLAGS_STATIC= (default)
 #
+# Note: -static flag must come BEFORE -l flags for static linking to work
+#
 LDFLAGS_STATIC =
-LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
-LDFLAGS += $(LDFLAGS_STATIC)
+LDFLAGS = $(LDFLAGS_STATIC) $(PKG_LDFLAGS) -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
 	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG

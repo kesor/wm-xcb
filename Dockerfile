@@ -1,7 +1,7 @@
 # Build and run wm using Nix
-FROM nixos/nix:latest
+FROM nixos/nix:latest AS builder
 
-# Enable flakes
+# Enable flakes (git is already in nixos/nix image)
 RUN mkdir -p /etc/nix && \
     echo 'experimental-features = nix-command flakes' >> /etc/nix/nix.conf
 
@@ -19,8 +19,23 @@ RUN rm -rf .git && \
     git commit -m "init"
 
 # Build using nix develop shell environment (dynamic linking)
-RUN nix develop --command make clean && \
-    nix develop --command make LDFLAGS_STATIC=
+# Combine clean and build in single nix develop call for faster builds
+RUN nix develop --command sh -c 'make clean && make LDFLAGS_STATIC='
+
+# ---------------------------------------------------------------------------
+# Runtime stage
+# ---------------------------------------------------------------------------
+FROM nixos/nix:latest
+
+# Install Xvfb for headless testing
+RUN nix-channel --add https://nixos.org/channels/nixos-unstable nixpkgs && \
+    nix-channel --update && \
+    nix-env -f '<nixpkgs>' -iA xvfb
+
+WORKDIR /src
+
+# Copy built binary from builder
+COPY --from=builder /src/wm ./
 
 # Run for testing
 CMD ["sh", "-c", "Xvfb :0 -screen 0 1024x768x24 & sleep 2 && ./wm"]
