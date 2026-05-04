@@ -42,9 +42,11 @@
               cp wm $out/bin/
               cat > $out/bin/start.sh << EOF
               #!/usr/bin/env sh
+              export DISPLAY=:99
               ${pkgs.lib.getExe pkgs.xvfb-run} ${pkgs.lib.getExe pkgs.x11vnc} -display :99 -forever -shared &
               sleep 2
-              DISPLAY=:99 /wm/bin/wm
+              ${pkgs.lib.getExe pkgs.xterm} &
+              /wm/bin/wm
               EOF
               chmod +x $out/bin/start.sh
             '';
@@ -70,10 +72,6 @@
               fontconfig
               gdb
             ];
-
-            shellHook = ''
-              echo "wm-xcb development environment loaded"
-            '';
           };
         };
 
