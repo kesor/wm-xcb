@@ -127,32 +127,24 @@ test_launcher_dmenu_config(void)
 }
 
 /*
- * Test: launcher action invocation
+ * Test: launcher action callback is correctly set
  */
 static void
-test_launcher_action_invoke(void)
+test_launcher_action_callback(void)
 {
-  ActionInvocation inv = {
-    .target         = TARGET_ID_NONE,
-    .data           = NULL,
-    .correlation_id = 0,
-    .userdata       = NULL,
-    .target_type    = ACTION_TARGET_NONE,
-  };
-
-  /* Note: This will actually try to run dmenu, which may fail
-   * in a headless environment. We just check that the action exists
-   * and returns a result (even if false due to missing dmenu). */
   action_registry_init();
   launcher_init();
 
-  bool result = action_invoke("app.launch", &inv);
-  /* Result can be true (if dmenu available and user selects something)
-   * or false (if dmenu not available or no selection).
-   * We just verify the action can be invoked. */
-  (void) result;
+  Action* action = action_lookup("app.launch");
+  ASSERT(action != NULL, "app.launch action should exist");
 
-  /* Cleanup */
+  if (action != NULL) {
+    /* Verify callback is set (but don't invoke it - dmenu is interactive) */
+    ASSERT(action->callback != NULL, "action callback should be set");
+    ASSERT(action->target_type == ACTION_TARGET_NONE,
+           "action target type should be ACTION_TARGET_NONE");
+  }
+
   launcher_shutdown();
   action_registry_shutdown();
 }
@@ -170,7 +162,7 @@ run_launcher_tests(void)
   RUN_TEST(test_launcher_double_init);
   RUN_TEST(test_launcher_shutdown);
   RUN_TEST(test_launcher_dmenu_config);
-  RUN_TEST(test_launcher_action_invoke);
+  RUN_TEST(test_launcher_action_callback);
 
   printf("\n  [PASS] %d passed, [FAIL] %d failed\n\n", pass_count, fail_count);
 }
