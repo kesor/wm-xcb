@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <string.h>
 #include "test-registry.h"
 #include "test-wm.h"
 #include "wm-hub.h"
@@ -1334,4 +1335,224 @@ TEST_GROUP(HubRouting, {
   test_get_executor_after_unregister();
   test_simple_request_flow();
   test_fullscreen_toggle_flow();
+});
+
+/*
+ * Target Type Registry Tests
+ */
+
+void
+test_target_type_registry_basic(void)
+{
+  LOG_CLEAN("== Testing target type registry basic operations");
+  hub_init();
+
+  /* hub_init() registers client, monitor, tag */
+  assert(hub_target_type_count() == 3);
+
+  /* Lookup by name */
+  HubTargetType* client = hub_get_target_type_by_name("client");
+  assert(client != NULL);
+  assert(strcmp(client->name, "client") == 0);
+  assert(client->id == 0);                  /* First registered */
+  assert(client->reserved == true);
+
+  HubTargetType* monitor = hub_get_target_type_by_name("monitor");
+  assert(monitor != NULL);
+  assert(monitor->id == 1);                 /* Second registered */
+
+  HubTargetType* tag = hub_get_target_type_by_name("tag");
+  assert(tag != NULL);
+  assert(tag->id == 2);                      /* Third registered */
+
+  /* Unknown type returns NULL */
+  HubTargetType* unknown = hub_get_target_type_by_name("keyboard");
+  assert(unknown == NULL);
+
+  /* Lookup by ID */
+  HubTargetType* by_id = hub_get_target_type_by_id(0);
+  assert(by_id != NULL);
+  assert(strcmp(by_id->name, "client") == 0);
+
+  /* Invalid ID returns NULL */
+  HubTargetType* invalid_id = hub_get_target_type_by_id(999);
+  assert(invalid_id == NULL);
+
+  hub_shutdown();
+}
+
+void
+test_target_type_id_by_name(void)
+{
+  LOG_CLEAN("== Testing hub_get_target_type_id_by_name");
+  hub_init();
+
+  /* Valid types return their registered IDs */
+  assert(hub_get_target_type_id_by_name("client") == 0);
+  assert(hub_get_target_type_id_by_name("monitor") == 1);
+  assert(hub_get_target_type_id_by_name("tag") == 2);
+
+  /* Invalid types return TARGET_TYPE_INVALID */
+  assert(hub_get_target_type_id_by_name("keyboard") == TARGET_TYPE_INVALID);
+  assert(hub_get_target_type_id_by_name("nonexistent") == TARGET_TYPE_INVALID);
+  assert(hub_get_target_type_id_by_name(NULL) == TARGET_TYPE_INVALID);
+
+  hub_shutdown();
+}
+
+void
+test_get_all_target_types(void)
+{
+  LOG_CLEAN("== Testing hub_get_all_target_types");
+  hub_init();
+
+  uint32_t count = 0;
+  HubTargetType** all = hub_get_all_target_types(&count);
+
+  assert(all != NULL);
+  assert(count == 3);
+
+  /* Verify all types are present */
+  bool found_client  = false;
+  bool found_monitor = false;
+  bool found_tag     = false;
+
+  for (uint32_t i = 0; i < count; i++) {
+    if (strcmp(all[i]->name, "client") == 0)
+      found_client = true;
+    if (strcmp(all[i]->name, "monitor") == 0)
+      found_monitor = true;
+    if (strcmp(all[i]->name, "tag") == 0)
+      found_tag = true;
+  }
+
+  assert(found_client == true);
+  assert(found_monitor == true);
+  assert(found_tag == true);
+
+  hub_shutdown();
+}
+
+void
+test_target_type_duplicate_registration(void)
+{
+  LOG_CLEAN("== Testing duplicate target type registration");
+  hub_init();
+
+  /* Register the same type again - should return existing */
+  HubTargetType* first  = hub_get_target_type_by_name("client");
+  HubTargetType* second = hub_register_target_type("client", NULL);
+
+  assert(first == second);              /* Same pointer */
+  assert(hub_target_type_count() == 3); /* Count unchanged */
+
+  hub_shutdown();
+}
+
+void
+test_register_new_target_type(void)
+{
+  LOG_CLEAN("== Testing registering new target types");
+  hub_init();
+
+  /* Register a new type */
+  HubTargetType* new_type = hub_register_target_type("keyboard", NULL);
+  assert(new_type != NULL);
+  assert(strcmp(new_type->name, "keyboard") == 0);
+  assert(new_type->id == 3);            /* Fourth type */
+  assert(new_type->reserved == true);
+
+  /* Verify it can be looked up */
+  assert(hub_get_target_type_by_name("keyboard") == new_type);
+  assert(hub_get_target_type_id_by_name("keyboard") == 3);
+  assert(hub_target_type_count() == 4);
+
+  hub_shutdown();
+}
+
+void
+test_null_target_type_name_rejected(void)
+{
+  LOG_CLEAN("== Testing NULL target type name is rejected");
+  hub_init();
+
+  HubTargetType* result = hub_register_target_type(NULL, NULL);
+  assert(result == NULL);
+  assert(hub_target_type_count() == 3); /* Count unchanged */
+
+  hub_shutdown();
+}
+
+void
+test_components_for_target_type_name(void)
+{
+  LOG_CLEAN("== Testing hub_get_components_for_target_type_name");
+  hub_init();
+
+  hub_register_component(&test_fullscreen);
+  hub_register_component(&test_focus);
+  hub_register_component(&test_monitor);
+
+  /* Get components for "client" type by name */
+  HubComponent** client_comps = hub_get_components_for_target_type_name("client");
+  assert(client_comps != NULL);
+
+  int count = 0;
+  for (int i = 0; client_comps[i] != NULL; i++) {
+    count++;
+  }
+  assert(count == 2); /* fullscreen + focus */
+
+  /* Get components for "monitor" type by name */
+  HubComponent** monitor_comps = hub_get_components_for_target_type_name("monitor");
+  assert(monitor_comps != NULL);
+
+  count = 0;
+  for (int i = 0; monitor_comps[i] != NULL; i++) {
+    count++;
+  }
+  assert(count == 1); /* monitor */
+
+  /* Unknown type returns NULL */
+  HubComponent** unknown_comps = hub_get_components_for_target_type_name("nonexistent");
+  assert(unknown_comps == NULL);
+
+  hub_shutdown();
+}
+
+void
+test_target_type_with_component_owner(void)
+{
+  LOG_CLEAN("== Testing target type owner tracking");
+  hub_init();
+
+  /* Register a type with a specific owner */
+  HubComponent owner_comp = {
+    .name                  = "owner-component",
+    .accepted_target_names = NULL,
+    .accepted_targets     = NULL,
+    .registered           = false,
+  };
+  hub_register_component(&owner_comp);
+
+  HubTargetType* owned_type = hub_register_target_type("owned-type", &owner_comp);
+  assert(owned_type != NULL);
+  assert(owned_type->owner == &owner_comp);
+
+  /* Type registered with NULL owner should have NULL owner */
+  HubTargetType* builtin_type = hub_get_target_type_by_name("client");
+  assert(builtin_type->owner == NULL);
+
+  hub_shutdown();
+}
+
+TEST_GROUP(HubTargetTypeRegistry, {
+  test_target_type_registry_basic();
+  test_target_type_id_by_name();
+  test_get_all_target_types();
+  test_target_type_duplicate_registration();
+  test_register_new_target_type();
+  test_null_target_type_name_rejected();
+  test_components_for_target_type_name();
+  test_target_type_with_component_owner();
 });

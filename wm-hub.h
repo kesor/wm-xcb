@@ -59,23 +59,18 @@ enum {
  *   hub_get_target_type_id_by_name("monitor")
  *   etc.
  *
- * These macros will resolve to the dynamically registered IDs.
- * Default values are provided as fallback for initialization order issues.
+ * Default values match the registration order in hub_init().
+ * After hub_init(), these values are equivalent to the dynamically
+ * registered IDs due to the resolve_target_type_id() mapping.
  */
 enum {
   TARGET_TYPE_CLIENT   = 0,
   TARGET_TYPE_MONITOR  = 1,
-  TARGET_TYPE_KEYBOARD = 2,
-  TARGET_TYPE_TAG      = 3,
-  TARGET_TYPE_SYSTEM   = 4,
-  TARGET_TYPE_COUNT    = 5,
+  TARGET_TYPE_TAG      = 2,
+  TARGET_TYPE_COUNT    = 3,
 };
 
-/*
- * Legacy compatibility: TARGET_TYPE_NONE sentinel
- * Used to terminate arrays of target types in component definitions.
- * This is still useful for component declaration compatibility.
- */
+/* Legacy: TARGET_TYPE_NONE for terminating target arrays */
 #define TARGET_TYPE_NONE UINT32_MAX
 
 /* Invalid ID sentinel */

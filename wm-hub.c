@@ -233,6 +233,9 @@ hub_get_all_target_types(uint32_t* count)
  * Resolve legacy target type ID to current registered ID.
  * For backward compatibility - handles the case where legacy enum values
  * need to be mapped to dynamically registered types.
+ *
+ * Returns the resolved type_id, or TARGET_TYPE_INVALID if the type
+ * is not registered.
  */
 static uint32_t
 resolve_target_type_id(uint32_t legacy_id)
@@ -243,15 +246,8 @@ resolve_target_type_id(uint32_t legacy_id)
     return legacy_id;
   }
 
-  /* Fall back to first registered type as default */
-  for (uint32_t i = 0; i < target_type_count; i++) {
-    if (target_types[i].reserved) {
-      return i;
-    }
-  }
-
-  /* No registered types, return 0 as fallback (invalid will be caught later) */
-  return 0;
+  /* Unknown or unregistered type - return INVALID instead of silently mapping */
+  return TARGET_TYPE_INVALID;
 }
 
 void
@@ -273,18 +269,34 @@ hub_register_component(HubComponent* comp)
   }
 
   /* Resolve accepted target type names to pointers */
+  uint32_t accepted_count = 0;
   if (comp->accepted_target_names != NULL) {
     for (uint32_t i = 0; comp->accepted_target_names[i] != NULL; i++) {
-      const char*    name = comp->accepted_target_names[i];
-      HubTargetType* tt   = hub_get_target_type_by_name(name);
-      if (tt != NULL) {
-        LOG_DEBUG("Component '%s' accepts target type '%s' (id=%u)",
-                  comp->name, name, tt->id);
-      } else {
-        LOG_WARN("Component '%s' references unknown target type '%s'",
-                 comp->name, name);
-      }
+      accepted_count++;
     }
+  }
+
+  /* Allocate and populate accepted_targets array */
+  if (accepted_count > 0) {
+    comp->accepted_targets = calloc(accepted_count + 1, sizeof(HubTargetType*));
+    if (comp->accepted_targets != NULL) {
+      uint32_t j = 0;
+      for (uint32_t i = 0; comp->accepted_target_names[i] != NULL; i++) {
+        const char*    name = comp->accepted_target_names[i];
+        HubTargetType* tt   = hub_get_target_type_by_name(name);
+        if (tt != NULL) {
+          comp->accepted_targets[j++] = tt;
+          LOG_DEBUG("Component '%s' accepts target type '%s' (id=%u)",
+                    comp->name, name, tt->id);
+        } else {
+          LOG_WARN("Component '%s' references unknown target type '%s'",
+                   comp->name, name);
+        }
+      }
+      comp->accepted_targets[j] = NULL; /* NULL-terminate */
+    }
+  } else {
+    comp->accepted_targets = NULL;
   }
 
   /* Add to main component array */
@@ -368,6 +380,10 @@ hub_unregister_component(const char* name)
       break;
     }
   }
+
+  /* Free accepted_targets array if allocated */
+  free(comp->accepted_targets);
+  comp->accepted_targets = NULL;
 
   comp->registered = false;
   LOG_DEBUG("Unregistered component: %s", name);

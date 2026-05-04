@@ -8,7 +8,7 @@
 
 ## Problem
 
-Currently, target types are hardcoded in `wm-hub.h`:
+Previously, target types were hardcoded in `wm-hub.h`:
 
 ```c
 enum {
@@ -21,7 +21,7 @@ enum {
 };
 ```
 
-This violates separation of concerns — target types should be introduced by the components that own them, not centralized in the hub.
+This violated separation of concerns — target types should be introduced by the components that own them, not centralized in the hub.
 
 ## Design Goals
 
@@ -30,42 +30,37 @@ This violates separation of concerns — target types should be introduced by th
 3. **Ownership**: Each component owns its target types, matching component-based architecture
 4. **Performance**: Fast integer-based lookup for common operations
 
-## Proposed Solution
+## Implemented Solution
 
-### Core Concept: Target Type Registry
+### HubTargetType Structure
 
-Components register their target types with the hub at initialization. The hub maintains a registry of target types indexed by name (for extensibility) and by integer (for fast lookup).
+Target types are now dynamically registered structures:
 
 ```c
-/*
- * Target type definition
- * Introduced by a component, registered with the hub.
- */
-typedef struct TargetType {
-  const char*     name;       // e.g., "client", "monitor", "focused-client"
-  uint32_t        id;         // unique integer ID (assigned on registration)
-  HubComponent*   owner;      // component that introduced this type
-  
-  /* Optional: resolver for symbolic targets of this type */
-  TargetID (*resolve)(const char* symbolic);
-} TargetType;
+struct HubTargetType {
+  const char*   name;     /* e.g., "client", "monitor", "focused-client" */
+  uint32_t      id;       /* unique integer ID, assigned on registration */
+  HubComponent* owner;    /* component that introduced this type */
+  bool          reserved; /* true once registered */
+};
 ```
 
-### Component Declares Its Target Types
+### String-Based Target Type Declaration
 
-Components declare what target types they introduce:
+Components declare accepted target types via string names, which are resolved at registration time:
 
 ```c
-typedef struct HubComponent {
-  const char*      name;
+struct HubComponent {
+  const char*      name;           /* component identifier */
   
-  /* Target types this component INTRODUCES (it owns these) */
-  TargetType*      introduced_targets;
-  uint32_t         num_introduced;
+  /* Target types this component ACCEPTS (works with these)
+   * NULL-terminated array of target type names.
+   * Resolved to HubTargetType* at component registration time.
+   */
+  const char**     accepted_target_names;
   
-  /* Target types this component ACCEPTS (it works with these) */
-  TargetType**     accepted_targets;  // by name
-  uint32_t         num_accepted;
+  /* Resolved target types (populated at registration) */
+  HubTargetType**  accepted_targets;
   
   // ... rest unchanged
 } HubComponent;
@@ -74,26 +69,13 @@ typedef struct HubComponent {
 ### Example: Focus Component
 
 ```c
-// Focus component introduces TARGET_TYPE_FOCUSED_CLIENT
-static TargetType focus_introduced_types[] = {
-  {
-    .name    = "focused-client",
-    .resolve = focus_resolve_current_client,
-  },
-};
-
-// Focus component accepts TARGET_TYPE_CLIENT (any managed client)
-static TargetType* focus_accepted_types[] = {
-  hub_get_target_type_by_name("client"),  // resolved at init
-  NULL,
-};
+// Focus component accepts "client" target type
+static const char* client_targets[] = { "client", NULL };
 
 HubComponent focus_component = {
-  .name               = "focus",
-  .introduced_targets  = focus_introduced_types,
-  .num_introduced      = 1,
-  .accepted_targets    = focus_accepted_types,
-  .num_accepted        = 1,
+  .name                  = "focus",
+  .accepted_target_names = client_targets,
+  .accepted_targets      = NULL,  /* populated at hub_register_component() */
   // ...
 };
 ```
@@ -101,41 +83,53 @@ HubComponent focus_component = {
 ### Example: Client List Component
 
 ```c
-// Client list introduces TARGET_TYPE_CLIENT (managed X11 windows)
-static TargetType client_list_introduced_types[] = {
-  {
-    .name    = "client",
-    .resolve = NULL,  // concrete targets, no symbolic resolution
-  },
-};
-
-static TargetType* client_list_accepted_types[] = {
-  hub_get_target_type_by_name("client"),
-  NULL,
-};
+// Client list accepts "client" target type
+static const char* client_targets[] = { "client", NULL };
 
 HubComponent client_list_component = {
-  .name               = "client-list",
-  .introduced_targets  = client_list_introduced_types,
-  .num_introduced      = 1,
-  .accepted_targets    = client_list_accepted_types,
-  .num_accepted        = 1,
+  .name                  = "client-list",
+  .accepted_target_names = client_targets,
+  .accepted_targets      = NULL,
   // ...
 };
 ```
 
 ### Target Type Registration
 
-When a component registers with the hub, it also registers its target types:
+Built-in types are registered at `hub_init()`:
+
+```c
+void hub_init(void) {
+  // ...
+  (void) hub_register_target_type("client", NULL);
+  (void) hub_register_target_type("monitor", NULL);
+  (void) hub_register_target_type("tag", NULL);
+}
+```
+
+Components can register additional types at any time:
+
+```c
+HubTargetType* hub_register_target_type(const char* name, HubComponent* owner);
+```
+
+When a component registers, its `accepted_target_names` are resolved to `HubTargetType*` pointers and stored in `accepted_targets`:
 
 ```c
 void hub_register_component(HubComponent* comp) {
-  // ... existing component registration ...
+  // ...
+  /* Resolve accepted target type names to pointers */
+  uint32_t accepted_count = 0;
+  if (comp->accepted_target_names != NULL) {
+    for (uint32_t i = 0; comp->accepted_target_names[i] != NULL; i++) {
+      accepted_count++;
+    }
+  }
   
-  // Register target types introduced by this component
-  for (uint32_t i = 0; i < comp->num_introduced; i++) {
-    TargetType* tt = &comp->introduced_targets[i];
-    tt->id    = hub_register_target_type(tt->name, comp);
+  /* Allocate and populate accepted_targets array */
+  if (accepted_count > 0) {
+    comp->accepted_targets = calloc(accepted_count + 1, sizeof(HubTargetType*));
+    // ... resolve each name and store pointer
   }
 }
 ```
@@ -147,136 +141,125 @@ Two lookup mechanisms:
 2. **By ID**: For fast runtime lookup
 
 ```c
-/* By name - for configuration and component reference */
-TargetType* hub_get_target_type_by_name(const char* name);
+/* By name - returns NULL if not found */
+HubTargetType* hub_get_target_type_by_name(const char* name);
 
-/* By ID - for fast runtime lookup in hot paths */
-TargetType* hub_get_target_type_by_id(uint32_t id);
+/* By ID - returns NULL if not found or invalid ID */
+HubTargetType* hub_get_target_type_by_id(uint32_t id);
 
-/* Get all target types */
-TargetType** hub_get_all_target_types(uint32_t* count);
+/* Get integer ID by name - returns TARGET_TYPE_INVALID if not found */
+uint32_t hub_get_target_type_id_by_name(const char* name);
+
+/* Get all registered target types */
+HubTargetType** hub_get_all_target_types(uint32_t* count);
+
+/* Get components accepting a type by name */
+HubComponent** hub_get_components_for_target_type_name(const char* type_name);
 ```
 
-### Hub Target Structure
+### HubTarget Structure
 
-Targets now reference target types by pointer (or ID for fast lookup):
+Targets reference target types by ID:
 
 ```c
 struct HubTarget {
-  TargetID       id;         // concrete ID (window, output, etc.)
-  TargetType*    type;       // reference to registered type (fast path)
-  // or: uint32_t   type_id;   // ID for fast lookup
-  bool           registered;
+  TargetID     id;
+  TargetTypeId type_id;  /* ID for fast lookup, maps to HubTargetType */
+  bool         registered;
 };
 ```
 
-### Backward Compatibility
+### Legacy Constants
 
-For backward compatibility, we provide a transition layer:
+For backward compatibility, enum constants are provided but deprecated:
 
 ```c
-// Legacy names map to new target types
-#define TARGET_TYPE_CLIENT    (hub_get_target_type_by_name("client")->id)
-#define TARGET_TYPE_MONITOR   (hub_get_target_type_by_name("monitor")->id)
-#define TARGET_TYPE_TAG       (hub_get_target_type_by_name("tag")->id)
-// etc.
+/* Deprecated - use hub_get_target_type_id_by_name("client") instead */
+enum {
+  TARGET_TYPE_CLIENT   = 0,
+  TARGET_TYPE_MONITOR  = 1,
+  TARGET_TYPE_TAG      = 2,
+  TARGET_TYPE_COUNT    = 3,
+};
+
+/* Legacy: for terminating target arrays */
+#define TARGET_TYPE_NONE UINT32_MAX
 ```
 
-This way existing code using `TARGET_TYPE_CLIENT` continues to work.
+The values match the registration order in `hub_init()` and are resolved at runtime via `resolve_target_type_id()`.
+
+### Unknown Type Handling
+
+Unknown or unregistered type IDs return `TARGET_TYPE_INVALID` instead of silently mapping to another type:
+
+```c
+static uint32_t resolve_target_type_id(uint32_t legacy_id) {
+  if (target_type_count > 0 && legacy_id < target_type_count &&
+      target_types[legacy_id].reserved) {
+    return legacy_id;
+  }
+  return TARGET_TYPE_INVALID;  /* Explicit error, not silent fallback */
+}
+```
 
 ### Built-in Target Types
 
-The first components to initialize register the base target types:
+The hub registers base target types at initialization:
 
-| Component | Introduces | Notes |
-|-----------|-----------|-------|
-| client-list | `client` | Managed X11 windows |
-| monitor-manager | `monitor` | RandR outputs/displays |
-| tag-manager | `tag` | Virtual workspaces |
+| Type | ID | Introduced By |
+|------|----|---------------|
+| client | 0 | hub_init() (placeholder for client-list) |
+| monitor | 1 | hub_init() (placeholder for monitor-manager) |
+| tag | 2 | hub_init() (placeholder for tag-manager) |
 
-These are "built-in" in the sense that they're registered early, but they're still introduced by components, not hardcoded in the hub.
+These are registered early to ensure consistent IDs, but future extensions can register additional types.
 
-## Symbolic Target Resolution
-
-Components can provide resolvers for their target types:
-
-```c
-typedef TargetID (*TargetResolver)(const char* symbolic);
-
-TargetID focus_resolve_current_client(const char* symbolic) {
-  if (strcmp(symbolic, "current") == 0) {
-    return focus_component.focused_window;
-  }
-  return TARGET_ID_NONE;
-}
-```
-
-The hub uses these resolvers to resolve symbolic targets:
-
-```c
-TargetID hub_resolve_symbolic(const char* target_name, const char* symbolic) {
-  TargetType* tt = hub_get_target_type_by_name(target_name);
-  if (tt && tt->resolve) {
-    return tt->resolve(symbolic);
-  }
-  return TARGET_ID_NONE;
-}
-```
-
-## Implementation Phases
+## Implementation Status
 
 ### Phase 1: Target Type Registry (Issue #99)
-- [x] Create TargetType structure
+- [x] Create HubTargetType structure
 - [x] Add hub_register_target_type() function
 - [x] Add hub_get_target_type_by_name() function
+- [x] Add hub_get_target_type_id_by_name() function
 - [x] Add hub_get_target_type_by_id() function
-- [x] Update component registration to register target types
-- [x] Provide backward compatibility macros
+- [x] Add hub_get_all_target_types() function
+- [x] Populate accepted_targets at registration
 
 ### Phase 2: Component Updates (Issue #91)
-- [x] Update client-list component to declare `client` target type
-- [x] Update monitor-manager component to declare `monitor` target type
-- [x] Update tag-manager component to declare `tag` target type
-- [x] Update all components to use new target type declaration
+- [x] Update client-list component to declare `accepted_target_names`
+- [x] Update monitor-manager component to declare `accepted_target_names`
+- [x] Update tag-manager component to declare `accepted_target_names`
+- [x] Update focus component to use `accepted_target_names`
+- [x] Update fullscreen component to use `accepted_target_names`
+- [x] Update keybinding component to use `accepted_target_names`
+- [x] Update pertag component to use `accepted_target_names`
+- [x] Update tiling component to use `accepted_target_names`
 
-### Phase 3: Symbolic Resolution (Future)
-- [ ] Add resolver field to TargetType
-- [ ] Implement hub_resolve_symbolic()
-- [ ] Update focus component with resolver
-- [ ] Update hub request routing for symbolic targets
+### Phase 3: Target Creation Updates
+- [x] Update client.c to use hub_get_target_type_id_by_name("client")
+- [x] Update monitor.c to use hub_get_target_type_id_by_name("monitor")
+- [x] Update tag.c to use hub_get_target_type_id_by_name("tag")
 
-## Open Questions
+### Phase 4: Testing
+- [x] Add target type registry tests to test-wm-hub.c
 
-1. **Should target types be strings or integers for the API?**
-   - Current proposal: Strings for configuration/API, integers internally for performance
-   - Alternative: Pure strings (simpler, but slower)
-
-2. **How to handle duplicate target type names?**
-   - Proposal: Second component to register a type with same name fails
-   - Alternative: Allow override (last wins)
-
-3. **Should target types be unregisterable?**
-   - Proposal: No (once registered, they persist for the session)
-   - Rationale: Simplifies lookup, targets already have the type
-
-## Related Issues
-
-- **#91**: Components Should Introduce Their Own Target Types (blocked by this design)
-- **#83**: Actions and Wiring Architecture (uses target resolution)
-- **#84**: Configuration System for Keybindings, Rules, and Properties
-
-## Decision Log
+## Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| Components introduce target types | Separation of concerns - hub shouldn't know about specific types |
-| String-based names + integer IDs | Balances extensibility (strings) with performance (integers) |
-| Target types registered at component init | Single place for lifecycle management |
-| Resolver per target type | Allows components to define their own symbolic target semantics |
+| `accepted_target_names` instead of `introduced_targets` | Simpler API - components declare what they accept, not what they introduce |
+| `accepted_targets` populated at registration | No null-pointer issues during component initialization |
+| `TARGET_TYPE_INVALID` for unknown types | Explicit error handling instead of silent fallback |
+| Built-in types registered in hub_init() | Ensures consistent IDs across all components |
 
----
+## Related Issues
 
-*See also:*
+- **#91**: Components Should Introduce Their Own Target Types
+- **#83**: Actions and Wiring Architecture (uses target resolution)
+- **#84**: Configuration System for Keybindings, Rules, and Properties
+
+## See Also
+
 - `architecture/hub.md` — Hub implementation
 - `architecture/target.md` — Target design
 - `architecture/decisions.md` — Decision rationale
