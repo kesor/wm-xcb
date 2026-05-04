@@ -286,6 +286,184 @@ tmux list-windows | grep issue
 
 ---
 
+## ⚠️ TOP REPEATED MISTAKES (Read Before Starting)
+
+Based on analysis of 54 merged PRs, these issues appear repeatedly:
+
+### 1. Documentation Out of Sync with Code (25+ occurrences)
+- **Symptom**: Comments/headers describe behavior that doesn't match implementation
+- **Fix**: Update documentation in the SAME commit that changes behavior
+
+```c
+// BAD: Documentation says X but code does Y
+/**
+ * Resizes the widget to fit its contents
+ */
+void widget_set_size(Widget* w, int size) {
+    // Actually ignores size parameter
+    (void)size;
+}
+
+// GOOD: Documentation matches what the code actually does
+/**
+ * Sets the widget's minimum size (may be ignored if greater than max)
+ */
+void widget_set_size(Widget* w, int size);
+```
+
+### 2. Memory Leaks (15+ occurrences)
+- **Symptom**: Allocated memory not freed, especially in shutdown/error paths
+- **Fix**: Track ownership, free in all code paths including errors
+
+```c
+// BAD: Leaks on error paths
+void component_init(void) {
+    data = malloc(...);
+    if (something_fails) return;  // LEAK!
+    free(data);
+}
+
+// GOOD: Free on all exits
+void component_init(void) {
+    data = malloc(...);
+    if (something_fails) {
+        free(data);
+        return;
+    }
+    // ...
+}
+```
+
+### 3. Component Coupling Violations (12+ occurrences)
+- **Symptom**: Components calling each other directly instead of through Hub
+- **Fix**: All inter-component communication goes through hub_send_request() or hub_emit()
+
+```c
+// BAD: Direct coupling
+void component_a_action(void) {
+    component_b_do_something();  // NO!
+}
+
+// GOOD: Go through Hub
+void component_a_action(void) {
+    hub_send_request(REQ_COMPONENT_B_DO_SOMETHING, target_id);
+}
+```
+
+### 4. State Machine Pattern Violations (10+ occurrences)
+- **Symptom**: Bypassing SM for state changes, using wrong write type
+- **Fix**: State changes always go through SM (raw_write for hardware, transition for requests)
+
+```c
+// BAD: Direct state modification
+void on_configure(void) {
+    client->fullscreen = true;  // NO!
+}
+
+// GOOD: Go through SM
+void on_configure(void) {
+    sm_raw_write(client->fullscreen_sm, FULLSCREEN_ENTERED);
+}
+```
+
+### 5. Missing Test Coverage (8+ occurrences)
+- **Symptom**: New components/features without unit tests
+- **Fix**: Add tests BEFORE considering implementation done
+
+```c
+// REQUIRED: Test file for every new component
+// test-wm-mycomponent.c
+void test_my_component_init(void) {
+    assert(my_component_init() == true);
+    assert(my_component.registered == true);
+}
+void test_my_component_request(void) {
+    hub_send_request(REQ_MY_ACTION, some_target);
+    // assert expected state changes
+}
+```
+
+### 6. Null Pointer Dangling (8+ occurrences)
+- **Symptom**: Using pointers after objects freed, NULL checks missing
+- **Fix**: Snapshot pointers before callbacks that may free, check all returns
+
+```c
+// BAD: Iterator can be freed by callback
+for (Client* c = head; c != NULL; c = c->next) {
+    callback(c);  // May free c!
+}
+
+// GOOD: Snapshot next before callback
+for (Client* c = head; c != NULL;) {
+    Client* next = c->next;
+    callback(c);
+    c = next;
+}
+```
+
+### 7. Include Path Inconsistency (6+ occurrences)
+- **Symptom**: Using relative paths (`../../wm-hub.h`) instead of include paths
+- **Fix**: Use include-path-based includes (`#include "wm-hub.h"`)
+
+```c
+// BAD
+#include "../../wm-hub.h"
+
+// GOOD (matches rest of codebase)
+#include "wm-hub.h"
+```
+
+### 8. Event Type Collisions (4+ occurrences)
+- **Symptom**: Two components using same event ID (e.g., both use 20)
+- **Fix**: Check hub.h for used event IDs, use unique values
+
+```c
+// BAD: Collides with fullscreen EVT_*
+enum Events {
+    EVT_TAG_CHANGED = 20,  // Same as fullscreen!
+};
+
+// GOOD: Use unique, unused IDs
+enum Events {
+    EVT_TAG_CHANGED = 21,  // After MAX_EVENT_TYPES check
+};
+```
+
+### 9. API Contract Violations (6+ occurrences)
+- **Symptom**: Functions don't do what comments say, ownership unclear
+- **Fix**: Document ownership semantics, match implementation to docs
+
+```c
+// BAD: Ownership unclear
+void client_set_title(Client* c, char* title);
+
+// GOOD: Clear ownership semantics
+/**
+ * Sets client title.
+ * Takes ownership of `title` - caller must not free after call.
+ */
+void client_set_title(Client* c, char* title);
+```
+
+### 10. Registration Without Verification (5+ occurrences)
+- **Symptom**: Call hub_register_*() but don't check if it succeeded
+- **Fix**: Always verify registration and handle failures
+
+```c
+// BAD
+hub_register_component(&comp);
+LOG_DEBUG("Component registered");  // May not be true!
+
+// GOOD
+hub_register_component(&comp);
+if (!comp.registered) {
+    LOG_ERROR("Component registration failed");
+    return false;
+}
+```
+
+---
+
 ## When You're Done
 
 1. Make sure tests pass: `make test`
