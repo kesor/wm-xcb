@@ -11,15 +11,21 @@ PKGLIST = xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms
 PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST))
 PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST))
 
-# Always add glibc include path for clang tools
-# clang-tidy uses a standalone clang binary that does not include glibc in its search path
-GLIBC_DEV := $(shell clang -E -Wp,-v -x c /dev/null 2>&1 | grep "glibc.*include" | head -1 | tr -d " ")
-PKG_CFLAGS += -I$(GLIBC_DEV)
+# Always add vendor include paths for xcb-errors
 PKG_CFLAGS += -I. -Ivendor/xcb-errors-include -Ivendor/libxcb-errors/include
 
 CPPFLAGS = -DVERSION=\"${VERSION}\" -DWM_HUB_TESTING -D_DEFAULT_SOURCE
 CFLAGS = $(PKG_CFLAGS) $(VENDOR_INCLUDES) $(CPPFLAGS)
-LDFLAGS = $(PKG_LDFLAGS) -pthread -lc
+# ---------------------------------------------------------------------------
+# Static build for portable binary (works with glibc and musl)
+#
+# Use: make LDFLAGS_STATIC=-static (Alpine/musl)
+# For dynamic build: make LDFLAGS_STATIC= (default)
+#
+# Note: -static flag must come BEFORE -l flags for static linking to work
+#
+LDFLAGS_STATIC =
+LDFLAGS = $(LDFLAGS_STATIC) $(PKG_LDFLAGS) -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
 	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG
@@ -145,18 +151,19 @@ test-sm-standalone: wm-hub.o wm-log.o $(filter-out %.c,$(SRC_SM:.c=.o)) test-sm-
 	./test-sm-standalone
 
 # ---------------------------------------------------------------------------
-# Docker helpers
-# ---------------------------------------------------------------------------
+# Docker build and test targets
+# ----------------------------------------------------------------------------
 
-container-start:
-	docker run --rm -p5900:5900 --name x11vnc -v ${PWD}:/workspace -ti x11vnc
-
-container-exec:
-	docker exec -ti x11vnc /bin/bash
-
+# Build Docker image (multi-stage: Nix builder -> scratch runtime)
 container-build:
-	docker build -t x11vnc .
+	docker build -t $(NAME) .
 
-# ---------------------------------------------------------------------------
+# Run the container with VNC exposed on port 5900
+container-run:
+	docker run --rm -d -p 5900:5900 $(NAME)
 
-.PHONY: all clean container-start container-exec container-build test test-standalone test-sm-standalone check format tidy
+# Clean up Docker image
+container-clean:
+	docker rmi $(NAME)
+
+.PHONY: all clean test test-standalone test-sm-standalone check format tidy container-build container-run container-test container-clean

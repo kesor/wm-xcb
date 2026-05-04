@@ -12,3 +12,4 @@ test-*
 !test-*.h
 test
 pr-body.md
+result

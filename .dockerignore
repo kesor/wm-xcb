@@ -1,0 +1,7 @@
+wm
+*.o
+.git
+compile_commands.json
+compile_flags.txt
+test-*
+result
