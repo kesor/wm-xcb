@@ -45,24 +45,36 @@
           version = "0.0.1";
           src = ./.;
           buildInputs = with pkgs; [
-            libxcb libxcb-util libxcb-keysyms libxcb-wm libxcb-errors
-            libx11 libxrandr libxinerama freetype fontconfig
+            libxcb
+            libxcb-util
+            libxcb-keysyms
+            libxcb-wm
+            libxcb-errors
+            libx11
+            libxrandr
+            libxinerama
+            freetype
+            fontconfig
           ];
-          propagatedBuildInputs = with pkgs; [ xvfb x11vnc ];
-          nativeBuildInputs = with pkgs; [ pkg-config gnumake ];
+          propagatedBuildInputs = with pkgs; [
+            xvfb
+            x11vnc
+          ];
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            gnumake
+          ];
           buildPhase = ''
-            make CC=gcc PKG_CFLAGS="-I$PWD -I$PWD/vendor/xcb-errors-include -I$PWD/vendor/libxcb-errors/include $(pkg-config --cflags xcb xcb-util xcb-keysyms xcb-wm xcb-errors xcb-randr xcb-ewmh xcb-xinput)"
+            make
           '';
           installPhase = ''
             mkdir -p $out/bin
             cp wm $out/bin/
             # Create startup script that launches Xvfb, x11vnc, and wm
-            cat > $out/bin/start.sh << 'STARTSCRIPT'
+            cat > $out/bin/start.sh << STARTSCRIPT
 #!/bin/sh
-XVFB=$(find /nix/store -name Xvfb -type f 2>/dev/null | head -1)
-X11VNC=$(find /nix/store -name x11vnc -type f 2>/dev/null | head -1)
-if [ -x "$XVFB" ]; then exec "$XVFB" :0 -screen 0 1024x768x24; fi
-if [ -x "$X11VNC" ]; then "$X11VNC" -display :0 -forever -shared & fi
+${pkgs.xvfb}/bin/Xvfb :0 -screen 0 1024x768x24 &
+${pkgs.x11vnc}/bin/x11vnc -display :0 -forever -shared &
 sleep 1
 DISPLAY=:0 /wm/bin/wm
 STARTSCRIPT
