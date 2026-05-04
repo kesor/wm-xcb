@@ -5,17 +5,19 @@
 
 /* Mock component for testing */
 static HubComponent mock_component = {
-  .name       = "test-component",
-  .requests   = (RequestType[]) { 0 },
-  .targets    = (TargetType[]) { TARGET_TYPE_NONE },
-  .registered = false,
+  .name                  = "test-component",
+  .requests              = (RequestType[]) { 0 },
+  .accepted_target_names = NULL,
+  .accepted_targets      = NULL,
+  .registered            = false,
 };
 
 static HubComponent mock_component2 = {
-  .name       = "test-component-2",
-  .requests   = (RequestType[]) { 0 },
-  .targets    = (TargetType[]) { TARGET_TYPE_NONE },
-  .registered = false,
+  .name                  = "test-component-2",
+  .requests              = (RequestType[]) { 0 },
+  .accepted_target_names = NULL,
+  .accepted_targets      = NULL,
+  .registered            = false,
 };
 
 /* Track handler calls */

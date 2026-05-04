@@ -30,11 +30,12 @@
  */
 static FullscreenComponent fullscreen_component = {
   .base = {
-           .name       = FULLSCREEN_COMPONENT_NAME,
-           .requests   = (RequestType[]) { REQ_CLIENT_FULLSCREEN, 0 },
-           .targets    = (TargetType[]) { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE },
-           .executor   = NULL,
-           .registered = false,
+           .name                  = FULLSCREEN_COMPONENT_NAME,
+           .requests              = (RequestType[]) { REQ_CLIENT_FULLSCREEN, 0 },
+           .accepted_target_names = (const char*[]) { "client", NULL },
+           .accepted_targets      = NULL,
+           .executor              = NULL,
+           .registered            = false,
            },
   .initialized = false,
 };
@@ -368,7 +369,7 @@ fullscreen_executor(struct HubRequest* req)
 
   /* Get client from target ID */
   Client* c = (Client*) hub_get_target_by_id(req->target);
-  if (c == NULL || c->target.type != TARGET_TYPE_CLIENT) {
+  if (c == NULL || c->target.type_id != hub_get_target_type_id_by_name("client")) {
     LOG_DEBUG("fullscreen_executor: no client found for target");
     hub_emit(EVT_FULLSCREEN_FAILED, req->target, NULL);
     return;

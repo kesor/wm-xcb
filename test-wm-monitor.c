@@ -33,7 +33,7 @@ test_monitor_create_destroy(void)
   }
   assert(m != NULL);
   assert(m->target.id == (TargetID) output);
-  assert(m->target.type == TARGET_TYPE_MONITOR);
+  assert(m->target.type_id == hub_get_target_type_id_by_name("monitor"));
   assert(m->target.registered == true);
   assert(m->output == output);
   assert(m->crtc == XCB_NONE);
@@ -51,7 +51,7 @@ test_monitor_create_destroy(void)
     abort();
   }
   assert(t != NULL);
-  assert(t->type == TARGET_TYPE_MONITOR);
+  assert(t->type_id == hub_get_target_type_id_by_name("monitor"));
 
   /* Destroy */
   monitor_destroy(m);
@@ -372,14 +372,15 @@ test_monitor_with_hub_integration(void)
   monitor_list_init();
 
   /* Register a test component that handles monitors */
-  static RequestType monitor_requests[] = { 1, 0 };
-  static TargetType  monitor_targets[]  = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
+  static RequestType monitor_requests[]     = { 1, 0 };
+  static const char* monitor_target_names[] = { "monitor", NULL };
 
   static HubComponent test_component = {
-    .name       = "test-monitor-component",
-    .requests   = monitor_requests,
-    .targets    = monitor_targets,
-    .registered = false,
+    .name                  = "test-monitor-component",
+    .requests              = monitor_requests,
+    .accepted_target_names = monitor_target_names,
+    .accepted_targets      = NULL,
+    .registered            = false,
   };
 
   hub_register_component(&test_component);

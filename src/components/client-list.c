@@ -17,11 +17,12 @@
  */
 static ClientListComponent client_list_component = {
   .base = {
-           .name       = CLIENT_LIST_COMPONENT_NAME,
-           .requests   = NULL,
-           .targets    = (TargetType[]) { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE },
-           .executor   = NULL,
-           .registered = false,
+           .name                  = CLIENT_LIST_COMPONENT_NAME,
+           .requests              = NULL,
+           .accepted_target_names = (const char*[]) { "client", NULL },
+           .accepted_targets      = NULL,
+           .executor              = NULL,
+           .registered            = false,
            },
   .initialized = false,
 };

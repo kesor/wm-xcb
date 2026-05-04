@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "src/components/monitor-manager.h"
 #include "src/target/monitor.h"
@@ -169,14 +170,14 @@ test_monitor_manager_accepts_monitor_target(void)
   if (comp == NULL) {
     abort();
   }
-  TargetType* targets = comp->targets;
-  if (targets == NULL) {
+  const char** target_names = comp->accepted_target_names;
+  if (target_names == NULL) {
     abort();
   }
 
   bool found_mon = false;
-  for (int i = 0; targets[i] != TARGET_TYPE_NONE; i++) {
-    if (targets[i] == TARGET_TYPE_MONITOR) {
+  for (int i = 0; target_names[i] != NULL; i++) {
+    if (strcmp(target_names[i], "monitor") == 0) {
       found_mon = true;
       break;
     }
@@ -213,12 +214,12 @@ test_monitor_manager_with_monitors(void)
 
   /* Verify it's a monitor target */
   HubTarget* t = hub_get_target_by_id(100);
-  if (t->type != TARGET_TYPE_MONITOR) {
+  if (t->type_id != hub_get_target_type_id_by_name("monitor")) {
     abort();
   }
 
   /* Get all monitors */
-  HubTarget** monitors = hub_get_targets_by_type(TARGET_TYPE_MONITOR);
+  HubTarget** monitors = hub_get_targets_by_type(hub_get_target_type_id_by_name("monitor"));
   if (monitors == NULL) {
     abort();
   }

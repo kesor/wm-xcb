@@ -56,7 +56,7 @@ test_tag_create_destroy(void)
   assert(t != NULL);
   assert(t->index == 0);
   assert(t->target.id != TARGET_ID_NONE);
-  assert(t->target.type == TARGET_TYPE_TAG);
+  assert(t->target.type_id == hub_get_target_type_id_by_name("tag"));
   assert(t->target.registered == true);
   assert(t->mask == TAG_MASK(0));
   /* name may be NULL when tag_create is called with a name but the allocation fails
@@ -72,7 +72,7 @@ test_tag_create_destroy(void)
     abort();
   }
   assert(target != NULL);
-  assert(target->type == TARGET_TYPE_TAG);
+  assert(target->type_id == hub_get_target_type_id_by_name("tag"));
 
   /* Destroy - save ID first to avoid use-after-free */
   TargetID saved_id = t->target.id;
@@ -270,7 +270,8 @@ test_tag_with_hub_integration(void)
   tag_list_init();
 
   /* All tags should be registered */
-  HubTarget** tags = hub_get_targets_by_type(TARGET_TYPE_TAG);
+  uint32_t    tag_type_id = hub_get_target_type_id_by_name("tag");
+  HubTarget** tags        = hub_get_targets_by_type(tag_type_id);
   assert(tags != NULL);
 
   /* Count TAG targets */
@@ -281,13 +282,15 @@ test_tag_with_hub_integration(void)
   assert(count == TAG_NUM_TAGS);
 
   /* Verify TAG targets are separate from MONITOR targets */
-  HubTarget** monitors = hub_get_targets_by_type(TARGET_TYPE_MONITOR);
+  uint32_t    monitor_type_id = hub_get_target_type_id_by_name("monitor");
+  HubTarget** monitors        = hub_get_targets_by_type(monitor_type_id);
   if (monitors != NULL) {
     assert(monitors[0] == NULL); /* No monitors created yet */
   }
 
   /* Verify TAG targets are separate from CLIENT targets */
-  HubTarget** clients = hub_get_targets_by_type(TARGET_TYPE_CLIENT);
+  uint32_t    client_type_id = hub_get_target_type_id_by_name("client");
+  HubTarget** clients        = hub_get_targets_by_type(client_type_id);
   if (clients != NULL) {
     assert(clients[0] == NULL); /* No clients created yet */
   }

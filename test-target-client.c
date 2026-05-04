@@ -68,7 +68,7 @@ test_client_create(void)
   }
   assert(c != NULL);
   assert(c->window == 100);
-  assert(c->target.type == TARGET_TYPE_CLIENT);
+  assert(c->target.type_id == hub_get_target_type_id_by_name("client"));
   assert(c->target.id == 100);
   assert(c->target.registered == true);
 
@@ -79,7 +79,7 @@ test_client_create(void)
     abort();
   }
   assert(t != NULL);
-  assert(t->type == TARGET_TYPE_CLIENT);
+  assert(t->type_id == hub_get_target_type_id_by_name("client"));
 
   /* Verify in list */
   assert(client_list_get_head() == c);

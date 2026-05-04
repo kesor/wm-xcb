@@ -357,7 +357,7 @@ test_raw_write_emits_via_hub(void)
   };
   SMTemplate* t = make_tmpl("raw-emit", states, 2, trans, 2, OFF);
 
-  HubTarget target = { .id = 42, .type = TARGET_TYPE_CLIENT, .registered = false };
+  HubTarget target = { .id = 42, .type_id = hub_get_target_type_id_by_name("client"), .registered = false };
   hub_register_target(&target);
 
   hub_subscribe(OFF, event_catcher, NULL);
