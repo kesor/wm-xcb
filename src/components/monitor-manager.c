@@ -52,22 +52,23 @@ static xcb_randr_output_t* monitor_manager_get_screen_outputs(xcb_window_t root,
 static RequestType monitor_manager_requests[] = { 0 }; /* 0-terminated */
 
 /*
- * Target types accepted by monitor manager
+ * Target type names accepted by monitor manager
  */
-static TargetType monitor_manager_targets[] = {
-  TARGET_TYPE_MONITOR,
-  TARGET_TYPE_NONE,
+static const char* monitor_manager_target_names[] = {
+  "monitor",
+  NULL,
 };
 
 /*
  * Monitor Manager Component
  */
 HubComponent monitor_manager_component = {
-  .name       = "monitor-manager",
-  .requests   = monitor_manager_requests,
-  .targets    = monitor_manager_targets,
-  .executor   = monitor_manager_executor,
-  .registered = false,
+  .name                  = "monitor-manager",
+  .requests              = monitor_manager_requests,
+  .accepted_target_names = monitor_manager_target_names,
+  .accepted_targets      = NULL,
+  .executor              = monitor_manager_executor,
+  .registered            = false,
 };
 
 /*

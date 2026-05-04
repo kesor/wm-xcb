@@ -3,10 +3,10 @@
 #include "test-wm.h"
 #include "wm-hub.h"
 
-/* Test component definitions - use TARGET_TYPE_NONE for proper termination */
-static RequestType fullscreen_requests[] = { 1, 2, 0 }; /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */
-static TargetType  client_targets[]      = { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE };
-static TargetType  monitor_targets[]     = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
+/* Test component definitions - use string-based target type names */
+static RequestType fullscreen_requests[]  = { 1, 2, 0 }; /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */
+static const char* client_target_names[]  = { "client", NULL };
+static const char* monitor_target_names[] = { "monitor", NULL };
 
 /* Track adoption calls */
 static int      adopt_count_client    = 0;
@@ -48,55 +48,59 @@ on_unadopt_monitor(HubTarget* target)
 
 /* Test components that accept CLIENT targets */
 static HubComponent test_fullscreen = {
-  .name       = "fullscreen",
-  .requests   = fullscreen_requests,
-  .targets    = client_targets,
-  .registered = false,
-  .on_adopt   = on_adopt_client,
-  .on_unadopt = on_unadopt_client,
+  .name                  = "fullscreen",
+  .requests              = fullscreen_requests,
+  .accepted_target_names = client_target_names,
+  .accepted_targets      = NULL,
+  .registered            = false,
+  .on_adopt              = on_adopt_client,
+  .on_unadopt            = on_unadopt_client,
 };
 
 /* test_focus handles request type 1 AND 3 (for override/fallback testing) */
 static RequestType  focus_requests[] = { 1, 3, 0 }; /* REQ_CLIENT_FOCUS = 3, also handles 1 */
 static HubComponent test_focus       = {
-        .name       = "focus",
-        .requests   = focus_requests,
-        .targets    = client_targets,
-        .registered = false,
-        .on_adopt   = on_adopt_client,
-        .on_unadopt = on_unadopt_client,
+        .name                  = "focus",
+        .requests              = focus_requests,
+        .accepted_target_names = client_target_names,
+        .accepted_targets      = NULL,
+        .registered            = false,
+        .on_adopt              = on_adopt_client,
+        .on_unadopt            = on_unadopt_client,
 };
 
 static HubComponent test_monitor = {
-  .name       = "monitor",
-  .requests   = (RequestType[]) { 4, 5, 0 }, /* REQ_MONITOR_* = 4, 5 */
-  .targets    = monitor_targets,
-  .registered = false,
-  .on_adopt   = on_adopt_monitor,
-  .on_unadopt = on_unadopt_monitor,
+  .name                  = "monitor",
+  .requests              = (RequestType[]) { 4, 5, 0 }, /* REQ_MONITOR_* = 4, 5 */
+  .accepted_target_names = monitor_target_names,
+  .accepted_targets      = NULL,
+  .registered            = false,
+  .on_adopt              = on_adopt_monitor,
+  .on_unadopt            = on_unadopt_monitor,
 };
 
+/* Test targets use compile-time constant type IDs */
 static HubTarget test_client1 = {
   .id         = 100,
-  .type       = TARGET_TYPE_CLIENT,
+  .type_id    = TARGET_TYPE_CLIENT,
   .registered = false,
 };
 
 static HubTarget test_client2 = {
   .id         = 101,
-  .type       = TARGET_TYPE_CLIENT,
+  .type_id    = TARGET_TYPE_CLIENT,
   .registered = false,
 };
 
 static HubTarget test_monitor1 = {
   .id         = 200,
-  .type       = TARGET_TYPE_MONITOR,
+  .type_id    = TARGET_TYPE_MONITOR,
   .registered = false,
 };
 
 static HubTarget test_monitor2 = {
   .id         = 201,
-  .type       = TARGET_TYPE_MONITOR,
+  .type_id    = TARGET_TYPE_MONITOR,
   .registered = false,
 };
 
@@ -269,7 +273,7 @@ test_register_target_none_id(void)
 
   HubTarget none_target = {
     .id         = TARGET_ID_NONE,
-    .type       = TARGET_TYPE_CLIENT,
+    .type_id    = hub_get_target_type_id_by_name("client"),
     .registered = false,
   };
   hub_register_target(&none_target);
@@ -336,7 +340,7 @@ test_get_targets_by_type(void)
   hub_register_target(&test_monitor1);
   hub_register_target(&test_monitor2);
 
-  HubTarget** clients = hub_get_targets_by_type(TARGET_TYPE_CLIENT);
+  HubTarget** clients = hub_get_targets_by_type(hub_get_target_type_id_by_name("client"));
   if (clients == NULL) {
     LOG_ERROR("hub_get_targets_by_type returned NULL");
     abort();
@@ -346,7 +350,7 @@ test_get_targets_by_type(void)
   assert(clients[1] == &test_client2);
   assert(clients[2] == NULL); /* NULL-terminated */
 
-  HubTarget** monitors = hub_get_targets_by_type(TARGET_TYPE_MONITOR);
+  HubTarget** monitors = hub_get_targets_by_type(hub_get_target_type_id_by_name("monitor"));
   if (monitors == NULL) {
     LOG_ERROR("hub_get_targets_by_type returned NULL");
     abort();
@@ -356,16 +360,12 @@ test_get_targets_by_type(void)
   assert(monitors[1] == &test_monitor2);
   assert(monitors[2] == NULL); /* NULL-terminated */
 
-  HubTarget** empty = hub_get_targets_by_type(TARGET_TYPE_KEYBOARD);
-  if (empty == NULL) {
-    LOG_ERROR("hub_get_targets_by_type returned NULL");
-    abort();
-  }
-  assert(empty != NULL);
-  assert(empty[0] == NULL); /* No keyboard targets registered */
+  HubTarget** empty = hub_get_targets_by_type(hub_get_target_type_id_by_name("keyboard"));
+  /* No keyboard targets exist, so returns NULL (invalid type) */
+  assert(empty == NULL);
 
   /* Invalid type */
-  HubTarget** invalid = hub_get_targets_by_type(TARGET_TYPE_COUNT + 1);
+  HubTarget** invalid = hub_get_targets_by_type(hub_get_target_type_id_by_name("nonexistent"));
   assert(invalid == NULL);
 
   hub_shutdown();
@@ -486,7 +486,7 @@ test_duplicate_target_id_rejected(void)
   /* Try to register another target with the same ID - should fail */
   HubTarget duplicate_target = {
     .id         = 100,
-    .type       = TARGET_TYPE_MONITOR,
+    .type_id    = hub_get_target_type_id_by_name("monitor"),
     .registered = false,
   };
   hub_register_target(&duplicate_target);
@@ -505,7 +505,7 @@ test_large_target_id_lookup(void)
   /* Use a target ID larger than MAX_TARGETS (256) */
   HubTarget large_id_target = {
     .id         = 1000,
-    .type       = TARGET_TYPE_CLIENT,
+    .type_id    = hub_get_target_type_id_by_name("client"),
     .registered = false,
   };
 
@@ -535,7 +535,7 @@ test_target_type_null_termination(void)
   hub_register_target(&test_client1);
   hub_register_target(&test_client2);
 
-  HubTarget** clients = hub_get_targets_by_type(TARGET_TYPE_CLIENT);
+  HubTarget** clients = hub_get_targets_by_type(hub_get_target_type_id_by_name("client"));
 
   /* Verify proper iteration with NULL terminator */
   int count = 0;
@@ -862,35 +862,39 @@ exec_monitor(struct HubRequest* req)
 
 /* Components with executors */
 static HubComponent routing_fullscreen = {
-  .name       = "routing-fullscreen",
-  .requests   = (RequestType[]) { 1, 2, 0 }, /* Request types 1, 2 */
-  .targets    = client_targets,
-  .executor   = exec_fullscreen,
-  .registered = false,
+  .name                  = "routing-fullscreen",
+  .requests              = (RequestType[]) { 1, 2, 0 }, /* Request types 1, 2 */
+  .accepted_target_names = client_target_names,
+  .accepted_targets      = NULL,
+  .executor              = exec_fullscreen,
+  .registered            = false,
 };
 
 static HubComponent routing_focus = {
-  .name       = "routing-focus",
-  .requests   = (RequestType[]) { 3, 0 }, /* Request type 3 */
-  .targets    = client_targets,
-  .executor   = exec_focus,
-  .registered = false,
+  .name                  = "routing-focus",
+  .requests              = (RequestType[]) { 3, 0 }, /* Request type 3 */
+  .accepted_target_names = client_target_names,
+  .accepted_targets      = NULL,
+  .executor              = exec_focus,
+  .registered            = false,
 };
 
 static HubComponent routing_monitor = {
-  .name       = "routing-monitor",
-  .requests   = (RequestType[]) { 4, 5, 0 }, /* Request types 4, 5 */
-  .targets    = monitor_targets,
-  .executor   = exec_monitor,
-  .registered = false,
+  .name                  = "routing-monitor",
+  .requests              = (RequestType[]) { 4, 5, 0 }, /* Request types 4, 5 */
+  .accepted_target_names = monitor_target_names,
+  .accepted_targets      = NULL,
+  .executor              = exec_monitor,
+  .registered            = false,
 };
 
 static HubComponent routing_no_exec = {
-  .name       = "routing-no-exec",
-  .requests   = (RequestType[]) { 99, 0 }, /* Request type 99 */
-  .targets    = client_targets,
-  .executor   = NULL, /* No executor - should not be called */
-  .registered = false,
+  .name                  = "routing-no-exec",
+  .requests              = (RequestType[]) { 99, 0 }, /* Request type 99 */
+  .accepted_target_names = client_target_names,
+  .accepted_targets      = NULL,
+  .executor              = NULL, /* No executor - should not be called */
+  .registered            = false,
 };
 
 void
@@ -1204,7 +1208,7 @@ test_get_components_for_target_type(void)
   hub_register_component(&test_monitor);
 
   /* Get components for CLIENT type */
-  HubComponent** client_comps = hub_get_components_for_target_type(TARGET_TYPE_CLIENT);
+  HubComponent** client_comps = hub_get_components_for_target_type(hub_get_target_type_id_by_name("client"));
   assert(client_comps != NULL);
 
 
@@ -1216,7 +1220,7 @@ test_get_components_for_target_type(void)
 
 
   /* Get components for MONITOR type */
-  HubComponent** monitor_comps = hub_get_components_for_target_type(TARGET_TYPE_MONITOR);
+  HubComponent** monitor_comps = hub_get_components_for_target_type(hub_get_target_type_id_by_name("monitor"));
   assert(monitor_comps != NULL);
 
 
@@ -1227,14 +1231,9 @@ test_get_components_for_target_type(void)
   assert(monitor_count == 1); /* monitor */
 
   /* Get components for KEYBOARD type (none registered) */
-  HubComponent** empty_comps = hub_get_components_for_target_type(TARGET_TYPE_KEYBOARD);
-  assert(empty_comps != NULL);
-  /* Verify it's NULL-terminated with no entries */
-  int empty_count = 0;
-  for (int i = 0; empty_comps[i] != NULL; i++) {
-    empty_count++;
-  }
-  assert(empty_count == 0); /* No components for KEYBOARD type */
+  HubComponent** empty_comps = hub_get_components_for_target_type(hub_get_target_type_id_by_name("keyboard"));
+  /* No keyboard type exists, so returns NULL (invalid type) */
+  assert(empty_comps == NULL);
 
 
   hub_shutdown();

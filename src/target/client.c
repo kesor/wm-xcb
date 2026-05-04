@@ -299,7 +299,7 @@ client_create(xcb_window_t window)
 
   /* Initialize base target */
   c->target.id         = (TargetID) window;
-  c->target.type       = TARGET_TYPE_CLIENT;
+  c->target.type_id    = hub_get_target_type_id_by_name("client");
   c->target.registered = false;
 
   /* Initialize X properties */
@@ -394,7 +394,7 @@ Client*
 client_get_by_window(xcb_window_t window)
 {
   HubTarget* t = hub_get_target_by_id((TargetID) window);
-  if (t == NULL || t->type != TARGET_TYPE_CLIENT)
+  if (t == NULL || t->type_id != hub_get_target_type_id_by_name("client"))
     return NULL;
   return (Client*) t;
 }

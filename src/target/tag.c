@@ -72,7 +72,7 @@ tag_create(int index, const char* name)
    * Tag targets use IDs: TAG_ID_BASE + index
    */
   t->target.id         = tag_index_to_target_id(index);
-  t->target.type       = TARGET_TYPE_TAG;
+  t->target.type_id    = hub_get_target_type_id_by_name("tag");
   t->target.registered = false;
 
   /* Initialize tag properties */
@@ -298,7 +298,7 @@ Tag*
 tag_get_by_id(TargetID id)
 {
   HubTarget* t = hub_get_target_by_id(id);
-  if (t == NULL || t->type != TARGET_TYPE_TAG)
+  if (t == NULL || t->type_id != hub_get_target_type_id_by_name("tag"))
     return NULL;
   return (Tag*) t;
 }

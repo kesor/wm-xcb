@@ -10,6 +10,7 @@
 #define MAX_COMPONENTS    64
 #define MAX_TARGETS       256
 #define MAX_REQUEST_TYPES 256
+#define MAX_TARGET_TYPES  16
 
 static HubComponent* components[MAX_COMPONENTS];
 static uint32_t      component_count = 0;
@@ -25,6 +26,14 @@ static uint32_t               name_entry_count = 0;
 
 /* Component lookup by request type (array indexed by RequestType) */
 static HubComponent* component_by_request_type[MAX_REQUEST_TYPES];
+
+/* Target type registry */
+static HubTargetType target_types[MAX_TARGET_TYPES];
+static uint32_t      target_type_count = 0;
+
+/* Target type lookup by name */
+static HubTargetType* target_type_by_name[MAX_TARGET_TYPES];
+static uint32_t       target_type_name_count = 0;
 
 /* Target registry */
 static HubTarget* targets[MAX_TARGETS];
@@ -48,9 +57,9 @@ target_id_hash(TargetID id)
   return (uint32_t) ((id ^ (id >> 16)) % TARGET_ID_MAP_SIZE);
 }
 
-/* Targets grouped by type (array of arrays) */
-static HubTarget* targets_by_type[TARGET_TYPE_COUNT][MAX_TARGETS];
-static uint32_t   targets_by_type_count[TARGET_TYPE_COUNT];
+/* Targets grouped by type ID (array of arrays) */
+static HubTarget* targets_by_type[MAX_TARGET_TYPES][MAX_TARGETS];
+static uint32_t   targets_by_type_count[MAX_TARGET_TYPES];
 
 /* Event Bus - maximum number of event types */
 #define MAX_EVENT_TYPES 64
@@ -69,6 +78,7 @@ static void       component_add_to_request_type_index(HubComponent* comp);
 static void       target_by_id_map_insert(HubTarget* target);
 static void       target_by_id_map_remove(TargetID id);
 static HubTarget* target_by_id_map_lookup(TargetID id);
+static uint32_t   resolve_target_type_id(uint32_t legacy_id);
 
 /*
  * Clear all registry state.
@@ -81,6 +91,12 @@ clear_registry_state(void)
   memset(components, 0, sizeof(components));
   memset(component_by_name, 0, sizeof(component_by_name));
   memset(component_by_request_type, 0, sizeof(component_by_request_type));
+
+  /* Clear target type arrays */
+  memset(target_types, 0, sizeof(target_types));
+  memset(target_type_by_name, 0, sizeof(target_type_by_name));
+  target_type_count      = 0;
+  target_type_name_count = 0;
 
   /* Clear target arrays */
   memset(targets, 0, sizeof(targets));
@@ -101,6 +117,141 @@ hub_init(void)
 {
   LOG_DEBUG("Initializing hub registry");
   clear_registry_state();
+
+  /* Register built-in target types early */
+  (void) hub_register_target_type("client", NULL);
+  (void) hub_register_target_type("monitor", NULL);
+  (void) hub_register_target_type("tag", NULL);
+}
+
+/*
+ * Register a target type with the hub.
+ * Returns the registered HubTargetType, or NULL on failure.
+ * If a type with the same name already exists, returns the existing type.
+ */
+HubTargetType*
+hub_register_target_type(const char* name, HubComponent* owner)
+{
+  if (name == NULL) {
+    LOG_ERROR("Cannot register NULL target type name");
+    return NULL;
+  }
+
+  /* Check if type already exists */
+  HubTargetType* existing = hub_get_target_type_by_name(name);
+  if (existing != NULL) {
+    LOG_DEBUG("Target type '%s' already registered", name);
+    return existing;
+  }
+
+  if (target_type_count >= MAX_TARGET_TYPES) {
+    LOG_ERROR("Maximum number of target types reached (%d)", MAX_TARGET_TYPES);
+    return NULL;
+  }
+
+  /* Create new target type */
+  HubTargetType* tt = &target_types[target_type_count++];
+  tt->name          = name;
+  tt->id            = target_type_count - 1; /* 0-indexed ID */
+  tt->owner         = owner;
+  tt->reserved      = true;
+
+  /* Add to name index */
+  if (target_type_name_count < MAX_TARGET_TYPES) {
+    target_type_by_name[target_type_name_count++] = tt;
+  }
+
+  LOG_DEBUG("Registered target type: name='%s', id=%u", name, tt->id);
+  return tt;
+}
+
+/*
+ * Get a target type by name.
+ * Returns NULL if not found.
+ */
+HubTargetType*
+hub_get_target_type_by_name(const char* name)
+{
+  if (name == NULL)
+    return NULL;
+
+  for (uint32_t i = 0; i < target_type_name_count; i++) {
+    HubTargetType* tt = target_type_by_name[i];
+    if (tt != NULL && tt->name != NULL && strcmp(tt->name, name) == 0) {
+      return tt;
+    }
+  }
+  return NULL;
+}
+
+/*
+ * Get a target type ID by name.
+ * Returns TARGET_TYPE_INVALID if not found.
+ */
+uint32_t
+hub_get_target_type_id_by_name(const char* name)
+{
+  HubTargetType* tt = hub_get_target_type_by_name(name);
+  return tt ? tt->id : TARGET_TYPE_INVALID;
+}
+
+/*
+ * Get a target type by ID.
+ * Returns NULL if not found or invalid ID.
+ */
+HubTargetType*
+hub_get_target_type_by_id(uint32_t id)
+{
+  if (id >= target_type_count)
+    return NULL;
+
+  return &target_types[id];
+}
+
+/*
+ * Get all registered target types.
+ * Returns array of pointers (owned by hub, do not free).
+ * count is set to the number of types.
+ */
+HubTargetType**
+hub_get_all_target_types(uint32_t* count)
+{
+  static HubTargetType* result[MAX_TARGET_TYPES];
+
+  if (count != NULL) {
+    *count = target_type_count;
+  }
+
+  for (uint32_t i = 0; i < target_type_count; i++) {
+    result[i] = &target_types[i];
+  }
+
+  return result;
+}
+
+/*
+ * Resolve legacy target type ID to current registered ID.
+ * For backward compatibility - handles the case where legacy enum values
+ * need to be mapped to dynamically registered types.
+ */
+static uint32_t
+resolve_target_type_id(uint32_t legacy_id)
+{
+  /* If we have a registered type at this index, use it */
+  if (target_type_count > 0 && legacy_id < target_type_count &&
+      target_types[legacy_id].reserved) {
+    return legacy_id;
+  }
+
+  /* Fall back to first registered type as default */
+  for (uint32_t i = 0; i < target_type_count; i++) {
+    if (target_types[i].reserved) {
+      return i;
+    }
+  }
+
+  /* No registered types, return 0 as fallback (invalid will be caught later) */
+  return 0;
 }
 
 void
@@ -119,6 +270,21 @@ hub_register_component(HubComponent* comp)
   if (component_count >= MAX_COMPONENTS) {
     LOG_ERROR("Maximum number of components reached (%d)", MAX_COMPONENTS);
     return;
+  }
+
+  /* Resolve accepted target type names to pointers */
+  if (comp->accepted_target_names != NULL) {
+    for (uint32_t i = 0; comp->accepted_target_names[i] != NULL; i++) {
+      const char*    name = comp->accepted_target_names[i];
+      HubTargetType* tt   = hub_get_target_type_by_name(name);
+      if (tt != NULL) {
+        LOG_DEBUG("Component '%s' accepts target type '%s' (id=%u)",
+                  comp->name, name, tt->id);
+      } else {
+        LOG_WARN("Component '%s' references unknown target type '%s'",
+                 comp->name, name);
+      }
+    }
   }
 
   /* Add to main component array */
@@ -175,7 +341,7 @@ hub_unregister_component(const char* name)
         /* Only recompute if this component was the handler */
         if (component_by_request_type[rt] == comp) {
           component_by_request_type[rt] = NULL;
-          /* Recompute from remaining registered components */
+          /* Recompute from remaining components */
           for (int32_t j = (int32_t) component_count - 1; j >= 0; j--) {
             HubComponent* other = components[j];
             if (other != NULL && other->requests != NULL) {
@@ -232,34 +398,49 @@ hub_get_component_by_request_type(RequestType type)
 }
 
 /*
- * Get all components that accept a specific target type.
+ * Get all components that accept a specific target type ID.
  * Returns a NULL-terminated array of components.
  * The array is owned by the hub and should not be modified or freed.
+ * Returns NULL for invalid type IDs.
  */
 HubComponent**
-hub_get_components_for_target_type(TargetType type)
+hub_get_components_for_target_type(TargetTypeId type_id)
 {
   static HubComponent* results[MAX_COMPONENTS + 1];
   static uint32_t      result_count = 0;
 
-  if (type >= TARGET_TYPE_COUNT) {
+  /* Check for invalid type_id (sentinel value) */
+  if (type_id == TARGET_TYPE_INVALID) {
     return NULL;
   }
 
+  /* Check if type_id is in valid range */
+  if (type_id >= target_type_count || !target_types[type_id].reserved) {
+    return NULL;
+  }
+
+  /* Resolve type_id to actual registered type */
+  uint32_t resolved_id = resolve_target_type_id(type_id);
+
+  /* Clear the results array */
+  memset(results, 0, sizeof(results));
   result_count = 0;
 
   for (uint32_t i = 0; i < component_count; i++) {
     HubComponent* comp = components[i];
-    if (comp == NULL || comp->targets == NULL)
+    if (comp == NULL)
       continue;
 
-    /* Check if this component accepts the target type */
-    for (uint32_t j = 0; comp->targets[j] != TARGET_TYPE_NONE; j++) {
-      if (comp->targets[j] == type) {
-        if (result_count < MAX_COMPONENTS) {
-          results[result_count++] = comp;
+    /* Check accepted_target_names for a match */
+    if (comp->accepted_target_names != NULL) {
+      for (uint32_t j = 0; comp->accepted_target_names[j] != NULL; j++) {
+        HubTargetType* tt = hub_get_target_type_by_name(comp->accepted_target_names[j]);
+        if (tt != NULL && tt->id == resolved_id) {
+          if (result_count < MAX_COMPONENTS) {
+            results[result_count++] = comp;
+          }
+          break;
         }
-        break;
       }
     }
   }
@@ -267,6 +448,18 @@ hub_get_components_for_target_type(TargetType type)
   return results;
 }
 
+/*
+ * Get all components that accept a specific target type by name.
+ */
+HubComponent**
+hub_get_components_for_target_type_name(const char* type_name)
+{
+  HubTargetType* tt = hub_get_target_type_by_name(type_name);
+  if (tt == NULL)
+    return NULL;
+
+  return hub_get_components_for_target_type(tt->id);
+}
 
 /*
  * Adopt all compatible components for a target.
@@ -279,7 +472,7 @@ hub_adopt_components_for_target(HubTarget* target)
   if (target == NULL)
     return;
 
-  HubComponent** comps = hub_get_components_for_target_type(target->type);
+  HubComponent** comps = hub_get_components_for_target_type(target->type_id);
   if (comps == NULL)
     return;
 
@@ -304,7 +497,7 @@ hub_unadopt_components_for_target(HubTarget* target)
   if (target == NULL)
     return;
 
-  HubComponent** comps = hub_get_components_for_target_type(target->type);
+  HubComponent** comps = hub_get_components_for_target_type(target->type_id);
   if (comps == NULL)
     return;
 
@@ -342,10 +535,8 @@ hub_register_target(HubTarget* target)
     return;
   }
 
-  if (target->type >= TARGET_TYPE_COUNT) {
-    LOG_ERROR("Invalid target type %u", target->type);
-    return;
-  }
+  /* Resolve type_id to registered type */
+  uint32_t resolved_type = resolve_target_type_id(target->type_id);
 
   /* Check for duplicate ID */
   if (hub_get_target_by_id(target->id) != NULL) {
@@ -356,20 +547,21 @@ hub_register_target(HubTarget* target)
   /* Add to main target array */
   targets[target_count++] = target;
   target->registered      = true;
+  target->type_id         = resolved_type; /* Store resolved ID */
 
   /* Add to ID index (hash map for arbitrary TargetID values) */
   target_by_id_map_insert(target);
 
   /* Add to type index with NULL terminator */
-  if (targets_by_type_count[target->type] < MAX_TARGETS) {
-    targets_by_type[target->type][targets_by_type_count[target->type]++] = target;
+  if (targets_by_type_count[resolved_type] < MAX_TARGETS) {
+    targets_by_type[resolved_type][targets_by_type_count[resolved_type]++] = target;
     /* Ensure NULL terminator */
-    if (targets_by_type_count[target->type] < MAX_TARGETS) {
-      targets_by_type[target->type][targets_by_type_count[target->type]] = NULL;
+    if (targets_by_type_count[resolved_type] < MAX_TARGETS) {
+      targets_by_type[resolved_type][targets_by_type_count[resolved_type]] = NULL;
     }
   }
 
-  LOG_DEBUG("Registered target: id=%" PRIu64 ", type=%u", target->id, target->type);
+  LOG_DEBUG("Registered target: id=%" PRIu64 ", type_id=%u", target->id, target->type_id);
 
   /* Adopt all compatible components */
   hub_adopt_components_for_target(target);
@@ -389,14 +581,16 @@ hub_unregister_target(TargetID id)
     return;
   }
 
+  uint32_t type_id = target->type_id;
+
   /* Remove from type index */
-  for (uint32_t i = 0; i < targets_by_type_count[target->type]; i++) {
-    if (targets_by_type[target->type][i] == target) {
-      targets_by_type[target->type][i] =
-          targets_by_type[target->type][targets_by_type_count[target->type] - 1];
-      targets_by_type_count[target->type]--;
+  for (uint32_t i = 0; i < targets_by_type_count[type_id]; i++) {
+    if (targets_by_type[type_id][i] == target) {
+      targets_by_type[type_id][i] =
+          targets_by_type[type_id][targets_by_type_count[type_id] - 1];
+      targets_by_type_count[type_id]--;
       /* Clear vacated slot and ensure NULL terminator */
-      targets_by_type[target->type][targets_by_type_count[target->type]] = NULL;
+      targets_by_type[type_id][targets_by_type_count[type_id]] = NULL;
       break;
     }
   }
@@ -430,18 +624,39 @@ hub_get_target_by_id(TargetID id)
 }
 
 HubTarget**
-hub_get_targets_by_type(TargetType type)
+hub_get_targets_by_type(TargetTypeId type_id)
 {
-  if (type >= TARGET_TYPE_COUNT)
+  /* Check for invalid type_id (sentinel value) */
+  if (type_id == TARGET_TYPE_INVALID) {
     return NULL;
+  }
+
+  /* Check if type_id is valid - must be within range and have a registered type */
+  if (type_id >= target_type_count || !target_types[type_id].reserved) {
+    /* Invalid type_id or type not registered */
+    return NULL;
+  }
+
+  /* Resolve type_id to actual registered type */
+  uint32_t resolved_id = resolve_target_type_id(type_id);
 
   /* Ensure NULL terminator is set */
-  if (targets_by_type_count[type] < MAX_TARGETS) {
-    targets_by_type[type][targets_by_type_count[type]] = NULL;
+  if (targets_by_type_count[resolved_id] < MAX_TARGETS) {
+    targets_by_type[resolved_id][targets_by_type_count[resolved_id]] = NULL;
   }
 
   /* Return pointer to the array - caller should not modify */
-  return targets_by_type[type];
+  return targets_by_type[resolved_id];
+}
+
+HubTarget**
+hub_get_targets_by_type_name(const char* type_name)
+{
+  HubTargetType* tt = hub_get_target_type_by_name(type_name);
+  if (tt == NULL)
+    return NULL;
+
+  return hub_get_targets_by_type(tt->id);
 }
 
 uint32_t
@@ -454,6 +669,12 @@ uint32_t
 hub_target_count(void)
 {
   return target_count;
+}
+
+uint32_t
+hub_target_type_count(void)
+{
+  return target_type_count;
 }
 
 /* Internal helper: add component to request type index */

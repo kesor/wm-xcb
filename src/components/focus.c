@@ -35,11 +35,12 @@ static SMTemplate* cached_focus_template = NULL;
  */
 static FocusComponent focus_component = {
   .base = {
-           .name       = FOCUS_COMPONENT_NAME,
-           .requests   = NULL, /* Focus is driven by XCB events, not requests */
-      .targets    = (TargetType[]) { TARGET_TYPE_CLIENT, TARGET_TYPE_NONE },
-           .executor   = NULL,
-           .registered = false,
+           .name                  = FOCUS_COMPONENT_NAME,
+           .requests              = NULL, /* Focus is driven by XCB events, not requests */
+      .accepted_target_names = (const char*[]) { "client", NULL },
+           .accepted_targets      = NULL,
+           .executor              = NULL,
+           .registered            = false,
            },
   .initialized    = false,
   .focused_window = 0,

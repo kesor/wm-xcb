@@ -35,11 +35,12 @@ static SMTemplate* cached_layout_template = NULL;
  */
 static TilingComponent tiling_component = {
   .base = {
-           .name       = TILING_COMPONENT_NAME,
-           .requests   = (RequestType[]) { REQ_MONITOR_TILE, 0 },
-           .targets    = (TargetType[]) { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE },
-           .executor   = NULL,
-           .registered = false,
+           .name                  = TILING_COMPONENT_NAME,
+           .requests              = (RequestType[]) { REQ_MONITOR_TILE, 0 },
+           .accepted_target_names = (const char*[]) { "monitor", NULL },
+           .accepted_targets      = NULL,
+           .executor              = NULL,
+           .registered            = false,
            },
   .initialized     = false,
   .default_mfact   = 0.5F, /* 50% master, 50% stack */
@@ -613,7 +614,7 @@ tiling_executor(struct HubRequest* req)
 
   /* Get monitor from target ID */
   Monitor* m = (Monitor*) hub_get_target_by_id(req->target);
-  if (m == NULL || m->target.type != TARGET_TYPE_MONITOR) {
+  if (m == NULL || m->target.type_id != hub_get_target_type_id_by_name("monitor")) {
     LOG_DEBUG("tiling_executor: no monitor found for target");
     return;
   }

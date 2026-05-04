@@ -229,7 +229,7 @@ monitor_create(xcb_randr_output_t output)
 
   /* Initialize base target */
   m->target.id         = (TargetID) output;
-  m->target.type       = TARGET_TYPE_MONITOR;
+  m->target.type_id    = hub_get_target_type_id_by_name("monitor");
   m->target.registered = false;
 
   /* Initialize properties */

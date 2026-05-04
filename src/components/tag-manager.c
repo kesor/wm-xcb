@@ -67,14 +67,12 @@ static TagManagerComponent tag_manager_component_instance = {
           REQ_TAG_CLIENT_TOGGLE,
           0,
       },
-           .targets = (TargetType[]) {
-          TARGET_TYPE_MONITOR,
-          TARGET_TYPE_NONE,
-      },
-           .executor   = NULL, /* Set below */
-      .on_adopt   = tag_manager_on_adopt,
-           .on_unadopt = tag_manager_on_unadopt,
-           .registered = false,
+           .accepted_target_names = (const char*[]) { "monitor", NULL },
+           .accepted_targets      = NULL,
+           .executor              = NULL, /* Set below */
+      .on_adopt              = tag_manager_on_adopt,
+           .on_unadopt            = tag_manager_on_unadopt,
+           .registered            = false,
            },
   .initialized = false,
 };
@@ -403,7 +401,7 @@ tag_manager_handle_view_request(RequestType type, TargetID target, void* data)
   }
 
   HubTarget* t = hub_get_target_by_id(target);
-  if (t == NULL || t->type != TARGET_TYPE_MONITOR) {
+  if (t == NULL || t->type_id != hub_get_target_type_id_by_name("monitor")) {
     LOG_DEBUG("Tag view: invalid target");
     return;
   }
@@ -447,7 +445,7 @@ tag_manager_handle_toggle_request(RequestType type, TargetID target, void* data)
   }
 
   HubTarget* t = hub_get_target_by_id(target);
-  if (t == NULL || t->type != TARGET_TYPE_MONITOR) {
+  if (t == NULL || t->type_id != hub_get_target_type_id_by_name("monitor")) {
     LOG_DEBUG("Tag toggle: invalid target");
     return;
   }
@@ -571,7 +569,7 @@ tag_manager_listener(Event e)
 void
 tag_manager_on_adopt(HubTarget* target)
 {
-  if (target == NULL || target->type != TARGET_TYPE_MONITOR) {
+  if (target == NULL || target->type_id != hub_get_target_type_id_by_name("monitor")) {
     return;
   }
 
@@ -599,7 +597,7 @@ tag_manager_on_adopt(HubTarget* target)
 void
 tag_manager_on_unadopt(HubTarget* target)
 {
-  if (target == NULL || target->type != TARGET_TYPE_MONITOR) {
+  if (target == NULL || target->type_id != hub_get_target_type_id_by_name("monitor")) {
     return;
   }
 

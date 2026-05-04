@@ -25,16 +25,17 @@
 /*
  * Pertag component - registered with hub for adoption
  */
-static RequestType  pertag_requests[] = { 0 }; /* No requests */
-static TargetType   pertag_targets[]  = { TARGET_TYPE_MONITOR, TARGET_TYPE_NONE };
-static HubComponent pertag_component  = {
-   .name       = "pertag",
-   .requests   = pertag_requests,
-   .targets    = pertag_targets,
-   .executor   = NULL, /* No requests */
-   .on_adopt   = pertag_on_adopt,
-   .on_unadopt = pertag_on_unadopt,
-   .registered = false,
+static RequestType  pertag_requests[]     = { 0 }; /* No requests */
+static const char*  pertag_target_names[] = { "monitor", NULL };
+static HubComponent pertag_component      = {
+       .name                  = "pertag",
+       .requests              = pertag_requests,
+       .accepted_target_names = pertag_target_names,
+       .accepted_targets      = NULL,
+       .executor              = NULL, /* No requests */
+       .on_adopt              = pertag_on_adopt,
+       .on_unadopt            = pertag_on_unadopt,
+       .registered            = false,
 };
 
 /*
@@ -116,7 +117,7 @@ pertag_init_internal(Pertag* pt, struct Monitor* m)
 void
 pertag_on_adopt(HubTarget* target)
 {
-  if (target == NULL || target->type != TARGET_TYPE_MONITOR) {
+  if (target == NULL || target->type_id != hub_get_target_type_id_by_name("monitor")) {
     LOG_ERROR("pertag_on_adopt: invalid target");
     return;
   }
@@ -156,7 +157,7 @@ pertag_on_adopt(HubTarget* target)
 void
 pertag_on_unadopt(HubTarget* target)
 {
-  if (target == NULL || target->type != TARGET_TYPE_MONITOR)
+  if (target == NULL || target->type_id != hub_get_target_type_id_by_name("monitor"))
     return;
 
   Monitor* m  = (Monitor*) target;

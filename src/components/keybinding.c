@@ -54,11 +54,12 @@ static bool initialized = false;
  * requests that THIS component handles, not requests it sends.
  */
 HubComponent keybinding_component = {
-  .name       = "keybinding",
-  .requests   = NULL, /* We don't handle requests, we send them */
-  .targets    = NULL, /* We don't adopt targets */
-  .executor   = NULL, /* No executor - we only generate requests */
-  .registered = false,
+  .name                  = "keybinding",
+  .requests              = NULL, /* We don't handle requests, we send them */
+  .accepted_target_names = NULL, /* We don't adopt targets */
+  .accepted_targets      = NULL,
+  .executor              = NULL, /* No executor - we only generate requests */
+  .registered            = false,
 };
 
 /*

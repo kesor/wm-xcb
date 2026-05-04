@@ -132,7 +132,7 @@ test_create_notify_creates_client(void)
   /* Client should be registered with hub */
   HubTarget* t = hub_get_target_by_id(200);
   assert(t != NULL);
-  assert(t != NULL && t->type == TARGET_TYPE_CLIENT);
+  assert(t != NULL && t->type_id == hub_get_target_type_id_by_name("client"));
 
   /* Cleanup */
   client_list_component_shutdown();
@@ -521,7 +521,7 @@ test_client_adopts_components_on_creation(void)
   /* Verify client is registered as TARGET_TYPE_CLIENT */
   HubTarget* t = hub_get_target_by_id(4000);
   assert(t != NULL);
-  assert(t != NULL && t->type == TARGET_TYPE_CLIENT);
+  assert(t != NULL && t->type_id == hub_get_target_type_id_by_name("client"));
 
   /* Cleanup */
   client_list_component_shutdown();
