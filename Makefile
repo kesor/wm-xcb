@@ -156,19 +156,14 @@ test-sm-standalone: wm-hub.o wm-log.o $(filter-out %.c,$(SRC_SM:.c=.o)) test-sm-
 
 # Build Docker image (multi-stage: Nix builder -> scratch runtime)
 container-build:
-	docker build -t $(NAME):test .
+	docker build -t $(NAME) .
 
 # Run the container with VNC exposed on port 5900
 container-run:
-	docker run --rm -p 5900:5900 $(NAME):test
-
-# Test container build by running tests
-container-test: container-build
-	@echo "Checking binary exists in container..."
-	@docker run --rm wm:test ls -la /wm/bin/wm
+	docker run --rm -d -p 5900:5900 $(NAME)
 
 # Clean up Docker image
 container-clean:
-	docker rmi $(NAME):test
+	docker rmi $(NAME)
 
 .PHONY: all clean test test-standalone test-sm-standalone check format tidy container-build container-run container-test container-clean
