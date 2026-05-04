@@ -1354,16 +1354,16 @@ test_target_type_registry_basic(void)
   HubTargetType* client = hub_get_target_type_by_name("client");
   assert(client != NULL);
   assert(strcmp(client->name, "client") == 0);
-  assert(client->id == 0);                  /* First registered */
+  assert(client->id == 0); /* First registered */
   assert(client->reserved == true);
 
   HubTargetType* monitor = hub_get_target_type_by_name("monitor");
   assert(monitor != NULL);
-  assert(monitor->id == 1);                 /* Second registered */
+  assert(monitor->id == 1); /* Second registered */
 
   HubTargetType* tag = hub_get_target_type_by_name("tag");
   assert(tag != NULL);
-  assert(tag->id == 2);                      /* Third registered */
+  assert(tag->id == 2); /* Third registered */
 
   /* Unknown type returns NULL */
   HubTargetType* unknown = hub_get_target_type_by_name("keyboard");
@@ -1406,8 +1406,8 @@ test_get_all_target_types(void)
   LOG_CLEAN("== Testing hub_get_all_target_types");
   hub_init();
 
-  uint32_t count = 0;
-  HubTargetType** all = hub_get_all_target_types(&count);
+  uint32_t        count = 0;
+  HubTargetType** all   = hub_get_all_target_types(&count);
 
   assert(all != NULL);
   assert(count == 3);
@@ -1459,7 +1459,7 @@ test_register_new_target_type(void)
   HubTargetType* new_type = hub_register_target_type("keyboard", NULL);
   assert(new_type != NULL);
   assert(strcmp(new_type->name, "keyboard") == 0);
-  assert(new_type->id == 3);            /* Fourth type */
+  assert(new_type->id == 3); /* Fourth type */
   assert(new_type->reserved == true);
 
   /* Verify it can be looked up */
@@ -1530,8 +1530,8 @@ test_target_type_with_component_owner(void)
   HubComponent owner_comp = {
     .name                  = "owner-component",
     .accepted_target_names = NULL,
-    .accepted_targets     = NULL,
-    .registered           = false,
+    .accepted_targets      = NULL,
+    .registered            = false,
   };
   hub_register_component(&owner_comp);
 

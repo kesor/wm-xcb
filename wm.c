@@ -18,6 +18,8 @@
 #include "src/components/pertag.h"
 #include "src/components/tiling.h"
 
+#include "src/actions/launcher.h"
+
 #include "wm.h"
 
 int
@@ -41,6 +43,9 @@ main(int argc, char** argv)
   monitor_manager_init();
   tiling_component_init();
 
+  /* Initialize launcher action (must be after action_registry_init which happens in keybinding_init) */
+  launcher_init();
+
   /* Main event loop */
   while (running) {
     handle_xcb_events();
@@ -51,6 +56,7 @@ main(int argc, char** argv)
   tiling_component_shutdown();
   client_list_component_shutdown();
   keybinding_shutdown();
+  /* launcher_shutdown is called by keybinding_shutdown via action_registry_shutdown */
   fullscreen_component_shutdown();
   /* pertag shutdown happens after monitor_manager because monitors unregister first */
   hub_shutdown();
