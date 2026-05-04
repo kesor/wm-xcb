@@ -24,6 +24,7 @@
  */
 #include "test-client-list-component.h"
 #include "test-focus-component.h"
+#include "test-launcher.h"
 #include "test-target-client.h"
 #include "test-wm-hub.h"
 #include "test-wm-monitor-manager.h"

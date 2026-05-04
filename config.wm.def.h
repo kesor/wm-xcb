@@ -108,6 +108,9 @@ config_wire_keybindings(void)
 
   /* Tile monitor - Mod+i */
   KB(MODKEY, 31, "monitor.tile");
+
+  /* Application launcher - Mod+p (dmenu_run) */
+  KB(MODKEY, 33, "app.launch");
 }
 
 #endif /* CONFIG_WM_H */

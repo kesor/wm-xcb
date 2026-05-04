@@ -64,10 +64,10 @@ enum {
  * registered IDs due to the resolve_target_type_id() mapping.
  */
 enum {
-  TARGET_TYPE_CLIENT   = 0,
-  TARGET_TYPE_MONITOR  = 1,
-  TARGET_TYPE_TAG      = 2,
-  TARGET_TYPE_COUNT    = 3,
+  TARGET_TYPE_CLIENT  = 0,
+  TARGET_TYPE_MONITOR = 1,
+  TARGET_TYPE_TAG     = 2,
+  TARGET_TYPE_COUNT   = 3,
 };
 
 /* Legacy: TARGET_TYPE_NONE for terminating target arrays */
