@@ -275,18 +275,26 @@ echo "Creating review task..."
 create_review_task "$PR_NUM" "$TITLE" "$BRANCH" "$DIFF_SIZE" "$CHANGED_FILES" "$MODE"
 
 # Create tmux session for review
-WORKTREE_NAME="wm-review-${PR_NUM}"
 SESSION_NAME="wm-review"
 
-# Create worktree if needed (for the review)
-if [ ! -d "../${WORKTREE_NAME}" ]; then
-    echo "Creating worktree for review..."
+# Check if there's an existing worktree for this branch
+# Pattern: wm-issue-{number} for branch issue-{number}
+BRANCH_NUM=$(echo "$BRANCH" | sed 's/issue-//')
+EXISTING_WORKTREE="../wm-issue-${BRANCH_NUM}"
+
+if [ -d "${EXISTING_WORKTREE}" ]; then
+    WORKTREE_NAME="wm-issue-${BRANCH_NUM}"
+    echo "Using existing worktree: ${WORKTREE_NAME}"
+elif [ ! -d "../wm-review-${PR_NUM}" ]; then
+    echo "Creating new worktree for review..."
+    WORKTREE_NAME="wm-review-${PR_NUM}"
     git worktree add "../${WORKTREE_NAME}" "origin/${BRANCH}" 2>/dev/null || {
-        echo "Worktree exists or failed, continuing with current repo"
+        echo "Worktree creation failed, using current repo"
         WORKTREE_NAME="suckless/wm"
     }
 else
-    echo "Using existing worktree for review..."
+    WORKTREE_NAME="wm-review-${PR_NUM}"
+    echo "Using existing review worktree: ${WORKTREE_NAME}"
 fi
 
 # Copy architecture docs to review context
