@@ -313,24 +313,35 @@ void widget_set_size(Widget* w, int size);
 
 ### 2. Memory Leaks (15+ occurrences)
 - **Symptom**: Allocated memory not freed, especially in shutdown/error paths
-- **Fix**: Track ownership, free in all code paths including errors
+- **Fix**: Track ownership, free in all code paths. Document who owns the memory.
 
 ```c
-// BAD: Leaks on error paths
+// BAD: Leaks on error path AND on success path
 void component_init(void) {
-    data = malloc(...);
+    Data* data = malloc(sizeof(Data));
     if (something_fails) return;  // LEAK!
-    free(data);
+    // Also: data leaked on shutdown if not freed
 }
 
-// GOOD: Free on all exits
+// GOOD: Document ownership and free on all exits
+// Ownership: component owns 'data', caller must not free
 void component_init(void) {
-    data = malloc(...);
-    if (something_fails) {
-        free(data);
-        return;
+    Data* data = malloc(sizeof(Data));
+    if (data == NULL) {
+        LOG_ERROR("Failed to allocate data");
+        return false;
     }
-    // ...
+    // ... use data ...
+    // On shutdown or error: free(data)
+}
+
+// GOOD: Ownership transferred to caller or stored
+void component_init(Data** out_data) {
+    Data* data = malloc(sizeof(Data));
+    if (data == NULL) return false;
+    // Ownership transferred to caller
+    *out_data = data;
+    return true;
 }
 ```
 
@@ -383,14 +394,15 @@ void test_my_component_request(void) {
 }
 ```
 
-### 6. Null Pointer Dangling (8+ occurrences)
-- **Symptom**: Using pointers after objects freed, NULL checks missing
-- **Fix**: Snapshot pointers before callbacks that may free, check all returns
+### 6. Dangling Pointers / Use-After-Free (8+ occurrences)
+- **Symptom**: Using a pointer after the object it points to has been freed
+- **Fix**: Snapshot pointers before callbacks that may free, null after free, check NULL before use
 
 ```c
-// BAD: Iterator can be freed by callback
+// BAD: Iterator pointer invalidated by callback
 for (Client* c = head; c != NULL; c = c->next) {
     callback(c);  // May free c!
+    // c is now dangling
 }
 
 // GOOD: Snapshot next before callback
@@ -398,6 +410,14 @@ for (Client* c = head; c != NULL;) {
     Client* next = c->next;
     callback(c);
     c = next;
+}
+
+// GOOD: Null pointer after free
+void cleanup(Component* comp) {
+    if (comp->data != NULL) {
+        free(comp->data);
+        comp->data = NULL;  // Prevent dangling use
+    }
 }
 ```
 
@@ -415,19 +435,27 @@ for (Client* c = head; c != NULL;) {
 
 ### 8. Event Type Collisions (4+ occurrences)
 - **Symptom**: Two components using same event ID (e.g., both use 20)
-- **Fix**: Check hub.h for used event IDs, use unique values
+- **Fix**: EVT_* values must be globally unique across ALL components. Check ALL existing enum definitions.
 
 ```c
-// BAD: Collides with fullscreen EVT_*
-enum Events {
-    EVT_TAG_CHANGED = 20,  // Same as fullscreen!
+// BAD: Collides with fullscreen events (EVT_FULLSCREEN_EXITED = 21)
+enum ComponentEvents {
+    EVT_TAG_CHANGED = 21,  // Collision!
 };
 
-// GOOD: Use unique, unused IDs
-enum Events {
-    EVT_TAG_CHANGED = 21,  // After MAX_EVENT_TYPES check
+// GOOD: Check ALL component headers, use unique value in 0..63 range
+// grep -r "EVT_" src/components/ | grep "= [0-9]"
+enum ComponentEvents {
+    EVT_TAG_CHANGED = 22,  // After checking no component uses 22
 };
 ```
+
+**How to check for collisions:**
+```bash
+grep -rn "EVT_" src/components/ src/actions/ --include="*.h" | grep -E "= [0-9]+"
+```
+
+The hub event bus supports values 0 to `MAX_EVENT_TYPES-1` (currently 64).
 
 ### 9. API Contract Violations (6+ occurrences)
 - **Symptom**: Functions don't do what comments say, ownership unclear
