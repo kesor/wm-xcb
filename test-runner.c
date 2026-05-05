@@ -13,6 +13,7 @@
  * Include all test headers to register their test groups
  */
 #include "test-launcher.h"
+#include "test-terminal.h"
 #include "test-wm-hub.h"
 #include "test-wm-keybinding.h"
 #include "test-wm-monitor.h"

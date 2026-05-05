@@ -19,6 +19,7 @@
 #include "src/components/tiling.h"
 
 #include "src/actions/launcher.h"
+#include "src/actions/terminal.h"
 
 #include "wm.h"
 
@@ -45,6 +46,9 @@ main(int argc, char** argv)
 
   /* Initialize launcher action (must be after action_registry_init which happens in keybinding_init) */
   launcher_init();
+
+  /* Initialize terminal action */
+  terminal_init();
 
   /* Main event loop */
   while (running) {

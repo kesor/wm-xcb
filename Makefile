@@ -78,7 +78,8 @@ TEST_SRC = \
 	test-focus-component.c \
 	test-wm-keybinding.c \
 	test-wm-monitor-manager.c \
-	test-launcher.c
+	test-launcher.c \
+	test-terminal.c
 
 TEST_OBJ = $(TEST_SRC:.c=.o)
 

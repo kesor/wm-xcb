@@ -57,11 +57,11 @@ test_keybinding_lookup_exact(void)
   xcb_handler_init();
   keybinding_init();
 
-  /* Mod4 + keycode 36 (Return) -> focus.focus-current */
+  /* Mod4 + keycode 36 (Return) -> terminal.spawn (was focus.focus-current) */
   const KeyBinding* binding = keybinding_lookup(XCB_MOD_MASK_4, 36);
-  assert(binding != NULL && strcmp(binding->action, "focus.focus-current") == 0);
+  assert(binding != NULL && strcmp(binding->action, "terminal.spawn") == 0);
 
-  /* Mod4 + Shift + keycode 36 -> focus.focus-prev */
+  /* Mod4 + Shift + keycode 36 -> focus.focus-prev (unchanged) */
   binding = keybinding_lookup(XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 36);
   assert(binding != NULL && strcmp(binding->action, "focus.focus-prev") == 0);
 
@@ -112,14 +112,15 @@ test_keybinding_modifier_normalization(void)
   keybinding_init();
 
   /* Mod4 + lock modifier should still match Mod4 alone */
+  /* Mod+Enter now spawns terminal, not focus */
   uint32_t          mod_with_lock = XCB_MOD_MASK_4 | XCB_MOD_MASK_LOCK;
   const KeyBinding* binding       = keybinding_lookup(mod_with_lock, 36);
-  assert(binding != NULL && strcmp(binding->action, "focus.focus-current") == 0);
+  assert(binding != NULL && strcmp(binding->action, "terminal.spawn") == 0);
 
   /* Mod4 + NumLock (mode switch) should also match */
   uint32_t mod_with_numlock = XCB_MOD_MASK_4 | XCB_MOD_MASK_2;
   binding                   = keybinding_lookup(mod_with_numlock, 36);
-  assert(binding != NULL && strcmp(binding->action, "focus.focus-current") == 0);
+  assert(binding != NULL && strcmp(binding->action, "terminal.spawn") == 0);
 
   keybinding_shutdown();
   xcb_handler_shutdown();
@@ -212,9 +213,10 @@ test_keybinding_get_bindings(void)
 
   LOG_DEBUG("Got %" PRIu32 " keybindings via accessor", count);
 
-  /* Verify first binding is Mod+Enter for focus */
+  /* Verify first binding is Mod+Enter for terminal.spawn */
   const KeyBinding* first = bindings[0];
-  assert(first != NULL && strcmp(first->action, "focus.focus-current") == 0 && first->keycode == 36);
+  /* First binding is now terminal.spawn on keycode 36 (Mod+Enter) */
+  assert(first != NULL && strcmp(first->action, "terminal.spawn") == 0 && first->keycode == 36);
 
   keybinding_shutdown();
   hub_shutdown();
