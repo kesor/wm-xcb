@@ -26,6 +26,7 @@
 #include "test-focus-component.h"
 #include "test-launcher.h"
 #include "test-target-client.h"
+#include "test-terminal.h"
 #include "test-wm-hub.h"
 #include "test-wm-monitor-manager.h"
 #include "test-wm-monitor.h"
