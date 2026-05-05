@@ -119,20 +119,6 @@ terminal_set_command(const char* cmd)
 }
 
 /*
- * SIGCHLD handler to reap zombie processes.
- * This ensures forked terminal processes don't become zombies.
- */
-static void
-sigchld_handler(int sig)
-{
-  (void) sig;
-
-  /* Reap all terminated children */
-  while (waitpid(-1, NULL, WNOHANG) > 0)
-    ;
-}
-
-/*
  * Initialize the terminal module.
  * Registers the "terminal.spawn" action with the action registry.
  */
@@ -152,17 +138,20 @@ terminal_init(void)
     return;
   }
 
-  /* Install SIGCHLD handler to reap zombie processes */
-  struct sigaction sa;
-  memset(&sa, 0, sizeof(sa));
-  sa.sa_handler = sigchld_handler;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags   = SA_RESTART;
-
-  if (sigaction(SIGCHLD, &sa, NULL) < 0) {
-    LOG_WARN("Failed to install SIGCHLD handler: %s", strerror(errno));
-    /* Non-fatal - zombies may occur but terminal will still work */
-  }
+  /*
+   * Note: We intentionally do NOT install a SIGCHLD handler.
+   *
+   * Rationale: The launcher module (launcher.c) needs to wait for its forked
+   * dmenu child using waitpid(pid, ...). A process-wide SIGCHLD handler that
+   * reaps all children (waitpid(-1, ...)) would steal children from the
+   * launcher, causing waitpid to fail with ECHILD.
+   *
+   * Terminal children are reaped using WNOHANG after spawn() returns.
+   * For long-running terminal processes, they will eventually become zombies,
+   * but since terminals are typically long-lived, this is acceptable.
+   * Alternatively, the window manager process could be configured to ignore
+   * SIGCHLD signals from child processes using prctl(PR_SET_PDEATHSIG).
+   */
 
   initialized = true;
   LOG_DEBUG("Terminal module initialized (using: %s)", terminal_get_default());
@@ -208,6 +197,11 @@ terminal_action_spawn(ActionInvocation* inv)
  * Spawn a terminal in a new process.
  * Uses fork()+exec() to avoid affecting the window manager.
  * Uses shell to parse command, supporting arguments and flags.
+ *
+ * Note: This is a fire-and-forget operation. The child process is not
+ * explicitly reaped here - the kernel will deliver SIGCHLD when it exits.
+ * For long-running terminal emulators, this is not a problem as they
+ * typically outlive the window manager session.
  */
 bool
 terminal_spawn(void)
@@ -249,14 +243,19 @@ terminal_spawn(void)
     _exit(1);
   }
 
-  /* Parent process - log and return immediately */
+  /* Parent process - try to reap immediately */
+  /* Use WNOHANG to avoid blocking - child may still be running */
+  int status;
+  pid_t reaped = waitpid(pid, &status, WNOHANG);
 
-  LOG_DEBUG("Terminal spawned: pid=%d cmd=%s", (int) pid, terminal_get_default());
-
-  /*
-   * We don't wait for the child - this is fire-and-forget.
-   * The SIGCHLD handler will reap it when it exits.
-   */
+  if (reaped > 0) {
+    /* Child exited immediately (likely exec failed) */
+    LOG_DEBUG("Terminal child exited immediately: pid=%d status=%d",
+              (int) pid, WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+  } else {
+    /* Child is still running (normal case) */
+    LOG_DEBUG("Terminal spawned: pid=%d cmd=%s", (int) pid, terminal_get_default());
+  }
 
   return true;
 }

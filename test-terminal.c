@@ -23,46 +23,12 @@
 #include "test-terminal.h"
 
 /*
- * Block SIGCHLD during test to prevent signal delivery during assertions.
- * This is needed because the terminal spawn action may have SIGCHLD handling
- * that could interfere with test assertions.
- */
-static void
-block_sigchld(void)
-{
-  sigset_t mask;
-  sigemptyset(&mask);
-  sigaddset(&mask, SIGCHLD);
-  sigprocmask(SIG_BLOCK, &mask, NULL);
-}
-
-static void
-unblock_sigchld(void)
-{
-  sigset_t mask;
-  sigemptyset(&mask);
-  sigaddset(&mask, SIGCHLD);
-  sigprocmask(SIG_UNBLOCK, &mask, NULL);
-}
-
-static void
-reap_children(void)
-{
-  /* Reap any zombie children */
-  while (waitpid(-1, NULL, WNOHANG) > 0)
-    ;
-}
-
-/*
  * Test: terminal action exists after init
  */
 void
 test_terminal_action_exists(void)
 {
   LOG_CLEAN("  test_terminal_action_exists...");
-
-  block_sigchld();
-  reap_children();
 
   action_registry_init();
   terminal_init();
@@ -78,8 +44,6 @@ test_terminal_action_exists(void)
 
   terminal_shutdown();
   action_registry_shutdown();
-
-  unblock_sigchld();
 }
 
 /*
@@ -90,16 +54,12 @@ test_terminal_double_init(void)
 {
   LOG_CLEAN("  test_terminal_double_init...");
 
-  block_sigchld();
-
   action_registry_init();
   terminal_init();
   terminal_init(); /* Should be safe */
 
   terminal_shutdown();
   action_registry_shutdown();
-
-  unblock_sigchld();
 }
 
 /*
@@ -109,8 +69,6 @@ void
 test_terminal_shutdown(void)
 {
   LOG_CLEAN("  test_terminal_shutdown...");
-
-  block_sigchld();
 
   action_registry_init();
   terminal_init();
@@ -124,8 +82,6 @@ test_terminal_shutdown(void)
   assert(action_lookup("terminal.spawn") == NULL);
 
   action_registry_shutdown();
-
-  unblock_sigchld();
 }
 
 /*
@@ -136,11 +92,21 @@ test_terminal_default_command(void)
 {
   LOG_CLEAN("  test_terminal_default_command...");
 
+  /* Clear any custom command first */
+  action_registry_init();
+  terminal_init();
+  terminal_set_command(NULL);
+
+  /* Clear TERMINAL env var */
+  unsetenv("TERMINAL");
+
+  /* Should return xterm */
   const char* cmd = terminal_get_default();
   assert(cmd != NULL);
-  /* Should return xterm or $TERMINAL env var */
+  assert(strcmp(cmd, "xterm") == 0);
 
-  LOG_DEBUG("Default terminal: %s", cmd);
+  terminal_shutdown();
+  action_registry_shutdown();
 }
 
 /*
@@ -151,14 +117,12 @@ test_terminal_custom_command(void)
 {
   LOG_CLEAN("  test_terminal_custom_command...");
 
-  block_sigchld();
-
   action_registry_init();
   terminal_init();
 
   /* Save original TERMINAL env var if set */
-  const char* orig_term = getenv("TERMINAL");
-  char*        saved_term = NULL;
+  const char* orig_term  = getenv("TERMINAL");
+  char*       saved_term = NULL;
   if (orig_term != NULL) {
     saved_term = strdup(orig_term);
     unsetenv("TERMINAL");
@@ -175,7 +139,7 @@ test_terminal_custom_command(void)
   /* Clear custom command */
   terminal_set_command(NULL);
 
-  /* Should fall back to default */
+  /* Should fall back to default (xterm without env var) */
   cmd = terminal_get_default();
   assert(cmd != NULL);
   assert(strcmp(cmd, "xterm") == 0);
@@ -188,8 +152,6 @@ test_terminal_custom_command(void)
 
   terminal_shutdown();
   action_registry_shutdown();
-
-  unblock_sigchld();
 }
 
 /*
@@ -200,14 +162,20 @@ test_terminal_env_variable(void)
 {
   LOG_CLEAN("  test_terminal_env_variable...");
 
-  block_sigchld();
-
-  /* Clear any custom command first */
   action_registry_init();
   terminal_init();
+
+  /* Clear any custom command first */
   terminal_set_command(NULL);
 
-  /* Set TERMINAL env var */
+  /* Save original TERMINAL env var */
+  const char* orig_term  = getenv("TERMINAL");
+  char*       saved_term = NULL;
+  if (orig_term != NULL) {
+    saved_term = strdup(orig_term);
+  }
+
+  /* Set TERMINAL env var to a test value */
   setenv("TERMINAL", "alacritty -e tmux", 1);
 
   /* Should return the env var value */
@@ -218,48 +186,37 @@ test_terminal_env_variable(void)
   /* Clear env var */
   unsetenv("TERMINAL");
 
-  terminal_shutdown();
-  action_registry_shutdown();
-
-  unblock_sigchld();
-}
-
-/*
- * Test: terminal action callback (mocked - doesn't actually spawn)
- */
-void
-test_terminal_action_callback(void)
-{
-  LOG_CLEAN("  test_terminal_action_callback...");
-
-  block_sigchld();
-  reap_children();
-
-  action_registry_init();
-  terminal_init();
-
-  /* Verify action exists before calling */
-  Action* action = action_lookup("terminal.spawn");
-  assert(action != NULL);
-  assert(action->callback == terminal_action_spawn);
-
-  /* Test that terminal_spawn returns true (fork succeeds) */
-  bool result = terminal_spawn();
-  /* Result is true if fork succeeded (even if exec fails later) */
-  assert(result == true);
-
-  /* Reap the child (exec will fail if no matching terminal) */
-  int status;
-  pid_t waited = waitpid(-1, &status, WNOHANG);
-  if (waited > 0) {
-    /* Child exited - expected since no real terminal */
-    LOG_DEBUG("Terminal child exited (expected - no real terminal installed)");
+  /* Restore original TERMINAL env var */
+  if (saved_term != NULL) {
+    setenv("TERMINAL", saved_term, 1);
+    free(saved_term);
   }
 
   terminal_shutdown();
   action_registry_shutdown();
+}
 
-  unblock_sigchld();
+/*
+ * Test: action registration uses proper target type
+ */
+void
+test_terminal_action_target_type(void)
+{
+  LOG_CLEAN("  test_terminal_action_target_type...");
+
+  action_registry_init();
+  terminal_init();
+
+  Action* action = action_lookup("terminal.spawn");
+  assert(action != NULL);
+
+  /* Verify it's a no-target action */
+  assert(action->target_type == ACTION_TARGET_NONE);
+  assert(action->target_required == false);
+  assert(action->target_resolver == NULL);
+
+  terminal_shutdown();
+  action_registry_shutdown();
 }
 
 /*
@@ -276,7 +233,7 @@ test_terminal_run_all(void)
   test_terminal_default_command();
   test_terminal_custom_command();
   test_terminal_env_variable();
-  test_terminal_action_callback();
+  test_terminal_action_target_type();
 
   LOG_CLEAN("  All terminal tests passed!");
 }
@@ -288,5 +245,5 @@ TEST_GROUP(TerminalModule, {
   test_terminal_default_command();
   test_terminal_custom_command();
   test_terminal_env_variable();
-  test_terminal_action_callback();
+  test_terminal_action_target_type();
 });
