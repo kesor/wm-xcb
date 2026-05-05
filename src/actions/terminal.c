@@ -14,6 +14,7 @@
  */
 
 #include <errno.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -45,13 +46,14 @@ static bool initialized = false;
 
 /*
  * Custom terminal command (NULL = use env var)
+ * We store a copy since callers may free their buffer
  */
-static const char* custom_terminal = NULL;
+static char* custom_terminal = NULL;
 
 /*
  * Default fallback terminal
  */
-#define DEFAULT_TERMINAL "xterm"
+#define DEFAULT_TERMINAL     "xterm"
 
 /*
  * Maximum terminal command length
@@ -63,7 +65,7 @@ static const char* custom_terminal = NULL;
  * Returns the custom command if set, otherwise $TERMINAL env var,
  * or the fallback default.
  *
- * @return  terminal command string (caller must not modify or free)
+ * @return  terminal command string (owned by this module, do not free)
  */
 const char*
 terminal_get_default(void)
@@ -85,11 +87,49 @@ terminal_get_default(void)
 
 /*
  * Set a custom terminal command.
+ * The command is copied internally so callers can free their buffer.
  */
 void
 terminal_set_command(const char* cmd)
 {
-  custom_terminal = cmd;
+  /* Free existing custom command if any */
+  if (custom_terminal != NULL) {
+    free(custom_terminal);
+    custom_terminal = NULL;
+  }
+
+  if (cmd == NULL || cmd[0] == '\0') {
+    return;
+  }
+
+  /* Copy the command string */
+  size_t len = strlen(cmd);
+  if (len >= TERMINAL_MAX_CMD_LEN) {
+    LOG_WARN("Terminal command too long (max %d chars)", TERMINAL_MAX_CMD_LEN - 1);
+    len = TERMINAL_MAX_CMD_LEN - 1;
+  }
+
+  custom_terminal = malloc(len + 1);
+  if (custom_terminal != NULL) {
+    memcpy(custom_terminal, cmd, len);
+    custom_terminal[len] = '\0';
+  } else {
+    LOG_ERROR("Failed to allocate terminal command string");
+  }
+}
+
+/*
+ * SIGCHLD handler to reap zombie processes.
+ * This ensures forked terminal processes don't become zombies.
+ */
+static void
+sigchld_handler(int sig)
+{
+  (void) sig;
+
+  /* Reap all terminated children */
+  while (waitpid(-1, NULL, WNOHANG) > 0)
+    ;
 }
 
 /*
@@ -112,13 +152,25 @@ terminal_init(void)
     return;
   }
 
+  /* Install SIGCHLD handler to reap zombie processes */
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = sigchld_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags   = SA_RESTART;
+
+  if (sigaction(SIGCHLD, &sa, NULL) < 0) {
+    LOG_WARN("Failed to install SIGCHLD handler: %s", strerror(errno));
+    /* Non-fatal - zombies may occur but terminal will still work */
+  }
+
   initialized = true;
   LOG_DEBUG("Terminal module initialized (using: %s)", terminal_get_default());
 }
 
 /*
  * Shutdown the terminal module.
- * Unregisters the action.
+ * Unregisters the action and frees custom terminal string.
  */
 void
 terminal_shutdown(void)
@@ -131,6 +183,12 @@ terminal_shutdown(void)
 
   /* Unregister the action */
   action_unregister("terminal.spawn");
+
+  /* Free custom terminal string */
+  if (custom_terminal != NULL) {
+    free(custom_terminal);
+    custom_terminal = NULL;
+  }
 
   initialized = false;
   LOG_DEBUG("Terminal module shutdown complete");
@@ -149,6 +207,7 @@ terminal_action_spawn(ActionInvocation* inv)
 /*
  * Spawn a terminal in a new process.
  * Uses fork()+exec() to avoid affecting the window manager.
+ * Uses shell to parse command, supporting arguments and flags.
  */
 bool
 terminal_spawn(void)
@@ -164,11 +223,6 @@ terminal_spawn(void)
     /* Child process - execute terminal */
 
     /*
-     * Reset signal handlers to default (we're a child process)
-     */
-    signal(SIGCHLD, SIG_DFL);
-
-    /*
      * Use setsid to create a new session and detach from controlling tty.
      * This prevents the terminal from receiving signals from the WM's tty.
      */
@@ -180,10 +234,15 @@ terminal_spawn(void)
     const char* term_cmd = terminal_get_default();
 
     /*
-     * Execute the terminal.
-     * execlp searches PATH for the command.
+     * Use sh -c to parse the command, allowing:
+     * - Commands with arguments: "alacritty -e tmux"
+     * - Commands with flags: "kitty --hold"
+     * - Shell built-ins and complex commands
+     *
+     * This is safe because the command comes from user configuration
+     * ($TERMINAL env var or custom command set by user).
      */
-    execlp(term_cmd, term_cmd, (char*) NULL);
+    execlp("sh", "sh", "-c", term_cmd, (char*) NULL);
 
     /* If execlp returns, it failed */
     LOG_DEBUG("Child: failed to execute terminal '%s': %s", term_cmd, strerror(errno));
@@ -196,7 +255,7 @@ terminal_spawn(void)
 
   /*
    * We don't wait for the child - this is fire-and-forget.
-   * The child will become orphaned and continue running independently.
+   * The SIGCHLD handler will reap it when it exits.
    */
 
   return true;
