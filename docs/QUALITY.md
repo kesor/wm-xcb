@@ -155,9 +155,11 @@ scripts/check-build-variants.sh   # release, sanitize and debug builds in one tr
 - **`make tidy` (clang-tidy).** Slow, needs `bear` and a full rebuild, and today
   it produces noise rather than findings. It belongs in CI as its own advisory
   job once someone has triaged the output.
-- **`scripts/review-agent.sh`.** It spawns an LLM to review a PR against the
-  architecture docs. Useful as a second opinion, useless as a gate: it can pass
-  code that fails a test and fail code that is correct, and nobody can rerun it
-  to the same answer. It stays advisory and is never listed in `lefthook.yml`.
+- **Reviews, by a human or an agent.** They catch what a check cannot express —
+  a criterion quietly reinterpreted, a doc that now lies, a design choice that
+  will cost later — and they are useless as a gate: a review does not answer the
+  same way twice, and nobody can rerun it to the same answer. `.agents/skills/wm-review/SKILL.md`
+  is the procedure; its findings become a commit (which the gates then judge) or
+  a bead comment. Never a `lefthook.yml` job.
 - **Coverage percentages.** Not until the seam tests pass, otherwise the number
   measures the wrong thing.

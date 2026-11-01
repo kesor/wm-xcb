@@ -30,6 +30,7 @@ part of this repository; if you keep one next to this checkout it is at
 | `docs/QUALITY.md` | The gates that run on commit, push, and CI — and how to add one |
 | `.agents/skills/wm-bootstrap/SKILL.md` | Session bootstrap: state, code map, beads map, gates, traps. Load with `/skill:wm-bootstrap` |
 | `.agents/skills/wm-5s/SKILL.md` | How to file harness friction as beads while you work |
+| `.agents/skills/wm-review/SKILL.md` | Reviewing a `work/<bead>` branch: depth by module, verdict format, fix-or-record |
 | `docs/VISION.md` | Why this project exists |
 | `docs/architecture/overview.md` | Core concepts and architecture |
 | `plans/wm-architecture.md` | Phased implementation plan |
