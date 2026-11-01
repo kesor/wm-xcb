@@ -6,11 +6,14 @@
 #
 # Asks make for a sanitizer build, a plain build and a debug build in the same
 # checkout, with no `make clean` in between, and checks the binary that each
-# one leaves at the tree root. A plain link that reuses -fsanitize objects
-# fails on __asan_init; a plain `make` that decides the sanitizer binary is
-# already up to date links nothing and quietly leaves the wrong build in ./wm,
-# which no link error would catch. That second case is why the binary at the
-# root is checked for ASan symbols and not only for a zero exit status.
+# one leaves at the tree root. Both directions are checked, because each one
+# fails differently. A plain link that reuses -fsanitize objects fails to link
+# on __asan_init. A plain `make` that decides the sanitizer binary is already
+# up to date links nothing and leaves the wrong build in ./wm, which no link
+# error catches. And `make SANITIZE=1` after a plain build links the plain
+# objects into an instrumented binary and exits 0, so the run has no sanitizer
+# coverage at all while looking correct. That is why the binary at the root is
+# checked for ASan symbols and not only for a zero exit status.
 #
 # The builds print a screenful of -Wpedantic warnings from the debug variant,
 # so their output goes to a log that is printed only when a step fails.
@@ -57,6 +60,10 @@ instrumented wm || fail "make SANITIZE=1 built ./wm without ASan symbols"
 
 run_make "plain make after make SANITIZE=1"
 instrumented wm && fail "plain make left the instrumented ./wm in place"
+
+run_make "make SANITIZE=1 after a plain build" SANITIZE=1
+instrumented wm ||
+  fail "make SANITIZE=1 after a plain build linked plain objects: ./wm has no ASan symbols"
 
 run_make "make DEBUG=1 after a plain build" DEBUG=1
 run_make "plain make after make DEBUG=1"
