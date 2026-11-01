@@ -1,18 +1,7 @@
 #!/usr/bin/env sh
-# Runs the commit message rules. See docs/QUALITY.md.
+# Runs the gates in lefthook.yml for this hook. See docs/QUALITY.md.
 #
-# The rule is one script, so this hook can run it directly when the dev shell is
-# not active.
+# core.hooksPath is local config, so the pointer to this directory cannot be
+# committed: run 'make hooks' once per clone.
 set -u
-
-if [ "${WM_HOOKS:-1}" = "0" ]; then
-  echo "wm: WM_HOOKS=0, skipping the commit message rules"
-  exit 0
-fi
-
-if command -v lefthook >/dev/null 2>&1; then
-  exec lefthook run commit-msg "$@"
-fi
-
-root=$(git rev-parse --show-toplevel)
-exec "$root/scripts/check-commit-msg.sh" "$@"
+exec "$(git rev-parse --show-toplevel)/scripts/run-hook.sh" "${0##*/}" "$@"

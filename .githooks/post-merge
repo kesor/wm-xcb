@@ -1,32 +1,7 @@
 #!/usr/bin/env sh
 # Runs the gates in lefthook.yml for this hook. See docs/QUALITY.md.
 #
-# Committed so a clone gets the same gates as the maintainer's checkout. The
-# one thing git cannot commit is the pointer to this directory:
-#   make hooks        # git config --local core.hooksPath .githooks
-#
-# Escapes:
-#   WM_HOOKS=0 git commit ...   skip the gates for one commit, on purpose
-#   make format                 fix the formatting gate
+# core.hooksPath is local config, so the pointer to this directory cannot be
+# committed: run 'make hooks' once per clone.
 set -u
-
-if [ "${WM_HOOKS:-1}" = "0" ]; then
-  echo "wm: WM_HOOKS=0, skipping the ${0##*/} gates"
-  exit 0
-fi
-
-if command -v lefthook >/dev/null 2>&1; then
-  exec lefthook run "${0##*/}" "$@"
-fi
-
-# Not in the dev shell: run the same lefthook config from inside it, rather
-# than keeping a second copy of the gate list here.
-root=$(git rev-parse --show-toplevel)
-if command -v nix >/dev/null 2>&1 && [ -f "$root/flake.nix" ]; then
-  echo "wm: lefthook is not on PATH, running the ${0##*/} gates through nix develop" >&2
-  exec nix develop "$root" --command lefthook run "${0##*/}" "$@"
-fi
-
-echo "wm: neither lefthook nor nix found, skipping the ${0##*/} gates" >&2
-echo "wm: CI runs them regardless." >&2
-exit 0
+exec "$(git rev-parse --show-toplevel)/scripts/run-hook.sh" "${0##*/}" "$@"

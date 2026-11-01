@@ -71,6 +71,34 @@ WM_HOOKS=0 git commit -m "wip"
 That is an escape hatch, not a habit: the same commit will still meet the gates
 when it is pushed.
 
+## Why the gate scripts have no nix shebang
+
+Both forms work on this machine, tested 2026-11-01 with Nix 2.36:
+
+```sh
+#!/usr/bin/env -S nix develop /home/evgeny/src/suckless/wm -c bash   # works
+#!/usr/bin/env nix-shell                                             # works
+#! nix-shell -i bash -p lefthook
+```
+
+Neither is used for the gates, for three reasons:
+
+- The `nix-shell -p lefthook` form resolves packages from the channel, not from
+  the flake: it picked lefthook 2.1.14 while the dev shell has 2.1.15, and it
+  has none of the build dependencies (`clang-format`, `pkg-config`, the libxcb
+  family), so `make` inside it fails. It drifts from the flake by construction.
+- The `nix develop` form needs a path or a working directory in the shebang.
+  Hooks run from the repo root, so it would work there, but the same script
+  called from another directory would fail to find the flake, and a machine
+  without Nix would fail to exec the hook at all instead of warning and
+  continuing.
+- The gates already run inside the dev shell when it is active. A shebang makes
+  the second entry re-enter `nix develop` on every gate, which is a second of
+  flake evaluation per script for no benefit.
+
+`scripts/run-hook.sh` keeps the decision in one place: lefthook if present,
+otherwise `nix develop --command lefthook`, otherwise a warning.
+
 ## The async baseline
 
 `scripts/check-async.sh` fails on a blocking call unless it is waived or listed
