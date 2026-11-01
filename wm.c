@@ -6,20 +6,11 @@
 #include "wm-running.h"
 #include "wm-signals.h"
 
+#include "wm-components.h"
 #include "wm-hub.h"
 #include "wm-states.h"
 #include "wm-xcb-ewmh.h"
 #include "wm-xcb.h"
-
-#include "src/components/client-list.h"
-#include "src/components/fullscreen.h"
-#include "src/components/keybinding.h"
-#include "src/components/monitor-manager.h"
-#include "src/components/pertag.h"
-#include "src/components/tiling.h"
-
-#include "src/actions/launcher.h"
-#include "src/actions/terminal.h"
 
 #include "wm.h"
 
@@ -35,41 +26,14 @@ main(int argc, char** argv)
   /* Initialize hub first */
   hub_init();
 
-  /* Initialize components.
-   * keybinding_init creates the action registry. fullscreen_component_init
-   * registers an action and aborts the component if that fails, so it follows. */
-  keybinding_init();
-  fullscreen_component_init();
-  client_list_component_init();
-  /* Initialize pertag BEFORE monitor_manager so monitors get adopted */
-  pertag_component_init();
-  monitor_manager_init();
-  tiling_component_init();
-
-  /* Initialize launcher action (must be after action_registry_init which happens in keybinding_init) */
-  launcher_init();
-
-  /* Initialize terminal action */
-  terminal_init();
+  wm_components_init();
 
   /* Main event loop */
   while (running) {
     handle_xcb_events();
   }
 
-  /* Shutdown in reverse order.
-   * Clients hold fullscreen state machines that point at the component's
-   * template, so the client list goes first. The action unregister needs the
-   * registry, which keybinding_shutdown destroys. */
-  monitor_manager_shutdown();
-  tiling_component_shutdown();
-  client_list_component_shutdown();
-  fullscreen_component_shutdown();
-  /* launcher_shutdown is called by keybinding_shutdown via action_registry_shutdown */
-  keybinding_shutdown();
-  /* pertag shutdown happens after monitor_manager because monitors unregister first */
-  hub_shutdown();
-  pertag_component_shutdown();
+  wm_components_shutdown();
 
   /* Cleanup core systems */
   destruct_state_machine();

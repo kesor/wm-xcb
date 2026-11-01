@@ -74,7 +74,11 @@ static bool initialized = false;
 void
 launcher_init(void)
 {
-  if (initialized) {
+  /* The registry can be dropped and rebuilt underneath this module without
+   * launcher_shutdown() running: keybinding_shutdown() clears it directly. The
+   * flag would then claim an action that is no longer registered, and the
+   * second startup would leave app.launch missing. */
+  if (initialized && action_exists(launcher_action.name)) {
     LOG_DEBUG("Launcher already initialized");
     return;
   }

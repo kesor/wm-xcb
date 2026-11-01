@@ -8,7 +8,8 @@
  * XCB Events Handled:
  * - XCB_CREATE_NOTIFY - create Client, register with hub
  * - XCB_DESTROY_NOTIFY - destroy Client, unregister from hub
- * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, map the window
+ * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, select pointer
+ *   enter/leave so the focus component sees them, map the window
  * - XCB_UNMAP_NOTIFY - unmanage Client
  *
  * Events Emitted:
