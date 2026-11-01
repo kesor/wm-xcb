@@ -28,6 +28,7 @@ part of this repository; if you keep one next to this checkout it is at
 | `docs/PHILOSOPHY.md` | **The rules** — user promises, the four commitments, the state machine contract |
 | `docs/TESTING.md` | Unit tests, Xephyr sessions, performance measurement |
 | `docs/QUALITY.md` | The gates that run on commit, push, and CI — and how to add one |
+| `.agents/skills/wm-bootstrap/SKILL.md` | Session bootstrap: state, code map, beads map, gates, traps. Load with `/skill:wm-bootstrap` |
 | `docs/VISION.md` | Why this project exists |
 | `docs/architecture/overview.md` | Core concepts and architecture |
 | `plans/wm-architecture.md` | Phased implementation plan |
