@@ -111,6 +111,7 @@ setup_xcb()
   connect_to_x_display(&dpy);
   get_root_window(dpy, &root);
 
+  client_atoms_init();
   client_list_init();
 
   check_no_running_wm();
@@ -231,4 +232,8 @@ handle_xcb_events()
   handle_state_event(event);
 
   free(event);
+
+  /* Handlers queue requests and change the window tree; one flush per
+   * iteration sends them without waiting on a reply (PHILOSOPHY 2.3). */
+  xcb_flush(dpy);
 }

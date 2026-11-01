@@ -29,6 +29,9 @@
  */
 static Client client_sentinel;
 
+/* Set by client_atoms_init(), read by client_set_wm_state(). */
+static xcb_atom_t wm_state_atom = XCB_ATOM_NONE;
+
 static void
 client_properties_init(Client* c)
 {
@@ -781,6 +784,47 @@ xcb_void_cookie_t
 client_show(xcb_window_t wnd)
 {
   return xcb_map_window(dpy, wnd);
+}
+
+/*
+ * Intern the atoms the client code needs but xcb does not predefine.
+ */
+void
+client_atoms_init(void)
+{
+  if (dpy == NULL || wm_state_atom != XCB_ATOM_NONE)
+    return;
+
+  static const char name[] = "WM_STATE";
+
+  /* allow-blocking: startup, the event loop has not started yet */
+  xcb_intern_atom_reply_t* reply =
+      xcb_intern_atom_reply(dpy, xcb_intern_atom(dpy, 0, sizeof(name) - 1, name), NULL);
+  if (reply == NULL) {
+    LOG_ERROR("Failed to intern the WM_STATE atom");
+    return;
+  }
+
+  wm_state_atom = reply->atom;
+  free(reply);
+}
+
+/*
+ * Set the ICCCM WM_STATE property on a window.
+ * The value is a pair: the state, then the icon window (None, no icon support).
+ */
+bool
+client_set_wm_state(xcb_window_t wnd, enum ClientWMState state)
+{
+  if (dpy == NULL || wm_state_atom == XCB_ATOM_NONE)
+    return false;
+
+  uint32_t values[] = { (uint32_t) state, XCB_NONE };
+
+  xcb_change_property(
+      dpy, XCB_PROP_MODE_REPLACE, wnd, wm_state_atom, wm_state_atom, 32, 2, values);
+
+  return true;
 }
 
 /*

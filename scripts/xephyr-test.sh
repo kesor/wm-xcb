@@ -18,9 +18,9 @@
 #
 # Exit status: 0 if all checks pass, 1 otherwise.
 #
-# The WM does not map or tile windows yet (bd show wm-4f6.1),
-# so this script currently fails check 2. It is written as the acceptance test
-# for the X11 output path: it turns green when that path works.
+# The WM maps windows but does not tile them yet (bd show wm-4f6.3), so checks 3
+# and 4 fail. It is written as the acceptance test for the X11 output path: it
+# turns green when that path works.
 
 set -uo pipefail
 
