@@ -42,6 +42,10 @@ pre-commit:
       run: make test
       fail_text: "make test failed."
 
+    standalone:
+      run: make test-standalone && make test-sm-standalone
+      fail_text: "A standalone test target failed to link or run."
+
     async:
       run: ./scripts/check-async.sh
       fail_text: "New blocking call in the event loop. Known work: bd list --parent wm-46k.2"
@@ -73,6 +77,10 @@ pre-push:
     unit:
       run: make test
       fail_text: "make test failed."
+
+    standalone:
+      run: make test-standalone && make test-sm-standalone
+      fail_text: "A standalone test target failed to link or run."
 
     debug-build:
       # -pedantic is what caught the zero-length array in tiling.c, so it runs on

@@ -173,7 +173,7 @@ test-x: $(NAME) tools/xclient
 	./tests/x/run.sh $(TEST_X_ARGS)
 
 # Standalone test (no XCB dependencies required)
-test-standalone: wm-hub.o test-wm-hub-standalone.c
+test-standalone: wm-hub.o wm-log.o test-wm-hub-standalone.c
 	$(CC) $(CFLAGS) -o $@ $^
 	./test-standalone
 
