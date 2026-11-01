@@ -16,7 +16,7 @@ model.*
 |-------|------|------|------|
 | `pre-commit` | every commit | ~5 s | paths, docs, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
-| `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build |
+| `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build, the standalone tests, and the build variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run` — **advisory** |
 | CI `sanitize` | every push and PR | ~2 min | `make test SANITIZE=1` |
@@ -37,6 +37,7 @@ in beads.
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
 | commit-msg | `scripts/check-commit-msg.sh` | no `Co-Authored-By`, no "generated with", no robot footer |
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
+| build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
 | seam | `make test-x` | modifiable X behaviour: mapped, tiled, focused, tags, EWMH (advisory) |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
 
@@ -146,6 +147,7 @@ lefthook run pre-commit     # just the commit-time gates
 LEFTHOOK_EXCLUDE=beads lefthook run pre-push   # without the beads export
 make test-x                 # seam tests (needs a display; Xephyr handles that)
 make test SANITIZE=1        # sanitizers (builds the test binary too)
+scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 ```
 
 ## What is deliberately not a gate

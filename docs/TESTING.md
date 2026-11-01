@@ -61,7 +61,7 @@ make test-standalone       # hub registry and event bus only
 ### Debug build
 
 ```bash
-make clean && make DEBUG=1
+make DEBUG=1
 ```
 
 Adds `-g3 -O0 -Wall -pedantic -DDEBUG`, which turns `LOG_DEBUG()` into real
@@ -70,6 +70,17 @@ output. This is the build to use when you need to see what the WM decided.
 `tiling.c` used to break this build and was fixed on 2026-11-01. If the debug
 build stops compiling, treat that as a bug: it is the only way to read the
 event log.
+
+### Build directories
+
+Each flag set compiles into its own directory under `build/`: `release`,
+`release-sanitize`, `debug`, `debug-sanitize`. So `make`, `make SANITIZE=1` and
+`make DEBUG=1` can be alternated in one checkout with no `make clean` in
+between, and no build reuses another variant's objects. Whatever was built
+last is copied to `./wm` and `./test`, which is where the scripts and the flake
+read them; `make clean` removes every variant.
+
+`scripts/check-build-variants.sh` is the gate for this (see `docs/QUALITY.md`).
 
 ---
 
@@ -301,7 +312,6 @@ valgrind --leak-check=full ./test
 AddressSanitizer and UBSan (rebuild with `SANITIZE=1`):
 
 ```bash
-make clean
 make test SANITIZE=1             # whole suite under ASan+UBSan, exit 0, no leak report
 make SANITIZE=1                  # the instrumented wm binary for a live session
 DISPLAY=:2 ./wm
@@ -313,7 +323,9 @@ binary needs `make test SANITIZE=1`. Measured 2026-11-01 after the hub registry
 fix: `./test` passes all assertions and LeakSanitizer prints no summary, so the
 exit status is the answer. `detect_leaks=1` is set to match the CI sanitize job.
 
-Remember to `make clean && make` afterwards, or every later run is instrumented.
+Remember that `./wm` is now the instrumented binary: run `make` to put the
+plain one back. The objects do not need cleaning, see *Build directories*
+above.
 
 ### Following the syscalls
 

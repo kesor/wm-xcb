@@ -41,6 +41,14 @@ ifeq ($(strip $(SANITIZE)),1)
 	LDFLAGS += -fsanitize=address,undefined
 endif
 
+# Objects for each flag set live in their own directory. An object compiled
+# with -fsanitize, or with -DDEBUG, is not interchangeable with a plain one,
+# and make cannot tell the two apart by looking at the file on disk: the
+# -fsanitize link then fails on __asan_init, or, worse, succeeds and silently
+# leaves the other variant's code in the binary. Separate directories make
+# alternating `make` and `make SANITIZE=1` in one tree work without a clean.
+BUILD_VARIANT = $(if $(filter 1,$(DEBUG)),debug,release)$(if $(filter 1,$(SANITIZE)),-sanitize,)
+BUILD_DIR = build/$(BUILD_VARIANT)
 # ---------------------------------------------------------------------------
 # Source file lists - grouped by module for easy extension
 # ---------------------------------------------------------------------------
@@ -66,11 +74,11 @@ SRC_COMP    = $(wildcard src/components/*.c)
 SRC_ACTIONS = $(wildcard src/actions/*.c)
 
 # Main executable object (must be excluded from test link)
-MAIN_OBJ = $(NAME).o
+MAIN_OBJ = $(BUILD_DIR)/$(NAME).o
 
 # All main source files
 SRC = $(ROOT_SRC) $(SRC_SM) $(SRC_XCB) $(SRC_TARGET) $(SRC_COMP) $(SRC_ACTIONS)
-OBJ = $(SRC:.c=.o)
+OBJ = $(SRC:%.c=$(BUILD_DIR)/%.o)
 
 # Test source files
 TEST_SRC = \
@@ -88,7 +96,7 @@ TEST_SRC = \
 	test-launcher.c \
 	test-terminal.c
 
-TEST_OBJ = $(TEST_SRC:.c=.o)
+TEST_OBJ = $(TEST_SRC:%.c=$(BUILD_DIR)/%.o)
 
 # ---------------------------------------------------------------------------
 # Build rules
@@ -97,18 +105,30 @@ TEST_OBJ = $(TEST_SRC:.c=.o)
 all: compile_flags.txt $(NAME)
 	@echo "Build complete."
 
-compile_flags.txt:
+# Always rewritten: it carries CFLAGS, which change with the variant, and a
+# stale copy points clangd at another variant's flags.
+compile_flags.txt: FORCE
 	@echo "${CFLAGS}" > compile_flags.txt
 
 # Generic pattern rule for all .c -> .o
-%.o: %.c
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
 	${CC} -c ${CFLAGS} -MD -MP -o $@ $<
 
 -include $(OBJ:.o=.d)
 -include $(TEST_OBJ:.o=.d)
 
-$(NAME): $(OBJ)
+$(BUILD_DIR)/$(NAME): $(OBJ)
 	${CC} -o $@ $(OBJ) ${LDFLAGS}
+
+# The scripts and the flake read the binary from the tree root (tests/x/run.sh,
+# scripts/xephyr-test.sh), so it is copied out of the variant directory. The
+# copy runs on every build: switching variants has to replace the binary, and
+# mtimes cannot say which variant produced the one already there.
+$(NAME): $(BUILD_DIR)/$(NAME) FORCE
+	@cmp -s $< $@ || cp $< $@
+
+FORCE:
 
 # ---------------------------------------------------------------------------
 # Development tools
@@ -143,12 +163,15 @@ check: format tidy
 # Testing
 # ---------------------------------------------------------------------------
 
-test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
+$(BUILD_DIR)/test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 	${CC} -o $@ $^ ${LDFLAGS}
+
+test: $(BUILD_DIR)/test FORCE
+	@cmp -s $< $@ || cp $< $@
 	./test
 
 clean:
-	rm -f $(NAME) $(OBJ) $(TEST_OBJ) test compile_commands.json compile_flags.txt tools/xclient
+	rm -rf build $(NAME) test compile_commands.json compile_flags.txt tools/xclient
 
 # Point git at the committed hooks once per clone. The hook files live in
 # .githooks/ and call lefthook, which runs the gates in lefthook.yml.
@@ -173,12 +196,13 @@ test-x: $(NAME) tools/xclient
 	./tests/x/run.sh $(TEST_X_ARGS)
 
 # Standalone test (no XCB dependencies required)
-test-standalone: wm-hub.o wm-log.o test-wm-hub-standalone.c
-	$(CC) $(CFLAGS) -o $@ $^
+# FORCE because the binary is shared by the variants, like wm and test above.
+test-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o test-wm-hub-standalone.c FORCE
+	$(CC) $(CFLAGS) -o $@ $(filter-out FORCE,$^)
 	./test-standalone
 
-test-sm-standalone: wm-hub.o wm-log.o $(filter-out %.c,$(SRC_SM:.c=.o)) test-sm-standalone.c
-	$(CC) $(CFLAGS) -o $@ $^
+test-sm-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o $(filter-out %.c,$(SRC_SM:%.c=$(BUILD_DIR)/%.o)) test-sm-standalone.c FORCE
+	$(CC) $(CFLAGS) -o $@ $(filter-out FORCE,$^)
 	./test-sm-standalone
 
 # ---------------------------------------------------------------------------
@@ -208,4 +232,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x check-async print-src hooks test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean
+.PHONY: all clean test test-x check-async print-src hooks test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean FORCE
