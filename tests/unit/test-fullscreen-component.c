@@ -97,7 +97,31 @@ test_fullscreen_toggle_action(void)
   hub_shutdown();
 }
 
+/*
+ * Test: registering the action is part of init. Without the registry the
+ * component must not come up half-initialized, or a caller that runs before
+ * keybinding_init drops fullscreen for the whole session.
+ */
+void
+test_fullscreen_init_requires_action_registry(void)
+{
+  LOG_CLEAN("== Testing fullscreen init without the action registry");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+
+  assert(fullscreen_component_init() == false);
+  assert(fullscreen_component_is_initialized() == false);
+  assert(hub_get_component_by_name(FULLSCREEN_COMPONENT_NAME) == NULL);
+
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(FullscreenComponent, {
   test_fullscreen_action_registered();
   test_fullscreen_toggle_action();
+  test_fullscreen_init_requires_action_registry();
 });
