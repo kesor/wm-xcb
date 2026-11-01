@@ -84,6 +84,15 @@ The point of all four is a promise to the person using the WM: behaviour does no
 change behind their back when a new feature lands. Developer comfort is not the
 goal; dwm is easier to read than this project and works today.
 
+### Do not invent limits
+
+Write a constraint only when you can put a number and a source on it: the API
+cost of a run, the context you have left, a command that blocks for N seconds,
+a person who has to approve. "No time", "running low", "to keep this short",
+"if it fits", "given the length" are not constraints; they are a decision to
+stop early, and stopping early leaves a half-checked tree behind. Do the work or
+name the specific thing that blocks it.
+
 ---
 
 ## The Architecture in Brief

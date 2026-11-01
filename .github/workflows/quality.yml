@@ -4,9 +4,9 @@ name: quality
 # lefthook.yml, and this workflow calls the same commands, so a gate added for
 # a commit hook is not silently missing from CI.
 #
-# Jobs marked "advisory" are expected to fail today. They are wired and visible
-# on purpose: the point is to watch the number go down, not to hide it. Flip
-# continue-on-error off when the first green run is merged.
+# The seam job is required because tests/x/run.sh now separates known failures
+# (tests/quality/seam-baseline.txt) from new ones: a red seam job means this
+# branch broke something, which is exactly what a required gate should say.
 
 on:
   push:
@@ -39,7 +39,6 @@ jobs:
   seam:
     name: seam tests (what X sees)
     runs-on: ubuntu-latest
-    continue-on-error: true # advisory until the X11 output path works
     steps:
       - uses: actions/checkout@v5
       - uses: cachix/install-nix-action@v31

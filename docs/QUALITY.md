@@ -18,12 +18,12 @@ model.*
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build, the standalone tests, and the build variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
-| CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run` — **advisory** |
+| CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run`, required: known failures are baselined |
 | CI `sanitize` | every push and PR | ~2 min | `make test SANITIZE=1` |
 
-Advisory means `continue-on-error: true`. They are wired and their output is
-visible on purpose; they become required when they are green, which is tracked
-in beads.
+No CI job is advisory any more. The seam job could only become required once
+`tests/x/run.sh` could tell a known failure from a new one; the baseline in
+`tests/quality/seam-baseline.txt` is what makes its verdict mean something.
 
 ## The gates
 
@@ -39,7 +39,7 @@ in beads.
 | commit-msg | `scripts/check-commit-msg.sh` | no `Co-Authored-By`, no "generated with", no robot footer |
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
-| seam | `make test-x` | modifiable X behaviour: mapped, tiled, focused, tags, EWMH (advisory) |
+| seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
 
 ## Where the hooks live

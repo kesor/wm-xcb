@@ -109,12 +109,22 @@ exported. `tests/x/lib.sh` has the helpers: `spawn_client`, `wait_viewable`,
 `require_visible`, `rect_of`, `overlap_pairs`, `focused_window`, `press`,
 `root_prop`, and the `check_*` assertions.
 
-The suite prints one line per assertion and exits non-zero while any fail. Every
-failure names the beads issue that owns the defect, so the count is whatever the
-run says and never lives here:
+A failure listed in `tests/quality/seam-baseline.txt` is a **known** failure: it
+is reported and does not fail the run. A failure missing from that file is
+**new** and exits non-zero, which is what the CI seam job watches. The suite
+therefore needs the baseline to be useful: without it, every run is red and a
+regression is invisible next to the standing list of unwired features.
 
-| Test | Fails because |
-|------|---------------|
+```bash
+make test-x TEST_X_ARGS="--update-baseline"   # accept today's failures
+```
+
+Refresh it when an epic lands, and read the diff: an entry that disappears is
+progress, an entry that appears is either a new defect or a test that got
+stricter. The remaining known failures, as of the last refresh:
+
+| Test | Known failure, because |
+|------|-------------------------|
 | `test-40-focus-on-manage` | no `xcb_set_input_focus` anywhere (4.4) |
 | `test-50-tag-switch-keybinding` | no key grab, so `KEY_PRESS` never arrives (4.5) |
 | `test-60-ewmh-root-properties` | no root properties are set |
