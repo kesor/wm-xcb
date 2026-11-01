@@ -559,10 +559,13 @@ void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULL
 ## When You're Done
 
 1. Make sure tests pass: `make test`
-2. Format code: `clang-format --style=file -i *.c *.h`
-3. Commit with meaningful message
-4. Push to your branch
-5. Create PR referencing the issue
+2. If the change touches windows, focus, keys, or X properties, run the seam
+   tests too: `make tools/xclient && make test-x`. They assert what X sees, and
+   they are expected to fail only for the defects listed in `docs/STATUS.md`.
+3. Format code: `clang-format --style=file -i *.c *.h`
+4. Commit with meaningful message
+5. Push to your branch
+6. Create PR referencing the issue
 
 ---
 

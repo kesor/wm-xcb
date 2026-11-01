@@ -150,6 +150,11 @@ test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 clean:
 	rm -f $(NAME) $(OBJ) $(TEST_OBJ) test compile_commands.json compile_flags.txt tools/xclient
 
+# Seam tests: assert what the X server sees, against a live WM in a nested
+# display. See docs/TESTING.md. Expect failures until the X11 output path works.
+test-x: $(NAME) tools/xclient
+	./tests/x/run.sh $(TEST_X_ARGS)
+
 # Standalone test (no XCB dependencies required)
 test-standalone: wm-hub.o test-wm-hub-standalone.c
 	$(CC) $(CFLAGS) -o $@ $^
@@ -186,4 +191,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean
+.PHONY: all clean test test-x test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean

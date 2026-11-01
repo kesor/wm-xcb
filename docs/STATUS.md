@@ -17,6 +17,7 @@
 |------|-------|----------|
 | Build (`make`) | works | gcc, `-Os`, links against libxcb, xcb-randr, xcb-ewmh, xcb-xinput, xcb-keysyms |
 | Unit tests (`make test`) | 645 assertions pass, 0 fail | 18 test files at repo root |
+| Seam tests (`make test-x`) | **2 assertions pass, 9 fail** | `tests/x/`, 8 files; every failure maps to a defect in §4 |
 | SM standalone tests (`make test-sm-standalone`) | pass | `All SM tests passed!` |
 | Hub standalone tests (`make test-standalone`) | **link error** | `undefined reference to 'logger'`: `wm-log.o` missing from the link line |
 | Debug build (`make DEBUG=1`) | works (fixed 2026-11-01) | was broken by a zero-length array in `src/components/tiling.c`; now `NULL` with count 0 |
@@ -192,14 +193,17 @@ work (§4.5-4.6), then focus (§4.4), then the rest.
 # 1. build and run the unit tests
 make && make test
 
-# 2. nested X session: does the WM map and tile windows?
+# 2. does the WM do what X users would see? (seam tests, expect failures)
 make tools/xclient
+make test-x
+
+# 3. nested X session by hand
 scripts/xephyr-test.sh --windows 2 --verbose
 
-# 3. cost of the WM while idle and while windows appear
+# 4. cost of the WM while idle and while windows appear
 scripts/perf-test.sh --windows 10
 
-# 4. what the WM actually saw (needs a debug build)
+# 5. what the WM actually saw (needs a debug build)
 make clean && make DEBUG=1
 Xephyr :2 -screen 1280x800 -noreset &
 DISPLAY=:2 ./wm 2>&1 | tee /tmp/wm.log &

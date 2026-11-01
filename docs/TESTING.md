@@ -2,8 +2,8 @@
 
 *Written 2026-11-01. Numbers in this file were measured on this machine.*
 
-> **Bottom line:** run `scripts/xephyr-test.sh` for the "does it manage windows"
-> check and `scripts/perf-test.sh` for cost. Both start their own nested X
+> **Bottom line:** `make test` covers the model, `make test-x` covers the seam
+> between the WM and the X server, `scripts/perf-test.sh` covers cost. Both start their own nested X
 > server, so they need no second machine and no root. Without arguments they
 > print PASS/FAIL lines and leave logs under `$TMPDIR` (`wm-xephyr-test/`,
 > `wm-perf-test/`).
@@ -65,7 +65,53 @@ event log.
 
 ---
 
-## 3. Nested X server (Xephyr)
+## 3. Seam tests
+
+```bash
+make test-x                 # all of tests/x/test-*.sh
+make test-x TEST_X_ARGS="--filter=tag"   # one file
+make test-x TEST_X_ARGS="--keep"         # leave the session running
+make test-x TEST_X_ARGS="--verbose"      # print the WM log for each failure
+```
+
+A seam test asserts what the X server sees, not what the WM thinks: the window
+is viewable, `WM_STATE` is `Normal`, two windows do not overlap, the input focus
+is where the WM said it would be, `_NET_CLIENT_LIST` exists. Those are the
+assertions the unit tests cannot make, and `docs/STATUS.md` §4 is entirely made
+of things this level would have caught.
+
+`scripts/xephyr-test.sh` is the earlier single-scenario version of the same idea;
+prefer `make test-x`, and keep the old script only because several beads issues
+name it.
+
+`tests/x/run.sh` starts one Xephyr and one WM for the whole run, then runs each
+file as a separate process with `DISPLAY`, `WM_PID`, `WM_LOG` and `ROOT_DIR`
+exported. `tests/x/lib.sh` has the helpers: `spawn_client`, `wait_viewable`,
+`require_visible`, `rect_of`, `overlap_pairs`, `focused_window`, `press`,
+`root_prop`, and the `check_*` assertions.
+
+Current result on this tree: **2 assertions pass, 9 fail**. Every failure names
+the defect it belongs to:
+
+| Test | Fails because |
+|------|---------------|
+| `test-10-map-on-map-request` | the WM never maps the window (4.1) |
+| `test-20-wm-state-property` | `WM_STATE` is never set (4.1) |
+| `test-30-tiling-two-windows` | windows never become viewable, so tiling is unobservable (4.3) |
+| `test-40-focus-on-manage` | no `xcb_set_input_focus` anywhere (4.4) |
+| `test-50-tag-switch-keybinding` | no key grab, so `KEY_PRESS` never arrives (4.5) |
+| `test-60-ewmh-root-properties` | no root properties are set |
+| `test-70-client-exit-cleanup` | blocked on the same mapping failure |
+| `test-80-many-windows` | 0 of 20 windows become viewable |
+
+Write a test so that it cannot pass for the wrong reason: a precondition such as
+"the window is visible before I press the key" uses `require_visible`, which
+stops the test, not `check_eq`, which would let a later "the window is gone now"
+pass because it was never there.
+
+---
+
+## 4. Nested X server (Xephyr)
 
 Xephyr renders a second X server inside a window on your real session. The WM
 under test runs as the only WM on that second display.
@@ -149,7 +195,7 @@ at check 2, and should be made to pass rather than adjusted.
 
 ---
 
-## 4. Performance
+## 5. Performance
 
 ```bash
 scripts/perf-test.sh [--windows N] [--display :N] [--keep]
@@ -234,7 +280,7 @@ event arrives.
 
 ---
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -248,7 +294,7 @@ event arrives.
 
 ---
 
-## 6. What to test when you change something
+## 7. What to test when you change something
 
 | Change | Check |
 |--------|-------|

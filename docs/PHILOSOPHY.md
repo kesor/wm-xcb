@@ -22,10 +22,36 @@ a promise the code does not keep is a defect list, not marketing.
 | **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | not kept: `docs/STATUS.md` 4.1 |
 | **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop key handling | not kept: the launcher blocks the loop, and the loop busy-waits (4.7) |
 | **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | not kept: no key grabs exist (4.5) |
-| **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: 645 assertions cover the model, nothing covers the X seam |
+| **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: 645 assertions cover the model, `make test-x` covers the X seam with 11 assertions of which 9 fail today |
 | **The WM can explain itself** | current state and recent transitions can be dumped and read | not kept: `LOG_DEBUG` only, no state dump or event trace |
 
 Those five are the product. Everything below exists to keep them.
+
+### The other promise: you should never need a C compiler
+
+dwm is a developer's window manager. Colors and keybindings live in `config.h`,
+so changing them means a rebuild; anything more is a patch from a wiki, applied
+with `patch`, and stepping on the other patches. That is the same criticism this
+project makes about patch conflicts, seen from the user's side instead of the
+maintainer's.
+
+wm is no better today: configuration is compiled into `config.def.h` and
+`config.wm.def.h`, and seven of the nine wired keybindings name actions that do
+not exist, silently. So this is a goal with a status column, not a claim.
+
+| Goal | Status 2026-11-01 |
+|------|-------------------|
+| No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, seven keys resolve to nothing |
+| Change keybindings, rules, and tag names in a text file, no rebuild | not kept: compiled in |
+| Reload that file without restarting | not kept |
+| A wrong line in that file says what is wrong, once, at startup | not kept: a binding to a missing action is silent |
+| Every feature a dwm patch provides is a config toggle here | not kept |
+
+**The rule that follows:** a feature a user turns on is a config key, not a
+`#define` and not a patch. If the only way to enable it is to edit our source,
+it is not finished. That rule is also what makes the extension point test in §4
+worth anything: an extension point nobody can reach without a compiler is not an
+extension point.
 
 ---
 

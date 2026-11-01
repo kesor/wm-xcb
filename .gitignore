@@ -10,6 +10,7 @@ task-*.txt
 test-*
 !test-*.c
 !test-*.h
+!tests/x/test-*.sh
 test
 pr-body.md
 result
