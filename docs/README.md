@@ -1,6 +1,6 @@
 # wm/ Project Documentation
 
-*Last updated: 2026-04-30*
+*Last updated: 2026-11-01*
 
 ---
 
@@ -8,8 +8,10 @@
 
 | Document | Purpose |
 |----------|---------|
-| **[VISION.md](VISION.md)** | ⭐ **The Vision** — Why we built this, the paradigm shift |
-| **[IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md)** | Quick reference for implementation order |
+| **[STATUS.md](STATUS.md)** | ⭐ **Where the project stands** — audited state, open defects, what to fix first |
+| **[TESTING.md](TESTING.md)** | How to run unit tests, a nested Xephyr session, and performance measurements |
+| **[VISION.md](VISION.md)** | Why we built this, the paradigm shift |
+| **[IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md)** | Planned implementation order (its completion percentages predate the 2026-11-01 audit) |
 
 ---
 
@@ -76,19 +78,9 @@ See [extensions/README.md](extensions/README.md) for the full index.
 
 ## What's Implemented
 
-See [IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md) for the phased implementation plan.
-
-Current codebase has:
-- ✅ XCB connection and event loop
-- ✅ Basic state machine (IDLE, WINDOW_MOVE, WINDOW_RESIZE)
-- ✅ Window list management
-- ✅ Signal handling and logging
-
----
-
-## What's Next
-
-See [plans/wm-architecture.md](../plans/wm-architecture.md) for detailed implementation phases.
+See [STATUS.md](STATUS.md). In short: hub, state machine framework, targets, and
+eight components exist and pass 645 unit-test assertions, but the WM does not
+map or tile windows yet, so it shows nothing on screen.
 
 ---
 

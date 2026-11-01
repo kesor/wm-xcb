@@ -3,6 +3,11 @@
 *Replaces: `PRE-WORK_CHECKLIST.md` (superseded by architecture decisions)*
 *Last updated: 2026-04-30 (audit #81, updated with lessons learned)*
 
+> **The completion percentages below are out of date.** They count framework
+> code, not working behaviour. For the audited state as of 2026-11-01, see
+> [STATUS.md](STATUS.md), and for the order to fix things in, see the beads
+> epics (`bd list --type=epic`).
+
 ---
 
 ## Overview

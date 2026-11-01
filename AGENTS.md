@@ -22,10 +22,12 @@ Reference: dwm (`../dwm/`) — analyzed extensively for design patterns
 
 | Document | Purpose |
 |----------|---------|
-| `docs/PRE-WORK_CHECKLIST.md` | Initial handoff context |
-| `docs/GRILL-ME-PROMPT.md` | Design decisions made in grill session |
+| `docs/STATUS.md` | **Start here** — audited state, open defects, what to fix first |
+| `docs/TESTING.md` | Unit tests, Xephyr sessions, performance measurement |
+| `docs/VISION.md` | Why this project exists |
 | `docs/architecture/overview.md` | Core concepts and architecture |
 | `plans/wm-architecture.md` | Phased implementation plan |
+| `bd list --type=epic` | Current work breakdown |
 | `.github/ISSUE_TEMPLATE/prd.yml` | Product Requirements Document |
 
 ### Architecture Documents
