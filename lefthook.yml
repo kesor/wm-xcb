@@ -74,6 +74,10 @@ pre-push:
       run: make test
       fail_text: "make test failed."
 
+    standalone:
+      run: make test-standalone && make test-sm-standalone
+      fail_text: "A standalone test target failed to link or run."
+
     debug-build:
       # -pedantic is what caught the zero-length array in tiling.c, so it runs on
       # every push. It rebuilds twice so normal objects are left behind.

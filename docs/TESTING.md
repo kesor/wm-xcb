@@ -54,7 +54,7 @@ Two extra targets:
 
 ```bash
 make test-sm-standalone    # state machine framework only, prints DEBUG trace
-make test-standalone       # BROKEN: link fails, wm-log.o missing from the recipe
+make test-standalone       # hub registry and event bus only
 ```
 
 ### Debug build
@@ -341,7 +341,7 @@ event arrives.
 
 | Change | Check |
 |--------|-------|
-| hub, registry, event bus | `make test`, then `make test-standalone` once it links again |
+| hub, registry, event bus | `make test`, then `make test-standalone` |
 | state machine framework | `make test-sm-standalone` |
 | any component | its `test-*.c` file under `make test`, plus `scripts/xephyr-test.sh` |
 | anything in the manage/map/tile path | `scripts/xephyr-test.sh --windows 2 --verbose` and `--windows 5` |

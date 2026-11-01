@@ -19,7 +19,7 @@
 | Unit tests (`make test`) | 645 assertions pass, 0 fail | 18 test files at repo root |
 | Seam tests (`make test-x`) | **2 assertions pass, 9 fail** | `tests/x/`, 8 files; every failure maps to a defect in §4 |
 | SM standalone tests (`make test-sm-standalone`) | pass | `All SM tests passed!` |
-| Hub standalone tests (`make test-standalone`) | **link error** | `undefined reference to 'logger'`: `wm-log.o` missing from the link line |
+| Hub standalone tests (`make test-standalone`) | pass | `=== All tests passed ===` |
 | Debug build (`make DEBUG=1`) | works (fixed 2026-11-01) | was broken by a zero-length array in `src/components/tiling.c`; now `NULL` with count 0 |
 | Start under Xephyr | works | takes substructure redirect, stays alive, exits on SIGTERM |
 | RandR monitor discovery | works | log: `Monitor manager: Creating monitor for output 571`, geometry `1280x800+0+0` |
@@ -161,8 +161,9 @@ starting point.
     (24 bytes per registered target), and nothing frees the `accepted_targets`
     array allocated in `hub_register_component()` (16 bytes per component). ASan
     on `./test`: 936 bytes in 47 allocations.
-14. `make test-standalone` does not link: `wm-log.o` is missing from the recipe
-    (`Makefile:153`).
+14. `make test-standalone` did not link: `wm-log.o` was missing from the recipe
+    (`Makefile:177`). Fixed by adding `wm-log.o` to the link line; both
+    standalone targets now run as a gate.
 15. `docs/IMPLEMENTATION-ROADMAP.md` claims "~75% Complete" and marks Phase 3
     components as the remaining work. Given items 1-6, that number describes the
     framework, not the window manager. `docs/README.md` is stale the same way
