@@ -36,12 +36,12 @@ project makes about patch conflicts, seen from the user's side instead of the
 maintainer's.
 
 wm is no better today: configuration is compiled into `config.def.h` and
-`config.wm.def.h`, and seven of the nine wired keybindings name actions that do
-not exist, silently. So this is a goal with a status column, not a claim.
+`config.wm.def.h`, and most of the wired keybindings name actions that do not
+exist, silently. So this is a goal with a status column, not a claim.
 
 | Goal | Status 2026-11-01 |
 |------|-------------------|
-| No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, seven keys resolve to nothing |
+| No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, most keys resolve to nothing |
 | Change keybindings, rules, and tag names in a text file, no rebuild | not kept: compiled in |
 | Reload that file without restarting | not kept |
 | A wrong line in that file says what is wrong, once, at startup | not kept: a binding to a missing action is silent |
@@ -239,7 +239,8 @@ beads epic for state machine ergonomics.
 
 ## 6. What is deliberately not a goal
 
-- **Being small.** dwm is 2,673 lines and works; wm is 14,290 and does not yet.
+- **Being small.** dwm is a few thousand lines and works; wm is several times
+  that and does not yet. Compare them with `wc -l` if the ratio matters.
   Smaller is a real virtue and wm does not have it. The bet is that
   composability is worth the size, and that size stays bounded because features
   are additive rather than interleaved.

@@ -88,8 +88,8 @@ Nothing in this repository depends on them being present.
 Short version, and the parts that stay true until they are fixed:
 
 - **Built:** hub (registry, request router, event bus), state machine framework,
-  targets (`Client`, `Monitor`, `Tag`), and eight components. The unit suite
-  passes.
+  targets (`Client`, `Monitor`, `Tag`), and the built-in components. The unit
+  suite passes.
 - **Works against X:** connecting, taking substructure redirect, RandR monitor
   discovery, tracking windows as `Client` targets.
 - **Does not work:** the WM never maps the windows it tracks, so nothing appears

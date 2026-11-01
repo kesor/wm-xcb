@@ -45,7 +45,7 @@ make            # normal build, -Os
 make test       # builds and runs test/, prints "Total: N passed, M failed"
 ```
 
-`make test` links every non-`main` object plus the 18 `test-*.c` files and runs
+`make test` links every non-`main` object plus the `test-*.c` files and runs
 them. The runner prints the current count and must report zero failures.
 Components are tested
 without an X server by calling their handlers with fabricated events and
@@ -98,8 +98,9 @@ exported. `tests/x/lib.sh` has the helpers: `spawn_client`, `wait_viewable`,
 `require_visible`, `rect_of`, `overlap_pairs`, `focused_window`, `press`,
 `root_prop`, and the `check_*` assertions.
 
-Current result on this tree: **2 assertions pass, 9 fail**. Every failure names
-the defect it belongs to:
+The suite prints one line per assertion and exits non-zero while any fail. Every
+failure names the beads issue that owns the defect, so the count is whatever the
+run says and never lives here:
 
 | Test | Fails because |
 |------|---------------|
@@ -353,3 +354,4 @@ event arrives.
 
 Every change that touches behaviour should leave `make test` green and
 `scripts/xephyr-test.sh` at least as green as it was.
+

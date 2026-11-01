@@ -24,7 +24,7 @@ part of this repository; if you keep one next to this checkout it is at
 
 | Document | Purpose |
 |----------|---------|
-| `docs/README.md` | Doc index and the current state in six lines |
+| `docs/README.md` | Doc index and the current state in a short section |
 | `docs/PHILOSOPHY.md` | **The rules** — user promises, the four commitments, the state machine contract |
 | `docs/TESTING.md` | Unit tests, Xephyr sessions, performance measurement |
 | `docs/QUALITY.md` | The gates that run on commit, push, and CI — and how to add one |
@@ -313,7 +313,7 @@ tmux list-windows | grep issue
 
 ## ⚠️ TOP REPEATED MISTAKES (Read Before Starting)
 
-Based on analysis of 54 merged PRs, these issues appear repeatedly:
+These issues have appeared repeatedly across the merged pull requests:
 
 ### 1. Documentation Out of Sync with Code (25+ occurrences)
 - **Symptom**: Comments/headers describe behavior that doesn't match implementation
