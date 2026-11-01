@@ -36,7 +36,7 @@ case "${1:-}" in
 esac
 
 # Built by their own make targets, not by `make test`.
-STANDALONE="test-sm-standalone.c test-wm-hub-standalone.c"
+STANDALONE="tests/unit/test-sm-standalone.c tests/unit/test-wm-hub-standalone.c"
 
 mapfile -t BUILT < <(make -s print-test-src 2>/dev/null | tr ' ' '\n' | grep -E '\.c$')
 if [ "${#BUILT[@]}" -eq 0 ]; then
@@ -72,7 +72,7 @@ while IFS= read -r f; do
   FOUND=$((FOUND + 1))
   printf '  NOT BUILT  %s\n' "$f"
   printf '             declares a TEST_GROUP but is missing from TEST_SRC in the Makefile\n'
-done < <(git ls-files 'test-*.c' | sort)
+done < <(git ls-files 'tests/unit/test-*.c' | sort)
 
 if [ "$FOUND" -eq 0 ]; then
   [ "$VERBOSE" -eq 1 ] && echo "check-test-src: ${CHECKED} test file(s) with a group, all built or standalone"

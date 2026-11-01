@@ -82,21 +82,21 @@ OBJ = $(SRC:%.c=$(BUILD_DIR)/%.o)
 
 # Test source files
 TEST_SRC = \
-	test-registry.c \
-	test-runner.c \
-	test-wm-hub.c \
-	test-wm-xcb-handler.c \
-	test-wm-monitor.c \
-	test-wm-tag.c \
-	test-target-client.c \
-	test-client-list-component.c \
-	test-tiling-component.c \
-	test-focus-component.c \
-	test-wm-keybinding.c \
-	test-wm-monitor-manager.c \
-	test-launcher.c \
-	test-terminal.c \
-	test-tag-manager-component.c
+	tests/unit/test-registry.c \
+	tests/unit/test-runner.c \
+	tests/unit/test-wm-hub.c \
+	tests/unit/test-wm-xcb-handler.c \
+	tests/unit/test-wm-monitor.c \
+	tests/unit/test-wm-tag.c \
+	tests/unit/test-target-client.c \
+	tests/unit/test-client-list-component.c \
+	tests/unit/test-tiling-component.c \
+	tests/unit/test-focus-component.c \
+	tests/unit/test-wm-keybinding.c \
+	tests/unit/test-wm-monitor-manager.c \
+	tests/unit/test-launcher.c \
+	tests/unit/test-terminal.c \
+	tests/unit/test-tag-manager-component.c
 
 TEST_OBJ = $(TEST_SRC:%.c=$(BUILD_DIR)/%.o)
 
@@ -202,11 +202,11 @@ test-x: $(NAME) tools/xclient
 
 # Standalone test (no XCB dependencies required)
 # FORCE because the binary is shared by the variants, like wm and test above.
-test-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o test-wm-hub-standalone.c FORCE
+test-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o tests/unit/test-wm-hub-standalone.c FORCE
 	$(CC) $(CFLAGS) -o $@ $(filter-out FORCE,$^)
 	./test-standalone
 
-test-sm-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o $(filter-out %.c,$(SRC_SM:%.c=$(BUILD_DIR)/%.o)) test-sm-standalone.c FORCE
+test-sm-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o $(filter-out %.c,$(SRC_SM:%.c=$(BUILD_DIR)/%.o)) tests/unit/test-sm-standalone.c FORCE
 	$(CC) $(CFLAGS) -o $@ $(filter-out FORCE,$^)
 	./test-sm-standalone
 

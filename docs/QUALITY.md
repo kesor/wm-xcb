@@ -14,7 +14,7 @@ model.*
 
 | Layer | When | Time | Runs |
 |-------|------|------|------|
-| `pre-commit` | every commit | ~5 s | paths, docs, test-src, beads export, formatting, build, unit tests, async rule |
+| `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build, the standalone tests, and the build variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
@@ -33,10 +33,12 @@ No CI job is advisory any more. The seam job could only become required once
 | unit | `make test` | the unit suite across hub, state machines, targets, components |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
+| bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every tracked C file and header matches `.clang-format`; `--fix` rewrites the same list (`make format`) |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
 | commit-msg | `scripts/check-commit-msg.sh` | no `Co-Authored-By`, no "generated with", no robot footer |
+| sanitize | `scripts/check-sanitize.sh` | no *new* leak site under ASan; known ones come from `tests/quality/asan-baseline.txt` |
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
 | seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |

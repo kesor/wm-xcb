@@ -45,7 +45,7 @@ make            # normal build, -Os
 make test       # builds and runs test/, prints "Total: N passed, M failed"
 ```
 
-`make test` links every non-`main` object plus the `test-*.c` files and runs
+`make test` links every non-`main` object plus the `tests/unit/test-*.c` files and runs
 them. The runner prints the current count and must report zero failures.
 Components are tested
 without an X server by calling their handlers with fabricated events and
@@ -117,7 +117,12 @@ regression is invisible next to the standing list of unwired features.
 
 ```bash
 make test-x TEST_X_ARGS="--update-baseline"   # accept today's failures
+scripts/check-sanitize.sh --update-baseline  # accept today's leak sites
 ```
+
+Layout: the unit tests live in `tests/unit/`, the seam tests in `tests/x/`, and
+the reviewed baselines in `tests/quality/`. The repository root is the window
+manager itself.
 
 Refresh it when an epic lands, and read the diff: an entry that disappears is
 progress, an entry that appears is either a new defect or a test that got
@@ -365,7 +370,7 @@ event arrives.
 |--------|-------|
 | hub, registry, event bus | `make test`, then `make test-standalone` |
 | state machine framework | `make test-sm-standalone` |
-| any component | its `test-*.c` file under `make test`, plus `scripts/xephyr-test.sh` |
+| any component | its `tests/unit/test-*.c` file under `make test`, plus `scripts/xephyr-test.sh` |
 | anything in the manage/map/tile path | `scripts/xephyr-test.sh --windows 2 --verbose` and `--windows 5` |
 | event loop, focus, or key handling | `make check-async`, `scripts/perf-test.sh` for idle CPU, plus a manual session to press keys |
 | memory-owning code (clients, monitors, SMs) | `valgrind ./test` and a `--windows 50` run |

@@ -23,10 +23,10 @@
 #
 # Exit status: 0 if every test passed, 1 otherwise.
 #
-# The suite asserts what a user sees on the X server. Assertions still fail
-# where key grabs, focus and the EWMH root properties are missing
-# (bd show wm-4f6); those failures are the specification for the X11 output
-# path work.
+# The suite asserts what a user sees on the X server. The assertions that still
+# fail are the ones for key grabs, focus and the EWMH root properties; failures
+# that remain on an unwired tree are listed as known ones in
+# tests/quality/seam-baseline.txt.
 
 set -uo pipefail
 
@@ -255,8 +255,7 @@ if [ "$UPDATE_BASELINE" -eq 1 ]; then
     echo "# Each line is <test file>|<assertion label>. A failure listed here is"
     echo "# known and does not fail the run; a failure missing from here is new."
     echo "# Removing an entry is how a fixed assertion stops being excused: the run"
-    echo "# reports stale entries, and the list is meant to shrink. The work that"
-    echo "# removes them is tracked in bd list --parent wm-4f6."
+    echo "# reports stale entries, and the list is meant to shrink."
     printf '%s\n' "${CURRENT_KEYS[@]}" | sort -u
   } >"$BASELINE"
   echo "seam tests: baseline updated with $(printf '%s\n' "${CURRENT_KEYS[@]}" | sort -u | grep -c .) entries"

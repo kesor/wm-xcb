@@ -10,7 +10,7 @@
 # core.hooksPath and these gates stop running. docs/QUALITY.md explains it.
 #
 # Layers, fastest first:
-#   pre-commit  ~5s     paths, docs, test-src, formatting, build, unit, async, beads
+#   pre-commit  ~5s     paths, docs, test-src, bead-refs, formatting, build, unit, async, beads
 #   commit-msg  instant  commit message rules
 #   pre-push    ~40s    the above, plus the -pedantic debug build
 #   CI                   everything, plus sanitizers and the seam tests
@@ -34,6 +34,11 @@ pre-commit:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC, so its assertions never run."
 
+    bead-refs:
+      glob: "*.{c,h,sh,yml,yaml}"
+      run: ./scripts/check-bead-refs.sh
+      fail_text: "Code cites a beads issue id. Say the reason, constraint or workaround in place."
+
     docs:
       glob: "*.md"
       run: ./scripts/check-docs.sh
@@ -54,7 +59,7 @@ pre-commit:
 
     async:
       run: ./scripts/check-async.sh
-      fail_text: "New blocking call in the event loop. Known work: bd list --parent wm-46k.2"
+      fail_text: "New blocking call in the event loop: nothing in the loop may wait. Move the wait out of the handler, or mark the line with an allow-blocking reason if it runs before the loop starts."
 
 commit-msg:
   commands:
@@ -76,6 +81,10 @@ pre-push:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC."
 
+    bead-refs:
+      run: ./scripts/check-bead-refs.sh
+      fail_text: "Code cites a beads issue id."
+
     docs:
       run: ./scripts/check-docs.sh
       fail_text: "A document cites a line number, duplicates a count, or claims a completion percentage."
@@ -96,6 +105,10 @@ pre-push:
       run: make test-standalone && make test-sm-standalone
       fail_text: "A standalone test target failed to link or run."
 
+    sanitize:
+      run: ./scripts/check-sanitize.sh
+      fail_text: "A new memory leak: fix it, or run --update-baseline and say why it is deferred."
+
     debug-build:
       # -pedantic is what caught the zero-length array in tiling.c, so it runs on
       # every push. The leading clean stays: this is the only gate that builds
@@ -107,7 +120,7 @@ pre-push:
 
     build-variants:
       run: ./scripts/check-build-variants.sh
-      fail_text: "make, make SANITIZE=1 and make DEBUG=1 no longer share one tree. Each variant needs its own object directory (bd show wm-dfg.5)."
+      fail_text: "make, make SANITIZE=1 and make DEBUG=1 no longer share one tree. Each variant needs its own object directory under build/."
 
 post-checkout:
   commands:

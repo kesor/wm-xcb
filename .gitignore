@@ -9,8 +9,8 @@ task-*.txt
 
 # Test binaries - ignore all test-* then un-ignore source files
 test-*
-!test-*.c
-!test-*.h
+!tests/unit/test-*.c
+!tests/unit/test-*.h
 !tests/x/test-*.sh
 test
 pr-body.md

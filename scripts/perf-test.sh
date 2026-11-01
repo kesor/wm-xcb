@@ -204,7 +204,7 @@ echo "burst CPU: ${burst_cpu} ms ($(awk -v c="$burst_cpu" -v n="$WINDOWS" 'BEGIN
 echo "RSS: ${rss_before} kB before, ${rss_after} kB after ($((rss_after - rss_before)) kB growth)"
 
 if [ "$tiled" -ne 1 ]; then
-  echo "RESULT: INCOMPLETE - the WM does not map or tile windows yet (bd show wm-4f6.1), so the tiling number is a timeout"
+  echo "RESULT: INCOMPLETE - the WM does not map or tile windows, so the tiling number is a timeout"
   exit 1
 fi
 echo "RESULT: OK"

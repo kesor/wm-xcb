@@ -90,6 +90,13 @@ run_all_tests(void)
 int
 main(void)
 {
+  /*
+   * Line-buffered stdout. The suite is usually run into a pipe (`make test |
+   * tail`, a CI log, this sanitizer check), and LeakSanitizer exits the process
+   * without flushing a block buffer: the assertion summary would vanish on
+   * exactly the runs where the leak report matters.
+   */
+  setvbuf(stdout, NULL, _IOLBF, 0);
   run_all_tests();
   return 0;
 }

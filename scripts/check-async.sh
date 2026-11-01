@@ -154,8 +154,7 @@ if [ "$UPDATE" -eq 1 ]; then
     echo "# Each line is <file>|<normalized call>. A violation listed here does not"
     echo "# fail the check; a violation missing from here does. Remove entries when"
     echo "# the call is gone: the script reports stale lines, and the point of the"
-    echo "# file is that it shrinks. The work that removes them is tracked in"
-    echo "# 'bd list --parent wm-46k.2'."
+    echo "# file is that it shrinks."
     printf '%s\n' "${CURRENT[@]}" | sort -u
   } >"$BASELINE_FILE"
   echo "check-async: baseline updated with $(printf '%s\n' "${CURRENT[@]}" | sort -u | grep -c .) entrie(s) in ${BASELINE_FILE#"$ROOT_DIR/"}"
@@ -179,6 +178,6 @@ if [ "$NEW_VIOLATIONS" -eq 0 ]; then
   exit 0
 fi
 echo "check-async: $NEW_VIOLATIONS new violation(s), $KNOWN known, $WAIVED waived"
-echo "Known work: 'bd list --parent wm-46k.2'. To accept a new one on purpose:"
+echo "To accept a new one on purpose:"
 echo "  scripts/check-async.sh --update-baseline   (then commit the baseline diff)"
 exit 1

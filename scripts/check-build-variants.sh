@@ -68,7 +68,9 @@ instrumented wm ||
 run_make "make DEBUG=1 after a plain build" DEBUG=1
 run_make "plain make after make DEBUG=1"
 
-run_make "make test SANITIZE=1" test SANITIZE=1
+# Leak reports are check-sanitize.sh's subject, and they exit non-zero;
+# this script only asks whether the variants can share one tree.
+ASAN_OPTIONS=detect_leaks=0 run_make "make test SANITIZE=1" test SANITIZE=1
 run_make "make test after make test SANITIZE=1" test
 
 echo "check-build-variants: release, sanitize and debug builds share one tree"

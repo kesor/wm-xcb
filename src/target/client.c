@@ -274,7 +274,7 @@ client_list_contains_window(xcb_window_t window)
 
 /*
  * Monitor a new window belongs to. Pointer routing would need motion tracking
- * that does not exist yet (pointer handling is wm-rh6), so the selected
+ * that does not exist yet, because nothing tracks pointer motion, so the selected
  * monitor wins, with the first monitor in the list as the answer for a tree
  * where nothing is selected.
  */

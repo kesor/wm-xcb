@@ -84,6 +84,21 @@ The point of all four is a promise to the person using the WM: behaviour does no
 change behind their back when a new feature lands. Developer comfort is not the
 goal; dwm is easier to read than this project and works today.
 
+### Code says the thing, not the ticket
+
+Never write a beads id in source, a script, a Makefile or a CI config. A reader
+of the file does not have the tracker open, and an id carries no explanation: it
+is a pointer to another system standing where the reason should be. Write the
+reason, the constraint, the workaround, the behaviour that must not regress.
+`scripts/check-bead-refs.sh` fails the build on one.
+
+The same goes for names: no file, function or test named after a ticket. A test
+called `test_wm_4f6_1_map_request` will outlive the ticket and mean nothing.
+
+Documents may name the tracker where the tracker is the subject — a workflow doc,
+a roadmap that maps phases to epics — but not where the id is a substitute for
+the content.
+
 ### Do not invent limits
 
 Write a constraint only when you can put a number and a source on it: the API

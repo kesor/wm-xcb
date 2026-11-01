@@ -144,12 +144,18 @@ monitor_sm_set_internal(Monitor* m, const char* sm_name, StateMachine* sm)
 static void
 monitor_sm_storage_free(Monitor* m)
 {
+  /*
+   * Every stored machine belongs to this monitor: a component created it during
+   * adoption and nobody else holds it, so destroying the monitor destroys them.
+   * The one exception is "pertag", whose slot holds a Pertag* rather than a
+   * StateMachine*.
+   */
   for (uint32_t i = 0; i < m->sms.count; i++) {
     if (m->sms.names[i] != NULL) {
-      /* Check for component data that needs freeing */
-      /* Pertag stores Pertag* as void* in machines[i] - free it */
-      if (strcmp(m->sms.names[i], "pertag") == 0 && m->sms.machines[i] != NULL) {
+      if (strcmp(m->sms.names[i], "pertag") == 0) {
         free(m->sms.machines[i]);
+      } else if (m->sms.machines[i] != NULL) {
+        sm_destroy(m->sms.machines[i]);
       }
       free(m->sms.names[i]);
     }
@@ -189,14 +195,12 @@ monitor_list_init(void)
 void
 monitor_list_shutdown(void)
 {
+  /*
+   * Through monitor_destroy, not free(): a monitor owns the state machines
+   * stored on it and its name table, and free() here dropped all of them.
+   */
   while (monitor_list != NULL) {
-    Monitor* next = monitor_list->next;
-    /* Unregister from hub if still registered */
-    if (monitor_list->target.registered) {
-      hub_unregister_target(monitor_list->target.id);
-    }
-    free(monitor_list);
-    monitor_list = next;
+    monitor_destroy(monitor_list);
   }
   monitor_list     = NULL;
   selected_monitor = NULL;
