@@ -18,6 +18,7 @@
 #include "../target/client.h"
 #include "../target/monitor.h"
 #include "../target/tag.h"
+#include "src/actions/action-registry.h"
 #include "tag-manager.h"
 #include "wm-hub.h"
 #include "wm-log.h"
@@ -399,6 +400,132 @@ tag_manager_update_visibility(Monitor* m)
 }
 
 /*
+ * Actions
+ *
+ * The three tag actions the default config wires. Each one turns an invocation
+ * into the request this component already handles, so a keybinding and any
+ * other caller take the same path.
+ */
+
+/*
+ * The tag number arrives as a pointer-sized argument, the way
+ * keybinding-binding packs KB_TAG() arguments, and is read back in the
+ * executor as a uint32_t.
+ */
+static bool
+tag_manager_action_tag(ActionInvocation* inv, uint32_t* tag)
+{
+  if (inv == NULL || inv->data == NULL)
+    return false;
+
+  *tag = (uint32_t) (uintptr_t) inv->data;
+  return true;
+}
+
+/*
+ * The executor runs inside hub_send_request_data(), before it returns, so a
+ * tag on this frame is still alive when the handler reads it.
+ */
+static bool
+tag_manager_action_view(ActionInvocation* inv)
+{
+  uint32_t tag;
+  if (inv == NULL || !tag_manager_action_tag(inv, &tag))
+    return false;
+
+  hub_send_request_data(REQ_TAG_VIEW, inv->target, &tag);
+  return true;
+}
+
+static bool
+tag_manager_action_toggle(ActionInvocation* inv)
+{
+  uint32_t tag;
+  if (inv == NULL || !tag_manager_action_tag(inv, &tag))
+    return false;
+
+  hub_send_request_data(REQ_TAG_TOGGLE, inv->target, &tag);
+  return true;
+}
+
+static bool
+tag_manager_action_client_move(ActionInvocation* inv)
+{
+  uint32_t tag;
+  if (inv == NULL || !tag_manager_action_tag(inv, &tag))
+    return false;
+
+  hub_send_request_data(REQ_TAG_CLIENT_TOGGLE, inv->target, &tag);
+  return true;
+}
+
+static Action tag_manager_view_action = {
+  .name            = "tag-manager.view",
+  .description     = "Show tag N on the selected monitor",
+  .callback        = tag_manager_action_view,
+  .target_resolver = NULL,
+  .target_type     = ACTION_TARGET_MONITOR,
+  .target_required = true,
+  .userdata        = NULL,
+};
+
+static Action tag_manager_toggle_action = {
+  .name            = "tag-manager.toggle",
+  .description     = "Toggle visibility of tag N on the selected monitor",
+  .callback        = tag_manager_action_toggle,
+  .target_resolver = NULL,
+  .target_type     = ACTION_TARGET_MONITOR,
+  .target_required = true,
+  .userdata        = NULL,
+};
+
+static Action tag_manager_client_move_action = {
+  .name            = "tag-manager.client-move",
+  .description     = "Move the focused client to tag N",
+  .callback        = tag_manager_action_client_move,
+  .target_resolver = NULL,
+  .target_type     = ACTION_TARGET_CLIENT,
+  .target_required = true,
+  .userdata        = NULL,
+};
+
+/*
+ * Register the tag actions before the component reaches the hub, so a
+ * half-initialized component is never visible to anyone.
+ */
+static bool
+tag_manager_register_actions(void)
+{
+  if (!action_register(&tag_manager_view_action)) {
+    LOG_ERROR("Failed to register action '%s'", tag_manager_view_action.name);
+    return false;
+  }
+
+  if (!action_register(&tag_manager_toggle_action)) {
+    LOG_ERROR("Failed to register action '%s'", tag_manager_toggle_action.name);
+    action_unregister(tag_manager_view_action.name);
+    return false;
+  }
+
+  if (!action_register(&tag_manager_client_move_action)) {
+    LOG_ERROR("Failed to register action '%s'", tag_manager_client_move_action.name);
+    action_unregister(tag_manager_view_action.name);
+    action_unregister(tag_manager_toggle_action.name);
+    return false;
+  }
+
+  return true;
+}
+
+static void
+tag_manager_unregister_actions(void)
+{
+  action_unregister(tag_manager_view_action.name);
+  action_unregister(tag_manager_toggle_action.name);
+  action_unregister(tag_manager_client_move_action.name);
+}
+
+/*
  * Request executors
  */
 
@@ -687,6 +814,9 @@ tag_manager_component_init(void)
   /* Set the executor */
   tag_manager_component()->executor = tag_manager_executor;
 
+  if (!tag_manager_register_actions())
+    return false;
+
   /* Register with hub */
   hub_register_component(tag_manager_component());
 
@@ -719,6 +849,8 @@ tag_manager_component_shutdown(void)
 
   /* Unregister from hub */
   hub_unregister_component(TAG_MANAGER_COMPONENT_NAME);
+
+  tag_manager_unregister_actions();
 
   /* Free cached template */
   if (cached_tag_view_template != NULL) {

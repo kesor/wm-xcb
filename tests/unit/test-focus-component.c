@@ -6,6 +6,7 @@
  */
 
 #include <string.h>
+#include "src/actions/action-registry.h"
 #include "src/components/client-list.h"
 #include "src/components/focus.h"
 #include "src/xcb/xcb-handler.h"
@@ -50,6 +51,7 @@ test_focus_component_init(void)
   hub_init();
   sm_registry_init();
   xcb_handler_init();
+  action_registry_init();
 
   /* Initially not initialized */
   assert(focus_component_is_initialized() == false);
@@ -73,6 +75,7 @@ test_focus_component_init(void)
 
   /* Cleanup */
   focus_component_shutdown();
+  action_registry_shutdown();
   xcb_handler_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -90,12 +93,14 @@ test_focus_component_shutdown(void)
   sm_registry_init();
   xcb_handler_init();
   client_list_init();
+  action_registry_init();
   focus_component_init();
 
   /* Verify handlers are registered */
   assert(xcb_handler_count_for_type(XCB_ENTER_NOTIFY) >= 1);
 
   focus_component_shutdown();
+  action_registry_shutdown();
 
   /* Handlers should be unregistered */
   assert(xcb_handler_count_for_type(XCB_ENTER_NOTIFY) == 0);
@@ -151,6 +156,7 @@ test_focus_sm_for_client(void)
   hub_init();
   sm_registry_init();
   client_list_init();
+  action_registry_init();
   focus_component_init();
 
   /* Create a client */
@@ -175,6 +181,7 @@ test_focus_sm_for_client(void)
 
   /* Cleanup */
   focus_component_shutdown();
+  action_registry_shutdown();
   client_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -191,6 +198,7 @@ test_focus_raw_write(void)
   hub_init();
   sm_registry_init();
   client_list_init();
+  action_registry_init();
   focus_component_init();
 
   /* Create a client */
@@ -216,6 +224,7 @@ test_focus_raw_write(void)
 
   /* Cleanup */
   focus_component_shutdown();
+  action_registry_shutdown();
   client_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -232,6 +241,7 @@ test_enter_notify_sets_focus(void)
   hub_init();
   sm_registry_init();
   client_list_init();
+  action_registry_init();
   focus_component_init();
 
   /* Create two clients */
@@ -280,6 +290,7 @@ test_enter_notify_sets_focus(void)
 
   /* Cleanup */
   focus_component_shutdown();
+  action_registry_shutdown();
   client_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -296,6 +307,7 @@ test_leave_notify_clears_focus(void)
   hub_init();
   sm_registry_init();
   client_list_init();
+  action_registry_init();
   focus_component_init();
 
   /* Create a client */
@@ -330,6 +342,7 @@ test_leave_notify_clears_focus(void)
 
   /* Cleanup */
   focus_component_shutdown();
+  action_registry_shutdown();
   client_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -346,6 +359,7 @@ test_focus_event_emission(void)
   hub_init();
   sm_registry_init();
   client_list_init();
+  action_registry_init();
   focus_component_init();
 
   /* Reset tracking */
@@ -383,6 +397,7 @@ test_focus_event_emission(void)
   hub_unsubscribe(EVT_CLIENT_UNFOCUSED, focus_test_event_handler);
 
   focus_component_shutdown();
+  action_registry_shutdown();
   client_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -399,6 +414,7 @@ test_focus_guards(void)
   hub_init();
   sm_registry_init();
   client_list_init();
+  action_registry_init();
   focus_component_init();
 
   /* Create a non-focusable client */
@@ -423,6 +439,142 @@ test_focus_guards(void)
 
   /* Cleanup */
   focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test the action names the default config wires for this component.
+ */
+void
+test_focus_actions_registered(void)
+{
+  LOG_CLEAN("== Testing focus actions are registered");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  action_registry_init();
+  focus_component_init();
+
+  Action* current = action_lookup("focus.focus-current");
+  assert(current != NULL);
+  if (current != NULL) {
+    assert(current->callback != NULL);
+    assert(current->target_type == ACTION_TARGET_NONE);
+    assert(current->target_required == false);
+  }
+
+  Action* prev = action_lookup("focus.focus-prev");
+  assert(prev != NULL);
+  if (prev != NULL) {
+    assert(prev->callback != NULL);
+    assert(prev->target_type == ACTION_TARGET_NONE);
+    assert(prev->target_required == false);
+  }
+
+  focus_component_shutdown();
+
+  /* Shutdown must take the names with it, or a restart cannot register them */
+  assert(action_lookup("focus.focus-current") == NULL);
+  assert(action_lookup("focus.focus-prev") == NULL);
+
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test that focus.focus-current picks the newest client that can take focus,
+ * and that the resolved target is the one every client-targeted action sees.
+ */
+void
+test_focus_current_action(void)
+{
+  LOG_CLEAN("== Testing focus.focus-current action");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+
+  Client* older = client_create(100);
+  assert_or_abort(older != NULL);
+  Client* newer = client_create(200);
+  assert_or_abort(newer != NULL);
+
+  /* A window on a hidden tag is not a focus target. */
+  Client* hidden = client_create(300);
+  assert_or_abort(hidden != NULL);
+
+  client_set_managed(older, true);
+  client_set_focusable(older, true);
+  client_set_mapped(older, true);
+  client_set_managed(newer, true);
+  client_set_focusable(newer, true);
+  client_set_mapped(newer, true);
+  client_set_managed(hidden, true);
+  client_set_focusable(hidden, true);
+  client_set_mapped(hidden, false);
+
+  assert(action_invoke("focus.focus-current", NULL) == true);
+  assert(focus_get_focused_window() == 200);
+
+  /* Client-targeted actions resolve through the same focus state. */
+  assert(action_resolve_current_client() == newer->target.id);
+  assert(action_get_current_client() == newer);
+
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test that focus.focus-prev walks to the older client and wraps around.
+ */
+void
+test_focus_prev_action(void)
+{
+  LOG_CLEAN("== Testing focus.focus-prev action");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+
+  Client* older = client_create(100);
+  assert_or_abort(older != NULL);
+  Client* newer = client_create(200);
+  assert_or_abort(newer != NULL);
+
+  client_set_managed(older, true);
+  client_set_focusable(older, true);
+  client_set_mapped(older, true);
+  client_set_managed(newer, true);
+  client_set_focusable(newer, true);
+  client_set_mapped(newer, true);
+
+  assert(action_invoke("focus.focus-current", NULL) == true);
+  assert(focus_get_focused_window() == 200);
+
+  assert(action_invoke("focus.focus-prev", NULL) == true);
+  assert(focus_get_focused_window() == 100);
+  assert(focus_is_focused(older) == true);
+  assert(focus_is_focused(newer) == false);
+
+  /* The oldest client has no older neighbour; the ring wraps to the newest. */
+  assert(action_invoke("focus.focus-prev", NULL) == true);
+  assert(focus_get_focused_window() == 200);
+
+  focus_component_shutdown();
+  action_registry_shutdown();
   client_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -439,6 +591,7 @@ test_unmanaged_client_not_focusable(void)
   hub_init();
   sm_registry_init();
   client_list_init();
+  action_registry_init();
   focus_component_init();
 
   /* Create an un-managed client */
@@ -456,6 +609,7 @@ test_unmanaged_client_not_focusable(void)
 
   /* Cleanup */
   focus_component_shutdown();
+  action_registry_shutdown();
   client_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -474,5 +628,8 @@ TEST_GROUP(FocusComponent, {
   test_leave_notify_clears_focus();
   test_focus_event_emission();
   test_focus_guards();
+  test_focus_actions_registered();
+  test_focus_current_action();
+  test_focus_prev_action();
   test_unmanaged_client_not_focusable();
 });

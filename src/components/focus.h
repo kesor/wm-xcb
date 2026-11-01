@@ -147,10 +147,26 @@ FocusState focus_get_state(Client* c);
 void focus_set_state(Client* c, FocusState state);
 
 /*
+ * Focus a client because something asked for it (a keybinding, an action).
+ * Runs the focus guard, unlike focus_set_state(), and unfocuses the client
+ * that was focused before. Returns false when the client is not focusable.
+ */
+bool focus_focus_client(Client* c);
+
+/*
  * Get the currently focused client.
  * Returns NULL if no client has focus.
  */
 Client* focus_get_focused_client(void);
+
+/*
+ * Get the target ID of the currently focused client.
+ * Returns TARGET_ID_NONE if no client has focus.
+ *
+ * This is the resolver behind every action with a client target, so it has to
+ * live in the component that owns focus state.
+ */
+TargetID focus_get_current_client(void);
 
 /*
  * Get the currently focused window.

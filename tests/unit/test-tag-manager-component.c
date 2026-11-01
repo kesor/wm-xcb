@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "src/actions/action-registry.h"
 #include "src/components/focus.h"
 #include "src/components/tag-manager.h"
 #include "src/target/client.h"
@@ -56,6 +57,7 @@ test_tag_manager_init_shutdown(void)
 
   hub_init();
   monitor_list_init();
+  action_registry_init();
 
   /* Tag manager should initialize without error */
   bool result = tag_manager_component_init();
@@ -64,6 +66,7 @@ test_tag_manager_init_shutdown(void)
 
   /* Tag manager should shutdown cleanly */
   tag_manager_component_shutdown();
+  action_registry_shutdown();
   assert(tag_manager_component_is_initialized() == false);
 
   monitor_list_shutdown();
@@ -84,6 +87,7 @@ test_tag_manager_receives_tag_view_requests(void)
   monitor_list_init();
 
   /* Initialize tag manager */
+  action_registry_init();
   tag_manager_component_init();
 
   /* Create a monitor */
@@ -110,6 +114,7 @@ test_tag_manager_receives_tag_view_requests(void)
   monitor_list_shutdown();
   tag_list_shutdown();
   tag_manager_component_shutdown();
+  action_registry_shutdown();
   hub_shutdown();
 }
 
@@ -126,6 +131,7 @@ test_tag_manager_receives_tag_toggle_requests(void)
   tag_list_init();
   monitor_list_init();
 
+  action_registry_init();
   tag_manager_component_init();
 
   Monitor* m = monitor_create(100);
@@ -159,6 +165,7 @@ test_tag_manager_receives_tag_toggle_requests(void)
   monitor_list_shutdown();
   tag_list_shutdown();
   tag_manager_component_shutdown();
+  action_registry_shutdown();
   hub_shutdown();
 }
 
@@ -174,6 +181,7 @@ test_tag_manager_emits_events(void)
   hub_init();
   tag_list_init();
   monitor_list_init();
+  action_registry_init();
   tag_manager_component_init();
 
   /* Subscribe to tag change events */
@@ -202,6 +210,7 @@ test_tag_manager_emits_events(void)
   monitor_list_shutdown();
   tag_list_shutdown();
   tag_manager_component_shutdown();
+  action_registry_shutdown();
   hub_shutdown();
 }
 
@@ -218,6 +227,7 @@ test_tag_manager_updates_client_visibility(void)
   tag_list_init();
   monitor_list_init();
   client_list_init();
+  action_registry_init();
   tag_manager_component_init();
   focus_component_init();
 
@@ -263,6 +273,7 @@ test_tag_manager_updates_client_visibility(void)
   monitor_list_shutdown();
   tag_list_shutdown();
   tag_manager_component_shutdown();
+  action_registry_shutdown();
   hub_shutdown();
 }
 
@@ -279,6 +290,7 @@ test_tag_manager_client_tag_toggle(void)
   tag_list_init();
   monitor_list_init();
   client_list_init();
+  action_registry_init();
   tag_manager_component_init();
   focus_component_init();
 
@@ -325,6 +337,7 @@ test_tag_manager_client_tag_toggle(void)
   monitor_list_shutdown();
   tag_list_shutdown();
   tag_manager_component_shutdown();
+  action_registry_shutdown();
   hub_shutdown();
 }
 
@@ -341,6 +354,7 @@ test_tag_manager_with_multiple_monitors(void)
   tag_list_init();
   monitor_list_init();
 
+  action_registry_init();
   tag_manager_component_init();
 
   /* Create two monitors */
@@ -378,6 +392,7 @@ test_tag_manager_with_multiple_monitors(void)
   monitor_list_shutdown();
   tag_list_shutdown();
   tag_manager_component_shutdown();
+  action_registry_shutdown();
   hub_shutdown();
 }
 
@@ -393,6 +408,7 @@ test_tag_manager_invalid_tag_index(void)
   hub_init();
   monitor_list_init();
 
+  action_registry_init();
   tag_manager_component_init();
 
   Monitor* m = monitor_create(100);
@@ -416,6 +432,147 @@ test_tag_manager_invalid_tag_index(void)
   monitor_destroy(m);
   monitor_list_shutdown();
   tag_manager_component_shutdown();
+  action_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test: the three tag actions the default config wires are registered, and
+ * each one resolves the target type it needs.
+ */
+void
+test_tag_manager_actions_registered(void)
+{
+  LOG_CLEAN("== Testing tag manager action registration");
+
+  hub_init();
+  action_registry_init();
+  tag_manager_component_init();
+
+  Action* view = action_lookup("tag-manager.view");
+  assert(view != NULL);
+  if (view != NULL) {
+    assert(view->callback != NULL);
+    assert(view->target_type == ACTION_TARGET_MONITOR);
+    assert(view->target_required == true);
+  }
+
+  Action* toggle = action_lookup("tag-manager.toggle");
+  assert(toggle != NULL);
+  if (toggle != NULL) {
+    assert(toggle->callback != NULL);
+    assert(toggle->target_type == ACTION_TARGET_MONITOR);
+    assert(toggle->target_required == true);
+  }
+
+  Action* move = action_lookup("tag-manager.client-move");
+  assert(move != NULL);
+  if (move != NULL) {
+    assert(move->callback != NULL);
+    assert(move->target_type == ACTION_TARGET_CLIENT);
+    assert(move->target_required == true);
+  }
+
+  tag_manager_component_shutdown();
+
+  /* Shutdown must take the names with it, or a restart cannot register them */
+  assert(action_lookup("tag-manager.view") == NULL);
+  assert(action_lookup("tag-manager.toggle") == NULL);
+  assert(action_lookup("tag-manager.client-move") == NULL);
+
+  action_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test: invoking a tag action reaches the request the component handles.
+ */
+void
+test_tag_manager_view_and_toggle_actions(void)
+{
+  LOG_CLEAN("== Testing tag view and toggle actions");
+
+  hub_init();
+  tag_list_init();
+  monitor_list_init();
+  action_registry_init();
+  tag_manager_component_init();
+
+  Monitor* m = monitor_create(100);
+  assert_or_abort(m != NULL);
+  monitor_set_selected(m);
+
+  ActionInvocation inv = {
+    .target = TARGET_ID_NONE,
+    .data   = (void*) (uintptr_t) 3, /* tag 3 */
+  };
+
+  assert(action_invoke("tag-manager.view", &inv) == true);
+  assert(tag_manager_get_visible_tags(m) == TAG_MASK(2));
+
+  inv.data = (void*) (uintptr_t) 1; /* add tag 1 to the view */
+  assert(action_invoke("tag-manager.toggle", &inv) == true);
+  assert(tag_manager_get_visible_tags(m) == (TAG_MASK(0) | TAG_MASK(2)));
+
+  /* A tag action without a tag argument cannot do anything. */
+  inv.data = NULL;
+  assert(action_invoke("tag-manager.view", &inv) == false);
+
+  monitor_destroy(m);
+  monitor_list_shutdown();
+  tag_list_shutdown();
+  tag_manager_component_shutdown();
+  action_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test: the client-move action moves the focused client off the visible tag.
+ */
+void
+test_tag_manager_client_move_action(void)
+{
+  LOG_CLEAN("== Testing tag client-move action");
+
+  hub_init();
+  sm_registry_init();
+  tag_list_init();
+  monitor_list_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+  tag_manager_component_init();
+
+  Monitor* m = monitor_create(100);
+  assert_or_abort(m != NULL);
+  monitor_set_selected(m);
+  tag_manager_on_adopt(&m->target);
+
+  Client* c = client_create(500);
+  assert_or_abort(c != NULL);
+  client_set_managed(c, true);
+  client_set_focusable(c, true);
+  client_set_mapped(c, true);
+  focus_set_state(c, FOCUS_STATE_FOCUSED);
+  assert(c->tags == TAG_MASK(0));
+
+  /* Tag 1 is the visible one, so moving the client there again hides it. */
+  ActionInvocation inv = {
+    .target = TARGET_ID_NONE,
+    .data   = (void*) (uintptr_t) 1,
+  };
+  assert(action_invoke("tag-manager.client-move", &inv) == true);
+  assert(c->tags == 0);
+  assert(c->mapped == false);
+
+  tag_manager_component_shutdown();
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  monitor_destroy(m);
+  monitor_list_shutdown();
+  tag_list_shutdown();
+  sm_registry_shutdown();
   hub_shutdown();
 }
 
@@ -428,4 +585,7 @@ TEST_GROUP(TagManager, {
   test_tag_manager_client_tag_toggle();
   test_tag_manager_with_multiple_monitors();
   test_tag_manager_invalid_tag_index();
+  test_tag_manager_actions_registered();
+  test_tag_manager_view_and_toggle_actions();
+  test_tag_manager_client_move_action();
 });

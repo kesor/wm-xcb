@@ -41,7 +41,7 @@ exist, silently. So this is a goal with a status column, not a claim.
 
 | Goal | Status 2026-11-01 |
 |------|-------------------|
-| No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, most keys resolve to nothing |
+| No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, and no key is grabbed, so no default binding fires |
 | Change keybindings, rules, and tag names in a text file, no rebuild | not kept: compiled in |
 | Reload that file without restarting | not kept |
 | A wrong line in that file says what is wrong, once, at startup | not kept: a binding to a missing action is silent |

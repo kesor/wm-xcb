@@ -9,7 +9,16 @@
  */
 
 #include <string.h>
+#include "src/actions/action-registry.h"
+#include "src/actions/keybinding-binding.h"
+#include "src/actions/launcher.h"
+#include "src/actions/terminal.h"
+#include "src/components/focus.h"
+#include "src/components/fullscreen.h"
 #include "src/components/keybinding.h"
+#include "src/components/tag-manager.h"
+#include "src/components/tiling.h"
+#include "src/sm/sm-registry.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-wm.h"
@@ -315,6 +324,75 @@ test_keybinding_no_executor(void)
   hub_shutdown();
 }
 
+/*
+ * Test: every action name the compiled-in default config wires resolves.
+ *
+ * config.wm.def.h is what a user gets before editing anything. A binding there
+ * that names an action nobody registers is a key that does nothing, with no
+ * message at startup, so the whole wired table is checked, not a sample.
+ */
+void
+test_keybinding_wired_actions_resolve(void)
+{
+  LOG_CLEAN("== Testing every wired keybinding names a registered action");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+
+  /* keybinding_init wires the default config and owns the action registry. */
+  keybinding_init();
+  fullscreen_component_init();
+  focus_component_init();
+  tag_manager_component_init();
+  tiling_component_init();
+  launcher_init();
+  terminal_init();
+
+  const KeyBinding* const* bindings = keybinding_binding_get_all();
+  assert_or_abort(bindings != NULL);
+
+  uint32_t unresolved = 0;
+  for (uint32_t i = 0; i < keybinding_binding_get_count(); i++) {
+    if (!action_exists(bindings[i]->action)) {
+      LOG_CLEAN("  binding to unregistered action '%s'", bindings[i]->action);
+      unresolved++;
+    }
+  }
+  assert(unresolved == 0);
+
+  /* Names the default config and the documentation use, including one no
+   * default keybinding reaches yet. */
+  static const char* const expected[] = {
+    "app.launch",
+    "terminal.spawn",
+    "focus.focus-current",
+    "focus.focus-prev",
+    "tag-manager.view",
+    "tag-manager.toggle",
+    "tag-manager.client-move",
+    "fullscreen.toggle",
+    "monitor.tile",
+  };
+
+  for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
+    if (!action_exists(expected[i]))
+      LOG_CLEAN("  missing action '%s'", expected[i]);
+    assert(action_exists(expected[i]));
+  }
+
+  terminal_shutdown();
+  launcher_shutdown();
+  tiling_component_shutdown();
+  tag_manager_component_shutdown();
+  focus_component_shutdown();
+  fullscreen_component_shutdown();
+  keybinding_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(KeybindingComponent, {
   test_keybinding_component_registration();
   test_keybinding_lookup_exact();
@@ -326,4 +404,5 @@ TEST_GROUP(KeybindingComponent, {
   test_keybinding_handle_key_press();
   test_keybinding_shutdown_reinit();
   test_keybinding_no_executor();
+  test_keybinding_wired_actions_resolve();
 });
