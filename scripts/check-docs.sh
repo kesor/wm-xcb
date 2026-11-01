@@ -4,7 +4,7 @@
 #
 # Usage: scripts/check-docs.sh [files...]
 #
-# Two kinds of rot, both cheap to prevent and expensive to live with:
+# Three kinds of rot, all cheap to prevent and expensive to live with:
 #
 #   1. Line references. `wm-xcb.c:212` is wrong the moment a line is added above
 #      it, so every code change becomes prose edits in files that have nothing
@@ -12,6 +12,10 @@
 #   2. Counts of things a command already reports: assertions, tests, violations,
 #      components, lines. The number in the document is a second source of truth
 #      that nobody updates, and updating it is not the fix: deleting it is.
+#   3. Completion percentages. "~75% complete" counts whatever the author
+#      happened to count (files written, not behaviour shown), and it reads as a
+#      measurement, so it is believed. Status comes from `bd list --type=epic`
+#      and from the test commands; a percentage of a plan is not either.
 #
 # Documents say what shape the system has; the command says how much. Beads
 # issues may cite lines and counts freely, because they are snapshots with a
@@ -33,7 +37,7 @@ for arg in "$@"; do
   case "$arg" in
     -v | --verbose) VERBOSE=1 ;;
     -h | --help)
-      sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+      awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"
       exit 0
       ;;
     *) FILES+=("$arg") ;;
@@ -65,6 +69,11 @@ LINE_REF='\b[A-Za-z0-9_./-]+\.(c|h|yml|yaml|nix|mk|sh):[0-9]+'
 NUMBER='(^|[^§0-9.])'
 COUNT="(${NUMBER})[0-9][0-9,]* ([\`'\"A-Za-z0-9_*.-]+ )?(assertions?|tests?|files?|lines?|violations?|waived|components?|bindings?|epics?)\b"
 
+# 3. completion percentages. Position strings ("50% 50% 50% 50%") and CPU
+# figures ("100% of a core") are not completion claims and must not match, hence
+# the trailing verb rather than a bare `%`.
+PERCENT='(^|[^0-9.])(~|about |approximately )?[0-9]{1,3}([.,][0-9]+)? ?% ?(complete|completion|done|finished|implemented)|percent (complete|done|finished)'
+
 FOUND=0
 report() { # report <file> <line> <kind> <text>
   FOUND=$((FOUND + 1))
@@ -82,6 +91,10 @@ for f in "${DOCS[@]}"; do
     [ -n "$hit" ] || continue
     report "$f" "${hit%%:*}" "COUNT" "${hit#*:}"
   done < <(grep -nE "$COUNT" "$f" 2>/dev/null)
+  while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    report "$f" "${hit%%:*}" "PERCENT" "${hit#*:}"
+  done < <(grep -niE "$PERCENT" "$f" 2>/dev/null)
 done
 
 if [ "$FOUND" -eq 0 ]; then
@@ -90,6 +103,7 @@ if [ "$FOUND" -eq 0 ]; then
 fi
 
 echo "check-docs: $FOUND problem(s) in documents."
-echo "Line numbers rot and counts drift: name the symbol, or the beads issue that"
-echo "owns the defect, and let the command print the number."
+echo "Line numbers rot, counts drift, and a percentage of a plan is a guess with"
+echo "a unit: name the symbol or the beads issue that owns the defect, and let the"
+echo "command print the number."
 exit 1

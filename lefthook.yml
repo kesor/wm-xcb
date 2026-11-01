@@ -32,7 +32,7 @@ pre-commit:
     docs:
       glob: "*.md"
       run: ./scripts/check-docs.sh
-      fail_text: "A document cites a line number or duplicates a count. Name the symbol or the beads issue; let the command print the number."
+      fail_text: "A document cites a line number, duplicates a count, or claims a completion percentage. Name the symbol or the beads issue; let the command print the number."
 
     format:
       glob: "*.{c,h}"
@@ -69,7 +69,7 @@ pre-push:
 
     docs:
       run: ./scripts/check-docs.sh
-      fail_text: "A document cites a line number or duplicates a count."
+      fail_text: "A document cites a line number, duplicates a count, or claims a completion percentage."
 
     format:
       run: ./scripts/format-check.sh
