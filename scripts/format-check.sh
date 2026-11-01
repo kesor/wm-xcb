@@ -1,37 +1,46 @@
 #!/usr/bin/env bash
 #
-# format-check.sh - fail when a C file is not clang-format clean.
+# format-check.sh - check or fix clang-format style for every C file.
 #
 # Usage:
-#   scripts/format-check.sh [files...]     # checks the files given
-#   scripts/format-check.sh                # checks every built source and test
+#   scripts/format-check.sh            # check all tracked sources and headers
+#   scripts/format-check.sh --fix      # rewrite them in place. Same list.
+#   scripts/format-check.sh file.c ...  # check only the files given
 #
-# This is a check, not a fixer: `make format` rewrites files, this one reports
-# and exits non-zero, so a commit hook cannot silently change what is staged.
+# The check and the fixer must agree on which files they own, or `make format`
+# rewrites a file the gate does not look at. That is what happened with
+# config.wm.def.h: the old `make format` reformatted it, the gate never checked
+# it. One list, in this file, used by both.
 #
-# Exit status: 0 when every file is formatted, 1 otherwise.
+# Exit status: 0 when every file is formatted (or after --fix), 1 otherwise.
 
 set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+FIX=0
+FILES=()
+for arg in "$@"; do
+  case "$arg" in
+    -f | --fix) FIX=1 ;;
+    -h | --help)
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *) FILES+=("$arg") ;;
+  esac
+done
+
 if ! command -v clang-format >/dev/null 2>&1; then
   echo "format-check: clang-format not found; start the dev shell (direnv allow)" >&2
   exit 1
 fi
 
-if [ "$#" -gt 0 ]; then
-  FILES=("$@")
-else
-  mapfile -t FILES < <(
-    {
-      make -s print-src 2>/dev/null | tr ' ' '\n'
-      echo "test-runner.h"
-      ls test-*.c test-*.h 2>/dev/null
-      echo "tools/xclient.c"
-    } | grep -E '\.(c|h)$' | sort -u
-  )
+# Everything tracked, minus vendor. vendor/ is third-party and not ours to
+# restyle.
+if [ "${#FILES[@]}" -eq 0 ]; then
+  mapfile -t FILES < <(git ls-files '*.c' '*.h' | grep -v '^vendor/')
 fi
 
 FAILED=0
@@ -42,12 +51,27 @@ for f in "${FILES[@]}"; do
     vendor/*) continue ;;
   esac
   CHECKED=$((CHECKED + 1))
+
+  if [ "$FIX" -eq 1 ]; then
+    clang-format --style=file -i "$f" || FAILED=$((FAILED + 1))
+    continue
+  fi
+
   if ! diff=$(clang-format --style=file --dry-run --Werror "$f" 2>&1); then
     FAILED=$((FAILED + 1))
     printf '  needs formatting: %s\n' "$f"
     printf '%s\n' "$diff" | head -5 | sed 's/^/    /'
   fi
 done
+
+if [ "$FIX" -eq 1 ]; then
+  if [ "$FAILED" -gt 0 ]; then
+    echo "format-check: clang-format failed on $FAILED file(s)"
+    exit 1
+  fi
+  echo "format-check: formatted $CHECKED file(s)"
+  exit 0
+fi
 
 if [ "$FAILED" -gt 0 ]; then
   echo "format-check: $FAILED of $CHECKED file(s) need formatting. Run: make format"

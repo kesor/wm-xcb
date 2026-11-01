@@ -32,7 +32,7 @@ in beads.
 | build | `make -j$(nproc)` | the tree compiles |
 | unit | `make test` | 645 assertions across hub, state machines, targets, components |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
-| format | `scripts/format-check.sh` | every C file matches `.clang-format`; reports, never rewrites |
+| format | `scripts/format-check.sh` | every tracked C file and header matches `.clang-format`; `--fix` rewrites the same list (`make format`) |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
 | commit-msg | `scripts/check-commit-msg.sh` | no `Co-Authored-By`, no "generated with", no robot footer |
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |

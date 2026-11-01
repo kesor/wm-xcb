@@ -67,10 +67,10 @@ static void
 config_wire_keybindings(void)
 {
   /* Spawn terminal - Mod+Enter */
-  KB(MODKEY, 36, "terminal.spawn");                              /* Mod+Enter: spawn terminal */
+  KB(MODKEY, 36, "terminal.spawn"); /* Mod+Enter: spawn terminal */
 
   /* Focus previous client - Mod+Shift+Enter */
-  KB(MODKEY | XCB_MOD_MASK_SHIFT, 36, "focus.focus-prev");      /* Mod+Shift+Enter: focus previous */
+  KB(MODKEY | XCB_MOD_MASK_SHIFT, 36, "focus.focus-prev"); /* Mod+Shift+Enter: focus previous */
 
   /* Tag view actions - Mod+1 through Mod+9 */
   KB_TAG(MODKEY, 10, "tag-manager.view", 1);

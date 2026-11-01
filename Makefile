@@ -118,10 +118,10 @@ $(NAME): $(OBJ)
 compile-commands: clean
 	@bear -- $(MAKE) -k CC=clang all
 
-# Format source files with clang-format
+# Format every tracked C source and header. Same file list as format-check.sh,
+# so the fixer and the gate never disagree.
 format:
-	clang-format --style=file -i $(SRC) $(TEST_SRC)
-	clang-format --style=file -i $(shell find . -name '*.c' -o -name '*.h' -not -path './vendor/*')
+	./scripts/format-check.sh --fix
 
 # Run clang-tidy on source files
 tidy: compile-commands
