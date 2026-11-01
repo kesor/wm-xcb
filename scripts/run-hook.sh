@@ -24,15 +24,18 @@ if [ "${WM_HOOKS:-1}" = "0" ]; then
   exit 0
 fi
 
+# --no-auto-install: hooks are committed in .githooks/ and core.hooksPath
+# points there, so lefthook has nothing to install and its reminder to run
+# 'lefthook install' is wrong for this repository.
 if command -v lefthook >/dev/null 2>&1; then
-  exec lefthook run "$hook" "$@"
+  exec lefthook run "$hook" --no-auto-install "$@"
 fi
 
 root=$(git rev-parse --show-toplevel)
 
 if command -v nix >/dev/null 2>&1 && [ -f "$root/flake.nix" ]; then
   echo "wm: lefthook is not on PATH, running the ${hook} gates through nix develop" >&2
-  exec nix develop "$root" --command lefthook run "$hook" "$@"
+  exec nix develop "$root" --command lefthook run "$hook" --no-auto-install "$@"
 fi
 
 # The message rule is one script, so it survives a machine without the dev shell.

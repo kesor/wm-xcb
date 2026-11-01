@@ -14,7 +14,7 @@ model.*
 
 | Layer | When | Time | Runs |
 |-------|------|------|------|
-| `pre-commit` | every commit | ~5 s | beads export, formatting, build, unit tests, async rule |
+| `pre-commit` | every commit | ~5 s | paths, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
@@ -31,6 +31,7 @@ in beads.
 |------|---------|----------------|
 | build | `make -j$(nproc)` | the tree compiles |
 | unit | `make test` | 645 assertions across hub, state machines, targets, components |
+| paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | format | `scripts/format-check.sh` | every C file matches `.clang-format`; reports, never rewrites |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
 | commit-msg | `scripts/check-commit-msg.sh` | no `Co-Authored-By`, no "generated with", no robot footer |
@@ -73,10 +74,10 @@ when it is pushed.
 
 ## Why the gate scripts have no nix shebang
 
-Both forms work on this machine, tested 2026-11-01 with Nix 2.36:
+Both forms work, tested 2026-11-01 on x86_64-linux with Nix 2.36:
 
 ```sh
-#!/usr/bin/env -S nix develop /home/evgeny/src/suckless/wm -c bash   # works
+#!/usr/bin/env -S nix develop <path-to-repo> -c bash                 # works
 #!/usr/bin/env nix-shell                                             # works
 #! nix-shell -i bash -p lefthook
 ```

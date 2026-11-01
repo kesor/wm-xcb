@@ -101,9 +101,11 @@ See `../extensions/README.md` for the index.
 
 ---
 
-## Reference: dwm Analysis
+## Reference: dwm analysis (not in this repository)
 
-The dwm analysis in `../../dwm/docs/` documents the existing implementation that inspired this design. Key documents:
+The study of dwm that inspired this design lives in a dwm fork's `docs/`
+directory. If you keep that checkout next to this repository
+(`../dwm/docs/`), the key documents are:
 
 - `state-machines-architecture.md` — 12 state machines identified in dwm
 - `globals.md` — Client and Monitor struct definitions

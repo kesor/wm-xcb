@@ -12,7 +12,9 @@ wm-xcb is a new X11 window manager built in C with XCB. The architecture is desi
 - **Events** flowing through a central Hub
 - Extensions that "just work" by coexisting without knowledge of each other
 
-Reference: dwm (`../dwm/`) — analyzed extensively for design patterns
+Reference: dwm, analyzed extensively for design patterns. A dwm checkout is not
+part of this repository; if you keep one next to this checkout it is at
+`../dwm/`.
 
 ---
 
@@ -113,10 +115,9 @@ Each component handles its own XCB events:
 
 ### Spawn a New Agent
 
-Use the spawn script from the main repo directory:
+Use the spawn script, from the repository root:
 
 ```bash
-cd ~/src/suckless/wm
 ./scripts/spawn-agent.sh <issue_number>
 ```
 
@@ -131,7 +132,6 @@ This:
 When code review comments are added to a PR:
 
 ```bash
-cd ~/src/suckless/wm
 ./scripts/spawn-agent.sh <PR_number> --fix
 ```
 
@@ -144,7 +144,6 @@ This:
 ### Continue Existing Work
 
 ```bash
-cd ~/src/suckless/wm
 ./scripts/spawn-agent.sh <issue_or_pr> --continue
 ```
 
@@ -612,9 +611,9 @@ Worktrees contain agent progress. Before removing or cleaning:
 ### The spawn-agent Script Has Quirks
 
 - Use `git fetch origin` at start, create worktrees from `origin/master`
-- Worktrees are in `~/src/suckless/wm-issue-N/`
+- Worktrees sit next to the main checkout, named `<checkout>-issue-N`
 - The tmux session is `wm-issues` with windows named `issue-N` or `pr-N`
-- nix develop needs to run from `~/src/suckless` (has flake.nix), then cd to worktree
+- Each worktree carries its own `flake.nix`, so `nix develop` works from inside it
 - Session name in pi is verbose — use `tmux attach -t wm-issues` then select window
 
 ### File Conflict Prevention

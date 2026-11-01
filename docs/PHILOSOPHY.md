@@ -130,8 +130,8 @@ handler, an action, an SM template, an event subscriber. Not by editing a shared
 function that other features also edit.
 
 This is the one commitment that dwm cannot make, and the reason wm exists.
-dwm's `arrange()` is edited by 13 of the 32 patches in `~/src/suckless/dwm/patches`,
-`focus()` by 11, `tile()` by 9. Two dwm extensions that both need `arrange()`
+On the dwm fork this project was measured against, `arrange()` is edited by 13
+of its 32 patches, `focus()` by 11, `tile()` by 9. Two dwm extensions that both need `arrange()`
 will conflict, and the user pays for that conflict in a fork nobody upstreams.
 
 **Honest limit — read this before claiming the advantage:** a feature that needs

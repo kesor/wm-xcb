@@ -64,17 +64,23 @@ See [extensions/README.md](extensions/README.md) for the full index.
 
 ---
 
-## Reference: dwm Analysis
+## Reference: dwm analysis (not in this repository)
+
+The design work started from a study of dwm. Those notes live in a dwm fork's
+`docs/` directory, not here. If you keep a dwm checkout next to this repository
+(`../dwm/`), the useful ones are:
 
 | Document | Purpose |
 |----------|---------|
-| `../dwm/docs/state-machines-architecture.md` | 12 state machines identified in dwm |
-| `../dwm/docs/globals.md` | Client and Monitor struct definitions |
-| `../dwm/docs/manage.md` | Window lifecycle |
-| `../dwm/docs/focus.md` | Focus management |
-| `../dwm/docs/view.md` | Tag/view system |
-| `../dwm/docs/tile.md` | Tiling algorithm |
+| `docs/state-machines-architecture.md` | 12 state machines identified in dwm |
+| `docs/globals.md` | Client and Monitor struct definitions |
+| `docs/manage.md` | Window lifecycle |
+| `docs/focus.md` | Focus management |
+| `docs/view.md` | Tag/view system |
+| `docs/tile.md` | Tiling algorithm |
 | + 17 more function docs | Full dwm coverage |
+
+Nothing in this repository depends on them being present.
 
 ---
 

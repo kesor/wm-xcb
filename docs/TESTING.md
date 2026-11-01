@@ -1,6 +1,6 @@
 # Testing the Window Manager
 
-*Written 2026-11-01. Numbers in this file were measured on this machine.*
+*Written 2026-11-01. Numbers in this file were measured on x86_64-linux with the dev shell below.*
 
 > **Bottom line:** `make test` covers the model, `make test-x` covers the seam
 > between the WM and the X server, `scripts/perf-test.sh` covers cost. Both start their own nested X
@@ -20,8 +20,9 @@ while working.
 
 The dev shell comes from `flake.nix` via direnv:
 
+Run these from the repository root.
+
 ```bash
-cd ~/src/suckless/wm
 direnv allow          # first time, or after editing flake.nix
 # alternative without direnv:
 nix develop
@@ -247,7 +248,7 @@ It starts the same way as `xephyr-test.sh` and prints five numbers:
 
 | Number | How it is measured | Why it matters |
 |--------|--------------------|----------------|
-| idle CPU | `/proc/<wm pid>/stat` utime+stime over 2 s wall | the WM must cost nothing when nothing happens |
+| idle CPU | `/proc/<wm pid>/stat` utime+stime over 2 s wall (Linux) | the WM must cost nothing when nothing happens |
 | burst CPU | utime+stime delta while N windows are created | cost of the manage path per window |
 | per window | burst CPU / N | comparable across window counts |
 | time to tile | wall clock until all N windows are viewable, polled every 10 ms, TIMEOUT at 5 s | the number a user feels |

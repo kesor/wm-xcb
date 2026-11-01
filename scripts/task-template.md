@@ -2,8 +2,8 @@
 
 ## IMPORTANT
 
-- You are in a git worktree at ~/src/suckless/wm-issue-{ISSUE}/
-- All work MUST be done in this directory, NOT in ~/src/suckless/wm
+- You are in the git worktree created for this issue
+- All work MUST be done in this worktree, NOT in the main checkout
 - Your branch is: {BRANCH_NAME}
 
 ## Steps

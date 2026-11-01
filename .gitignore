@@ -21,7 +21,7 @@ result
 # Test tool binaries (tools/xclient is built from tools/xclient.c)
 tools/xclient
 
-# Worker worktrees created by ~/src/suckless/ai-workers-for-wm/worker.sh
+# Worker worktrees created by the worker harness (worker.sh start <bead>)
 .worktrees/
 
 # Beads passive export: regenerated on every bd command, synced through
