@@ -150,10 +150,13 @@ test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 clean:
 	rm -f $(NAME) $(OBJ) $(TEST_OBJ) test compile_commands.json compile_flags.txt tools/xclient
 
-# Install the git hooks once per clone. lefthook owns .git/hooks and runs the
-# gates in lefthook.yml; beads runs as one of its jobs.
+# Point git at the committed hooks once per clone. The hook files live in
+# .githooks/ and call lefthook, which runs the gates in lefthook.yml.
+# core.hooksPath is local config, so it cannot be committed with the scripts.
 hooks:
-	lefthook install
+	git config --local core.hooksPath .githooks
+	@echo "hooks: core.hooksPath=$$(git config --local core.hooksPath)"
+	@echo "hooks: run 'lefthook run pre-push' to execute every gate now"
 
 # print-src is read by scripts/check-async.sh so the static check scans exactly
 # the files the build compiles.

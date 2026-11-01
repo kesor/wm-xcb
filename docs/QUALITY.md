@@ -38,21 +38,38 @@ in beads.
 | seam | `make test-x` | modifiable X behaviour: mapped, tiled, focused, tags, EWMH (advisory) |
 | sanitize | `make SANITIZE=1 && ./test` | memory and UB errors (advisory: the hub leaks 936 bytes) |
 
-## Who owns the hooks
+## Where the hooks live
 
-lefthook owns `.git/hooks`. beads runs as one job among the others, through
-`bd hooks run <hook>`, which is why `bd hooks install` is not used here: it takes
-over `core.hooksPath` and these gates stop running.
+The hook files are committed in `.githooks/` and each one is four lines: run
+`lefthook run <hook name>`. So the gates are in the repository, not in one
+machine's `.git`, and a worktree created by a worker gets the same ones.
 
-After a clone:
+Git cannot commit the pointer to that directory. `core.hooksPath` is local
+config, which leaves one command per clone:
 
 ```bash
 direnv allow        # or: nix develop
-make hooks          # lefthook install
+make hooks          # git config --local core.hooksPath .githooks
 ```
 
-A machine without the dev shell gets no gates, and the hook says so once instead
-of failing the commit. CI still runs everything.
+The two other hook owners stay out of the way: `lefthook install` would write
+shims into `.git/hooks` and `bd hooks install` would take over
+`core.hooksPath` for beads. Neither is needed, and `make hooks` is the only
+install step.
+
+If `lefthook` is not on PATH, the hook runs `nix develop --command lefthook run
+<hook>`, so the gates run from the same config instead of a second copy of the
+list. A machine with neither gets a warning and no gates; CI runs everything
+regardless.
+
+To skip the gates on purpose, for one commit:
+
+```bash
+WM_HOOKS=0 git commit -m "wip"
+```
+
+That is an escape hatch, not a habit: the same commit will still meet the gates
+when it is pushed.
 
 ## The async baseline
 
@@ -93,7 +110,7 @@ to leave it out, not to add a heuristic.
 ## Running everything by hand
 
 ```bash
-make hooks                  # once per clone
+make hooks                  # once per clone; points git at .githooks/
 lefthook run pre-push       # every gate that runs before a push
 lefthook run pre-commit     # just the commit-time gates
 LEFTHOOK_EXCLUDE=beads lefthook run pre-push   # without the beads export
