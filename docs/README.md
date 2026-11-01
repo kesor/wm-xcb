@@ -91,8 +91,9 @@ Short version, and the parts that stay true until they are fixed:
   targets (`Client`, `Monitor`, `Tag`), and the built-in components. The unit
   suite passes.
 - **Works against X:** connecting, taking substructure redirect, RandR monitor
-  discovery, tracking windows as `Client` targets, and mapping a window on
-  `MapRequest` with a border and `WM_STATE=Normal`.
+  discovery, tracking windows as `Client` targets, mapping a window on
+  `MapRequest` with a border and `WM_STATE=Normal`, and attaching every new
+  client to the selected monitor with that monitor's visible tags.
 - **Does not work:** the WM maps each window where the client asked for it and
   never tiles it, so windows overlap; it never grabs keys, so no binding fires;
   it never calls `xcb_set_input_focus`, so focus stays wherever the client left

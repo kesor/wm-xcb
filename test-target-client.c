@@ -465,6 +465,9 @@ test_client_wm_state_without_connection(void)
 
 /*
  * Test client with monitor association
+ *
+ * A new client belongs to the selected monitor and carries that monitor's
+ * visible tags, because tiling and tag membership both read those fields.
  */
 void
 test_client_monitor_association(void)
@@ -473,25 +476,97 @@ test_client_monitor_association(void)
 
   hub_init();
   sm_registry_init();
+  monitor_list_init();
   client_list_init();
 
   Monitor* m = monitor_create(200);
-  Client*  c = client_create(100);
+  monitor_set_geometry(m, 0, 0, 800, 600);
+  monitor_set_tagset(m, 1U << 2); /* tag 3 */
 
-  /* Initially no monitor */
-  assert(client_get_monitor(c) == NULL);
+  Client* c = client_create(100);
 
-  /* Set monitor */
-  client_set_monitor(c, m);
   assert(client_get_monitor(c) == m);
-
-  /* Client inherits monitor's tags */
-  m->tagset = 1 << 2; /* tag 3 */
-  client_set_tags(c, m->tagset);
   assert(client_has_tag(c, 2));
+  assert(c->tags == m->tagset);
 
   client_destroy(c);
   monitor_destroy(m);
+  monitor_list_shutdown();
+
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+/*
+ * Test client created when the monitor list is empty.
+ *
+ * RandR discovery runs before the event loop (monitor_manager_init in wm.c),
+ * so a window that appears during the session already has a monitor. This is
+ * the empty-list case: client_create must still return a usable client.
+ */
+void
+test_client_without_monitor(void)
+{
+  LOG_CLEAN("== Testing client created when the monitor list is empty");
+
+  hub_init();
+  sm_registry_init();
+  monitor_list_init();
+  client_list_init();
+
+  assert(monitor_get_selected() == NULL);
+
+  Client* c = client_create(100);
+  assert(client_get_monitor(c) == NULL);
+  assert(c->tags == 0);
+
+  client_destroy(c);
+  monitor_list_shutdown();
+
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+/*
+ * Selected monitor wins over list order. With nothing selected, the client
+ * takes the first monitor in the list. A one-monitor test cannot tell those
+ * apart: monitor_create() selects the monitor it prepends, which is also the
+ * list head.
+ */
+void
+test_client_monitor_selection_and_fallback(void)
+{
+  LOG_CLEAN("== Testing client monitor follows selection, then list head");
+
+  hub_init();
+  sm_registry_init();
+  monitor_list_init();
+  client_list_init();
+
+  Monitor* older = monitor_create(301);
+  Monitor* newer = monitor_create(302);
+  monitor_set_tagset(older, MONITOR_TAG_MASK(1));
+  monitor_set_tagset(newer, MONITOR_TAG_MASK(3));
+
+  assert(monitor_list_get_first() == newer);
+  monitor_set_selected(older);
+
+  Client* on_selected = client_create(401);
+  assert(client_get_monitor(on_selected) == older);
+  assert(on_selected->tags == older->tagset);
+  assert(on_selected->tags != newer->tagset);
+
+  monitor_set_selected(NULL);
+
+  Client* on_first = client_create(402);
+  assert(client_get_monitor(on_first) == newer);
+  assert(on_first->tags == newer->tagset);
+
+  client_destroy(on_selected);
+  client_destroy(on_first);
+  monitor_destroy(older);
+  monitor_destroy(newer);
+  monitor_list_shutdown();
 
   hub_shutdown();
   sm_registry_shutdown();
@@ -510,5 +585,7 @@ TEST_GROUP(ClientTarget, {
   test_client_count_managed();
   test_client_duplicate_creation();
   test_client_wm_state_without_connection();
+  test_client_without_monitor();
   test_client_monitor_association();
+  test_client_monitor_selection_and_fallback();
 });

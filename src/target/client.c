@@ -272,6 +272,19 @@ client_list_contains_window(xcb_window_t window)
   return false;
 }
 
+/*
+ * Monitor a new window belongs to. Pointer routing would need motion tracking
+ * that does not exist yet (pointer handling is wm-rh6), so the selected
+ * monitor wins, with the first monitor in the list as the answer for a tree
+ * where nothing is selected.
+ */
+static Monitor*
+client_default_monitor(void)
+{
+  Monitor* m = monitor_get_selected();
+  return m != NULL ? m : monitor_list_get_first();
+}
+
 Client*
 client_create(xcb_window_t window)
 {
@@ -323,7 +336,16 @@ client_create(xcb_window_t window)
     return NULL;
   }
 
-  LOG_DEBUG("Client created: window=%u", window);
+  /* A client with no monitor is invisible to tiling and belongs to no tag, so
+   * the association is made here rather than left to the layout component. */
+  Monitor* m = client_default_monitor();
+  if (m != NULL) {
+    client_set_monitor(c, m);
+    client_set_tags(c, m->tagset);
+  }
+
+  LOG_DEBUG("Client created: window=%u, monitor=%u, tags=0x%x",
+            window, m != NULL ? m->output : 0, c->tags);
   return c;
 }
 
@@ -748,6 +770,11 @@ client_configure(
     uint16_t              border_width,
     enum xcb_stack_mode_t stack_mode)
 {
+  /* Unit tests leave dpy NULL. xcb_configure_window(NULL, ...) crashes, and
+   * there is no server to configure. */
+  if (dpy == NULL)
+    return (xcb_void_cookie_t) { 0 };
+
   uint32_t value_list[] = { (uint32_t) x, (uint32_t) y, width, height, border_width, (uint32_t) stack_mode };
 
   const uint16_t value_mask =
@@ -783,6 +810,8 @@ client_configure_from_struct(const Client* c)
 xcb_void_cookie_t
 client_show(xcb_window_t wnd)
 {
+  if (dpy == NULL)
+    return (xcb_void_cookie_t) { 0 };
   return xcb_map_window(dpy, wnd);
 }
 
@@ -833,5 +862,7 @@ client_set_wm_state(xcb_window_t wnd, enum ClientWMState state)
 xcb_void_cookie_t
 client_hide(xcb_window_t wnd)
 {
+  if (dpy == NULL)
+    return (xcb_void_cookie_t) { 0 };
   return xcb_unmap_window(dpy, wnd);
 }

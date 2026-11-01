@@ -125,8 +125,6 @@ Client* client_create(xcb_window_t window) {
     c->window = window;
     c->title = NULL;
     c->class_name = NULL;
-    c->monitor = NULL;
-    c->tags = 0;
     c->managed = false;
     c->urgent = false;
     c->focusable = true;
@@ -141,6 +139,14 @@ Client* client_create(xcb_window_t window) {
     for (int i = 0; comps[i]; i++) {
         component_adopt(comps[i], &c->target);
     }
+    
+    // Selected monitor, or the first in the list when nothing is selected.
+    // Pointer routing needs motion tracking that does not exist yet.
+    Monitor* m = monitor_get_selected();
+    if (m == NULL)
+        m = monitor_list_get_first();
+    c->monitor = m;
+    c->tags = m ? m->tagset : 0;
     
     return c;
 }
