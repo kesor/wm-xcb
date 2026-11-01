@@ -150,6 +150,15 @@ test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 clean:
 	rm -f $(NAME) $(OBJ) $(TEST_OBJ) test compile_commands.json compile_flags.txt tools/xclient
 
+# print-src is read by scripts/check-async.sh so the static check scans exactly
+# the files the build compiles.
+print-src:
+	@echo $(SRC)
+
+# Static check: no blocking call reachable from the event loop (docs/PHILOSOPHY.md 2.3)
+check-async:
+	@./scripts/check-async.sh $(if $(V),-v,)
+
 # Seam tests: assert what the X server sees, against a live WM in a nested
 # display. See docs/TESTING.md. Expect failures until the X11 output path works.
 test-x: $(NAME) tools/xclient
@@ -191,4 +200,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean
+.PHONY: all clean test test-x check-async print-src test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean

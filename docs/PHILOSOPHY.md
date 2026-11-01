@@ -115,6 +115,9 @@ later as an event.
   lifetimes that have to be reasoned about (`req->data` must not outlive the
   executor).
 
+**Checked by** `make check-async` (`scripts/check-async.sh`), which fails on
+blocking calls unless the line carries `allow-blocking: <reason>`.
+
 **Current debt:** 17 synchronous `_reply()` calls (6 `wm-xcb.c`, 5
 `monitor-manager.c`, 4 `wm-xcb-ewmh.c`, 2 `wm-kbd-mouse.c`), and two worse cases:
 `handle_xcb_events()` spins at 100% of a core, and `launcher_run_dmenu()` blocks

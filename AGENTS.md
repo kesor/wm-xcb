@@ -562,10 +562,12 @@ void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULL
 2. If the change touches windows, focus, keys, or X properties, run the seam
    tests too: `make tools/xclient && make test-x`. They assert what X sees, and
    they are expected to fail only for the defects listed in `docs/STATUS.md`.
-3. Format code: `clang-format --style=file -i *.c *.h`
-4. Commit with meaningful message
-5. Push to your branch
-6. Create PR referencing the issue
+3. Run the static async check: `make check-async`. It must report zero new
+   violations; a waiver (`allow-blocking: <reason>`) needs a real reason.
+4. Format code: `clang-format --style=file -i *.c *.h`
+5. Commit with meaningful message
+6. Push to your branch
+7. Create PR referencing the issue
 
 ---
 

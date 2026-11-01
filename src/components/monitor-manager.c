@@ -286,6 +286,7 @@ monitor_manager_discover_outputs(void)
     xcb_randr_output_t output = outputs[i];
 
     /* Query output info once - get connection state and CRTC */
+    /* allow-blocking: initial output discovery at startup */
     xcb_randr_get_output_info_cookie_t cookie = xcb_randr_get_output_info(dpy, output, XCB_CURRENT_TIME);
     xcb_randr_get_output_info_reply_t* reply  = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
 
@@ -327,6 +328,7 @@ monitor_manager_get_screen_outputs(xcb_window_t root, int* count)
   }
 
   xcb_randr_get_screen_resources_cookie_t cookie = xcb_randr_get_screen_resources(dpy, root);
+  /* allow-blocking: startup discovery, no loop yet */
   xcb_randr_get_screen_resources_reply_t* reply  = xcb_randr_get_screen_resources_reply(dpy, cookie, NULL);
 
   if (reply == NULL) {

@@ -111,6 +111,42 @@ pass because it was never there.
 
 ---
 
+## 3b. Static checks
+
+```bash
+make check-async            # scans the files the build compiles
+make check-async V=-v       # also list the waived calls and why
+```
+
+`scripts/check-async.sh` enforces `docs/PHILOSOPHY.md` 2.3 mechanically. It asks
+the build for its source list (`make -s print-src`) so a file that is not
+compiled cannot produce findings, then flags calls that block:
+
+| Pattern | Why it is flagged |
+|---------|-------------------|
+| `xcb_*_reply()`, `xcb_wait_for_reply()`, `xcb_request_check()` | synchronous round trip: the loop waits for the server |
+| `xcb_poll_for_event()` | polling instead of blocking burns a core |
+| `read()` | a callback must not wait on a child's pipe |
+| `waitpid()` without `WNOHANG` | blocking wait on a child |
+| `sleep()`, `usleep()`, `nanosleep()` | anything that sleeps stops every client |
+
+A call is waived when it, or the two lines above it, carries
+`allow-blocking: <reason>`. The marker is the record of why the wait is safe,
+usually startup code that runs before the loop exists. Comments that mention a
+blocking function are ignored, so prose cannot produce a false positive.
+
+Current result: **9 violations, 6 waived**. The violations are the debt listed
+in `bd list --parent wm-46k.2`: `wm-xcb.c:216` (the busy-wait),
+`wm-xcb-ewmh.c:35` and `:61` (a property-handler path), `monitor-manager.c:468`,
+`:499`, `:544` (the RandR handler path), and `launcher.c:216`, `:221`, `:228`
+(the launcher that freezes the WM until dmenu exits).
+
+The check is meant to reach zero by removing the violations, not by adding
+markers. A new marker needs a reason that would satisfy a reviewer: "startup,
+before the loop runs" is one; "it is probably fine" is not.
+
+---
+
 ## 4. Nested X server (Xephyr)
 
 Xephyr renders a second X server inside a window on your real session. The WM
@@ -302,7 +338,7 @@ event arrives.
 | state machine framework | `make test-sm-standalone` |
 | any component | its `test-*.c` file under `make test`, plus `scripts/xephyr-test.sh` |
 | anything in the manage/map/tile path | `scripts/xephyr-test.sh --windows 2 --verbose` and `--windows 5` |
-| event loop, focus, or key handling | `scripts/perf-test.sh` for idle CPU, plus a manual session to press keys |
+| event loop, focus, or key handling | `make check-async`, `scripts/perf-test.sh` for idle CPU, plus a manual session to press keys |
 | memory-owning code (clients, monitors, SMs) | `valgrind ./test` and a `--windows 50` run |
 
 Every change that touches behaviour should leave `make test` green and
