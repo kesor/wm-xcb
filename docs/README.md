@@ -9,6 +9,7 @@
 | Document | Purpose |
 |----------|---------|
 | **[STATUS.md](STATUS.md)** | ⭐ **Where the project stands** — audited state, open defects, what to fix first |
+| **[PHILOSOPHY.md](PHILOSOPHY.md)** | ⭐ **The rules** — user promises, the four commitments, the state machine contract |
 | **[TESTING.md](TESTING.md)** | How to run unit tests, a nested Xephyr session, and performance measurements |
 | **[VISION.md](VISION.md)** | Why we built this, the paradigm shift |
 | **[IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md)** | Planned implementation order (its completion percentages predate the 2026-11-01 audit) |

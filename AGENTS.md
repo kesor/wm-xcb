@@ -23,6 +23,7 @@ Reference: dwm (`../dwm/`) — analyzed extensively for design patterns
 | Document | Purpose |
 |----------|---------|
 | `docs/STATUS.md` | **Start here** — audited state, open defects, what to fix first |
+| `docs/PHILOSOPHY.md` | **The rules** — user promises, the four commitments, the state machine contract |
 | `docs/TESTING.md` | Unit tests, Xephyr sessions, performance measurement |
 | `docs/VISION.md` | Why this project exists |
 | `docs/architecture/overview.md` | Core concepts and architecture |
@@ -56,6 +57,26 @@ docs/extensions/
 ├── cfact.md      # Per-client relative sizing
 └── ... (13 extensions total)
 ```
+
+---
+
+## The Project's Commitments
+
+Read `docs/PHILOSOPHY.md` before designing anything. Four rules, checked in review:
+
+1. **Components never call each other.** Requests and events through the hub only.
+2. **State machines own state.** `sm_raw_write()` for reality, `sm_transition()`
+   for intent. No direct assignment to a field that a machine tracks.
+3. **Async first.** Nothing in the event loop may wait: no `_reply()` in handlers,
+   no `waitpid()`/`read()` on a child, one flush per iteration, block in `poll()`
+   or `xcb_wait_for_event()`.
+4. **New behaviour is a registration, not an edit.** If a feature must edit a
+   file it does not own, that file is missing an extension point. Add the
+   extension point first and say so in the issue.
+
+The point of all four is a promise to the person using the WM: behaviour does not
+change behind their back when a new feature lands. Developer comfort is not the
+goal; dwm is easier to read than this project and works today.
 
 ---
 
@@ -490,6 +511,47 @@ if (!comp.registered) {
     LOG_ERROR("Component registration failed");
     return false;
 }
+```
+
+### 11. Blocking the event loop
+
+- **Symptom**: the WM stops responding to keys while something else happens; idle CPU is 100%
+- **Fix**: nothing in the loop may wait. No `xcb_*_reply()` inside a handler or
+  action, no `waitpid()`/`read()` on a child from a callback, one flush per
+  iteration, and the loop blocks in `poll()` or `xcb_wait_for_event()`
+
+```c
+// BAD: a keybinding that runs dmenu freezes the whole WM until dmenu exits
+bool launcher_action_launch(ActionInvocation* inv) {
+    read(pipefd[0], cmd, sizeof(cmd) - 1);   // blocks the event loop
+    waitpid(pid, &status, 0);                // blocks again
+}
+
+// GOOD: fork, return immediately, handle the result when it arrives
+spawn_async(argv, on_launcher_done);         // completion arrives as an event
+```
+
+```c
+// BAD: the loop spins, burning a core while nothing happens
+while (running) handle_xcb_events();         // xcb_poll_for_event() returns NULL at once
+
+// GOOD: block until there is something to do
+while (running) { event = xcb_wait_for_event(dpy); dispatch(event); }
+```
+
+### 12. State changed outside a state machine
+
+- **Symptom**: the WM and the X server disagree, or a subscriber never hears
+  about a change that happened
+- **Fix**: every tracked value changes through `sm_raw_write()` (reality) or
+  `sm_transition()` (intent), and every transition emits exactly one event
+
+```c
+// BAD
+void on_configure(Client* c) { c->fullscreen = true; }
+
+// GOOD
+void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULLSCREEN_STATE_ENTERED); }
 ```
 
 ---

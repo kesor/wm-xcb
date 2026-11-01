@@ -2,6 +2,10 @@
 
 *A window manager built for the next 20 years.*
 
+> The reasoning is here. The rules that follow from it, and the promises they
+> make to the person using the WM, are in [PHILOSOPHY.md](PHILOSOPHY.md). What
+> the code actually does today is in [STATUS.md](STATUS.md).
+
 ---
 
 ## The Problem with Patches
