@@ -27,6 +27,13 @@
 #include "wm-xcb.h"
 
 /*
+ * Cached FullscreenSM template - created once, reused for all clients.
+ * sm_create() stores the pointer instead of copying, so a template per client
+ * would leak one per window.
+ */
+static SMTemplate* cached_fullscreen_template = NULL;
+
+/*
  * Global component instance
  */
 static FullscreenComponent fullscreen_component = {
@@ -242,10 +249,14 @@ fullscreen_get_sm(Client* c)
     return sm;
 
   /* Create SM on demand */
-  SMTemplate* tmpl = fullscreen_sm_template_create();
+  SMTemplate* tmpl = cached_fullscreen_template;
   if (tmpl == NULL) {
-    LOG_ERROR("Failed to create fullscreen SM template for client");
-    return NULL;
+    tmpl = fullscreen_sm_template_create();
+    if (tmpl == NULL) {
+      LOG_ERROR("Failed to create fullscreen SM template for client");
+      return NULL;
+    }
+    cached_fullscreen_template = tmpl;
   }
 
   sm = sm_create(c, tmpl, fullscreen_sm_emit, c);
@@ -537,7 +548,6 @@ fullscreen_component_init(void)
 
   fullscreen_component.initialized = true;
   LOG_DEBUG("Fullscreen component initialized successfully");
-
   return true;
 }
 
@@ -565,6 +575,12 @@ fullscreen_component_shutdown(void)
   sm_unregister_action("fs_action_enter_fullscreen");
   sm_unregister_action("fs_action_exit_fullscreen");
   action_unregister(fullscreen_action.name);
+
+  /* Free cached template after the clients that reference it are gone */
+  if (cached_fullscreen_template != NULL) {
+    sm_template_destroy(cached_fullscreen_template);
+    cached_fullscreen_template = NULL;
+  }
 
   fullscreen_component.initialized = false;
   LOG_DEBUG("Fullscreen component shutdown complete");

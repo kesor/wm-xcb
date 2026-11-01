@@ -87,10 +87,11 @@ test_fullscreen_toggle_action(void)
   focus_set_state(c, FOCUS_STATE_UNFOCUSED);
   assert(action_invoke("fullscreen.toggle", NULL) == false);
 
+  /* Clients own SMs that point at the component's template, so they go first */
+  client_list_shutdown();
   fullscreen_component_shutdown();
   focus_component_shutdown();
   action_registry_shutdown();
-  client_list_shutdown();
   xcb_handler_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
