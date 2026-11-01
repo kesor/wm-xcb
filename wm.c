@@ -35,9 +35,11 @@ main(int argc, char** argv)
   /* Initialize hub first */
   hub_init();
 
-  /* Initialize components */
-  fullscreen_component_init();
+  /* Initialize components.
+   * keybinding_init creates the action registry. fullscreen_component_init
+   * registers an action and aborts the component if that fails, so it follows. */
   keybinding_init();
+  fullscreen_component_init();
   client_list_component_init();
   /* Initialize pertag BEFORE monitor_manager so monitors get adopted */
   pertag_component_init();
@@ -55,13 +57,16 @@ main(int argc, char** argv)
     handle_xcb_events();
   }
 
-  /* Shutdown in reverse order */
+  /* Shutdown in reverse order.
+   * Clients hold fullscreen state machines that point at the component's
+   * template, so the client list goes first. The action unregister needs the
+   * registry, which keybinding_shutdown destroys. */
   monitor_manager_shutdown();
   tiling_component_shutdown();
   client_list_component_shutdown();
-  keybinding_shutdown();
-  /* launcher_shutdown is called by keybinding_shutdown via action_registry_shutdown */
   fullscreen_component_shutdown();
+  /* launcher_shutdown is called by keybinding_shutdown via action_registry_shutdown */
+  keybinding_shutdown();
   /* pertag shutdown happens after monitor_manager because monitors unregister first */
   hub_shutdown();
   pertag_component_shutdown();

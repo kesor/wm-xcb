@@ -23,6 +23,7 @@
 #include "wm-log.h"
 
 #include "focus.h"
+#include "src/actions/action-registry.h"
 
 /*
  * Cached FocusSM template - created once at init, reused for all clients.
@@ -335,6 +336,181 @@ focus_get_focused_window(void)
 }
 
 /*
+ * Get the target ID of the currently focused client.
+ * This is the strong definition behind the weak fallback in action-registry.c,
+ * so every action with a client target resolves through focus state.
+ */
+TargetID
+focus_get_current_client(void)
+{
+  Client* c = focus_get_focused_client();
+  if (c == NULL)
+    return TARGET_ID_NONE;
+
+  return c->target.id;
+}
+
+/*
+ * Focus a client because something asked for it.
+ * The guard runs, so an unmanaged or unfocusable client is rejected instead of
+ * being focused the way a report from X would be.
+ */
+bool
+focus_focus_client(Client* c)
+{
+  if (c == NULL)
+    return false;
+
+  if (focus_component.focused_window == c->window)
+    return true;
+
+  StateMachine* sm = focus_get_sm(c);
+  if (sm == NULL)
+    return false;
+
+  if (!sm_transition(sm, FOCUS_STATE_FOCUSED))
+    return false;
+
+  Client* prev = client_get_by_window(focus_component.focused_window);
+  if (prev != NULL && prev != c) {
+    StateMachine* prev_sm = client_get_sm(prev, FOCUS_COMPONENT_NAME);
+    if (prev_sm != NULL)
+      sm_transition(prev_sm, FOCUS_STATE_UNFOCUSED);
+  }
+
+  focus_component.focused_window = c->window;
+  return true;
+}
+
+/*
+ * Actions
+ *
+ * Focus state belongs to this component, so the actions that change it are
+ * registered here rather than in the component that happens to bind a key.
+ */
+
+/*
+ * A client is a candidate when the WM would put focus there: managed, able to
+ * take focus, and mapped (that is, on a tag the monitor is showing).
+ */
+static bool
+focus_can_take_focus(const Client* c)
+{
+  return c != NULL && c->managed && c->focusable && c->mapped;
+}
+
+static Client*
+focus_current_candidate(void)
+{
+  for (Client* c = client_list_get_head(); c != NULL; c = client_get_next(c)) {
+    if (focus_can_take_focus(c))
+      return c;
+  }
+
+  return NULL;
+}
+
+/*
+ * Walk from `from` toward the older clients - the list runs newest first, so
+ * `next` is older - and wrap around to the newest at the oldest end, so
+ * focus-prev still moves when the focused client is the last one.
+ */
+static Client*
+focus_previous_candidate(Client* from)
+{
+  if (from == NULL)
+    return focus_current_candidate();
+
+  for (Client* c = from;;) {
+    c = client_get_next(c);
+    if (c == NULL)
+      c = client_list_get_head();
+    if (c == NULL || c == from)
+      break;
+    if (focus_can_take_focus(c))
+      return c;
+  }
+
+  return focus_can_take_focus(from) ? from : NULL;
+}
+
+static bool
+focus_action_focus_current(ActionInvocation* inv)
+{
+  (void) inv;
+
+  Client* c = focus_current_candidate();
+  if (c == NULL) {
+    LOG_DEBUG("focus.focus-current: no client can take focus");
+    return false;
+  }
+
+  return focus_focus_client(c);
+}
+
+static bool
+focus_action_focus_prev(ActionInvocation* inv)
+{
+  (void) inv;
+
+  Client* c = focus_previous_candidate(focus_get_focused_client());
+  if (c == NULL) {
+    LOG_DEBUG("focus.focus-prev: no client can take focus");
+    return false;
+  }
+
+  return focus_focus_client(c);
+}
+
+static Action focus_current_action = {
+  .name            = "focus.focus-current",
+  .description     = "Focus the most recently managed visible client",
+  .callback        = focus_action_focus_current,
+  .target_resolver = NULL,
+  .target_type     = ACTION_TARGET_NONE,
+  .target_required = false,
+  .userdata        = NULL,
+};
+
+static Action focus_prev_action = {
+  .name            = "focus.focus-prev",
+  .description     = "Focus the visible client before the focused one",
+  .callback        = focus_action_focus_prev,
+  .target_resolver = NULL,
+  .target_type     = ACTION_TARGET_NONE,
+  .target_required = false,
+  .userdata        = NULL,
+};
+
+/*
+ * Register the focus actions, before the component reaches the hub, so a
+ * half-initialized component is never visible to anyone.
+ */
+static bool
+focus_register_actions(void)
+{
+  if (!action_register(&focus_current_action)) {
+    LOG_ERROR("Failed to register action '%s'", focus_current_action.name);
+    return false;
+  }
+
+  if (!action_register(&focus_prev_action)) {
+    LOG_ERROR("Failed to register action '%s'", focus_prev_action.name);
+    action_unregister(focus_current_action.name);
+    return false;
+  }
+
+  return true;
+}
+
+static void
+focus_unregister_actions(void)
+{
+  action_unregister(focus_current_action.name);
+  action_unregister(focus_prev_action.name);
+}
+
+/*
  * XCB Event Handlers
  */
 
@@ -489,6 +665,12 @@ focus_component_init(void)
   sm_register_guard("focus_guard_can_focus", focus_guard_can_focus);
   sm_register_guard("focus_guard_can_unfocus", focus_guard_can_unfocus);
 
+  if (!focus_register_actions()) {
+    sm_unregister_guard("focus_guard_can_focus");
+    sm_unregister_guard("focus_guard_can_unfocus");
+    return false;
+  }
+
   /* Register with hub */
   hub_register_component(&focus_component.base);
 
@@ -509,9 +691,10 @@ focus_component_init(void)
     LOG_ERROR("Failed to register some XCB handlers for focus component");
     /* Clean up any handlers that were already registered */
     xcb_handler_unregister_component(&focus_component.base);
-    /* Unregister guards that were registered before the failure */
+    /* Unregister guards and actions registered before the failure */
     sm_unregister_guard("focus_guard_can_focus");
     sm_unregister_guard("focus_guard_can_unfocus");
+    focus_unregister_actions();
     /* Unregister from hub since we're not fully initialized */
     hub_unregister_component(FOCUS_COMPONENT_NAME);
     focus_component_reset();
@@ -545,9 +728,10 @@ focus_component_shutdown(void)
   /* Unregister from hub */
   hub_unregister_component(FOCUS_COMPONENT_NAME);
 
-  /* Unregister guards */
+  /* Unregister guards and actions */
   sm_unregister_guard("focus_guard_can_focus");
   sm_unregister_guard("focus_guard_can_unfocus");
+  focus_unregister_actions();
 
   /* Free cached template */
   if (cached_focus_template != NULL) {

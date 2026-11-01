@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "fullscreen.h"
+#include "src/actions/action-registry.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -24,6 +25,13 @@
 #include "wm-log.h"
 #include "wm-xcb-ewmh.h"
 #include "wm-xcb.h"
+
+/*
+ * Cached FullscreenSM template - created once, reused for all clients.
+ * sm_create() stores the pointer instead of copying, so a template per client
+ * would leak one per window.
+ */
+static SMTemplate* cached_fullscreen_template = NULL;
 
 /*
  * Global component instance
@@ -241,10 +249,14 @@ fullscreen_get_sm(Client* c)
     return sm;
 
   /* Create SM on demand */
-  SMTemplate* tmpl = fullscreen_sm_template_create();
+  SMTemplate* tmpl = cached_fullscreen_template;
   if (tmpl == NULL) {
-    LOG_ERROR("Failed to create fullscreen SM template for client");
-    return NULL;
+    tmpl = fullscreen_sm_template_create();
+    if (tmpl == NULL) {
+      LOG_ERROR("Failed to create fullscreen SM template for client");
+      return NULL;
+    }
+    cached_fullscreen_template = tmpl;
   }
 
   sm = sm_create(c, tmpl, fullscreen_sm_emit, c);
@@ -400,6 +412,31 @@ fullscreen_executor(struct HubRequest* req)
 }
 
 /*
+ * Action: toggle fullscreen on the client the invocation resolved.
+ * The work happens in this component's executor, so the keybinding path and
+ * the request path are the same code.
+ */
+static bool
+fullscreen_action_toggle(ActionInvocation* inv)
+{
+  if (inv == NULL || inv->target == TARGET_ID_NONE)
+    return false;
+
+  hub_send_request(REQ_CLIENT_FULLSCREEN, inv->target);
+  return true;
+}
+
+static Action fullscreen_action = {
+  .name            = "fullscreen.toggle",
+  .description     = "Toggle fullscreen on the focused client",
+  .callback        = fullscreen_action_toggle,
+  .target_resolver = NULL,
+  .target_type     = ACTION_TARGET_CLIENT,
+  .target_required = true,
+  .userdata        = NULL,
+};
+
+/*
  * PropertyNotify handler for _NET_WM_STATE monitoring
  */
 void
@@ -477,6 +514,16 @@ fullscreen_component_init(void)
   /* Register executor */
   fullscreen_component.base.executor = fullscreen_executor;
 
+  /* Actions go in before the component becomes visible to the hub */
+  if (!action_register(&fullscreen_action)) {
+    LOG_ERROR("Failed to register action '%s'", fullscreen_action.name);
+    sm_unregister_guard("fs_guard_can_fullscreen");
+    sm_unregister_guard("fs_guard_can_unfullscreen");
+    sm_unregister_action("fs_action_enter_fullscreen");
+    sm_unregister_action("fs_action_exit_fullscreen");
+    return false;
+  }
+
   /* Register with hub */
   hub_register_component(&fullscreen_component.base);
 
@@ -490,13 +537,17 @@ fullscreen_component_init(void)
     LOG_ERROR("Failed to register PROPERTY_NOTIFY handler for fullscreen component");
     /* Unregister from hub since we're not fully initialized */
     hub_unregister_component(FULLSCREEN_COMPONENT_NAME);
+    sm_unregister_guard("fs_guard_can_fullscreen");
+    sm_unregister_guard("fs_guard_can_unfullscreen");
+    sm_unregister_action("fs_action_enter_fullscreen");
+    sm_unregister_action("fs_action_exit_fullscreen");
+    action_unregister(fullscreen_action.name);
     fullscreen_component_reset();
     return false;
   }
 
   fullscreen_component.initialized = true;
   LOG_DEBUG("Fullscreen component initialized successfully");
-
   return true;
 }
 
@@ -518,11 +569,18 @@ fullscreen_component_shutdown(void)
   /* Unregister from hub */
   hub_unregister_component(FULLSCREEN_COMPONENT_NAME);
 
-  /* Unregister guards and actions */
+  /* Unregister guards, SM actions, and the registered action */
   sm_unregister_guard("fs_guard_can_fullscreen");
   sm_unregister_guard("fs_guard_can_unfullscreen");
   sm_unregister_action("fs_action_enter_fullscreen");
   sm_unregister_action("fs_action_exit_fullscreen");
+  action_unregister(fullscreen_action.name);
+
+  /* Free cached template after the clients that reference it are gone */
+  if (cached_fullscreen_template != NULL) {
+    sm_template_destroy(cached_fullscreen_template);
+    cached_fullscreen_template = NULL;
+  }
 
   fullscreen_component.initialized = false;
   LOG_DEBUG("Fullscreen component shutdown complete");
