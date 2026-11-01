@@ -95,7 +95,8 @@ TEST_SRC = \
 	test-wm-keybinding.c \
 	test-wm-monitor-manager.c \
 	test-launcher.c \
-	test-terminal.c
+	test-terminal.c \
+	test-tag-manager-component.c
 
 TEST_OBJ = $(TEST_SRC:%.c=$(BUILD_DIR)/%.o)
 
@@ -187,6 +188,9 @@ hooks:
 print-src:
 	@echo $(SRC)
 
+print-test-src:
+	@echo $(TEST_SRC)
+
 # Static check: no blocking call reachable from the event loop (docs/PHILOSOPHY.md 2.3)
 check-async:
 	@./scripts/check-async.sh $(if $(V),-v,)
@@ -233,4 +237,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x check-async print-src hooks test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean FORCE
+.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean FORCE

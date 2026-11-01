@@ -10,7 +10,7 @@
 # core.hooksPath and these gates stop running. docs/QUALITY.md explains it.
 #
 # Layers, fastest first:
-#   pre-commit  ~5s     paths, docs, formatting, build, unit tests, async, beads
+#   pre-commit  ~5s     paths, docs, test-src, formatting, build, unit, async, beads
 #   commit-msg  instant  commit message rules
 #   pre-push    ~40s    the above, plus the -pedantic debug build
 #   CI                   everything, plus sanitizers and the seam tests
@@ -28,6 +28,11 @@ pre-commit:
     paths:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory. Use a repo-relative path or <placeholder>."
+
+    test-src:
+      glob: "test-*.c"
+      run: ./scripts/check-test-src.sh
+      fail_text: "A test file is missing from TEST_SRC, so its assertions never run."
 
     docs:
       glob: "*.md"
@@ -66,6 +71,10 @@ pre-push:
     paths:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory."
+
+    test-src:
+      run: ./scripts/check-test-src.sh
+      fail_text: "A test file is missing from TEST_SRC."
 
     docs:
       run: ./scripts/check-docs.sh

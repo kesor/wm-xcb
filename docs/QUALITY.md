@@ -14,7 +14,7 @@ model.*
 
 | Layer | When | Time | Runs |
 |-------|------|------|------|
-| `pre-commit` | every commit | ~5 s | paths, docs, beads export, formatting, build, unit tests, async rule |
+| `pre-commit` | every commit | ~5 s | paths, docs, test-src, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build, the standalone tests, and the build variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
@@ -32,6 +32,7 @@ in beads.
 | build | `make -j$(nproc)` | the tree compiles |
 | unit | `make test` | the unit suite across hub, state machines, targets, components |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
+| test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every tracked C file and header matches `.clang-format`; `--fix` rewrites the same list (`make format`) |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
