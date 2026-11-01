@@ -33,9 +33,13 @@ SCREEN_H=800
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --filter)
+    --filter) # --filter NAME
       FILTER="$2"
       shift 2
+      ;;
+    --filter=*) # --filter=NAME, the form docs/TESTING.md shows
+      FILTER="${1#--filter=}"
+      shift
       ;;
     --keep)
       KEEP=1

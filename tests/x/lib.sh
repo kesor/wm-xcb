@@ -18,7 +18,6 @@
 XCLIENT="$ROOT_DIR/tools/xclient"
 PASS_COUNT=0
 FAIL_COUNT=0
-CLIENT_PIDS=()
 
 # Unique per test run so two tests never share a WM_CLASS.
 CLASS="seam-$$-$RANDOM"
@@ -81,7 +80,10 @@ spawn_client() {
   local out="$TMPDIR_SEAM/client-$count-$$-$RANDOM.txt"
   "$XCLIENT" -n "$count" -W "$width" -H "$height" -t "$title" -c "$CLASS" -v \
     >"$out" 2>&1 &
-  CLIENT_PIDS+=("$!")
+  # This function runs inside a command substitution (mapfile, $(...)), so a
+  # shell variable would be set in a subshell and lost. The pid goes to a file
+  # that kill_clients reads; $$ is the test process, the same in both calls.
+  echo "$!" >>"$TMPDIR_SEAM/client-pids.$$" 
   # The client prints "0x<id> <title>" per window once each is created.
   local waited=0
   while [ "$(wc -l <"$out")" -lt "$count" ] && [ "$waited" -lt 200 ]; do
@@ -178,11 +180,12 @@ root_prop() { # root_prop <atom>
 
 # kill_clients - stop every client this test started.
 kill_clients() {
-  local pid
-  for pid in ${CLIENT_PIDS+"${CLIENT_PIDS[@]}"}; do
-    kill "$pid" 2>/dev/null
-  done
-  CLIENT_PIDS=()
+  local pid pids="$TMPDIR_SEAM/client-pids.$$"
+  [ -f "$pids" ] || return 0
+  while IFS= read -r pid; do
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null
+  done <"$pids"
+  rm -f "$pids"
 }
 
 finish() {
