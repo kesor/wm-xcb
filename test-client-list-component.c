@@ -6,6 +6,8 @@
  */
 
 #include "src/components/client-list.h"
+#include "src/components/tiling.h"
+#include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-wm.h"
@@ -383,6 +385,50 @@ test_unmap_notify_unmanages_client(void)
 }
 
 /*
+ * Test a managed client lands on a monitor and is tiled there
+ *
+ * A client with no monitor never reaches tiling_collect_clients(), so the
+ * whole window stays where the client put it.
+ */
+void
+test_managed_client_lands_on_monitor(void)
+{
+  LOG_CLEAN("== Testing a managed client lands on the selected monitor");
+
+  hub_init();
+  xcb_handler_init();
+  monitor_list_init();
+  client_list_component_init();
+
+  Monitor* m = monitor_create(77);
+  monitor_set_geometry(m, 0, 0, 800, 600);
+  monitor_set_tagset(m, MONITOR_TAG_MASK(2));
+
+  xcb_map_request_event_t map_event = {
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 1,
+    .parent        = 100,
+    .window        = 800,
+  };
+  xcb_handler_dispatch(&map_event);
+
+  Client* c = client_get_by_window(800);
+  assert(c != NULL);
+  assert(client_get_monitor(c) == m);
+  assert(c->tags == MONITOR_TAG_MASK(2));
+
+  /* Tile: the master area is mfact of the monitor, full height */
+  tiling_tile_monitor(m);
+  assert(c->width == (uint16_t) (m->width * tiling_get_default_mfact()));
+  assert(c->height == m->height);
+
+  client_list_component_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+  monitor_list_shutdown();
+}
+
+/*
  * Test multiple clients in list
  */
 void
@@ -582,6 +628,7 @@ TEST_GROUP(ClientListComponent, {
   test_map_request_manages_client();
   test_map_request_creates_client_if_not_exists();
   test_unmap_notify_unmanages_client();
+  test_managed_client_lands_on_monitor();
   test_multiple_clients();
   test_client_list_utility_functions();
   test_client_adopts_components_on_creation();

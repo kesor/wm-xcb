@@ -125,8 +125,6 @@ Client* client_create(xcb_window_t window) {
     c->window = window;
     c->title = NULL;
     c->class_name = NULL;
-    c->monitor = NULL;
-    c->tags = 0;
     c->managed = false;
     c->urgent = false;
     c->focusable = true;
@@ -141,6 +139,12 @@ Client* client_create(xcb_window_t window) {
     for (int i = 0; comps[i]; i++) {
         component_adopt(comps[i], &c->target);
     }
+    
+    // Monitor association and tags: the selected monitor, which is where
+    // pointer-free routing puts a window until pointer tracking exists.
+    Monitor* m = monitor_get_selected();
+    c->monitor = m;
+    c->tags = m ? m->tagset : 0;
     
     return c;
 }

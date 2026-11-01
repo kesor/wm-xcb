@@ -465,6 +465,9 @@ test_client_wm_state_without_connection(void)
 
 /*
  * Test client with monitor association
+ *
+ * A new client belongs to the selected monitor and carries that monitor's
+ * visible tags, because tiling and tag membership both read those fields.
  */
 void
 test_client_monitor_association(void)
@@ -473,25 +476,50 @@ test_client_monitor_association(void)
 
   hub_init();
   sm_registry_init();
+  monitor_list_init();
   client_list_init();
 
   Monitor* m = monitor_create(200);
-  Client*  c = client_create(100);
+  monitor_set_geometry(m, 0, 0, 800, 600);
+  monitor_set_tagset(m, 1U << 2); /* tag 3 */
 
-  /* Initially no monitor */
-  assert(client_get_monitor(c) == NULL);
+  Client* c = client_create(100);
 
-  /* Set monitor */
-  client_set_monitor(c, m);
   assert(client_get_monitor(c) == m);
-
-  /* Client inherits monitor's tags */
-  m->tagset = 1 << 2; /* tag 3 */
-  client_set_tags(c, m->tagset);
   assert(client_has_tag(c, 2));
+  assert(c->tags == m->tagset);
 
   client_destroy(c);
   monitor_destroy(m);
+  monitor_list_shutdown();
+
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+/*
+ * Test client created before any monitor exists
+ *
+ * RandR discovery runs before the event loop, so this is the startup-window
+ * case, not the normal one. A client with no monitor must still be usable.
+ */
+void
+test_client_without_monitor(void)
+{
+  LOG_CLEAN("== Testing client created before any monitor exists");
+
+  hub_init();
+  sm_registry_init();
+  monitor_list_init();
+  client_list_init();
+
+  assert(monitor_get_selected() == NULL);
+
+  Client* c = client_create(100);
+  assert(client_get_monitor(c) == NULL);
+  assert(c->tags == 0);
+
+  client_destroy(c);
 
   hub_shutdown();
   sm_registry_shutdown();
@@ -510,5 +538,6 @@ TEST_GROUP(ClientTarget, {
   test_client_count_managed();
   test_client_duplicate_creation();
   test_client_wm_state_without_connection();
+  test_client_without_monitor();
   test_client_monitor_association();
 });
