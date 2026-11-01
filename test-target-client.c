@@ -498,15 +498,16 @@ test_client_monitor_association(void)
 }
 
 /*
- * Test client created before any monitor exists
+ * Test client created when the monitor list is empty.
  *
- * RandR discovery runs before the event loop, so this is the startup-window
- * case, not the normal one. A client with no monitor must still be usable.
+ * RandR discovery runs before the event loop (monitor_manager_init in wm.c),
+ * so a window that appears during the session already has a monitor. This is
+ * the empty-list case: client_create must still return a usable client.
  */
 void
 test_client_without_monitor(void)
 {
-  LOG_CLEAN("== Testing client created before any monitor exists");
+  LOG_CLEAN("== Testing client created when the monitor list is empty");
 
   hub_init();
   sm_registry_init();
@@ -520,6 +521,52 @@ test_client_without_monitor(void)
   assert(c->tags == 0);
 
   client_destroy(c);
+  monitor_list_shutdown();
+
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+/*
+ * Selected monitor wins over list order. With nothing selected, the client
+ * takes the first monitor in the list. A one-monitor test cannot tell those
+ * apart: monitor_create() selects the monitor it prepends, which is also the
+ * list head.
+ */
+void
+test_client_monitor_selection_and_fallback(void)
+{
+  LOG_CLEAN("== Testing client monitor follows selection, then list head");
+
+  hub_init();
+  sm_registry_init();
+  monitor_list_init();
+  client_list_init();
+
+  Monitor* older = monitor_create(301);
+  Monitor* newer = monitor_create(302);
+  monitor_set_tagset(older, MONITOR_TAG_MASK(1));
+  monitor_set_tagset(newer, MONITOR_TAG_MASK(3));
+
+  assert(monitor_list_get_first() == newer);
+  monitor_set_selected(older);
+
+  Client* on_selected = client_create(401);
+  assert(client_get_monitor(on_selected) == older);
+  assert(on_selected->tags == older->tagset);
+  assert(on_selected->tags != newer->tagset);
+
+  monitor_set_selected(NULL);
+
+  Client* on_first = client_create(402);
+  assert(client_get_monitor(on_first) == newer);
+  assert(on_first->tags == newer->tagset);
+
+  client_destroy(on_selected);
+  client_destroy(on_first);
+  monitor_destroy(older);
+  monitor_destroy(newer);
+  monitor_list_shutdown();
 
   hub_shutdown();
   sm_registry_shutdown();
@@ -540,4 +587,5 @@ TEST_GROUP(ClientTarget, {
   test_client_wm_state_without_connection();
   test_client_without_monitor();
   test_client_monitor_association();
+  test_client_monitor_selection_and_fallback();
 });

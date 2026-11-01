@@ -131,9 +131,10 @@ bool client_list_contains_window(xcb_window_t window);
 
 /*
  * Create a new Client for an X11 window.
- * Allocates and initializes the Client, attaches it to the selected monitor
- * with that monitor's visible tags, registers with Hub, and adds to the
- * client list. The monitor and tags stay NULL and 0 when no monitor exists.
+ * Allocates and initializes the Client, registers it with the Hub, and adds
+ * it to the client list. Attaches it to the selected monitor, or to the first
+ * monitor when none is selected, and copies that monitor's visible tags.
+ * The monitor and tags stay NULL and 0 when no monitor exists.
  *
  * Returns NULL on allocation failure or if window already exists.
  */

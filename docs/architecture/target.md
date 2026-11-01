@@ -140,9 +140,11 @@ Client* client_create(xcb_window_t window) {
         component_adopt(comps[i], &c->target);
     }
     
-    // Monitor association and tags: the selected monitor, which is where
-    // pointer-free routing puts a window until pointer tracking exists.
+    // Selected monitor, or the first in the list when nothing is selected.
+    // Pointer routing needs motion tracking that does not exist yet.
     Monitor* m = monitor_get_selected();
+    if (m == NULL)
+        m = monitor_list_get_first();
     c->monitor = m;
     c->tags = m ? m->tagset : 0;
     

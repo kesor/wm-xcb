@@ -770,8 +770,8 @@ client_configure(
     uint16_t              border_width,
     enum xcb_stack_mode_t stack_mode)
 {
-  /* Without an X connection (unit tests) the geometry in the struct is the
-   * whole result; there is no server to send the request to. */
+  /* Unit tests leave dpy NULL. xcb_configure_window(NULL, ...) crashes, and
+   * there is no server to configure. */
   if (dpy == NULL)
     return (xcb_void_cookie_t) { 0 };
 
