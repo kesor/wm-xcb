@@ -136,6 +136,8 @@ test_focus_sm_template_create(void)
 
   /* Check initial state is UNFOCUSED */
   assert(tmpl->initial_state == FOCUS_STATE_UNFOCUSED);
+
+  sm_template_destroy(tmpl);
 }
 
 /*

@@ -16,7 +16,7 @@
 | Area | State | Evidence |
 |------|-------|----------|
 | Build (`make`) | works | gcc, `-Os`, links against libxcb, xcb-randr, xcb-ewmh, xcb-xinput, xcb-keysyms |
-| Unit tests (`make test`) | 645 assertions pass, 0 fail | 18 test files at repo root |
+| Unit tests (`make test`) | 651 assertions pass, 0 fail | 18 test files at repo root |
 | Seam tests (`make test-x`) | **2 assertions pass, 9 fail** | `tests/x/`, 8 files; every failure maps to a defect in §4 |
 | SM standalone tests (`make test-sm-standalone`) | pass | `All SM tests passed!` |
 | Hub standalone tests (`make test-standalone`) | pass | `=== All tests passed ===` |
@@ -156,11 +156,15 @@ starting point.
 
 ### Repo hygiene
 
-13. **`hub_shutdown()` leaks registry memory.** `clear_registry_state()`
-    (`wm-hub.c:88`) zeroes `target_by_id_map` without freeing the hash chain
-    (24 bytes per registered target), and nothing frees the `accepted_targets`
-    array allocated in `hub_register_component()` (16 bytes per component). ASan
-    on `./test`: 936 bytes in 47 allocations.
+13. **`hub_shutdown()` leaked registry memory.** Fixed 2026-11-01:
+    `clear_registry_state()` (`wm-hub.c:92`) zeroed `target_by_id_map` without
+    freeing the hash chain (24 bytes per registered target), and nothing freed
+    the `accepted_targets` array allocated in `hub_register_component()`
+    (16 bytes per component); ASan on `./test` reported 936 bytes in 47
+    allocations. `clear_registry_state()` now frees both and NULLs the
+    component pointers, and `test_focus_sm_template_create()` destroys the
+    template it creates. `ASAN_OPTIONS=detect_leaks=1 ./test` with
+    `SANITIZE=1` reports nothing.
 14. `make test-standalone` did not link: `wm-log.o` was missing from the recipe
     (`Makefile:177`). Fixed by adding `wm-log.o` to the link line; both
     standalone targets now run as a gate.
