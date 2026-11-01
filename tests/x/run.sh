@@ -60,6 +60,15 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# Build first, quietly. These scripts execute ./wm from the tree root, and
+# nothing else rebuilds it, so a stale binary reports the behaviour of the
+# tree as it was and the result reads as a WM defect. When everything is
+# up to date this is one make invocation and a copy check.
+make -s -C "$ROOT_DIR" wm >/dev/null || {
+  echo "$(basename "$0"): the WM does not build; see make" >&2
+  exit 1
+}
+
 for cmd in Xephyr xdotool xprop; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "run.sh: missing '$cmd'. Start the dev shell: direnv allow" >&2
