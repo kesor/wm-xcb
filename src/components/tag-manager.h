@@ -6,6 +6,7 @@
  * - Manages the TagViewSM state machine for monitors
  * - Shows/hides clients based on tag membership
  * - Emits EVT_TAG_CHANGED on tag state changes
+ * - Sends REQ_MONITOR_TILE after a tag change alters the visible client set
  *
  * Keybindings that trigger these requests:
  * - Mod+1-9: REQ_TAG_VIEW (show specific tag)

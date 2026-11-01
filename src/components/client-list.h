@@ -17,6 +17,10 @@
  * - EVT_CLIENT_MANAGED - emitted after the client's window is mapped
  * - EVT_CLIENT_UNMANAGED - emitted when client is unmanaged
  *
+ * Requests Sent:
+ * - REQ_MONITOR_TILE - after a client is managed, unmanaged, or destroyed,
+ *   so the monitor's remaining windows are rearranged
+ *
  * Acceptance Criteria:
  * [x] New window appears -> Client created -> added to list
  * [x] Window destroyed -> Client removed -> list cleaned

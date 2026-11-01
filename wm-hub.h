@@ -49,6 +49,7 @@ typedef uint32_t TargetTypeId;
  */
 enum {
   REQ_CLIENT_FULLSCREEN = 10,
+  REQ_MONITOR_TILE      = 20,
 };
 
 /*

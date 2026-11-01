@@ -115,12 +115,9 @@ run says and never lives here:
 
 | Test | Fails because |
 |------|---------------|
-| `test-30-tiling-two-windows` | nothing tiles the windows yet (4.3) |
 | `test-40-focus-on-manage` | no `xcb_set_input_focus` anywhere (4.4) |
 | `test-50-tag-switch-keybinding` | no key grab, so `KEY_PRESS` never arrives (4.5) |
 | `test-60-ewmh-root-properties` | no root properties are set |
-| `test-70-client-exit-cleanup` | the test cannot kill its own client, the harness bug in `bd show wm-dfg.10` |
-| `test-80-many-windows` | nothing tiles the windows yet (4.3) |
 
 Write a test so that it cannot pass for the wrong reason: a precondition such as
 "the window is visible before I press the key" uses `require_visible`, which
@@ -179,9 +176,9 @@ DISPLAY=:2 ./wm &                     # add 2>&1 | tee /tmp/wm.log for a log
 DISPLAY=:2 tools/xclient -n 2 -v      # two bare X11 windows, prints their IDs
 ```
 
-Look at the Xephyr window. The WM maps each window at the size and position the
-client asked for and draws a one-pixel border, so both windows sit in the same
-place: nothing tiles them yet (`bd show wm-4f6.3`). That is not a setup problem.
+Look at the Xephyr window. The WM tiles the two windows side by side; with one
+master client, the first window takes half the screen and the second fills the
+other half.
 
 Kill the session with `pkill -x Xephyr`, or kill the PIDs you started. Do not
 `pkill -f wm`; the pattern matches your own shell command line and kills the

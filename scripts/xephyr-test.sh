@@ -18,9 +18,8 @@
 #
 # Exit status: 0 if all checks pass, 1 otherwise.
 #
-# The WM maps windows but does not tile them yet (bd show wm-4f6.3), so checks 3
-# and 4 fail. It is written as the acceptance test for the X11 output path: it
-# turns green when that path works.
+# This is the acceptance test for the X11 output path: it turns green when the
+# WM maps windows and tiles them on the monitor.
 
 set -uo pipefail
 

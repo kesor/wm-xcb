@@ -92,13 +92,17 @@ Short version, and the parts that stay true until they are fixed:
   suite passes.
 - **Works against X:** connecting, taking substructure redirect, RandR monitor
   discovery, tracking windows as `Client` targets, mapping a window on
-  `MapRequest` with a border and `WM_STATE=Normal`, and attaching every new
-  client to the selected monitor with that monitor's visible tags.
-- **Does not work:** the WM maps each window where the client asked for it and
-  never tiles it, so windows overlap; it never grabs keys, so no binding fires;
-  it never calls `xcb_set_input_focus`, so focus stays wherever the client left
-  it; it sets no EWMH root properties. The event loop polls instead of blocking,
-  so it burns a core while idle.
+  `MapRequest` with a border and `WM_STATE=Normal`, attaching every new client
+  to the selected monitor with that monitor's visible tags, and tiling that
+  monitor's visible clients when a window is managed or unmanaged. `monitor.tile`
+  is registered and sends the same request, but no key is grabbed yet, so
+  `MOD+i` cannot reach it from X.
+- **Does not work:** a tag change does not tile, because tag-manager is never
+  initialized (`bd show wm-4f6.13`); it never grabs keys, so no binding fires;
+  it never calls
+  `xcb_set_input_focus`, so focus stays wherever the client left it; it sets no
+  EWMH root properties. The event loop polls instead of blocking, so it burns a
+  core while idle.
 
 Do not take that from a document. Ask the tree:
 

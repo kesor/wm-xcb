@@ -6,6 +6,7 @@
  * - Uses TagViewSM to track visible tag bitmask
  * - On tag change: shows/hides clients based on tag membership
  * - Emits EVT_TAG_CHANGED event
+ * - Sends REQ_MONITOR_TILE after the visible set changes
  */
 
 #include <stdlib.h>
@@ -84,6 +85,19 @@ tag_manager_component(void)
 }
 
 /*
+ * Rearrange the monitor after a tag change made a different set of clients
+ * visible. Sent as a request: tag-manager does not call the tiling component.
+ */
+static void
+tag_manager_request_tile(Monitor* m)
+{
+  if (m == NULL)
+    return;
+
+  hub_send_request(REQ_MONITOR_TILE, m->target.id);
+}
+
+/*
  * Track static initialization
  */
 static bool static_init_done = false;
@@ -139,6 +153,7 @@ tag_view_sm_emit(StateMachine* sm, uint32_t from_state, uint32_t to_state, void*
 
   /* Update visibility for all clients on this monitor */
   tag_manager_update_visibility(m);
+  tag_manager_request_tile(m);
 }
 
 /*
@@ -321,6 +336,7 @@ tag_manager_set_visible_tags(Monitor* m, uint32_t tag_mask)
 
   /* Update visibility */
   tag_manager_update_visibility(m);
+  tag_manager_request_tile(m);
 }
 
 /*
@@ -549,6 +565,7 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
 
   /* Emit client tag changed event */
   hub_emit(EVT_TAG_CHANGED, c->target.id, NULL);
+  tag_manager_request_tile(client_get_monitor(c));
 }
 
 /*

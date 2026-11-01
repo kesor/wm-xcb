@@ -19,7 +19,7 @@ a promise the code does not keep is a defect list, not marketing.
 
 | Promise | What it means for the person using the WM | Status 2026-11-01 |
 |---------|-------------------------------------------|-------------------|
-| **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | not kept: windows are mapped but not sized or placed (`bd show wm-4f6.3`) |
+| **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | kept for new windows: mapped, tiled, and placed on `MapRequest` |
 | **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop key handling | not kept: the launcher blocks the loop, and the loop busy-waits (4.7) |
 | **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | not kept: no key grabs exist (4.5) |
 | **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: the unit suite covers the model, `make test-x` covers the X seam and still fails there |
