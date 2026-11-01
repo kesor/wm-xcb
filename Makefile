@@ -90,6 +90,7 @@ TEST_SRC = \
 	test-wm-tag.c \
 	test-target-client.c \
 	test-client-list-component.c \
+	test-tiling-component.c \
 	test-focus-component.c \
 	test-wm-keybinding.c \
 	test-wm-monitor-manager.c \

@@ -5,8 +5,12 @@
  * Manages the LayoutSM state machine and XCB window positioning.
  *
  * Component lifecycle:
- * - on_init(): register REQ_MONITOR_TILE executor
+ * - on_init(): register REQ_MONITOR_TILE executor and the monitor.tile action
  * - executor: handle REQ_MONITOR_TILE request, tile windows on monitor
+ *
+ * Requests come from client-list after a window is managed or unmanaged, from
+ * tag-manager when a tag change alters the visible set, and from the
+ * monitor.tile action a keybinding invokes.
  *
  * Layout Algorithm:
  * - Divides monitor into master area and stack
@@ -54,10 +58,9 @@ typedef enum LayoutEvent {
 
 /*
  * Request types handled by this component
+ * REQ_MONITOR_TILE is declared in wm-hub.h so client-list and tag-manager can
+ * send it without including this component's header.
  */
-enum {
-  REQ_MONITOR_TILE = 20,
-};
 
 /*
  * Tiling component structure

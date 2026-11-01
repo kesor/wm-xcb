@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "src/actions/action-registry.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -29,6 +30,21 @@
  * Cached LayoutSM template - created once at init, reused for all monitors.
  */
 static SMTemplate* cached_layout_template = NULL;
+
+/*
+ * The action keybindings invoke. It sends the same request the manage and
+ * unmanage paths send, so a key press and a new window cannot disagree about
+ * how a monitor is arranged.
+ */
+static Action tiling_tile_action = {
+  .name            = "monitor.tile",
+  .description     = "Tile the windows on the selected monitor",
+  .callback        = NULL,
+  .target_resolver = NULL,
+  .target_type     = ACTION_TARGET_MONITOR,
+  .target_required = true,
+  .userdata        = NULL,
+};
 
 /*
  * Global component instance
@@ -356,7 +372,7 @@ tiling_count_visible_clients(Monitor* m)
   Client*  c     = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->monitor == m) {
+    if (c->managed && c->mapped && c->monitor == m) {
       count++;
     }
     c = c->next;
@@ -390,7 +406,7 @@ tiling_collect_clients(Monitor* m, uint32_t* count)
   Client*  c   = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->monitor == m) {
+    if (c->managed && c->mapped && c->monitor == m) {
       if (idx < capacity) {
         clients[idx++] = c;
       } else {
@@ -596,6 +612,19 @@ tiling_get_default_nmaster(void)
 }
 
 /*
+ * Action callback: send the tile request for the selected monitor.
+ */
+static bool
+tiling_action_tile_monitor(ActionInvocation* inv)
+{
+  if (inv == NULL || inv->target == TARGET_ID_NONE)
+    return false;
+
+  hub_send_request(REQ_MONITOR_TILE, inv->target);
+  return true;
+}
+
+/*
  * Executor: Handle REQ_MONITOR_TILE request
  */
 static void
@@ -663,6 +692,11 @@ tiling_component_init(void)
     return false;
   }
 
+  tiling_tile_action.callback = tiling_action_tile_monitor;
+  if (!action_register(&tiling_tile_action)) {
+    LOG_WARN("Failed to register monitor.tile action");
+  }
+
   tiling_component.initialized = true;
   LOG_DEBUG("Tiling component initialized successfully");
 
@@ -680,6 +714,8 @@ tiling_component_shutdown(void)
   }
 
   LOG_DEBUG("Shutting down tiling component");
+
+  action_unregister("monitor.tile");
 
   /* Unregister from hub */
   hub_unregister_component(TILING_COMPONENT_NAME);

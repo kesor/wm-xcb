@@ -2,12 +2,14 @@
  * Client List Component Implementation
  *
  * Handles XCB events for client lifecycle management.
- * Manages the global client list via client.h.
+ * Manages the global client list via client.h, and sends REQ_MONITOR_TILE when
+ * a window joins or leaves a monitor so the remaining windows are rearranged.
  */
 
 #include <stdlib.h>
 
 #include "client-list.h"
+#include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-log.h"
 #include "wm-xcb.h"
@@ -234,6 +236,19 @@ client_list_on_create_notify(void* event)
 }
 
 /*
+ * Ask tiling to rearrange the monitor a client joined or left. The request is
+ * what keeps client-list from calling the tiling component directly.
+ */
+static void
+client_list_request_tile(Monitor* m)
+{
+  if (m == NULL)
+    return;
+
+  hub_send_request(REQ_MONITOR_TILE, m->target.id);
+}
+
+/*
  * Handle XCB_DESTROY_NOTIFY event.
  * Destroys the Client for the window.
  */
@@ -251,11 +266,17 @@ client_list_on_destroy_notify(void* event)
     return;
   }
 
+  /* client_destroy() detaches the client from its monitor, so the monitor has
+   * to be saved before the destroy if the remaining windows are to be tiled. */
+  Monitor* m = client_get_monitor(c);
+
   /* Emit client destroyed event BEFORE destroying */
   client_list_emit_event(EVT_CLIENT_DESTROYED, c);
 
   /* Destroy the client - this removes from list and unregisters from hub */
   client_destroy(c);
+
+  client_list_request_tile(m);
 
   LOG_DEBUG("Client destroyed: window=%u", e->window);
 }
@@ -316,6 +337,7 @@ client_list_on_map_request(void* event)
     client_list_map_client(c);
     client_set_mapped(c, true);
     client_list_emit_event(EVT_CLIENT_MANAGED, c);
+    client_list_request_tile(client_get_monitor(c));
   }
 
   LOG_DEBUG("Client managed: window=%u", e->window);
@@ -345,6 +367,7 @@ client_list_on_unmap_notify(void* event)
     client_set_managed(c, false);
     client_set_mapped(c, false);
     client_list_emit_event(EVT_CLIENT_UNMANAGED, c);
+    client_list_request_tile(client_get_monitor(c));
   }
 
   LOG_DEBUG("Client unmanaged: window=%u", e->window);
