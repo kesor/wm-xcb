@@ -8,7 +8,6 @@
 
 | Document | Purpose |
 |----------|---------|
-| **[STATUS.md](STATUS.md)** | ⭐ **Where the project stands** — audited state, open defects, what to fix first |
 | **[PHILOSOPHY.md](PHILOSOPHY.md)** | ⭐ **The rules** — user promises, the four commitments, the state machine contract |
 | **[TESTING.md](TESTING.md)** | How to run unit tests, a nested Xephyr session, and performance measurements |
 | **[QUALITY.md](QUALITY.md)** | The gates: what runs on commit, push, and CI, and how to add one |
@@ -84,11 +83,33 @@ Nothing in this repository depends on them being present.
 
 ---
 
-## What's Implemented
+## Current state
 
-See [STATUS.md](STATUS.md). In short: hub, state machine framework, targets, and
-eight components exist and pass 645 unit-test assertions, but the WM does not
-map or tile windows yet, so it shows nothing on screen.
+Short version, and the parts that stay true until they are fixed:
+
+- **Built:** hub (registry, request router, event bus), state machine framework,
+  targets (`Client`, `Monitor`, `Tag`), and eight components. The unit suite
+  passes.
+- **Works against X:** connecting, taking substructure redirect, RandR monitor
+  discovery, tracking windows as `Client` targets.
+- **Does not work:** the WM never maps the windows it tracks, so nothing appears
+  on screen; it never grabs keys, so no binding fires; it never calls
+  `xcb_set_input_focus`, so focus stays wherever the client left it; it sets no
+  EWMH root properties. The event loop polls instead of blocking, so it burns a
+  core while idle.
+
+Do not take that from a document. Ask the tree:
+
+```bash
+make test && make test-x      # model, then what X sees
+make check-async              # blocking calls in the event loop
+bd ready                      # what is known and unblocked
+bd list --type=epic           # the work in progress, grouped
+```
+
+Every defect behind the list above is a beads issue with the evidence in its
+description: `bd show` the epic you are working near. Beads is the living
+record; this file only says where to look.
 
 ---
 

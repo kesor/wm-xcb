@@ -14,7 +14,7 @@ model.*
 
 | Layer | When | Time | Runs |
 |-------|------|------|------|
-| `pre-commit` | every commit | ~5 s | paths, beads export, formatting, build, unit tests, async rule |
+| `pre-commit` | every commit | ~5 s | paths, doc refs, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
@@ -30,8 +30,9 @@ in beads.
 | Gate | Command | What it proves |
 |------|---------|----------------|
 | build | `make -j$(nproc)` | the tree compiles |
-| unit | `make test` | 651 assertions across hub, state machines, targets, components |
+| unit | `make test` | the unit suite across hub, state machines, targets, components |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
+| doc refs | `scripts/check-doc-refs.sh` | documents name symbols and beads ids, never a line number |
 | format | `scripts/format-check.sh` | every tracked C file and header matches `.clang-format`; `--fix` rewrites the same list (`make format`) |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
 | commit-msg | `scripts/check-commit-msg.sh` | no `Co-Authored-By`, no "generated with", no robot footer |

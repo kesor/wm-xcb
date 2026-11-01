@@ -19,15 +19,15 @@ The framework is built and unit-tested. **The window manager does not put
 windows on screen yet**: it never maps them, never grabs keys, never applies
 focus to X. So "make it work" means the X11 output path, which is epic
 `wm-4f6` and the top of the priority list. Do not describe the project as
-working; `docs/STATUS.md` is the audited truth and lists 16 defects with
-`file:line`.
+working; `docs/README.md#current-state` says what does and does not work, and
+each gap is a beads issue.
 
 ## Start here
 
 ```bash
 direnv allow          # or: nix develop
 make hooks            # once per clone: points git at .githooks
-make && make test     # 645 assertions must pass
+make && make test     # the unit suite must pass
 bd ready              # what can be picked up, unblocked
 ```
 
@@ -35,7 +35,6 @@ Then read, in this order:
 
 | Document | Why |
 |----------|-----|
-| `docs/STATUS.md` | audited state, defects, what to fix first |
 | `.agents/skills/wm-5s/SKILL.md` | how to file harness friction while you work |
 | `docs/PHILOSOPHY.md` | the four commitments and the rules that follow from them |
 | `docs/architecture/overview.md` | hub, targets, components, two kinds of write |
@@ -72,7 +71,7 @@ For testing mechanics, `docs/TESTING.md`. For the gate list, `docs/QUALITY.md`.
 | Gate | Command | Enforces |
 |------|---------|----------|
 | build | `make` | it compiles |
-| unit | `make test` | 645 assertions |
+| unit | `make test` | the unit suite |
 | seam | `make test-x` | what X sees: mapped, tiled, focused, tags, EWMH |
 | async | `make check-async` | no new blocking call (baseline in `tests/quality/`) |
 | paths | `scripts/check-paths.sh` | no home directory or personal source tree in a public repo |
@@ -81,7 +80,8 @@ For testing mechanics, `docs/TESTING.md`. For the gate list, `docs/QUALITY.md`.
 | debug | `make clean && make DEBUG=1` | the `-pedantic` build stays green |
 
 The hooks in `.githooks/` run these; CI runs the same commands. `make test-x`
-currently fails by design — every failure names a `docs/STATUS.md` defect. Do
+currently fails by design — every failure names the beads issue that owns the
+defect. Do
 not weaken a test to make it green; fix the defect or leave the failure and say
 so.
 

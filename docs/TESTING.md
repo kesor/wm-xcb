@@ -46,7 +46,8 @@ make test       # builds and runs test/, prints "Total: N passed, M failed"
 ```
 
 `make test` links every non-`main` object plus the 18 `test-*.c` files and runs
-them. Current state: 645 passing assertions, 0 failures. Components are tested
+them. The runner prints the current count and must report zero failures.
+Components are tested
 without an X server by calling their handlers with fabricated events and
 inspecting hub events; that is the pattern to copy for new components.
 
@@ -84,8 +85,8 @@ make test-x TEST_X_ARGS="--verbose"      # print the WM log for each failure
 A seam test asserts what the X server sees, not what the WM thinks: the window
 is viewable, `WM_STATE` is `Normal`, two windows do not overlap, the input focus
 is where the WM said it would be, `_NET_CLIENT_LIST` exists. Those are the
-assertions the unit tests cannot make, and `docs/STATUS.md` §4 is entirely made
-of things this level would have caught.
+assertions the unit tests cannot make, and every failure names the beads issue
+that owns the defect.
 
 `scripts/xephyr-test.sh` is the earlier single-scenario version of the same idea;
 prefer `make test-x`, and keep the old script only because several beads issues
@@ -142,11 +143,12 @@ A call is waived when it, or the two lines above it, carries
 usually startup code that runs before the loop exists. Comments that mention a
 blocking function are ignored, so prose cannot produce a false positive.
 
-Current result: **9 violations, 6 waived**. The violations are the debt listed
-in `bd list --parent wm-46k.2`: `wm-xcb.c:216` (the busy-wait),
-`wm-xcb-ewmh.c:35` and `:61` (a property-handler path), `monitor-manager.c:468`,
-`:499`, `:544` (the RandR handler path), and `launcher.c:216`, `:221`, `:228`
-(the launcher that freezes the WM until dmenu exits).
+The script prints the current counts. Every violation is the debt tracked in
+`bd list --parent wm-46k.2`: the busy-wait in `handle_xcb_events()`, the
+property-handler path through `print_atom_name()` and
+`ewmh_check_wm_state_fullscreen()`, the RandR handler path through
+`monitor_manager_update_crtc_geometry()` and its two helpers, and the blocking
+`read()`/`waitpid()` pair in `launcher_run_dmenu()`.
 
 The check is meant to reach zero by removing the violations, not by adding
 markers. A new marker needs a reason that would satisfy a reviewer: "startup,
@@ -168,8 +170,8 @@ DISPLAY=:2 tools/xclient -n 2 -v      # two bare X11 windows, prints their IDs
 ```
 
 Look at the Xephyr window. As of 2026-11-01 the WM does not map the windows, so
-the nested screen stays black — that is the defect `docs/STATUS.md` §4.1
-describes, not a setup problem.
+the nested screen stays black — that is the missing map path (`bd show wm-4f6.1`),
+not a setup problem.
 
 Kill the session with `pkill -x Xephyr`, or kill the PIDs you started. Do not
 `pkill -f wm`; the pattern matches your own shell command line and kills the
@@ -299,7 +301,7 @@ AddressSanitizer and UBSan (rebuild with `SANITIZE=1`):
 
 ```bash
 make clean
-make test SANITIZE=1             # 651 assertions, exit 0, no leak report
+make test SANITIZE=1             # whole suite under ASan+UBSan, exit 0, no leak report
 make SANITIZE=1                  # the instrumented wm binary for a live session
 DISPLAY=:2 ./wm
 ```

@@ -16,7 +16,7 @@
 # Exit status: 0 if every test passed, 1 otherwise.
 #
 # The suite asserts what a user sees on the X server. Many assertions fail
-# today because the WM does not map windows yet (docs/STATUS.md 4.1); those
+# today because the WM does not map windows yet (bd show wm-4f6.1); those
 # failures are the specification for the X11 output path work.
 
 set -uo pipefail

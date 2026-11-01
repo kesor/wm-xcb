@@ -19,10 +19,10 @@ a promise the code does not keep is a defect list, not marketing.
 
 | Promise | What it means for the person using the WM | Status 2026-11-01 |
 |---------|-------------------------------------------|-------------------|
-| **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | not kept: `docs/STATUS.md` 4.1 |
+| **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | not kept: the map path is missing (`bd show wm-4f6.1`) |
 | **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop key handling | not kept: the launcher blocks the loop, and the loop busy-waits (4.7) |
 | **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | not kept: no key grabs exist (4.5) |
-| **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: 645 assertions cover the model, `make test-x` covers the X seam with 11 assertions of which 9 fail today |
+| **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: the unit suite covers the model, `make test-x` covers the X seam and still fails there |
 | **The WM can explain itself** | current state and recent transitions can be dumped and read | not kept: `LOG_DEBUG` only, no state dump or event trace |
 
 Those five are the product. Everything below exists to keep them.
@@ -165,7 +165,7 @@ Short enough to check in review.
 | One flush per loop iteration | 2.3 | review |
 | Every request has a failure event | 2.2 | review: a request with only a success path is incomplete |
 | New behaviour is a registration, not an edit (see §2.4 test) | 2.4 | review |
-| Event ids come from the shared registry, never a fresh local enum | avoids the 20/20 and 100/64 collisions already in the tree | `docs/STATUS.md` 4.8 |
+| Event ids come from the shared registry, never a fresh local enum | avoids the collisions already in the tree | `bd show wm-4f6.8` |
 | `make test` green, `scripts/xephyr-test.sh` no worse than before | promise 4 | CI (planned) |
 | No AI attribution in commits, comments, or files | project rule | review |
 
@@ -254,6 +254,6 @@ beads epic for state machine ergonomics.
 
 ---
 
-*Related: `docs/VISION.md` (the story), `docs/STATUS.md` (what the code does
-today), `docs/architecture/state-machine.md` (the framework),
+*Related: `docs/VISION.md` (the story), [README.md](README.md#current-state)
+(what works today), `docs/architecture/state-machine.md` (the framework),
 `docs/TESTING.md` (how to check all of this).*

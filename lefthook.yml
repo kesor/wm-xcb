@@ -10,7 +10,7 @@
 # core.hooksPath and these gates stop running. docs/QUALITY.md explains it.
 #
 # Layers, fastest first:
-#   pre-commit  ~5s     paths, formatting, build, unit tests, async rule, beads
+#   pre-commit  ~5s     paths, doc refs, formatting, build, unit tests, async, beads
 #   commit-msg  instant  commit message rules
 #   pre-push    ~40s    the above, plus the -pedantic debug build
 #   CI                   everything, plus sanitizers and the seam tests
@@ -28,6 +28,11 @@ pre-commit:
     paths:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory. Use a repo-relative path or <placeholder>."
+
+    doc-refs:
+      glob: "*.md"
+      run: ./scripts/check-doc-refs.sh
+      fail_text: "A document cites a line number. Name the symbol or the beads issue instead."
 
     format:
       glob: "*.{c,h}"
@@ -61,6 +66,10 @@ pre-push:
     paths:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory."
+
+    doc-refs:
+      run: ./scripts/check-doc-refs.sh
+      fail_text: "A document cites a line number."
 
     format:
       run: ./scripts/format-check.sh

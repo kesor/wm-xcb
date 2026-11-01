@@ -24,7 +24,7 @@ part of this repository; if you keep one next to this checkout it is at
 
 | Document | Purpose |
 |----------|---------|
-| `docs/STATUS.md` | **Start here** — audited state, open defects, what to fix first |
+| `docs/README.md` | Doc index and the current state in six lines |
 | `docs/PHILOSOPHY.md` | **The rules** — user promises, the four commitments, the state machine contract |
 | `docs/TESTING.md` | Unit tests, Xephyr sessions, performance measurement |
 | `docs/QUALITY.md` | The gates that run on commit, push, and CI — and how to add one |
@@ -576,7 +576,7 @@ a gate fails, fix the cause. If the hook is missing, run `make hooks` once.
 1. Make sure tests pass: `make test`
 2. If the change touches windows, focus, keys, or X properties, run the seam
    tests too: `make tools/xclient && make test-x`. They assert what X sees, and
-   they are expected to fail only for the defects listed in `docs/STATUS.md`.
+   they are expected to fail only for defects that have a beads issue.
 3. Run the static async check: `make check-async`. It must report zero new
    violations; a waiver (`allow-blocking: <reason>`) needs a real reason.
 4. Format code: `make format`
