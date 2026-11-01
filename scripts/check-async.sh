@@ -3,36 +3,52 @@
 # check-async.sh - fail on code that can stall the event loop.
 #
 # Usage:
-#   scripts/check-async.sh [-v|--verbose]
+#   scripts/check-async.sh [-v|--verbose]      # check against the baseline
+#   scripts/check-async.sh --update-baseline   # accept today's violations
 #
 # docs/PHILOSOPHY.md 2.3: nothing in the event loop may wait. This script is the
 # mechanical half of that rule. It scans the sources that get compiled into the
 # WM and flags calls that block until X or a child process answers.
 #
-# A line is waived when it, or one of the two preceding lines, carries a comment
-# containing "allow-blocking: <reason>". The marker is the record of why the
-# wait is safe, usually because it happens during startup, before the loop runs.
+# Two kinds of exception, both explicit:
 #
-# Exit status: 0 when every blocking call is waived, 1 otherwise.
+#   1. Waiver: a comment containing "allow-blocking: <reason>" on the line or the
+#      two lines above it. The reason says why the wait is safe, usually because
+#      it runs at startup before the loop exists.
+#   2. Baseline: tests/quality/async-baseline.txt lists the violations that are
+#      already known and tracked in beads. A hit in the baseline does not fail
+#      the check, so unrelated work is not blocked. A violation that is not in
+#      the baseline fails, which is how the count only goes down.
+#
+# The baseline is written by --update-baseline and reviewed in the diff, the
+# same way a golden file is. Entries that no longer occur are reported as stale
+# and should be removed with --update-baseline.
+#
+# Exit status: 0 when there are no new violations, 1 otherwise.
 
 set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+BASELINE_FILE="$ROOT_DIR/tests/quality/async-baseline.txt"
 VERBOSE=0
-case "${1:-}" in
-  -v | --verbose) VERBOSE=1 ;;
-  -h | --help)
-    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
-    exit 0
-    ;;
-  "") ;;
-  *)
-    echo "check-async: unknown argument '$1'" >&2
-    exit 1
-    ;;
-esac
+UPDATE=0
+
+for arg in "$@"; do
+  case "$arg" in
+    -v | --verbose) VERBOSE=1 ;;
+    --update-baseline) UPDATE=1 ;;
+    -h | --help)
+      sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      echo "check-async: unknown argument '$arg'" >&2
+      exit 1
+      ;;
+  esac
+done
 
 # Compile the source list exactly as the build does, so a file that is not
 # built does not produce findings (wm-kbd-mouse.c is dead but still on disk).
@@ -53,8 +69,25 @@ RULES=(
   '\busleep\(|\bsleep\(|nanosleep\(|sleep inside the window manager stalls every client'
 )
 
-VIOLATIONS=0
+# Baseline keys are "file|normalized call", not line numbers, so edits that move
+# code around do not invalidate the whole file.
+normalize() {
+  printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]][[:space:]]*/ /g; s/[[:space:]]*$//'
+}
+
+declare -A BASELINE=()
+if [ -f "$BASELINE_FILE" ]; then
+  while IFS= read -r line; do
+    case "$line" in '' | '#'*) continue ;; esac
+    BASELINE["$line"]=1
+  done <"$BASELINE_FILE"
+fi
+
+NEW_VIOLATIONS=0
+KNOWN=0
 WAIVED=0
+declare -A SEEN=()
+declare -a CURRENT=()
 
 for f in "${SOURCES[@]}"; do
   for rule in "${RULES[@]}"; do
@@ -65,8 +98,7 @@ for f in "${SOURCES[@]}"; do
       line="${hit%%:*}"
       text="${hit#*:}"
 
-      # A call named in a comment is not a call. Comments explaining why a wait
-      # is safe are exactly what the marker section below asks for.
+      # A call named in a comment is not a call.
       stripped="$(printf '%s' "$text" | sed 's/^[[:space:]]*//')"
       case "$stripped" in
         \** | //* | '/*'*) continue ;;
@@ -77,31 +109,76 @@ for f in "${SOURCES[@]}"; do
         continue
       fi
 
-      # The waiver may sit on the line itself or in the two lines above it.
+      # A waiver sits on the line or the two above it, with a reason.
       start=$((line - 2))
       [ "$start" -lt 1 ] && start=1
       context=$(sed -n "${start},${line}p" "$f")
       if printf '%s' "$context" | grep -q 'allow-blocking:'; then
         WAIVED=$((WAIVED + 1))
         if [ "$VERBOSE" -eq 1 ]; then
-          printf '  waived     %s:%s  %s\n' "$f" "$line" \
+          printf '  waived  %s:%s  %s\n' "$f" "$line" \
             "$(printf '%s' "$context" | grep -o 'allow-blocking:.*' | head -1)"
         fi
         continue
       fi
 
-      VIOLATIONS=$((VIOLATIONS + 1))
-      printf '  VIOLATION  %s:%s  %s\n' "$f" "$line" "$reason"
-      printf '             %s\n' "$(printf '%s' "$text" | sed 's/^[[:space:]]*//')"
+      key="$f|$(normalize "$text")"
+      SEEN["$key"]=1
+      CURRENT+=("$key")
+
+      if [ "$UPDATE" -eq 1 ]; then
+        continue
+      fi
+
+      if [ -n "${BASELINE[$key]:-}" ]; then
+        KNOWN=$((KNOWN + 1))
+        if [ "$VERBOSE" -eq 1 ]; then
+          printf '  known   %s:%s\n' "$f" "$line"
+        fi
+        continue
+      fi
+
+      NEW_VIOLATIONS=$((NEW_VIOLATIONS + 1))
+      printf '  NEW VIOLATION  %s:%s  %s\n' "$f" "$line" "$reason"
+      printf '                 %s\n' "$(normalize "$text")"
     done < <(grep -nE "$pattern" "$f" 2>/dev/null)
   done
 done
 
-echo
-if [ "$VIOLATIONS" -eq 0 ]; then
-  echo "check-async: no violations in ${#SOURCES[@]} files ($WAIVED waived)"
+if [ "$UPDATE" -eq 1 ]; then
+  mkdir -p "$(dirname "$BASELINE_FILE")"
+  {
+    echo "# Known blocking calls in the window manager event loop."
+    echo "#"
+    echo "# Generated by scripts/check-async.sh --update-baseline."
+    echo "# Each line is <file>|<normalized call>. A violation listed here does not"
+    echo "# fail the check; a violation missing from here does. Remove entries when"
+    echo "# the call is gone: the script reports stale lines, and the point of the"
+    echo "# file is that it shrinks. The work that removes them is tracked in"
+    echo "# 'bd list --parent wm-46k.2'."
+    printf '%s\n' "${CURRENT[@]}" | sort -u
+  } >"$BASELINE_FILE"
+  echo "check-async: baseline updated with $(printf '%s\n' "${CURRENT[@]}" | sort -u | grep -c .) entrie(s) in ${BASELINE_FILE#"$ROOT_DIR/"}"
   exit 0
 fi
-echo "check-async: $VIOLATIONS violation(s) in ${#SOURCES[@]} files ($WAIVED waived)"
-echo "Each one is listed in a beads issue: 'bd list --parent wm-46k.2'."
+
+STALE=0
+for key in "${!BASELINE[@]}"; do
+  if [ -z "${SEEN[$key]:-}" ]; then
+    STALE=$((STALE + 1))
+    printf '  stale baseline entry: %s\n' "$key"
+  fi
+done
+
+echo
+if [ "$NEW_VIOLATIONS" -eq 0 ]; then
+  echo "check-async: no new violations (${#SOURCES[@]} files, $KNOWN known, $WAIVED waived)"
+  if [ "$STALE" -gt 0 ]; then
+    echo "check-async: $STALE stale baseline entrie(s); run --update-baseline to drop them"
+  fi
+  exit 0
+fi
+echo "check-async: $NEW_VIOLATIONS new violation(s), $KNOWN known, $WAIVED waived"
+echo "Known work: 'bd list --parent wm-46k.2'. To accept a new one on purpose:"
+echo "  scripts/check-async.sh --update-baseline   (then commit the baseline diff)"
 exit 1

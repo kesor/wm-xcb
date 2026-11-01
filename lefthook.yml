@@ -1,31 +1,83 @@
-# lefthook.yml - Git hooks configuration for wm
-
-config:
-  parallel: false
-  output:
-    - meta           # Print lefthook version
-    - summary        # Print summary block
-    - empty_summary  # Print summary when no steps to run
-    - success        # Print successful steps
-    - failure        # Print failed steps
-    - skips          # Print "skip" messages
+# lefthook.yml - the deterministic quality gates for wm.
+#
+# Every gate is a command a person can run by hand and get the same answer.
+# Nothing here consults a model: a gate that can be wrong for a reason nobody
+# can reproduce is not a gate. The LLM review (scripts/review-agent.sh) is
+# advisory and never listed here.
+#
+# lefthook owns .git/hooks. beads runs as one job among the others, through
+# 'bd hooks run <hook>'. Do not also run 'bd hooks install': it takes over
+# core.hooksPath and these gates stop running. docs/QUALITY.md explains it.
+#
+# Layers, fastest first:
+#   pre-commit  ~5s     formatting, build, unit tests, async rule, beads export
+#   commit-msg  instant  commit message rules
+#   pre-push    ~40s    the above, plus the -pedantic debug build
+#   CI                   everything, plus sanitizers and the seam tests
+#
+# Adding a gate: put the command in a script under scripts/, list it here, and
+# add the same command to .github/workflows/quality.yml. docs/QUALITY.md has
+# the checklist.
 
 pre-commit:
+  parallel: false
   commands:
-    format:
-      glob: "**/*.{c,h}"
-      run: make format
+    beads:
+      run: bd hooks run pre-commit
 
-    tidy:
-      glob: "**/*.{c,h}"
-      run: make tidy
+    format:
+      glob: "*.{c,h}"
+      run: ./scripts/format-check.sh {staged_files}
+      fail_text: "Formatting: run 'make format' and stage the result."
+
+    build:
+      run: make -j$(nproc)
+      fail_text: "The tree does not build."
+
+    unit:
+      run: make test
+      fail_text: "make test failed."
+
+    async:
+      run: ./scripts/check-async.sh
+      fail_text: "New blocking call in the event loop. Known work: bd list --parent wm-46k.2"
+
+commit-msg:
+  commands:
+    no-ai-attribution:
+      run: ./scripts/check-commit-msg.sh {1}
+      fail_text: "The git author is the only attribution a commit gets."
 
 pre-push:
-  skip: [pre-commit]
+  parallel: false
   commands:
-    format-check:
-      run: make format
+    beads:
+      run: bd hooks run pre-push
 
-    tidy:
-      glob: "**/*.{c,h}"
-      run: make tidy
+    format:
+      run: ./scripts/format-check.sh
+      fail_text: "Formatting: run 'make format'."
+
+    async:
+      run: ./scripts/check-async.sh
+      fail_text: "New blocking call in the event loop."
+
+    unit:
+      run: make test
+      fail_text: "make test failed."
+
+    debug-build:
+      # -pedantic is what caught the zero-length array in tiling.c, so it runs on
+      # every push. It rebuilds twice so normal objects are left behind.
+      run: make clean >/dev/null && make DEBUG=1 >/dev/null && make test >/dev/null && make clean >/dev/null && make -j$(nproc)
+      fail_text: "The -pedantic debug build or its tests failed."
+
+post-checkout:
+  commands:
+    beads:
+      run: bd hooks run post-checkout
+
+post-merge:
+  commands:
+    beads:
+      run: bd hooks run post-merge

@@ -1,0 +1,69 @@
+name: quality
+
+# Every gate in docs/QUALITY.md runs here. The gate list itself lives in
+# lefthook.yml, and this workflow calls the same commands, so a gate added for
+# a commit hook is not silently missing from CI.
+#
+# Jobs marked "advisory" are expected to fail today. They are wired and visible
+# on purpose: the point is to watch the number go down, not to hide it. Flip
+# continue-on-error off when the first green run is merged.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: build, unit tests, formatting, async rule, debug build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      # LEFTHOOK_EXCLUDE=beads: the beads Dolt database is local state and is
+      # not in the checkout, so its hook has nothing to run against here.
+      - name: quality gates
+        run: nix develop --command env LEFTHOOK_EXCLUDE=beads lefthook run pre-push
+
+  seam:
+    name: seam tests (what X sees)
+    runs-on: ubuntu-latest
+    continue-on-error: true # advisory until the X11 output path works
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: seam tests under a virtual host display
+        run: nix develop --command xvfb-run -a make test-x
+      - name: seam test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seam-test-logs
+          path: /tmp/wm-seam-tests/
+          if-no-files-found: ignore
+
+  sanitize:
+    name: address and UB sanitizers
+    runs-on: ubuntu-latest
+    continue-on-error: true # advisory: the hub leaks 936 bytes today
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: make test under ASan and UBSan
+        run: |
+          nix develop --command bash -c '
+            make clean >/dev/null
+            make SANITIZE=1 >/dev/null
+            ASAN_OPTIONS=detect_leaks=1 ./test
+          '

@@ -329,7 +329,7 @@ monitor_manager_get_screen_outputs(xcb_window_t root, int* count)
 
   xcb_randr_get_screen_resources_cookie_t cookie = xcb_randr_get_screen_resources(dpy, root);
   /* allow-blocking: startup discovery, no loop yet */
-  xcb_randr_get_screen_resources_reply_t* reply  = xcb_randr_get_screen_resources_reply(dpy, cookie, NULL);
+  xcb_randr_get_screen_resources_reply_t* reply = xcb_randr_get_screen_resources_reply(dpy, cookie, NULL);
 
   if (reply == NULL) {
     *count = 0;

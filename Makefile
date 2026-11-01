@@ -150,6 +150,11 @@ test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 clean:
 	rm -f $(NAME) $(OBJ) $(TEST_OBJ) test compile_commands.json compile_flags.txt tools/xclient
 
+# Install the git hooks once per clone. lefthook owns .git/hooks and runs the
+# gates in lefthook.yml; beads runs as one of its jobs.
+hooks:
+	lefthook install
+
 # print-src is read by scripts/check-async.sh so the static check scans exactly
 # the files the build compiles.
 print-src:
@@ -200,4 +205,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x check-async print-src test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean
+.PHONY: all clean test test-x check-async print-src hooks test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean

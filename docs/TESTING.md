@@ -10,6 +10,12 @@
 
 ---
 
+## 0. What runs automatically
+
+`lefthook` runs the gates on every commit and push; CI runs the same commands.
+See [QUALITY.md](QUALITY.md). The sections below are the layers you run by hand
+while working.
+
 ## 1. Environment
 
 The dev shell comes from `flake.nix` via direnv:

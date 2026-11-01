@@ -83,6 +83,10 @@
               imagemagick
               valgrind
               strace
+
+              # Quality gates: .beads/hooks/* call 'lefthook run <hook>'.
+              # See docs/QUALITY.md.
+              lefthook
             ];
           };
         };

@@ -25,6 +25,7 @@ Reference: dwm (`../dwm/`) — analyzed extensively for design patterns
 | `docs/STATUS.md` | **Start here** — audited state, open defects, what to fix first |
 | `docs/PHILOSOPHY.md` | **The rules** — user promises, the four commitments, the state machine contract |
 | `docs/TESTING.md` | Unit tests, Xephyr sessions, performance measurement |
+| `docs/QUALITY.md` | The gates that run on commit, push, and CI — and how to add one |
 | `docs/VISION.md` | Why this project exists |
 | `docs/architecture/overview.md` | Core concepts and architecture |
 | `plans/wm-architecture.md` | Phased implementation plan |
@@ -554,9 +555,22 @@ void on_configure(Client* c) { c->fullscreen = true; }
 void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULLSCREEN_STATE_ENTERED); }
 ```
 
+### 13. A quality check that only ran once
+
+- **Symptom**: someone ran a clever grep, a scan, or a manual review, found a
+  problem, fixed it, and the check never ran again
+- **Fix**: turn it into a gate. A script under `scripts/` that exits non-zero,
+  listed in `lefthook.yml` and in `.github/workflows/quality.yml`, documented in
+  `docs/QUALITY.md`. Gates are deterministic commands; an LLM review is a second
+  opinion, not a gate.
+
 ---
 
 ## When You're Done
+
+The commit hook runs the gates in `lefthook.yml` for you (build, unit tests,
+formatting, async rule, commit message). Do not skip them with `--no-verify`; if
+a gate fails, fix the cause. If the hook is missing, run `make hooks` once.
 
 1. Make sure tests pass: `make test`
 2. If the change touches windows, focus, keys, or X properties, run the seam
@@ -564,10 +578,13 @@ void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULL
    they are expected to fail only for the defects listed in `docs/STATUS.md`.
 3. Run the static async check: `make check-async`. It must report zero new
    violations; a waiver (`allow-blocking: <reason>`) needs a real reason.
-4. Format code: `clang-format --style=file -i *.c *.h`
+4. Format code: `make format`
 5. Commit with meaningful message
 6. Push to your branch
 7. Create PR referencing the issue
+
+Never add quality checks by hand in a one-off command. `docs/QUALITY.md` has the
+four-step recipe so the check runs for everyone from then on.
 
 ---
 

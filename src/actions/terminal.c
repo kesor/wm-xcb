@@ -245,7 +245,7 @@ terminal_spawn(void)
 
   /* Parent process - try to reap immediately */
   /* Use WNOHANG to avoid blocking - child may still be running */
-  int status;
+  int   status;
   pid_t reaped = waitpid(pid, &status, WNOHANG);
 
   if (reaped > 0) {

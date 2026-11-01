@@ -68,7 +68,7 @@ setup_xinput_initialize()
 {
   xcb_input_xi_query_version_cookie_t xi_cookie = xcb_input_xi_query_version_unchecked(dpy, XCB_INPUT_MAJOR_VERSION, XCB_INPUT_MINOR_VERSION);
   /* allow-blocking: startup, the event loop has not started yet */
-  xcb_input_xi_query_version_reply_t* xi_reply  = xcb_input_xi_query_version_reply(dpy, xi_cookie, NULL);
+  xcb_input_xi_query_version_reply_t* xi_reply = xcb_input_xi_query_version_reply(dpy, xi_cookie, NULL);
   LOG_DEBUG("XInput version: %d.%d", xi_reply->major_version, xi_reply->minor_version);
   free(xi_reply);
 }
@@ -90,9 +90,9 @@ setup_xinput_events()
 void
 check_no_running_wm()
 {
-  xcb_void_cookie_t    wm_cookie = xcb_change_window_attributes_checked(dpy, root, XCB_CW_EVENT_MASK, (uint32_t[]) { XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT });
+  xcb_void_cookie_t wm_cookie = xcb_change_window_attributes_checked(dpy, root, XCB_CW_EVENT_MASK, (uint32_t[]) { XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT });
   /* allow-blocking: startup, deciding whether another WM owns the display */
-  xcb_generic_error_t* err       = xcb_request_check(dpy, wm_cookie);
+  xcb_generic_error_t* err = xcb_request_check(dpy, wm_cookie);
   if (err) {
     error_details(err);
     free(err);
@@ -160,7 +160,7 @@ wm_manage_all_clients()
   // 1. query all the window descendants of the root window
   xcb_query_tree_cookie_t tree_cookie = xcb_query_tree_unchecked(dpy, root);
   /* allow-blocking: startup, before the loop runs */
-  xcb_query_tree_reply_t* reply       = xcb_query_tree_reply(dpy, tree_cookie, NULL);
+  xcb_query_tree_reply_t* reply = xcb_query_tree_reply(dpy, tree_cookie, NULL);
 
   if (!reply)
     return;
