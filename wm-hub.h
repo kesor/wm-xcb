@@ -115,7 +115,9 @@ struct HubComponent {
    */
   const char** accepted_target_names;
 
-  /* Resolved target types (populated at registration) */
+  /* Resolved target types (populated at registration).
+   * Owned by the hub: freed by hub_unregister_component() and hub_shutdown(),
+   * both of which set it back to NULL. The component must not free it. */
   HubTargetType** accepted_targets;
 
   RequestType*    requests;   /* 0-terminated array of request types handled */

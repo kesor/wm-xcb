@@ -19,7 +19,7 @@ model.*
 | `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run` — **advisory** |
-| CI `sanitize` | every push and PR | ~2 min | `make SANITIZE=1 && ./test` — **advisory** |
+| CI `sanitize` | every push and PR | ~2 min | `make test SANITIZE=1` |
 
 Advisory means `continue-on-error: true`. They are wired and their output is
 visible on purpose; they become required when they are green, which is tracked
@@ -30,14 +30,14 @@ in beads.
 | Gate | Command | What it proves |
 |------|---------|----------------|
 | build | `make -j$(nproc)` | the tree compiles |
-| unit | `make test` | 645 assertions across hub, state machines, targets, components |
+| unit | `make test` | 651 assertions across hub, state machines, targets, components |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | format | `scripts/format-check.sh` | every tracked C file and header matches `.clang-format`; `--fix` rewrites the same list (`make format`) |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
 | commit-msg | `scripts/check-commit-msg.sh` | no `Co-Authored-By`, no "generated with", no robot footer |
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
 | seam | `make test-x` | modifiable X behaviour: mapped, tiled, focused, tags, EWMH (advisory) |
-| sanitize | `make SANITIZE=1 && ./test` | memory and UB errors (advisory: the hub leaks 936 bytes) |
+| sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
 
 ## Where the hooks live
 
@@ -144,7 +144,7 @@ lefthook run pre-push       # every gate that runs before a push
 lefthook run pre-commit     # just the commit-time gates
 LEFTHOOK_EXCLUDE=beads lefthook run pre-push   # without the beads export
 make test-x                 # seam tests (needs a display; Xephyr handles that)
-make SANITIZE=1 && ./test   # sanitizers
+make test SANITIZE=1        # sanitizers (builds the test binary too)
 ```
 
 ## What is deliberately not a gate

@@ -475,6 +475,34 @@ test_shutdown_clears_indexes(void)
 }
 
 void
+test_shutdown_releases_registry_memory(void)
+{
+  LOG_CLEAN("== Testing shutdown releases the memory the registry allocated");
+
+  hub_init();
+  hub_register_component(&test_fullscreen);
+  hub_register_target(&test_client1);
+
+  assert(test_fullscreen.accepted_targets != NULL);
+
+  hub_shutdown();
+
+  /* The array is the hub's allocation: a pointer still here after shutdown is
+   * freed and dangling, or leaked. Only NULL is correct. */
+  assert(test_fullscreen.accepted_targets == NULL);
+
+  /* Re-register after shutdown and verify the array is rebuilt. */
+  hub_init();
+  hub_register_component(&test_fullscreen);
+  assert(test_fullscreen.accepted_targets != NULL);
+  assert(test_fullscreen.accepted_targets[0] == hub_get_target_type_by_name("client"));
+  assert(test_fullscreen.accepted_targets[1] == NULL);
+
+  hub_shutdown();
+  assert(test_fullscreen.accepted_targets == NULL);
+}
+
+void
 test_duplicate_target_id_rejected(void)
 {
   LOG_CLEAN("== Testing duplicate target ID is rejected");
@@ -1305,6 +1333,7 @@ TEST_GROUP(HubRegistry, {
   test_double_unregistration();
   test_idempotent_shutdown();
   test_shutdown_clears_indexes();
+  test_shutdown_releases_registry_memory();
   test_duplicate_target_id_rejected();
   test_large_target_id_lookup();
   test_target_type_null_termination();

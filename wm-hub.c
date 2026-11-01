@@ -78,15 +78,28 @@ static void       component_add_to_request_type_index(HubComponent* comp);
 static void       target_by_id_map_insert(HubTarget* target);
 static void       target_by_id_map_remove(TargetID id);
 static HubTarget* target_by_id_map_lookup(TargetID id);
+static void       target_by_id_map_clear(void);
 static uint32_t   resolve_target_type_id(uint32_t legacy_id);
 
 /*
- * Clear all registry state.
+ * Free the memory the registry handed out and forget every registration.
  * Called on both init and shutdown for consistent cleanup.
+ *
+ * The accepted_targets arrays and the target ID hash chains are heap memory;
+ * zeroing the arrays that point at them without freeing them leaks.
  */
 static void
 clear_registry_state(void)
 {
+  for (uint32_t i = 0; i < component_count; i++) {
+    if (components[i] != NULL) {
+      free(components[i]->accepted_targets);
+      components[i]->accepted_targets = NULL;
+    }
+  }
+
+  target_by_id_map_clear();
+
   /* Clear component arrays */
   memset(components, 0, sizeof(components));
   memset(component_by_name, 0, sizeof(component_by_name));
@@ -100,7 +113,6 @@ clear_registry_state(void)
 
   /* Clear target arrays */
   memset(targets, 0, sizeof(targets));
-  memset(target_by_id_map, 0, sizeof(target_by_id_map));
   memset(targets_by_type, 0, sizeof(targets_by_type));
   memset(targets_by_type_count, 0, sizeof(targets_by_type_count));
 
@@ -744,6 +756,24 @@ target_by_id_map_remove(TargetID id)
   }
 }
 
+/*
+ * Free every entry in the target ID hash map.
+ * Entries are allocated one per registered target by target_by_id_map_insert().
+ */
+static void
+target_by_id_map_clear(void)
+{
+  for (uint32_t i = 0; i < TARGET_ID_MAP_SIZE; i++) {
+    target_id_entry_t* entry = target_by_id_map[i];
+    while (entry != NULL) {
+      target_id_entry_t* next = entry->next;
+      free(entry);
+      entry = next;
+    }
+    target_by_id_map[i] = NULL;
+  }
+}
+
 static HubTarget*
 target_by_id_map_lookup(TargetID id)
 {
@@ -932,16 +962,17 @@ hub_shutdown(void)
   /* Clear routing indexes first */
   clear_routing_indexes();
 
-  /* Unregister all components */
-  while (component_count > 0) {
-    component_count--;
-    components[component_count]->registered = false;
+  /* Mark everything unregistered; clear_registry_state() frees the memory. */
+  for (uint32_t i = 0; i < component_count; i++) {
+    if (components[i] != NULL) {
+      components[i]->registered = false;
+    }
   }
 
-  /* Unregister all targets */
-  while (target_count > 0) {
-    target_count--;
-    targets[target_count]->registered = false;
+  for (uint32_t i = 0; i < target_count; i++) {
+    if (targets[i] != NULL) {
+      targets[i]->registered = false;
+    }
   }
 
   /* Clear all registry state including indexes */

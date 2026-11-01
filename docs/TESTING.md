@@ -298,16 +298,17 @@ valgrind --leak-check=full ./test
 AddressSanitizer and UBSan (rebuild with `SANITIZE=1`):
 
 ```bash
-make clean && make SANITIZE=1
-./test                      # 645 assertions, then the leak report
-DISPLAY=:2 ./wm             # instrumented live session
+make clean
+make test SANITIZE=1             # 651 assertions, exit 0, no leak report
+make SANITIZE=1                  # the instrumented wm binary for a live session
+DISPLAY=:2 ./wm
 ```
 
 `SANITIZE=1` adds `-fsanitize=address,undefined -fno-omit-frame-pointer -g` to
-both compile and link. Measured 2026-11-01: `./test` passes all assertions and
-then reports `936 byte(s) leaked in 47 allocation(s)`, all of it hub registry
-bookkeeping (see `docs/STATUS.md` §4.13). `make test` therefore exits non-zero
-under `SANITIZE=1`; read the leak summary instead of the exit status.
+both compile and link. `make SANITIZE=1` alone builds only `wm`, so the test
+binary needs `make test SANITIZE=1`. Measured 2026-11-01 after the hub registry
+fix: `./test` passes all assertions and LeakSanitizer prints no summary, so the
+exit status is the answer. `detect_leaks=1` is set to match the CI sanitize job.
 
 Remember to `make clean && make` afterwards, or every later run is instrumented.
 
