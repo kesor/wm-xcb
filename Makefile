@@ -34,6 +34,13 @@ else
 	CFLAGS += -Os
 endif
 
+# Address and UB sanitizers: make clean && make SANITIZE=1
+# Useful for the unit tests (valgrind ./test) and for a live session.
+ifeq ($(strip $(SANITIZE)),1)
+	CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer -g
+	LDFLAGS += -fsanitize=address,undefined
+endif
+
 # ---------------------------------------------------------------------------
 # Source file lists - grouped by module for easy extension
 # ---------------------------------------------------------------------------
@@ -141,7 +148,7 @@ test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 	./test
 
 clean:
-	rm -f $(NAME) $(OBJ) $(TEST_OBJ) test compile_commands.json compile_flags.txt
+	rm -f $(NAME) $(OBJ) $(TEST_OBJ) test compile_commands.json compile_flags.txt tools/xclient
 
 # Standalone test (no XCB dependencies required)
 test-standalone: wm-hub.o test-wm-hub-standalone.c
@@ -151,6 +158,17 @@ test-standalone: wm-hub.o test-wm-hub-standalone.c
 test-sm-standalone: wm-hub.o wm-log.o $(filter-out %.c,$(SRC_SM:.c=.o)) test-sm-standalone.c
 	$(CC) $(CFLAGS) -o $@ $^
 	./test-sm-standalone
+
+# ---------------------------------------------------------------------------
+# Test tools
+#
+# tools/xclient spawns bare X11 windows for integration and performance runs in
+# a nested X server (Xephyr). It needs only libxcb, so it works where xterm does
+# not (Xephyr usually has no usable fonts).
+# ---------------------------------------------------------------------------
+
+tools/xclient: tools/xclient.c
+	$(CC) $(PKG_CFLAGS) -o $@ $< $(PKG_LDFLAGS)
 
 # ---------------------------------------------------------------------------
 # Docker build and test targets
@@ -168,4 +186,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-standalone test-sm-standalone check format tidy container-build container-run container-test container-clean
+.PHONY: all clean test test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean

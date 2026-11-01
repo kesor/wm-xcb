@@ -71,6 +71,18 @@
               freetype
               fontconfig
               gdb
+
+              # Nested-X testing and measurement. See docs/TESTING.md.
+              xorg-server # provides Xephyr and Xvfb
+              xvfb-run
+              xorg.xprop
+              xorg.xrandr
+              xdotool
+              xterm
+              dmenu
+              imagemagick
+              valgrind
+              strace
             ];
           };
         };

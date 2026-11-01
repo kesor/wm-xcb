@@ -170,16 +170,11 @@ layout_sm_template_create(void)
     LAYOUT_STATE_TILE,
   };
 
-  /* No transitions needed - single state */
-  static SMTransition transitions[] = {};
-
-  SMTemplate* tmpl = sm_template_create(
-      "layout",
-      states,
-      1,
-      transitions,
-      0,
-      LAYOUT_STATE_TILE);
+  /* No transitions needed - single state.
+   * NULL rather than an empty array: a zero-length array initializer is a GNU
+   * extension, and the -pedantic debug build rejects it. */
+  SMTemplate* tmpl =
+      sm_template_create("layout", states, 1, NULL, 0, LAYOUT_STATE_TILE);
 
   if (tmpl == NULL) {
     LOG_ERROR("Failed to create layout state machine template");
