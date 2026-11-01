@@ -449,6 +449,21 @@ test_client_duplicate_creation(void)
 }
 
 /*
+ * Test WM_STATE is skipped when no atom was interned
+ */
+void
+test_client_wm_state_without_connection(void)
+{
+  LOG_CLEAN("== Testing WM_STATE is skipped without an X connection");
+
+  /* Unit tests never connect, so client_atoms_init() interns nothing. The
+   * property change must then be skipped: sending it would use a None atom and
+   * draw a BadAtom error from the server. */
+  client_atoms_init();
+  assert(client_set_wm_state(100, CLIENT_WM_STATE_NORMAL) == false);
+}
+
+/*
  * Test client with monitor association
  */
 void
@@ -494,5 +509,6 @@ TEST_GROUP(ClientTarget, {
   test_client_get_by_window();
   test_client_count_managed();
   test_client_duplicate_creation();
+  test_client_wm_state_without_connection();
   test_client_monitor_association();
 });

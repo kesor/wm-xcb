@@ -8,13 +8,13 @@
  * XCB Events Handled:
  * - XCB_CREATE_NOTIFY - create Client, register with hub
  * - XCB_DESTROY_NOTIFY - destroy Client, unregister from hub
- * - XCB_MAP_REQUEST - toggle managed flag on Client
- * - XCB_UNMAP_NOTIFY - toggle managed flag on Client
+ * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, map the window
+ * - XCB_UNMAP_NOTIFY - unmanage Client
  *
  * Events Emitted:
  * - EVT_CLIENT_CREATED - emitted after client creation
  * - EVT_CLIENT_DESTROYED - emitted after client destruction
- * - EVT_CLIENT_MANAGED - emitted when client is managed
+ * - EVT_CLIENT_MANAGED - emitted after the client's window is mapped
  * - EVT_CLIENT_UNMANAGED - emitted when client is unmanaged
  *
  * Acceptance Criteria:
@@ -119,7 +119,8 @@ void client_list_on_destroy_notify(void* event);
 
 /*
  * Handle XCB_MAP_REQUEST event.
- * Manages the window (adds to client list) if not already managed.
+ * Manages the window: adds it to the client list, sets its border and
+ * WM_STATE=Normal, and maps it.
  */
 void client_list_on_map_request(void* event);
 

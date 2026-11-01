@@ -85,6 +85,14 @@ typedef struct Client {
 void client_list_init(void);
 
 /*
+ * Intern the atoms the client code needs but xcb does not predefine.
+ *
+ * Interning needs a reply from the server, so this runs once at startup,
+ * before the event loop. Does nothing when there is no X connection.
+ */
+void client_atoms_init(void);
+
+/*
  * Shutdown the client list.
  * Destroys all clients in the list and cleans up resources.
  */
@@ -286,6 +294,24 @@ xcb_void_cookie_t client_configure(
  * Configure a client from its struct.
  */
 xcb_void_cookie_t client_configure_from_struct(const Client* c);
+
+/*
+ * ICCCM WM_STATE values. There is no 2: the protocol skips it.
+ */
+enum ClientWMState {
+  CLIENT_WM_STATE_WITHDRAWN = 0,
+  CLIENT_WM_STATE_NORMAL    = 1,
+  CLIENT_WM_STATE_ICONIC    = 3,
+};
+
+/*
+ * Set the ICCCM WM_STATE property on a window. Other clients use it to tell a
+ * managed window from one the WM ignores.
+ *
+ * Returns false when the atom was never interned, which happens when there is
+ * no X connection (unit tests); the property is then not set.
+ */
+bool client_set_wm_state(xcb_window_t wnd, enum ClientWMState state);
 
 /*
  * Show a client window (map it).

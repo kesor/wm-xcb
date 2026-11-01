@@ -10,6 +10,15 @@
 #include "client-list.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-log.h"
+#include "wm-xcb.h"
+
+/*
+ * Border drawn around a managed window. config.def.h has the same value in
+ * default_borders.width, but including it here would copy the whole compiled-in
+ * configuration into this file, unused. The tiling component writes the same
+ * width today (wm-4f6.11 is where both read the config).
+ */
+#define CLIENT_LIST_BORDER_WIDTH 1
 
 /*
  * Global component instance - static initialization ensures clean state
@@ -252,8 +261,34 @@ client_list_on_destroy_notify(void* event)
 }
 
 /*
+ * Put a window the WM has taken over on screen: give it the border, tell other
+ * clients it is managed through WM_STATE, and map it.
+ *
+ * Geometry and stacking belong to the layout component; X places a newly
+ * mapped window on top of its siblings, which is the order tiling wants.
+ *
+ * Without an X connection (unit tests) there is nothing to send, so the model
+ * is updated by the caller and the server calls are skipped.
+ */
+static void
+client_list_map_client(Client* c)
+{
+  if (dpy == NULL)
+    return;
+
+  uint16_t border = CLIENT_LIST_BORDER_WIDTH;
+  xcb_configure_window(dpy, c->window, XCB_CONFIG_WINDOW_BORDER_WIDTH, &border);
+  client_set_border_width(c, border);
+
+  if (!client_set_wm_state(c->window, CLIENT_WM_STATE_NORMAL))
+    LOG_WARN("WM_STATE atom missing, window %u stays unmarked in X", c->window);
+
+  client_show(c->window);
+}
+
+/*
  * Handle XCB_MAP_REQUEST event.
- * Manages the window (adds to client list).
+ * Manages the window (adds it to the client list) and maps it.
  */
 void
 client_list_on_map_request(void* event)
@@ -274,15 +309,15 @@ client_list_on_map_request(void* event)
     }
   }
 
-  /* Mark as managed */
+  /* Mark as managed. A second MapRequest for a managed window changes nothing:
+   * the window is already where the WM put it. */
   if (!client_is_managed(c)) {
     client_set_managed(c, true);
+    client_list_map_client(c);
+    client_set_mapped(c, true);
     client_list_emit_event(EVT_CLIENT_MANAGED, c);
   }
 
-  /* Note: We don't actually map the window here.
-   * The WM typically checks if the window should be managed,
-   * and if so, it maps it. This is a simplified implementation. */
   LOG_DEBUG("Client managed: window=%u", e->window);
 }
 
@@ -308,6 +343,7 @@ client_list_on_unmap_notify(void* event)
   /* Only emit unmanage event if client was managed */
   if (client_is_managed(c)) {
     client_set_managed(c, false);
+    client_set_mapped(c, false);
     client_list_emit_event(EVT_CLIENT_UNMANAGED, c);
   }
 

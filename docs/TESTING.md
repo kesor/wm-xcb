@@ -115,14 +115,12 @@ run says and never lives here:
 
 | Test | Fails because |
 |------|---------------|
-| `test-10-map-on-map-request` | the WM never maps the window (4.1) |
-| `test-20-wm-state-property` | `WM_STATE` is never set (4.1) |
-| `test-30-tiling-two-windows` | windows never become viewable, so tiling is unobservable (4.3) |
+| `test-30-tiling-two-windows` | nothing tiles the windows yet (4.3) |
 | `test-40-focus-on-manage` | no `xcb_set_input_focus` anywhere (4.4) |
 | `test-50-tag-switch-keybinding` | no key grab, so `KEY_PRESS` never arrives (4.5) |
 | `test-60-ewmh-root-properties` | no root properties are set |
-| `test-70-client-exit-cleanup` | blocked on the same mapping failure |
-| `test-80-many-windows` | 0 of 20 windows become viewable |
+| `test-70-client-exit-cleanup` | the test cannot kill its own client, the harness bug in `bd show wm-dfg.10` |
+| `test-80-many-windows` | nothing tiles the windows yet (4.3) |
 
 Write a test so that it cannot pass for the wrong reason: a precondition such as
 "the window is visible before I press the key" uses `require_visible`, which
@@ -181,9 +179,9 @@ DISPLAY=:2 ./wm &                     # add 2>&1 | tee /tmp/wm.log for a log
 DISPLAY=:2 tools/xclient -n 2 -v      # two bare X11 windows, prints their IDs
 ```
 
-Look at the Xephyr window. As of 2026-11-01 the WM does not map the windows, so
-the nested screen stays black — that is the missing map path (`bd show wm-4f6.1`),
-not a setup problem.
+Look at the Xephyr window. The WM maps each window at the size and position the
+client asked for and draws a one-pixel border, so both windows sit in the same
+place: nothing tiles them yet (`bd show wm-4f6.3`). That is not a setup problem.
 
 Kill the session with `pkill -x Xephyr`, or kill the PIDs you started. Do not
 `pkill -f wm`; the pattern matches your own shell command line and kills the
@@ -247,8 +245,9 @@ Exit status 0 means all checks passed. Logs go to `$TMPDIR/wm-xephyr-test/` (`wm
 usually not plain `/tmp`. `--keep` leaves the session running so you can look
 at it; the script prints the WM pid and display in that case.
 
-This is written as the acceptance test for the X11 output path: it fails today
-at check 2, and should be made to pass rather than adjusted.
+This is written as the acceptance test for the X11 output path. Check 2 passes
+since the WM maps windows on `MapRequest`; checks 3 and 4 wait for tiling
+(`bd show wm-4f6.3`). Make them pass rather than adjusting the checks.
 
 ---
 
@@ -345,7 +344,7 @@ event arrives.
 |---------|-------|-----|
 | `FATAL: Another window manager is already running` | another WM on that display, usually a stale `wm` from an earlier run | `pgrep -x wm`, kill those PIDs, or pick a different `--display` |
 | Xephyr exits at once with `Server is already active for display N` | lock file from a crashed run | `ls /tmp/.X*-lock /tmp/.X11-unix/`, remove the stale pair, or use another display |
-| nested screen is black | expected today: the WM maps nothing | `scripts/xephyr-test.sh --verbose`, read `wm.log` |
+| nested screen is black | the WM died before it mapped anything, or this is a stale session | `scripts/xephyr-test.sh --verbose`, read `wm.log` |
 | `xterm: cannot load font` | Xephyr has no usable fonts | use `tools/xclient` |
 | `xdotool: command not found` | not in the dev shell | `direnv allow` or `nix develop` |
 | WM dies silently at startup | `-DDEBUG` build not used, so the reason was never printed | `make DEBUG=1` and rerun |

@@ -268,8 +268,15 @@ test_map_request_manages_client(void)
   };
   xcb_handler_dispatch(&map_event);
 
-  /* Client should now be managed */
+  /* Client should now be managed and shown */
   assert(c != NULL && client_is_managed(c) == true);
+  assert(c != NULL && client_is_mapped(c) == true);
+
+  /* A repeat MapRequest is not a second manage: the window is already shown */
+  map_event.sequence = 3;
+  xcb_handler_dispatch(&map_event);
+  assert(client_list_managed_count() == 1);
+  assert(client_list_count() == 1);
 
   /* Cleanup */
   client_list_component_shutdown();
@@ -305,6 +312,7 @@ test_map_request_creates_client_if_not_exists(void)
   Client* c = client_get_by_window(600);
   assert(c != NULL);
   assert(c != NULL && client_is_managed(c) == true);
+  assert(c != NULL && client_is_mapped(c) == true);
 
   /* Cleanup */
   client_list_component_shutdown();
@@ -349,6 +357,7 @@ test_unmap_notify_unmanages_client(void)
 
   Client* c = client_get_by_window(700);
   assert(c != NULL && client_is_managed(c) == true);
+  assert(c != NULL && client_is_mapped(c) == true);
 
   /* Send UNMAP_NOTIFY */
   xcb_unmap_notify_event_t unmap_event = {
@@ -360,8 +369,9 @@ test_unmap_notify_unmanages_client(void)
   };
   xcb_handler_dispatch(&unmap_event);
 
-  /* Client should no longer be managed */
+  /* Client should no longer be managed or shown */
   assert(c != NULL && client_is_managed(c) == false);
+  assert(c != NULL && client_is_mapped(c) == false);
 
   /* Client still exists (just unmanaged) */
   assert(client_list_count() == 1);
