@@ -36,6 +36,7 @@ Then read, in this order:
 | Document | Why |
 |----------|-----|
 | `docs/STATUS.md` | audited state, defects, what to fix first |
+| `.agents/skills/wm-5s/SKILL.md` | how to file harness friction while you work |
 | `docs/PHILOSOPHY.md` | the four commitments and the rules that follow from them |
 | `docs/architecture/overview.md` | hub, targets, components, two kinds of write |
 | the architecture doc your issue names | e.g. `state-machine.md`, `xcb-integration.md` |
@@ -142,6 +143,14 @@ Two things it cannot decide for you:
   one worker several ids in one call.
 - **Review.** Workers commit to `work/<bead-id>` and never push, merge, or close
   a bead. Merging is a human decision.
+
+## Friction is a bug in the harness
+
+When a command, gate, documented step or tool does not work first time and you
+need a workaround, file a bead instead of working around it silently. Read
+`.agents/skills/wm-5s/SKILL.md`: it has the 5S bucket, the title shape, the
+four-field template, and the parent epic `wm-dfg`. File, then continue; list the
+beads in your final message. This is how the traps below stop being traps.
 
 ## Traps that already cost time
 

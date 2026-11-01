@@ -29,6 +29,7 @@ part of this repository; if you keep one next to this checkout it is at
 | `docs/TESTING.md` | Unit tests, Xephyr sessions, performance measurement |
 | `docs/QUALITY.md` | The gates that run on commit, push, and CI — and how to add one |
 | `.agents/skills/wm-bootstrap/SKILL.md` | Session bootstrap: state, code map, beads map, gates, traps. Load with `/skill:wm-bootstrap` |
+| `.agents/skills/wm-5s/SKILL.md` | How to file harness friction as beads while you work |
 | `docs/VISION.md` | Why this project exists |
 | `docs/architecture/overview.md` | Core concepts and architecture |
 | `plans/wm-architecture.md` | Phased implementation plan |
@@ -585,6 +586,11 @@ a gate fails, fix the cause. If the hook is missing, run `make hooks` once.
 
 Never add quality checks by hand in a one-off command. `docs/QUALITY.md` has the
 four-step recipe so the check runs for everyone from then on.
+
+When a command, gate, script, or documented step does not work first time and you
+need a workaround, file it: `.agents/skills/wm-5s/SKILL.md`. A workaround that
+nobody records is paid for again by the next session. Parent epic `wm-dfg`,
+label `friction`.
 
 ---
 
