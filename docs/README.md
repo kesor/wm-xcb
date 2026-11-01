@@ -12,7 +12,7 @@
 | **[TESTING.md](TESTING.md)** | How to run unit tests, a nested Xephyr session, and performance measurements |
 | **[QUALITY.md](QUALITY.md)** | The gates: what runs on commit, push, and CI, and how to add one |
 | **[VISION.md](VISION.md)** | Why we built this, the paradigm shift |
-| **[IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md)** | Planned implementation order (its completion percentages predate the 2026-11-01 audit) |
+| **[IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md)** | Implementation order and why it is this order (status lives in `bd list --type=epic`) |
 
 ---
 
