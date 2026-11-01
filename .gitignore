@@ -1,5 +1,6 @@
 wm
 *.o
+build/
 compile_commands.json
 *.plist
 *.d
