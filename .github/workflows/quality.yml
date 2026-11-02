@@ -10,9 +10,10 @@ name: quality
 # (tests/quality/seam-baseline.txt) from new ones: a red seam job means this
 # branch broke something, which is exactly what a required gate should say.
 #
-# The sanitize-x job exists because the sanitize job below runs the unit suite,
-# and without a display the X calls return before they build a request. Only a
-# live WM in a nested server can show a memory error in the map path.
+# The sanitize-x job exists because the sanitize gate in the gates job runs the
+# unit suite, and without a display the X calls return before they build a
+# request. Only a live WM in a nested server can show a memory error in the map
+# path.
 
 on:
   push:
@@ -39,8 +40,15 @@ jobs:
             experimental-features = nix-command flakes
       # LEFTHOOK_EXCLUDE=beads: the beads Dolt database is local state and is
       # not in the checkout, so its hook has nothing to run against here.
+      #
+      # --force: `lefthook run` has no push refs on stdin, so it diffs HEAD
+      # against @{push}. actions/checkout does `git checkout -B <branch>
+      # refs/remotes/origin/<branch>`, which sets that upstream to the commit
+      # just fetched, so the diff is empty and lefthook skips every command and
+      # exits 0. --force runs them anyway. The step's runtime is the signal:
+      # tens of seconds means the gates ran, a fraction of a second does not.
       - name: quality gates
-        run: nix develop --command env LEFTHOOK_EXCLUDE=beads lefthook run pre-push
+        run: nix develop --command env LEFTHOOK_EXCLUDE=beads lefthook run pre-push --force --no-auto-install
 
   seam:
     name: seam tests (what X sees)
@@ -57,19 +65,6 @@ jobs:
           name: seam-test-logs
           path: /tmp/wm-seam-tests/
           if-no-files-found: error
-
-  sanitize:
-    name: address and UB sanitizers
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: cachix/install-nix-action@v31
-      - name: make test under ASan and UBSan
-        run: |
-          nix develop --command bash -c '
-            make clean >/dev/null
-            ASAN_OPTIONS=detect_leaks=1 make test SANITIZE=1
-          '
 
   sanitize-x:
     name: the WM in a nested X server under ASan and UBSan
