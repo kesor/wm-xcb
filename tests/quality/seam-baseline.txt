@@ -6,7 +6,6 @@
 # Removing an entry is how a fixed assertion stops being excused: the run
 # reports stale entries, and the list is meant to shrink. The work that
 # removes them is tracked in bd list --parent wm-4f6.
-test-40-focus-on-manage.sh|xdotool cannot read an input focus
-test-50-tag-switch-keybinding.sh|MOD+2 changed nothing
+test-50-tag-switch-keybinding.sh|MOD+1 shows the window again
 test-60-ewmh-root-properties.sh|_NET_CLIENT_LIST is set
 test-60-ewmh-root-properties.sh|_NET_SUPPORTING_WM_CHECK is set

@@ -43,6 +43,15 @@ typedef struct KeyBindingLookup {
 void keybinding_binding_init(void);
 
 /*
+ * Set the modifier bits lookup ignores, so a binding still matches while a
+ * lock modifier is on. The server adds its NumLock bit to the event state of
+ * every press made with NumLock on, and that bit is not part of any binding;
+ * the keybinding component passes in the bit the server reported. A fresh
+ * keybinding_binding_init() starts again from CapsLock and Mod2.
+ */
+void keybinding_binding_set_ignored_modifiers(uint32_t mask);
+
+/*
  * Shutdown the keybinding binding system.
  */
 void keybinding_binding_shutdown(void);
