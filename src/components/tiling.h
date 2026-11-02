@@ -143,6 +143,13 @@ SMTemplate* layout_sm_template_create(void);
 StateMachine* tiling_get_sm(Monitor* m);
 
 /*
+ * Adoption hook - creates the layout state machine for a monitor.
+ * Called by the hub when a monitor target is registered, and only for a
+ * target of type "monitor".
+ */
+void tiling_on_adopt(HubTarget* target);
+
+/*
  * Get current layout state for a monitor.
  * Returns LAYOUT_STATE_TILE if no SM exists.
  */

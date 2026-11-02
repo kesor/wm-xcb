@@ -92,6 +92,43 @@ test_monitor_tile_action_registered(void)
 }
 
 /*
+ * Test: a monitor is given its layout state machine when it is registered.
+ *
+ * Adoption is what tells a component a monitor exists. Tiling used to register
+ * after the startup discovery created the monitors, so the startup monitor was
+ * never adopted and its layout state only appeared when the first tile request
+ * asked for it, while a monitor that arrived later was adopted.
+ */
+void
+test_monitor_gets_layout_sm_on_adoption(void)
+{
+  LOG_CLEAN("== Testing a monitor adopts tiling when it is registered");
+
+  hub_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_component_init();
+  tiling_component_init();
+
+  Monitor* m = create_test_monitor();
+
+  /* Read the stored machine, not tiling_get_sm(): that one creates the SM on
+   * demand and would hide a monitor that was never adopted. */
+  StateMachine* sm = monitor_get_sm(m, TILING_COMPONENT_NAME);
+  assert_or_abort(sm != NULL);
+  assert(sm->owner == m);
+  assert(tiling_get_state(m) == LAYOUT_STATE_TILE);
+
+  tiling_component_shutdown();
+  client_list_component_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
+/*
  * Test: a MapRequest tiles the client without anyone calling tiling directly.
  */
 void
@@ -347,6 +384,7 @@ test_client_tag_move_triggers_tiling(void)
 
 TEST_GROUP(TilingComponent, {
   test_monitor_tile_action_registered();
+  test_monitor_gets_layout_sm_on_adoption();
   test_manage_triggers_tiling();
   test_unmanage_triggers_tiling();
   test_monitor_tile_action_retiles();
