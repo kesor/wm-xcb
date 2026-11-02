@@ -2,8 +2,8 @@
 #
 # Every gate is a command a person can run by hand and get the same answer.
 # Nothing here consults a model: a gate that can be wrong for a reason nobody
-# can reproduce is not a gate. The LLM review (scripts/review-agent.sh) is
-# advisory and never listed here.
+# can reproduce is not a gate. The LLM review runs through the worker harness,
+# not through this file.
 #
 # lefthook owns .git/hooks. beads runs as one job among the others, through
 # 'bd hooks run <hook>'. Do not also run 'bd hooks install': it takes over
