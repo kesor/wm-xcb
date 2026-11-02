@@ -45,6 +45,11 @@ Two rules override the table: anything that makes work stop gets **P0**, and a
 `shitsuke` report (add the gate) is always worth **P1**, because it is the one
 that stops the recurrence.
 
+The bucket says how to fix it. What it cost is a muda, a different axis, and
+naming both in the title is what makes three reports of the same thing visible
+as three: `friction(seiton, waiting): ...`. `.agents/skills/wm-3m/SKILL.md` has
+the categories and how to judge a run.
+
 ## How to file
 
 Parent epic: `wm-dfg` ("Harness friction"). Verify with
