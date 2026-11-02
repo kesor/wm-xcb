@@ -14,9 +14,10 @@
 
 `lefthook` runs the gates on every commit and push; CI runs the same commands.
 The seam suite (`make test-x`) is one of the push gates, through
-`scripts/check-seam.sh`: it starts Xvfb when there is no `DISPLAY`, and fails
-rather than skipping when neither is available. See [QUALITY.md](QUALITY.md).
-The sections below are the layers you run by hand while working.
+`scripts/check-seam.sh`: it runs on a private Xvfb it starts itself, whatever
+`DISPLAY` says, and fails rather than skipping when that server cannot start.
+See [QUALITY.md](QUALITY.md). The sections below are the layers you run by hand
+while working.
 
 ## 1. Environment
 
@@ -90,16 +91,19 @@ make DEBUG=1 test-x                # the seam suite against the debug WM
 DEBUG=1 ./tests/x/run.sh           # the same thing spelled out
 ```
 
-Each harness run prints one line before it starts anything:
+`scripts/xephyr-test.sh` and `tests/x/run.sh` print two lines before they start
+anything: the parent display they will draw into, then the build they will run.
 
 ```
+xephyr-test.sh: parent display = :99 (private Xvfb), session display = :0
 xephyr-test.sh: variant=debug (DEBUG=1 SANITIZE=0), binary=<repo>/build/debug/wm, log=<tmpdir>/wm-xephyr-test/wm.log
 ```
 
-The variant, the binary that runs and the log it writes are in that line, so a
-run never leaves you guessing which build it used or where its output went. If
-that line says `variant=debug` and the log is still empty, the WM itself never
-logged and the binary is not the suspect. `SANITIZE=1` works the same way.
+The variant, the binary that runs and the log it writes are in the variant
+line, so a run never leaves you guessing which build it used or where its output
+went. If that line says `variant=debug` and the log is still empty, the WM
+itself never logged and the binary is not the suspect. `SANITIZE=1` works the
+same way.
 
 The WM flushes each log line as it writes it, so a log from a WM that was killed
 rather than shut down is complete up to the last line it wrote. That matters for
@@ -255,6 +259,37 @@ before the loop runs" is one; "it is probably fine" is not.
 Xephyr renders a second X server inside a window on your real session. The WM
 under test runs as the only WM on that second display.
 
+### The parent display
+
+Xephyr needs a parent display to draw its window into. `scripts/xephyr-test.sh`,
+`tests/x/run.sh`, `scripts/check-seam.sh` and `scripts/check-sanitize-x.sh` get
+a private Xvfb for it, started by the run itself, whether or not `DISPLAY` is
+set: no Xephyr window appears on the desktop you are working on, and the run
+answers the same on a display with another depth or a wedged server. The rule
+lives in `scripts/lib/private-display.sh`, and each run prints the display it
+used:
+
+```
+run.sh: parent display = :99 (private Xvfb), session display = :0
+```
+
+`tests/x/run.sh` also writes that line to `$TMPDIR_SEAM/parent-display.txt`, and
+`tests/x/test-91-private-parent-display.sh` fails when the display the run
+recorded is not the one it handed to its tests, or when it is the session's own.
+
+The escape hatch is `WM_USE_SESSION_DISPLAY=1`. It is for looking at a run by
+eye, and it also needs `--keep`, because the private server is killed with the
+run and a kept session on it would have nothing to draw into:
+
+```bash
+WM_USE_SESSION_DISPLAY=1 make test-x TEST_X_ARGS=--keep
+WM_USE_SESSION_DISPLAY=1 scripts/xephyr-test.sh --keep --verbose
+```
+
+`xvfb-run` and `Xvfb` come from the dev shell. Without them the scripts stop
+with a message naming what is missing rather than falling back to the session
+display: that fallback is what this replaced.
+
 ### Manual session
 
 ```bash
@@ -346,8 +381,10 @@ spawns N `xclient` windows, waits 4 s, then checks in order:
 Exit status 0 means all checks passed. Logs go to `$TMPDIR/wm-xephyr-test/` (`wm.log`, `xclient.log`,
 `xephyr.log`). `nix develop` sets `TMPDIR` to a per-shell directory, so it is
 usually not plain `/tmp`. `--keep` leaves the session running so you can look
-at it; the script prints the WM pid and display in that case. The first line
-names the variant, the binary and the log, as described under *Debug build*.
+at it; the script prints the WM pid and display in that case, and that display
+is a private Xvfb nobody can see unless `WM_USE_SESSION_DISPLAY=1` puts it on
+yours. The lines that name the parent display, then the variant, the binary and
+the log, are described under *Debug build*.
 
 This is written as the acceptance test for the X11 output path. Check 2 passes
 since the WM maps windows on `MapRequest`; checks 3 and 4 wait for tiling
@@ -495,7 +532,9 @@ arrives, and one `poll` that returns is what wakes it.
 | nested screen is black | the WM died before it mapped anything, or this is a stale session | `scripts/xephyr-test.sh --verbose`, read `wm.log` |
 | `xterm: cannot load font` | Xephyr has no usable fonts | use `tools/xclient` |
 | `xdotool: command not found` | not in the dev shell | `direnv allow` or `nix develop`; if the package the recipe needs is not in `flake.nix` at all, add it to `buildInputs` and commit that with the recipe |
-| WM dies silently at startup | `-DDEBUG` build not used, so the reason was never printed | check the variant on the first line of the run, then rerun with `DEBUG=1`, or with `DEBUG=1 scripts/xephyr-test.sh --verbose` |
+| WM dies silently at startup | `-DDEBUG` build not used, so the reason was never printed | check the variant line of the run, then rerun with `DEBUG=1`, or with `DEBUG=1 scripts/xephyr-test.sh --verbose` |
+| no Xephyr window appears anywhere | the run drew into its own private Xvfb, which is the default | read the parent-display line, or add `WM_USE_SESSION_DISPLAY=1` to watch it on your display |
+| `xvfb-run and Xvfb are not both on PATH` | not in the dev shell, and the session display is not used as a fallback | `direnv allow` or `nix develop`; `WM_USE_SESSION_DISPLAY=1` is the non-hermetic alternative |
 | `scripts/xephyr-test.sh` cannot find `wm` | not built | `make && make tools/xclient` |
 
 ---

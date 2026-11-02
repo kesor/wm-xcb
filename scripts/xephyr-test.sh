@@ -14,8 +14,16 @@
 # The WM it runs is the variant named by DEBUG and SANITIZE in the environment,
 # exactly as `make DEBUG=1` and `make SANITIZE=1` build it:
 #   DEBUG=1 scripts/xephyr-test.sh --verbose
-# The first line of output names the variant, the binary and the log, so a run
-# never leaves you guessing which binary it was or where its log went.
+# The first two lines name the parent display it draws into and then the
+# variant, the binary and the log, so a run never leaves you guessing which
+# binary it was, where its log went, or which display it used.
+#
+# The parent display Xephyr draws into is WM_PARENT_DISPLAY: a private Xvfb
+# this run starts, or the one an outer harness already started. See
+# scripts/lib/private-display.sh. --keep leaves the session on that display,
+# which nobody can see unless it is the session's, so looking at a run by eye
+# means both:
+#   WM_USE_SESSION_DISPLAY=1 scripts/xephyr-test.sh --keep
 #
 # Checks, in order:
 #   1. The WM stays alive for the whole run.
@@ -28,6 +36,10 @@
 # WM maps windows and tiles them on the monitor.
 
 set -uo pipefail
+
+# The parent-display helper re-executes this script, so it needs the arguments
+# from before the loop below consumed them.
+SCRIPT_ARGS=("$@")
 
 WINDOWS=2
 DISPLAY_NUM=""
@@ -76,6 +88,8 @@ XEPHYR_LOG="$LOG_DIR/xephyr.log"
 
 # shellcheck source=lib/wm-variant.sh
 . "$ROOT_DIR/scripts/lib/wm-variant.sh"
+# shellcheck source=lib/private-display.sh
+. "$ROOT_DIR/scripts/lib/private-display.sh"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -90,15 +104,19 @@ need() {
     exit 1
   fi
 }
+need Xephyr
+need xdotool
+need xprop
+
+# Before the build: the helper re-executes this script, and a build run twice
+# prints the variant line twice, which reads as two runs in the log.
+wm_parent_display "${SCRIPT_ARGS[@]}" || exit 1
+
 # Build first, and say which build it is, before Xephyr starts. These scripts
 # start the WM themselves, and nothing else rebuilds it, so a stale binary
 # reports the behaviour of the tree as it was and the result reads as a WM
 # defect.
 wm_build_variant "$WM_LOG" || exit 1
-
-need Xephyr
-need xdotool
-need xprop
 
 pick_display() {
   local n
@@ -157,7 +175,9 @@ wait_for_display() {
   return 1
 }
 
-"$(command -v Xephyr)" "$TEST_DISPLAY" -screen "${SCREEN_W}x${SCREEN_H}" -noreset \
+# DISPLAY may be a nested server a caller already started. The parent to draw
+# into is the one the helper named.
+DISPLAY="$WM_PARENT_DISPLAY" "$(command -v Xephyr)" "$TEST_DISPLAY" -screen "${SCREEN_W}x${SCREEN_H}" -noreset \
   >"$XEPHYR_LOG" 2>&1 &
 XEPHYR_PID=$!
 
