@@ -26,12 +26,13 @@ No CI job is advisory any more. The seam job could only become required once
 `tests/x/run.sh` could tell a known failure from a new one; the baseline in
 `tests/quality/seam-baseline.txt` is what makes its verdict mean something.
 
-The two nested-server jobs upload their logs as artifacts. Both pin
-`TMPDIR=/tmp` on the run line and upload from under `/tmp`, because `nix
-develop` points `TMPDIR` at a private per-shell directory and the harnesses
-write their logs under `$TMPDIR`. The upload fails the job when the directory
-is empty: an artifact step that quietly uploads nothing removes the evidence
-from exactly the run that needs it.
+The two nested-server jobs upload their logs as artifacts, both from under
+`/tmp`. `nix develop` points `TMPDIR` at a private per-shell directory and the
+harnesses write their logs under `$TMPDIR`, so the seam job pins `TMPDIR=/tmp`
+on its run line and `scripts/check-sanitize-x.sh` pins it on the harness
+invocation. The upload fails the job when that directory is empty: an artifact
+step that quietly uploads nothing removes the evidence from exactly the run
+that needs it.
 
 The `sanitize` and `sanitize-x` jobs cover different code because they can
 reach different code: the unit suite runs with no X connection, and the map,
@@ -60,7 +61,7 @@ rather than a hook.
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
 | seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
-| sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. Leak detection is forced on whatever `ASAN_OPTIONS` the caller has |
+| sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. `detect_leaks` and `leak_check_at_exit` are forced on in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 
 ## Where the hooks live
 

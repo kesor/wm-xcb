@@ -51,13 +51,15 @@ for arg in "$@"; do
 done
 
 # The leak report is the exit-time one, so it is only complete if the harness
-# lets the WM exit rather than killing it outright. detect_leaks=1 is the
-# default on Linux, but a caller's ASAN_OPTIONS can switch it off, and the
-# ${VAR:-default} form only fills in an unset variable. So the caller's options
-# are kept and this one is appended after them: ASan reads the string left to
-# right and the last value of a repeated key wins, which leaves no way to turn
-# the leak half of this gate off from outside it.
-export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS,}detect_leaks=1"
+# lets the WM exit rather than killing it outright. ${VAR:-default} only fills
+# in an unset variable, so a caller who exported detect_leaks=0 or
+# leak_check_at_exit=0 would keep that value. The option strings are read left
+# to right and the last value of a repeated key wins, so the caller's options
+# stay and these two keys are appended. LeakSanitizer options override
+# AddressSanitizer's leak flags, which is why the same keys are forced on
+# LSAN_OPTIONS and not only on ASAN_OPTIONS.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS,}detect_leaks=1,leak_check_at_exit=1"
+export LSAN_OPTIONS="${LSAN_OPTIONS:+$LSAN_OPTIONS,}detect_leaks=1,leak_check_at_exit=1"
 
 # The harness refuses to run without the test client, and `make clean` in CI
 # removes it.
