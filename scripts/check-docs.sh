@@ -61,12 +61,13 @@ fi
 # 1. line references in any document
 LINE_REF='\b[A-Za-z0-9_./-]+\.(c|h|yml|yaml|nix|mk|sh):[0-9]+'
 
-# 2. counts that duplicate a command. A leading section mark is not a count.
-# One optional token between the number and the noun, so "18 `test-*.c` files"
-# is caught as well as "651 assertions". Spelled-out numbers are left alone:
-# "four lines" and "one component" describe shape, and the false positives cost
-# more than the rare stale "eight components".
-NUMBER='(^|[^§0-9.])'
+# 2. counts that duplicate a command. A leading section mark is not a count,
+# and neither is the value of an assignment: `make DEBUG=1 test-x` is a
+# command, not "1 test". One optional token between the number and the noun,
+# so "18 `test-*.c` files" is caught as well as "651 assertions". Spelled-out
+# numbers are left alone: "four lines" and "one component" describe shape, and
+# the false positives cost more than the rare stale "eight components".
+NUMBER='(^|[^§0-9.=])'
 COUNT="(${NUMBER})[0-9][0-9,]* ([\`'\"A-Za-z0-9_*.-]+ )?(assertions?|tests?|files?|lines?|violations?|waived|components?|bindings?|epics?)\b"
 
 # 3. completion percentages. Position strings ("50% 50% 50% 50%") and CPU
