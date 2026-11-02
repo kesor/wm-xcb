@@ -17,15 +17,26 @@ setup_ewmh()
   ewmh = malloc(sizeof(xcb_ewmh_connection_t));
   memset(ewmh, 0, sizeof(xcb_ewmh_connection_t));
   xcb_intern_atom_cookie_t* cookie = xcb_ewmh_init_atoms(dpy, ewmh);
-  if (!xcb_ewmh_init_atoms_replies(ewmh, cookie, &error))
+  if (!xcb_ewmh_init_atoms_replies(ewmh, cookie, &error)) {
+    /* replies frees the per-screen lists on failure and leaves the pointers
+       dangling. destruct_ewmh wipes again; a second free is a double-free. */
+    ewmh->screens       = NULL;
+    ewmh->_NET_WM_CM_Sn = NULL;
     LOG_FATAL("Failed to initialize EWMH atoms");
-  return;
+  }
 }
 
 void
 destruct_ewmh()
 {
+  /* init_atoms allocates the screen list and one _NET_WM_CM_Sn atom per
+     screen inside the struct; free() alone loses them. wipe dereferences
+     its argument, unlike free, so a second call must not reach it. */
+  if (ewmh == NULL)
+    return;
+  xcb_ewmh_connection_wipe(ewmh);
   free(ewmh);
+  ewmh = NULL;
 }
 
 void
