@@ -332,7 +332,11 @@ since the WM maps windows on `MapRequest`; checks 3 and 4 wait for tiling
 scripts/perf-test.sh [--windows N] [--display :N] [--keep]
 ```
 
-It starts the same way as `xephyr-test.sh` and prints five numbers:
+It starts the same way as `xephyr-test.sh`: it builds the WM variant named by
+`DEBUG` and `SANITIZE`, prints the line that names the variant, the binary and
+the log, and runs that binary. The baseline below was measured on the release
+build; a debug build is `-O0` and its numbers are not comparable with it, which
+is why the variant is in the output. It then prints five numbers:
 
 | Number | How it is measured | Why it matters |
 |--------|--------------------|----------------|

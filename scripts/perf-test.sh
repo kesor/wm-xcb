@@ -9,6 +9,12 @@
 #   --display :N  X display for the nested server (default: first free :2..:9)
 #   --keep        leave Xephyr and the WM running on exit
 #
+# The WM it measures is the variant named by DEBUG and SANITIZE in the
+# environment, exactly as `make DEBUG=1` and `make SANITIZE=1` build it, and the
+# first line of output names the variant, the binary and the log. A number is
+# only worth the build that produced it: a debug build is -O0, so its idle and
+# burst CPU are not comparable with the release baseline in docs/TESTING.md.
+#
 # What is measured (all numbers printed with units):
 #   idle CPU      WM CPU time consumed over 2 s with no activity
 #   burst CPU     WM CPU time consumed while N windows are created
@@ -58,12 +64,14 @@ while [ $# -gt 0 ]; do
 done
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WM_BIN="$ROOT_DIR/wm"
 XCLIENT_BIN="$ROOT_DIR/tools/xclient"
 LOG_DIR="${TMPDIR:-/tmp}/wm-perf-test"
 mkdir -p "$LOG_DIR"
 WM_LOG="$LOG_DIR/wm.log"
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
+
+# shellcheck source=lib/wm-variant.sh
+. "$ROOT_DIR/scripts/lib/wm-variant.sh"
 
 for cmd in Xephyr xdotool; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -71,10 +79,12 @@ for cmd in Xephyr xdotool; do
     exit 1
   fi
 done
-if [ ! -x "$WM_BIN" ] || [ ! -x "$XCLIENT_BIN" ]; then
-  echo "perf-test: run 'make && make tools/xclient' first" >&2
+if [ ! -x "$XCLIENT_BIN" ]; then
+  echo "perf-test: build the test client first: make tools/xclient" >&2
   exit 1
 fi
+
+wm_build_variant "$WM_LOG" || exit 1
 
 if [ -z "$DISPLAY_NUM" ]; then
   for n in 2 3 4 5 6 7 8 9; do
@@ -147,7 +157,13 @@ if ! DISPLAY="$TEST_DISPLAY" xdotool getdisplaygeometry >/dev/null 2>&1; then
   exit 1
 fi
 
-DISPLAY="$TEST_DISPLAY" "$WM_BIN" >"$WM_LOG" 2>&1 &
+# stdbuf keeps DEBUG lines in the log when the WM is built with DEBUG=1; the
+# helper reports where that would stop a sanitize build from starting at all.
+if [ "$WM_VARIANT_STDBUF" -eq 1 ]; then
+  DISPLAY="$TEST_DISPLAY" stdbuf -oL -eL "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+else
+  DISPLAY="$TEST_DISPLAY" "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+fi
 WM_PID=$!
 sleep 1
 if ! kill -0 "$WM_PID" 2>/dev/null; then
