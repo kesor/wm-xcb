@@ -97,6 +97,7 @@ TEST_SRC = \
 	tests/unit/test-client-list-component.c \
 	tests/unit/test-tiling-component.c \
 	tests/unit/test-focus-component.c \
+	tests/unit/test-wm-components.c \
 	tests/unit/test-fullscreen-component.c \
 	tests/unit/test-wm-keybinding.c \
 	tests/unit/test-wm-monitor-manager.c \

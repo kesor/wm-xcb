@@ -13,7 +13,6 @@
 #include "test-registry.h"
 #include "test-target-client.h"
 #include "test-wm.h"
-#include "wm-components.h"
 #include "wm-hub.h"
 
 /*
@@ -617,41 +616,6 @@ test_unmanaged_client_not_focusable(void)
 }
 
 /*
- * The startup order is what makes the component exist at runtime: the
- * ENTER/LEAVE handlers and the focus actions are all registered inside
- * focus_component_init(). Run the same sequence the window manager runs and
- * check the component came out of it wired, then that shutdown undoes it.
- */
-void
-test_focus_component_starts_with_the_wm(void)
-{
-  LOG_CLEAN("== Testing the startup order initializes the focus component");
-
-  hub_init();
-  sm_registry_init();
-  xcb_handler_init();
-
-  wm_components_init();
-
-  assert(focus_component_is_initialized() == true);
-  assert(xcb_handler_count_for_type(XCB_ENTER_NOTIFY) >= 1);
-  assert(xcb_handler_count_for_type(XCB_LEAVE_NOTIFY) >= 1);
-  assert(hub_get_component_by_name(FOCUS_COMPONENT_NAME) != NULL);
-  assert(action_exists("focus.focus-current"));
-  assert(action_exists("focus.focus-prev"));
-
-  wm_components_shutdown();
-
-  assert(focus_component_is_initialized() == false);
-  assert(xcb_handler_count_for_type(XCB_ENTER_NOTIFY) == 0);
-  assert(action_exists("focus.focus-current") == false);
-
-  xcb_handler_shutdown();
-  sm_registry_shutdown();
-  hub_shutdown();
-}
-
-/*
  * Register test group
  */
 TEST_GROUP(FocusComponent, {
@@ -668,5 +632,4 @@ TEST_GROUP(FocusComponent, {
   test_focus_current_action();
   test_focus_prev_action();
   test_unmanaged_client_not_focusable();
-  test_focus_component_starts_with_the_wm();
 });

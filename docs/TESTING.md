@@ -409,7 +409,10 @@ the binary exit non-zero with LeakSanitizer's summary even when every assertion
 passed. The suite leaks today at the allocation sites listed in
 `tests/quality/asan-baseline.txt`, so a raw run of the whole suite is not the
 check: `scripts/check-sanitize.sh` runs the same binary and fails only on a site
-that is not in the baseline.
+that is not in the baseline. It also drops `suppressions=` and `log_path=` from
+the sanitizer options, checks the binary it ran for the ASan runtime, and fails
+when the baseline lists sites and the log holds no report, for the reasons the
+nested-server gate below gives.
 
 Remember that `./wm` is now the instrumented binary: run `make` to put the
 plain one back. The objects do not need cleaning, see *Build directories*
@@ -436,7 +439,8 @@ an uninstrumented binary writes a log with no report in it. `suppressions=` and
 `log_path=` are dropped from the sanitizer options before the harness starts,
 because either one turns a real report into silence. And a baseline with
 entries next to a log with no report fails, because that is either the fixes
-landing without their baseline update or the sanitizer never running.
+landing without their baseline update or the sanitizer never running. That
+verdict is `scripts/lib/sanitize-report.sh`, shared with the unit-suite gate.
 
 ```bash
 scripts/check-sanitize-x.sh --update-baseline  # accept today's sites under a live WM

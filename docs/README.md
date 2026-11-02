@@ -102,7 +102,10 @@ Short version, and the parts that stay true until they are fixed:
   `tag-manager.toggle`, and `tag-manager.client-move` are in the registry. The
   components `main` starts register the actions they own. A unit test inits
   every owner and fails if a name in `config.wm.def.h` is not registered after
-  that. No key is grabbed yet, so no keybinding can reach any of them from X.
+  that. `main` exits non-zero when a module on its startup check does not come
+  up, and a unit test runs that startup and asks each of those modules whether
+  it is up. No key is grabbed yet, so no keybinding can reach any
+  of them from X.
 - **Does not work:** it never grabs keys, so no binding fires; it never calls
   `xcb_set_input_focus`, so the X input focus stays wherever the client left it
   even though `FocusSM` follows the pointer; it sets no EWMH root properties.

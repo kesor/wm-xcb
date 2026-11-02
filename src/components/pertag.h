@@ -71,11 +71,18 @@ typedef struct Pertag {
  * Pertag component lifecycle
  */
 
+#define PERTAG_COMPONENT_NAME "pertag"
+
 /*
  * Initialize the pertag component.
  * Registers with hub so it can be adopted by monitors.
  */
 void pertag_component_init(void);
+
+/*
+ * Check if the component is initialized (for the startup check)
+ */
+bool pertag_component_is_initialized(void);
 
 /*
  * Shutdown the pertag component.
