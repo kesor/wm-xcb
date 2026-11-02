@@ -32,8 +32,9 @@
 # hide a report with an environment variable or a suppression file. And a
 # baseline with entries next to a log with no report fails: the fixes landed
 # without their baseline update, or the sanitizer did not run, and the log
-# cannot say which. The judgement itself lives in
-# scripts/lib/sanitize-x-report.sh, so it can be tested against recorded output.
+# cannot say which. The harness line is judged in
+# scripts/lib/sanitize-x-report.sh. The scrub and the site verdict live in
+# scripts/lib/sanitize-report.sh, which the unit gate reads too.
 #
 # Needs what the harness needs: Xephyr, xdotool, xprop, and a display for
 # Xephyr to draw into. CI runs it under xvfb-run, next to the seam job.
@@ -68,7 +69,7 @@ export SANITIZE_VERBOSE=$VERBOSE
 . "$ROOT_DIR/scripts/lib/sanitize-x-report.sh"
 
 for option_var in ASAN_OPTIONS LSAN_OPTIONS UBSAN_OPTIONS; do
-  sanitize_x_scrub_options "$option_var"
+  sanitize_scrub_options "$option_var"
 done
 
 # The leak report is the exit-time one, so it is only complete if the harness

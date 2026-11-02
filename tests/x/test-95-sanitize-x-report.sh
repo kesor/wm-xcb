@@ -134,4 +134,12 @@ sanitize_scrub_options ASAN_OPTIONS
 set +u
 check_eq "an unset option string scrubs to empty" "" "${ASAN_OPTIONS-}"
 
+# The gate has no set -e. A call to the removed name prints "command not found"
+# and continues, so the scrub never runs. This asserts the call site names the
+# function that exists.
+check_eq "the nested-server gate calls the shared scrub" 1 \
+  "$(grep -c 'sanitize_scrub_options' "$ROOT_DIR/scripts/check-sanitize-x.sh")"
+check_eq "the nested-server gate does not call the removed name" 0 \
+  "$(grep -c 'sanitize_x_scrub_options' "$ROOT_DIR/scripts/check-sanitize-x.sh")"
+
 finish
