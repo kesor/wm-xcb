@@ -12,7 +12,7 @@
 # Layers, fastest first:
 #   pre-commit  ~5s     paths, docs, test-src, bead-refs, workflow, formatting, build, unit, async, beads
 #   commit-msg  instant  commit message rules
-#   pre-push    ~65s    the above, plus the flake evaluation, the seam suite and the -pedantic debug build
+#   pre-push    ~65s    the above, plus the flake evaluation, the shell lint, the seam suite and the -pedantic debug build
 #   CI                   pre-push --force (beads excluded), plus seam and sanitize-x
 #
 # Adding a gate: put the command in a script under scripts/ and list it here.
@@ -113,6 +113,13 @@ pre-push:
     format:
       run: ./scripts/format-check.sh
       fail_text: "Formatting: run 'make format'."
+
+    # The gates and the harnesses are shell, so a defect in one of them is a
+    # gate that reports the wrong answer. The baseline comparison is not a
+    # one-line shellcheck invocation, so this job runs the script.
+    shellcheck:
+      run: ./scripts/check-shellcheck.sh
+      fail_text: "shellcheck reports a finding the baseline does not record. Fix it, or run --update-baseline and say in the commit why it is deferred."
 
     async:
       run: ./scripts/check-async.sh

@@ -3,14 +3,16 @@
 # format-check.sh - check or fix clang-format style for every C file.
 #
 # Usage:
-#   scripts/format-check.sh            # check all tracked sources and headers
+#   scripts/format-check.sh            # check the files this gate owns
 #   scripts/format-check.sh --fix      # rewrite them in place. Same list.
+#   scripts/format-check.sh --list     # print that list and exit
 #   scripts/format-check.sh file.c ...  # check only the files given
 #
 # The check and the fixer must agree on which files they own, or `make format`
 # rewrites a file the gate does not look at. That is what happened with
 # config.wm.def.h: the old `make format` reformatted it, the gate never checked
-# it. One list, in this file, used by both.
+# it. One list, in this file, used by both. --list is that list on stdout, which
+# is how tests/x/test-98-format-list.sh pins what the two of them cover.
 #
 # Exit status: 0 when every file is formatted (or after --fix), 1 otherwise.
 
@@ -20,12 +22,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 FIX=0
+LIST=0
 FILES=()
 for arg in "$@"; do
   case "$arg" in
     -f | --fix) FIX=1 ;;
+    --list) LIST=1 ;;
     -h | --help)
-      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+      awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"
       exit 0
       ;;
     *) FILES+=("$arg") ;;
@@ -37,10 +41,18 @@ if ! command -v clang-format >/dev/null 2>&1; then
   exit 1
 fi
 
-# Everything tracked, minus vendor. vendor/ is third-party and not ours to
-# restyle.
+# Everything tracked or about to be, minus vendor. vendor/ is third-party and
+# not ours to restyle. Untracked files are in the list because a new source or
+# test file is what the next commit adds: a list built from the index alone
+# reports the tree formatted while the file nobody has read is not, and the
+# pre-commit gate then rejects the commit that `make format` said was clean.
 if [ "${#FILES[@]}" -eq 0 ]; then
-  mapfile -t FILES < <(git ls-files '*.c' '*.h' | grep -v '^vendor/')
+  mapfile -t FILES < <(git ls-files --cached --others --exclude-standard '*.c' '*.h' | grep -v '^vendor/')
+fi
+
+if [ "$LIST" -eq 1 ]; then
+  printf '%s\n' "${FILES[@]}"
+  exit 0
 fi
 
 FAILED=0
