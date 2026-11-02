@@ -61,9 +61,6 @@ target_id_hash(TargetID id)
 static HubTarget* targets_by_type[MAX_TARGET_TYPES][MAX_TARGETS];
 static uint32_t   targets_by_type_count[MAX_TARGET_TYPES];
 
-/* Event Bus - maximum number of event types */
-#define MAX_EVENT_TYPES 64
-
 /* Event Bus - maximum subscribers per event type */
 #define MAX_SUBSCRIBERS 16
 
@@ -71,7 +68,7 @@ static uint32_t   targets_by_type_count[MAX_TARGET_TYPES];
 static struct {
   struct Subscriber subscribers[MAX_SUBSCRIBERS];
   int               count;
-} subscribers[MAX_EVENT_TYPES];
+} subscribers[HUB_MAX_EVENT_TYPES];
 
 /* Forward declarations */
 static void       component_add_to_request_type_index(HubComponent* comp);
@@ -800,7 +797,9 @@ target_by_id_map_lookup(TargetID id)
 void
 hub_emit(EventType type, TargetID target, void* data)
 {
-  if (type >= MAX_EVENT_TYPES) {
+  if (type >= HUB_MAX_EVENT_TYPES) {
+    LOG_ERROR("Dropping event type %u: the hub event bus holds %d types",
+              type, HUB_MAX_EVENT_TYPES);
     return;
   }
 
@@ -827,7 +826,9 @@ hub_emit(EventType type, TargetID target, void* data)
 void
 hub_subscribe(EventType type, EventHandler handler, void* userdata)
 {
-  if (type >= MAX_EVENT_TYPES) {
+  if (type >= HUB_MAX_EVENT_TYPES) {
+    LOG_ERROR("Cannot subscribe to event type %u: the hub event bus holds %d types",
+              type, HUB_MAX_EVENT_TYPES);
     return;
   }
 
@@ -982,7 +983,9 @@ hub_shutdown(void)
 void
 hub_unsubscribe(EventType type, EventHandler handler)
 {
-  if (type >= MAX_EVENT_TYPES) {
+  if (type >= HUB_MAX_EVENT_TYPES) {
+    LOG_ERROR("Cannot unsubscribe from event type %u: the hub event bus holds %d types",
+              type, HUB_MAX_EVENT_TYPES);
     return;
   }
 

@@ -28,6 +28,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "src/event-types.h"
 #include "wm-hub.h"
 
 /* Forward declarations */
@@ -53,7 +54,7 @@ enum TagManagerRequestType {
  * Tag Manager event types
  */
 enum TagManagerEventType {
-  EVT_TAG_CHANGED = 20, /* Emitted when tag view state changes */
+  EVT_TAG_CHANGED = EVT_TAG_MANAGER_BASE + 0, /* Emitted when tag view state changes */
 };
 
 /*

@@ -187,32 +187,31 @@ struct Event {
     void* data;         // event-specific payload
     uint64_t correlation_id;  // for matching requests to responses
 };
-
-enum EventType {
-    // State machine transition events
-    EVT_FULLSCREEN_ENTERED,
-    EVT_FULLSCREEN_EXITED,
-    EVT_CLIENT_TILED,
-    EVT_CLIENT_FLOATING,
-    
-    // Monitor events
-    EVT_MONITOR_CONNECTED,
-    EVT_MONITOR_DISCONNECTED,
-    EVT_RESOLUTION_CHANGED,
-    
-    // Client lifecycle
-    EVT_CLIENT_MANAGED,
-    EVT_CLIENT_UNMANAGED,
-    EVT_CLIENT_FOCUSED,
-    EVT_CLIENT_UNFOCUSED,
-    
-    // Request responses
-    EVT_REQUEST_SUCCESS,
-    EVT_REQUEST_FAILED,
-    
-    // ... more event types
-};
 ```
+
+### Event Type Ranges
+
+`EventType` is a `uint32_t`, but the event bus indexes its subscriber table by
+the value, so the usable values are `0` to `HUB_MAX_EVENT_TYPES - 1`. A value
+outside that range is dropped with an error in the log.
+
+Two components sharing a value receive each other's events, so each component
+numbers its events in its own range. `src/event-types.h` is the single list of
+ranges and the base constants the component enums start from:
+
+| Range | Component |
+|-------|-----------|
+| `0`-`9` | `client-list` |
+| `10`-`19` | `fullscreen` |
+| `20`-`29` | `tag-manager` |
+| `30`-`39` | `focus` |
+| `40`-`49` | `tiling` |
+| `50`-`59` | `connection` |
+| `60`-`63` | reserved |
+
+Add a new component by taking the next free range there, not the next free
+number. The unit suite walks every constant and fails on a duplicate or a value
+outside its range.
 
 ### Subscription API
 
