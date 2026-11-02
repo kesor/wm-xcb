@@ -93,19 +93,20 @@ Short version, and the parts that stay true until they are fixed:
 - **Works against X:** connecting, taking substructure redirect, RandR monitor
   discovery, tracking windows as `Client` targets, mapping a window on
   `MapRequest` with a border and `WM_STATE=Normal`, attaching every new client
-  to the selected monitor with that monitor's visible tags, and tiling that
-  monitor's visible clients when a window is managed or unmanaged. The
+  to the selected monitor with that monitor's visible tags, tiling that
+  monitor's visible clients when a window is managed or unmanaged, and tracking
+  which client the pointer is over: a managed window selects pointer enter and
+  leave, and the focus component raw-writes `FocusSM` from those events. The
   components `main` starts register the actions they own. A unit test inits
   every owner and fails if a name in `config.wm.def.h` is not registered after
   that. No key is grabbed yet, so no keybinding can reach any of them from X.
-- **Does not work:** it never grabs keys, so no binding fires; the focus and
-  tag-manager components are never initialized (`bd show wm-4f6.14`,
-  `bd show wm-4f6.13`), so `focus.focus-prev`, `tag-manager.view`,
+- **Does not work:** it never grabs keys, so no binding fires; the tag-manager
+  component is never initialized (`bd show wm-4f6.13`), so `tag-manager.view`,
   `tag-manager.toggle`, and `tag-manager.client-move` are not in the registry
-  of a running WM, mouse enter and leave reach no state machine, and a tag
-  request has no monitor tag view behind it; it never calls
-  `xcb_set_input_focus`, so focus stays wherever the client left it; it sets no
-  EWMH root properties. The event loop polls instead of blocking, so it burns a
+  of a running WM, and a tag request has no monitor tag view behind it; it
+  never calls `xcb_set_input_focus`, so the X input focus stays wherever the
+  client left it even though `FocusSM` follows the pointer; it sets no EWMH
+  root properties. The event loop polls instead of blocking, so it burns a
   core while idle.
 
 Do not take that from a document. Ask the tree:

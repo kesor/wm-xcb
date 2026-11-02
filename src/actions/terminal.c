@@ -125,7 +125,10 @@ terminal_set_command(const char* cmd)
 void
 terminal_init(void)
 {
-  if (initialized) {
+  /* Same as the launcher: keybinding_shutdown() clears the action registry
+   * without calling terminal_shutdown(), so the flag alone is not proof that
+   * terminal.spawn is still registered. */
+  if (initialized && action_exists(terminal_action.name)) {
     LOG_DEBUG("Terminal module already initialized");
     return;
   }
