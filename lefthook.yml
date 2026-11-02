@@ -115,9 +115,8 @@ pre-push:
       fail_text: "Formatting: run 'make format'."
 
     # The gates and the harnesses are shell, so a defect in one of them is a
-    # gate that reports the wrong answer. This one has its own header:
-    # shellcheck needs per-file source paths, which a one-line command cannot
-    # give it.
+    # gate that reports the wrong answer. The baseline comparison is not a
+    # one-line shellcheck invocation, so this job runs the script.
     shellcheck:
       run: ./scripts/check-shellcheck.sh
       fail_text: "shellcheck reports a finding the baseline does not record. Fix it, or run --update-baseline and say in the commit why it is deferred."
