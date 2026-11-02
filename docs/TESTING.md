@@ -75,13 +75,13 @@ The nested-server scripts run the variant you name, so the debug log is one
 command away:
 
 ```bash
-make DEBUG=1                       # build it, or let the script do it
+make DEBUG=1                       # build the debug WM, or let the scripts do it
 DEBUG=1 scripts/xephyr-test.sh --verbose
 make DEBUG=1 test-x                # the seam suite against the debug WM
 DEBUG=1 ./tests/x/run.sh           # the same thing spelled out
 ```
 
-Each of those prints one line before it starts anything:
+Each harness run prints one line before it starts anything:
 
 ```
 xephyr-test.sh: variant=debug (DEBUG=1 SANITIZE=0), binary=<repo>/build/debug/wm, log=<tmpdir>/wm-xephyr-test/wm.log
