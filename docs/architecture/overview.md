@@ -267,57 +267,10 @@ hub_notify_compatible_targets(COMPONENT_URGENCY);
 
 ## Directory Structure
 
-```
-wm/
-├── src/
-│   ├── hub/                    # Hub implementation
-│   │   ├── hub.c/h             # Main hub logic
-│   │   ├── registry.c/h        # Component/target registry
-│   │   ├── router.c/h         # Request routing
-│   │   └── event_bus.c/h      # Event pub/sub
-│   │
-│   ├── sm/                     # State machine framework
-│   │   ├── sm.c/h             # SM core
-│   │   ├── sm_transition.c/h  # Transition logic
-│   │   └── sm_template.c/h    # Template storage
-│   │
-│   ├── target/                # Target infrastructure
-│   │   ├── target.c/h         # Base target
-│   │   ├── client.c/h         # Client target
-│   │   ├── monitor.c/h        # Monitor target
-│   │   └── target_adoption.c/h
-│   │
-│   ├── components/            # Built-in components
-│   │   ├── fullscreen.c/h
-│   │   ├── floating.c/h
-│   │   ├── focus.c/h
-│   │   ├── connection.c/h     # Monitor connection
-│   │   ├── resolution.c/h     # Monitor resolution
-│   │   └── ... (others)
-│   │
-│   ├── listeners/             # Event listeners
-│   │   ├── xcb_listener.c/h   # XCB event dispatcher
-│   │   ├── randr_listener.c/h # RandR events
-│   │   └── ... (others)
-│   │
-│   └── main.c                 # Entry point
-│
-├── docs/
-│   ├── architecture/
-│   │   ├── overview.md        # This file
-│   │   ├── hub.md            # Hub detailed design
-│   │   ├── state-machine.md  # SM framework design
-│   │   ├── component.md      # Component design
-│   │   ├── target.md         # Target design
-│   │   ├── event-flow.md     # Event/request flows
-│   │   └── decisions.md      # Decision log with rationale
-│   │
-│   └── extensions/            # Extension designs
-│
-├── config.def.h               # Configuration
-├── Makefile
-└── config.mk
-```
+Where the code lives is one table, the "Where the code lives" table in
+`.agents/skills/wm-bootstrap/SKILL.md`. It is not copied here: a second copy
+disagrees with the tree eventually, and the copy an agent reads first is the
+one that sends it to a path that no longer exists.
 
 ---
 
