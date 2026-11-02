@@ -287,6 +287,39 @@ test_map_request_manages_client(void)
 }
 
 /*
+ * Test MAP_REQUEST sets the border width in the model
+ *
+ * The unit suite runs without an X connection, so client_list_map_client()
+ * sends no request; the width it asks X for still has to reach the client.
+ */
+void
+test_map_request_sets_border_width(void)
+{
+  LOG_CLEAN("== Testing MAP_REQUEST sets the client border width");
+
+  hub_init();
+  xcb_handler_init();
+  client_list_component_init();
+
+  xcb_map_request_event_t map_event = {
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 1,
+    .parent        = 100,
+    .window        = 700,
+  };
+  xcb_handler_dispatch(&map_event);
+
+  Client* c = client_get_by_window(700);
+  assert(c != NULL);
+  assert(c != NULL && c->border_width == 1);
+
+  /* Cleanup */
+  client_list_component_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
+/*
  * Test MAP_REQUEST creates client if not exists
  */
 void
@@ -626,6 +659,7 @@ TEST_GROUP(ClientListComponent, {
   test_create_notify_skips_override_redirect();
   test_destroy_notify_destroys_client();
   test_map_request_manages_client();
+  test_map_request_sets_border_width();
   test_map_request_creates_client_if_not_exists();
   test_unmap_notify_unmanages_client();
   test_managed_client_lands_on_monitor();
