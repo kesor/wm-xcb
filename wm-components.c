@@ -8,6 +8,7 @@
 #include "src/components/keybinding.h"
 #include "src/components/monitor-manager.h"
 #include "src/components/pertag.h"
+#include "src/components/tag-manager.h"
 #include "src/components/tiling.h"
 
 #include "src/actions/launcher.h"
@@ -21,8 +22,11 @@ wm_components_init(void)
   keybinding_init();
   fullscreen_component_init();
   client_list_component_init();
-  /* Initialize pertag BEFORE monitor_manager so monitors get adopted */
+  /* pertag and tag-manager store state machines on monitors, and adoption
+   * happens when the monitor target is registered. Both go before
+   * monitor_manager_init() creates the monitors. */
   pertag_component_init();
+  tag_manager_component_init();
   monitor_manager_init();
   focus_component_init();
   tiling_component_init();
@@ -40,6 +44,7 @@ wm_components_shutdown(void)
    * come from. Unregistering an action needs the registry, so every component
    * goes before keybinding_shutdown(). */
   monitor_manager_shutdown();
+  tag_manager_component_shutdown();
   tiling_component_shutdown();
   client_list_component_shutdown();
   focus_component_shutdown();

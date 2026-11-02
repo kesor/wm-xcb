@@ -17,6 +17,7 @@
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "test-wm.h"
+#include "wm-components.h"
 #include "wm-hub.h"
 
 /*
@@ -576,6 +577,53 @@ test_tag_manager_client_move_action(void)
   hub_shutdown();
 }
 
+/*
+ * Test: the startup order the window manager runs brings the component up.
+ *
+ * Every test above calls tag_manager_component_init() itself, so all of them
+ * pass with the component missing from wm_components_init(), which is how no
+ * monitor got a tag-view SM at runtime. This one runs the sequence main() runs
+ * and then checks what a monitor gets out of it.
+ */
+void
+test_tag_manager_starts_with_the_wm(void)
+{
+  LOG_CLEAN("== Testing the startup order initializes the tag manager");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  tag_list_init();
+  monitor_list_init();
+
+  wm_components_init();
+
+  assert(tag_manager_component_is_initialized() == true);
+  assert(hub_get_component_by_name(TAG_MANAGER_COMPONENT_NAME) != NULL);
+  assert(action_exists("tag-manager.view") == true);
+
+  Monitor* m = monitor_create(700);
+  assert_or_abort(m != NULL);
+
+  /* Read the stored machine, not tag_manager_get_view_sm(): that one creates
+   * the SM on demand and would hide a monitor that was never adopted. */
+  assert(monitor_get_sm(m, "tag-view") != NULL);
+  assert(tag_manager_get_visible_tags(m) == TAG_MASK(0));
+
+  monitor_destroy(m);
+
+  wm_components_shutdown();
+
+  assert(tag_manager_component_is_initialized() == false);
+  assert(hub_get_component_by_name(TAG_MANAGER_COMPONENT_NAME) == NULL);
+
+  monitor_list_shutdown();
+  tag_list_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(TagManager, {
   test_tag_manager_init_shutdown();
   test_tag_manager_receives_tag_view_requests();
@@ -588,4 +636,5 @@ TEST_GROUP(TagManager, {
   test_tag_manager_actions_registered();
   test_tag_manager_view_and_toggle_actions();
   test_tag_manager_client_move_action();
+  test_tag_manager_starts_with_the_wm();
 });
