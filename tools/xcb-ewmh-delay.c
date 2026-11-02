@@ -6,12 +6,12 @@
  * queue during a reply wait or a flush, so the test needs the WM to be between
  * "an event has arrived" and "the WM reads the socket".
  *
- * setup_ewmh() runs after the startup window rescan and before the event loop,
- * and it is the last startup step that waits for the server. Holding
- * xcb_ewmh_init_atoms() there gives the test a point after the rescan where it
- * can map a window. The real call sends the atom requests, and the reply wait
- * that follows reads the pending MapRequest into libxcb's queue along with the
- * replies.
+ * setup_ewmh() waits for the server after substructure redirect is selected
+ * and before wm_xcb_adopt_existing_windows(). Holding xcb_ewmh_init_atoms()
+ * there is a point where a map becomes a MapRequest and the window stays
+ * unmapped, so the adoption scan skips it. The reply wait reads that
+ * MapRequest into libxcb's queue along with the replies. Later startup reply
+ * waits do not put it back on the socket.
  *
  * The shim writes WM_QUEUE_TEST_MARKER once it is holding, and continues when
  * WM_QUEUE_TEST_GO exists. Both names are read from the environment; when
