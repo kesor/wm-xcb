@@ -19,4 +19,10 @@ logger(FILE* io, const char* fmt, ...)
     perror(NULL);
   } else
     (void) fputc('\n', io);
+
+  /* A redirected log is fully buffered, and a WM is usually killed rather than
+     exited, so a line that is still in the buffer never reaches the file and
+     the log stops mid-line at the buffer boundary. That reads as "the event
+     never arrived", which is what cost a session reading a DEBUG log. */
+  (void) fflush(io);
 }

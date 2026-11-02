@@ -73,4 +73,14 @@ run_make "plain make after make DEBUG=1"
 ASAN_OPTIONS=detect_leaks=0 run_make "make test SANITIZE=1" test SANITIZE=1
 run_make "make test after make test SANITIZE=1" test
 
+# A root ./test from before the suite stopped copying itself there still runs,
+# and nothing refreshes it. make has to remove it, or ./test prints a count
+# from the tree that produced the copy.
+printf '#!/bin/sh\necho stale\n' > test
+chmod +x test
+run_make "make removes a stale root ./test"
+if [ -e test ]; then
+  fail "make left ./test in place, so running it prints a count from an older tree"
+fi
+
 echo "check-build-variants: release, sanitize and debug builds share one tree"

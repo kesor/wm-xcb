@@ -167,13 +167,7 @@ if ! wait_for_display; then
   exit 1
 fi
 
-# stdbuf keeps DEBUG lines in the log when the WM is built with DEBUG=1; the
-# helper reports where that would stop a sanitize build from starting at all.
-if [ "$WM_VARIANT_STDBUF" -eq 1 ]; then
-  DISPLAY="$TEST_DISPLAY" stdbuf -oL -eL "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
-else
-  DISPLAY="$TEST_DISPLAY" "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
-fi
+DISPLAY="$TEST_DISPLAY" "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
 WM_PID=$!
 sleep 1
 

@@ -22,10 +22,9 @@
 #   Builds build/<variant>/wm for the DEBUG and SANITIZE in the environment,
 #   prints
 #     <script>: variant=<variant> (DEBUG=<d> SANITIZE=<s>), binary=<path>, log=<path>
-#   and leaves the path in WM_VARIANT_BIN, the stdbuf choice in
-#   WM_VARIANT_STDBUF, and the line itself in WM_VARIANT_LINE so a caller that
-#   needs to inspect it does not have to capture stdout in a subshell, which
-#   would throw the paths away.
+#   and leaves the path in WM_VARIANT_BIN and the line itself in WM_VARIANT_LINE
+#   so a caller that needs to inspect it does not have to capture stdout in a
+#   subshell, which would throw the paths away.
 wm_build_variant() {
   local log=$1 debug="${DEBUG:-0}" sanitize="${SANITIZE:-0}" variant
   local script build_log
@@ -53,16 +52,11 @@ wm_build_variant() {
     echo "$script: make reported variant '$variant' but $WM_VARIANT_BIN is missing" >&2
     return 1
   fi
-  # stdbuf keeps DEBUG lines in the log when the WM is killed rather than
-  # exited. It preloads a library, and ASan refuses to start unless its runtime
-  # comes first ("ASan runtime does not come first in initial library list").
-  # Every sanitize variant, including debug-sanitize, therefore runs without
-  # stdbuf. debug-sanitize still compiles LOG_DEBUG in; those lines are fully
-  # buffered when stdout is a file, and a kill can drop them.
-  case "$variant" in
-    *-sanitize) WM_VARIANT_STDBUF=0 ;;
-    *) WM_VARIANT_STDBUF=1 ;;
-  esac
+  # No stdbuf wrapper around the binary. It preloads a library, and ASan refuses
+  # to start unless its runtime comes first ("ASan runtime does not come first
+  # in initial library list"), so the sanitize harnesses could not use it. The
+  # WM flushes each log line itself, so a log from a WM that was killed is
+  # complete without one.
   WM_VARIANT_LINE="$script: variant=$variant (DEBUG=$debug SANITIZE=$sanitize), binary=$WM_VARIANT_BIN, log=$log"
   echo "$WM_VARIANT_LINE"
 }

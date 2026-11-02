@@ -156,14 +156,7 @@ xdotool getdisplaygeometry >/dev/null 2>&1 || {
   exit 1
 }
 
-# stdbuf keeps LOG_DEBUG lines in the file when the WM is built with DEBUG=1;
-# the helper reports where that would stop a sanitize build from starting at
-# all.
-if [ "$WM_VARIANT_STDBUF" -eq 1 ]; then
-  stdbuf -oL -eL "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
-else
-  "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
-fi
+"$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
 WM_PID=$!
 sleep 1
 kill -0 "$WM_PID" 2>/dev/null || {
