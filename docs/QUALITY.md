@@ -23,7 +23,13 @@ model.*
 |-------|------|------|------|
 | `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
+<<<<<<< HEAD
 | `pre-push` | every push | ~65 s | the above plus the flake evaluation, the seam suite, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
+||||||| parent of e4bad (drop the CI sanitize job, which ignored the leak baseline)
+| `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
+=======
+| `pre-push` | every push | ~50 s | the above plus the `-pedantic` debug build, the standalone tests, the build variants, the harness variants, and the sanitizers |
+>>>>>>> e4bad (drop the CI sanitize job, which ignored the leak baseline)
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push --force` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run`, required: known failures are baselined |
 | CI `sanitize-x` | every push and PR | ~1 min | `scripts/check-sanitize-x.sh` under `xvfb-run`: the WM in a nested server under ASan and UBSan |
@@ -41,6 +47,7 @@ invocation. The upload fails the job when that directory is empty: an artifact
 step that quietly uploads nothing removes the evidence from exactly the run
 that needs it.
 
+<<<<<<< HEAD
 The sanitizer coverage is split the same way the code is. The unit suite runs
 with no X connection, and the map, tile and focus requests return before they
 are built without one, so the `sanitize` gate inside the gates job cannot see
@@ -50,6 +57,30 @@ running a real WM in a nested server under ASan and UBSan. It is not in
 `lefthook.yml` because it rebuilds the tree under the sanitizers and takes about
 a minute; the seam suite it sits next to is a push gate, and needs no display of
 its own because `scripts/check-seam.sh` starts Xvfb when `DISPLAY` is unset.
+||||||| parent of e4bad (drop the CI sanitize job, which ignored the leak baseline)
+The `sanitize` and `sanitize-x` jobs cover different code because they can
+reach different code: the unit suite runs with no X connection, and the map,
+tile and focus requests return before they are built without one. A 2-byte
+value passed where XCB reads 4 left every gate green and aborted the WM on the
+first `MapRequest`. `sanitize-x` is not in `lefthook.yml` because it needs a
+display and a nested X server, the same reason the seam tests are a CI job
+rather than a hook.
+=======
+The `sanitize` gate and the `sanitize-x` job cover different code because they
+can reach different code: the unit suite runs with no X connection, and the map,
+tile and focus requests return before they are built without one. A 2-byte
+value passed where XCB reads 4 left every gate green and aborted the WM on the
+first `MapRequest`. `sanitize-x` is not in `lefthook.yml` because it needs a
+display and a nested X server, the same reason the seam tests are a CI job
+rather than a hook.
+>>>>>>> e4bad (drop the CI sanitize job, which ignored the leak baseline)
+
+The unit suite under the sanitizers is the `sanitize` gate in the `gates` job,
+not a job of its own. A job that ran `make test SANITIZE=1` raw was red from the
+first push: the suite leaks at allocation sites that
+`tests/quality/asan-baseline.txt` records, and only `scripts/check-sanitize.sh`
+reads that baseline. Two places asked the same question and answered
+differently, so the raw one is gone and the baseline is the single answer.
 
 A baseline records debt, so fixing a baselined site means updating the baseline
 in the same commit: an entry left behind says a defect is still there when it is
@@ -86,9 +117,18 @@ refusal is pinned by a test that needs no X server.
 | sanitize | `scripts/check-sanitize.sh` | no *new* leak site under ASan; known ones come from `tests/quality/asan-baseline.txt` |
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
+<<<<<<< HEAD
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh`, `tests/x/run.sh` and `scripts/perf-test.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
 | seam | `scripts/check-seam.sh` (`make test-x`) | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run. Runs before every push; starts Xvfb when there is no display, and fails rather than skipping when neither is available |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
+||||||| parent of e4bad (drop the CI sanitize job, which ignored the leak baseline)
+| harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
+| seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
+| sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
+=======
+| harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
+| seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
+>>>>>>> e4bad (drop the CI sanitize job, which ignored the leak baseline)
 | sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: the run reports `variant=release-sanitize`, no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. `detect_leaks` and `leak_check_at_exit` are forced on, and `suppressions=` and `log_path=` are dropped, in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 
 ## Where the hooks live
@@ -195,10 +235,18 @@ make hooks                  # once per clone; points git at .githooks/
 lefthook run pre-push --force   # every gate that runs before a push, changed files or not
 lefthook run pre-commit     # just the commit-time gates
 LEFTHOOK_EXCLUDE=beads lefthook run pre-push --force   # without the beads export
+<<<<<<< HEAD
 scripts/check-seam.sh       # the seam suite as the push gate runs it
 scripts/check-flake.sh      # the dev shell in flake.nix evaluates
 make test-x                 # the same suite, spelled out (needs a display)
 make test SANITIZE=1        # the unit suite under the sanitizers
+||||||| parent of e4bad (drop the CI sanitize job, which ignored the leak baseline)
+make test-x                 # seam tests (needs a display; Xephyr handles that)
+make test SANITIZE=1        # the unit suite under the sanitizers
+=======
+make test-x                 # seam tests (needs a display; Xephyr handles that)
+scripts/check-sanitize.sh    # the unit suite under the sanitizers, against the leak baseline
+>>>>>>> e4bad (drop the CI sanitize job, which ignored the leak baseline)
 scripts/check-sanitize-x.sh # the WM in a nested server under the sanitizers
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 scripts/check-harness-variant.sh  # the harnesses run the variant they report

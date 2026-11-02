@@ -10,9 +10,10 @@ name: quality
 # (tests/quality/seam-baseline.txt) from new ones: a red seam job means this
 # branch broke something, which is exactly what a required gate should say.
 #
-# The sanitize-x job exists because the sanitize job below runs the unit suite,
-# and without a display the X calls return before they build a request. Only a
-# live WM in a nested server can show a memory error in the map path.
+# The sanitize-x job exists because the sanitize gate in the job above runs the
+# unit suite, and without a display the X calls return before they build a
+# request. Only a live WM in a nested server can show a memory error in the map
+# path.
 
 on:
   push:
@@ -65,19 +66,6 @@ jobs:
           name: seam-test-logs
           path: /tmp/wm-seam-tests/
           if-no-files-found: error
-
-  sanitize:
-    name: address and UB sanitizers
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: cachix/install-nix-action@v31
-      - name: make test under ASan and UBSan
-        run: |
-          nix develop --command bash -c '
-            make clean >/dev/null
-            ASAN_OPTIONS=detect_leaks=1 make test SANITIZE=1
-          '
 
   sanitize-x:
     name: the WM in a nested X server under ASan and UBSan

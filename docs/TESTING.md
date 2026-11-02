@@ -397,17 +397,19 @@ valgrind --leak-check=full build/release/test
 AddressSanitizer and UBSan (rebuild with `SANITIZE=1`):
 
 ```bash
-make test SANITIZE=1             # whole suite under ASan+UBSan, exit 0, no leak report
+make test SANITIZE=1             # the whole suite under ASan+UBSan
 make SANITIZE=1                  # the instrumented wm binary for a live session
 DISPLAY=:2 ./wm
 ```
 
 `SANITIZE=1` adds `-fsanitize=address,undefined -fno-omit-frame-pointer -g` to
 both compile and link. `make SANITIZE=1` alone builds only `wm`, so the test
-binary needs `make test SANITIZE=1`. Measured 2026-11-01 after the hub registry
-fix: the test binary passes all assertions and LeakSanitizer prints no summary,
-so the exit status is the answer. `detect_leaks=1` is set to match the CI
-sanitize job.
+binary needs `make test SANITIZE=1`. `detect_leaks=1` is on, so a leak makes
+the binary exit non-zero with LeakSanitizer's summary even when every assertion
+passed. The suite leaks today at the allocation sites listed in
+`tests/quality/asan-baseline.txt`, so a raw run of the whole suite is not the
+check: `scripts/check-sanitize.sh` runs the same binary and fails only on a site
+that is not in the baseline.
 
 Remember that `./wm` is now the instrumented binary: run `make` to put the
 plain one back. The objects do not need cleaning, see *Build directories*
