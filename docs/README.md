@@ -97,17 +97,19 @@ Short version, and the parts that stay true until they are fixed:
   monitor's visible clients when a window is managed or unmanaged, and tracking
   which client the pointer is over: a managed window selects pointer enter and
   leave, and the focus component raw-writes `FocusSM` from those events. The
+  tag-manager component starts before monitor discovery, so every monitor is
+  adopted with a tag-view state machine and `tag-manager.view`,
+  `tag-manager.toggle`, and `tag-manager.client-move` are in the registry. The
   components `main` starts register the actions they own. A unit test inits
   every owner and fails if a name in `config.wm.def.h` is not registered after
   that. No key is grabbed yet, so no keybinding can reach any of them from X.
-- **Does not work:** it never grabs keys, so no binding fires; the tag-manager
-  component is never initialized (`bd show wm-4f6.13`), so `tag-manager.view`,
-  `tag-manager.toggle`, and `tag-manager.client-move` are not in the registry
-  of a running WM, and a tag request has no monitor tag view behind it; it
-  never calls `xcb_set_input_focus`, so the X input focus stays wherever the
-  client left it even though `FocusSM` follows the pointer; it sets no EWMH
-  root properties. The event loop polls instead of blocking, so it burns a
-  core while idle.
+- **Does not work:** it never grabs keys, so no binding fires; it never calls
+  `xcb_set_input_focus`, so the X input focus stays wherever the client left it
+  even though `FocusSM` follows the pointer; it sets no EWMH root properties.
+  The event loop polls instead of blocking, so it burns a core while idle.
+  Visible tags are stored twice: a tag view change updates the tag-view state
+  machine, and a new client still copies its tags from `Monitor.tagset`, which
+  no runtime path writes, so every new client lands on tag 1.
 
 Do not take that from a document. Ask the tree:
 
