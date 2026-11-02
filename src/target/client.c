@@ -8,6 +8,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <xcb/xcbext.h>
 
 #include "../sm/sm-registry.h"
 #include "../sm/sm.h"
@@ -29,8 +30,10 @@
  */
 static Client client_sentinel;
 
-/* Set by client_atoms_init(), read by client_set_wm_state(). */
-static xcb_atom_t wm_state_atom = XCB_ATOM_NONE;
+/* Set by client_atoms_init(), read by client_set_wm_state() and by the size
+ * hint reader. */
+static xcb_atom_t wm_state_atom        = XCB_ATOM_NONE;
+static xcb_atom_t wm_normal_hints_atom = XCB_ATOM_NONE;
 
 static void
 client_properties_init(Client* c)
@@ -49,6 +52,11 @@ client_properties_init(Client* c)
   c->focusable    = true;
   c->mapped       = false;
   c->stack_mode   = XCB_STACK_MODE_ABOVE;
+
+  /* No hints until the window says otherwise: a client that sets none is
+   * unconstrained, not zero-sized. */
+  memset(&c->size_hints, 0, sizeof(c->size_hints));
+  c->size_hints_pending = false;
 
   /* Initialize SM storage */
   c->sms.machines = NULL;
@@ -349,6 +357,23 @@ client_create(xcb_window_t window)
   return c;
 }
 
+/*
+ * Drop a size hint read whose reply nobody will consume.
+ *
+ * An unchecked request keeps its reply in libxcb until somebody reads or
+ * discards it, and a client can be destroyed or ask again before the reply has
+ * arrived.
+ */
+static void
+client_discard_size_hints(Client* c)
+{
+  if (!c->size_hints_pending)
+    return;
+  if (dpy != NULL)
+    xcb_discard_reply(dpy, c->size_hints_cookie.sequence);
+  c->size_hints_pending = false;
+}
+
 void
 client_destroy(Client* c)
 {
@@ -388,6 +413,10 @@ client_destroy(Client* c)
     free(c->class_name);
     c->class_name = NULL;
   }
+
+  /* A DestroyNotify can arrive in the same batch as the MapRequest that asked
+   * for the hints, so the reply may still be on its way. */
+  client_discard_size_hints(c);
 
   /* Unregister from Hub */
   if (c->target.registered) {
@@ -626,6 +655,181 @@ client_set_border_width(Client* c, uint16_t border_width)
 }
 
 /*
+ * Size hints
+ */
+
+void
+client_set_size_hints(Client* c, const ClientSizeHints* hints)
+{
+  if (c == NULL || hints == NULL)
+    return;
+  c->size_hints = *hints;
+}
+
+/* A CARD32 hint into the 16-bit window size X takes. A negative dimension is
+ * not a size, and reading it as unsigned would turn it into 65535. */
+static uint16_t
+client_hint_dimension(int32_t value)
+{
+  if (value <= 0)
+    return 0;
+  return (uint16_t) (value > UINT16_MAX ? UINT16_MAX : value);
+}
+
+bool
+client_size_hints_from_property(const int32_t* values, uint32_t count, ClientSizeHints* out)
+{
+  if (values == NULL || out == NULL)
+    return false;
+
+  /* Only the two lengths WM_SIZE_HINTS has: the 18 slots Xlib writes and the
+   * 15 pre-ICCCM slots. A shorter property is not one, and reading slots the
+   * client never wrote would size the window from the server's leftovers. */
+  if (count != CLIENT_SIZE_HINT_OLD_LENGTH && count < CLIENT_SIZE_HINT_LENGTH)
+    return false;
+
+  uint32_t flags = (uint32_t) values[CLIENT_SIZE_HINT_FLAGS];
+
+  /* Fixed offsets: the fields are where xPropSizeHints puts them whether or
+   * not their flag is set, which is why a property of all-zero position and
+   * size still has min_width at slot 5. Only a flag decides a field is used. */
+  ClientSizeHints parsed;
+  memset(&parsed, 0, sizeof(parsed));
+
+  if ((flags & CLIENT_SIZE_HINT_P_MIN_SIZE) != 0) {
+    parsed.min_width  = client_hint_dimension(values[CLIENT_SIZE_HINT_MIN_WIDTH]);
+    parsed.min_height = client_hint_dimension(values[CLIENT_SIZE_HINT_MIN_HEIGHT]);
+  }
+  if ((flags & CLIENT_SIZE_HINT_P_MAX_SIZE) != 0) {
+    parsed.max_width  = client_hint_dimension(values[CLIENT_SIZE_HINT_MAX_WIDTH]);
+    parsed.max_height = client_hint_dimension(values[CLIENT_SIZE_HINT_MAX_HEIGHT]);
+  }
+  if ((flags & CLIENT_SIZE_HINT_P_RESIZE_INC) != 0) {
+    parsed.inc_width  = client_hint_dimension(values[CLIENT_SIZE_HINT_WIDTH_INC]);
+    parsed.inc_height = client_hint_dimension(values[CLIENT_SIZE_HINT_HEIGHT_INC]);
+  }
+  if ((flags & CLIENT_SIZE_HINT_P_BASE_SIZE) != 0) {
+    /* The 15-slot form stops before the base size, so a property that names
+     * one is malformed rather than unconstrained. */
+    if (count < CLIENT_SIZE_HINT_LENGTH)
+      return false;
+    parsed.base_width  = client_hint_dimension(values[CLIENT_SIZE_HINT_BASE_WIDTH]);
+    parsed.base_height = client_hint_dimension(values[CLIENT_SIZE_HINT_BASE_HEIGHT]);
+  }
+
+  *out = parsed;
+  return true;
+}
+
+void
+client_request_size_hints(Client* c)
+{
+  if (c == NULL || dpy == NULL || wm_normal_hints_atom == XCB_ATOM_NONE)
+    return;
+
+  client_discard_size_hints(c);
+
+  /* Unchecked: an error must not travel to the event loop as a synthetic
+   * event, and a window that vanished can only fail here. The longest
+   * WM_SIZE_HINTS is 18 CARD32s; asking for that is asking for all of it. */
+  c->size_hints_cookie = xcb_get_property_unchecked(
+      dpy, 0, c->window, wm_normal_hints_atom, XCB_GET_PROPERTY_TYPE_ANY, 0, 18);
+  c->size_hints_pending = true;
+}
+
+bool
+client_poll_size_hints(Client* c)
+{
+  if (c == NULL || !c->size_hints_pending)
+    return false;
+
+  if (dpy == NULL) {
+    c->size_hints_pending = false;
+    return false;
+  }
+
+  void*                raw_reply = NULL;
+  xcb_generic_error_t* error     = NULL;
+
+  /* Not the reply-forcing call: this one reports "not yet" instead of waiting,
+   * so the event loop stays free. */
+  if (!xcb_poll_for_reply(dpy, c->size_hints_cookie.sequence, &raw_reply, &error)) {
+    return false;
+  }
+
+  c->size_hints_pending = false;
+
+  xcb_get_property_reply_t* reply = (xcb_get_property_reply_t*) raw_reply;
+  ClientSizeHints           parsed;
+  bool                      constrained = false;
+
+  if (reply != NULL && error == NULL && reply->format == 32) {
+    uint32_t count = (uint32_t) (xcb_get_property_value_length(reply) / (int) sizeof(uint32_t));
+
+    if (client_size_hints_from_property(
+            (const int32_t*) xcb_get_property_value(reply), count, &parsed)) {
+      client_set_size_hints(c, &parsed);
+      constrained = parsed.min_width != 0 || parsed.min_height != 0 ||
+                    parsed.max_width != 0 || parsed.max_height != 0 ||
+                    parsed.base_width != 0 || parsed.base_height != 0 ||
+                    parsed.inc_width != 0 || parsed.inc_height != 0;
+    }
+  } else if (error != NULL) {
+    LOG_DEBUG("WM_NORMAL_HINTS read failed for window %u", c->window);
+  }
+
+  free(error);
+  free(reply);
+
+  return constrained;
+}
+
+/* One dimension against the client's hints. */
+static uint16_t
+client_clamp_to_hints(uint32_t size, uint16_t min, uint16_t max, uint16_t base, uint16_t inc)
+{
+  /* ICCCM 4.1.2.3, as Xlib's XWMGeometry reads it: a client that sets only
+   * PMinSize means that size to be the base as well, and a client that sets
+   * only PBaseSize means it to be the minimum. A field the client left out is
+   * zero here, so the two defaults are each other. */
+  if (base == 0)
+    base = min;
+  if (min == 0)
+    min = base;
+
+  /* The increment counts from the base size, so the part above the base is
+   * what has to be a multiple of it. Rounding down keeps the window inside
+   * the area the layout gave it; the minimum then wins over both. */
+  if (inc > 1 && size > base)
+    size = base + ((size - base) / inc) * inc;
+  if (max > 0 && size > max)
+    size = max;
+  if (min > 0 && size < min)
+    size = min;
+
+  return (uint16_t) (size == 0 ? 1 : size);
+}
+
+void
+client_apply_size_hints(const Client* c, uint16_t* width, uint16_t* height)
+{
+  if (c == NULL || width == NULL || height == NULL)
+    return;
+
+  *width = client_clamp_to_hints(*width,
+                                 c->size_hints.min_width,
+                                 c->size_hints.max_width,
+                                 c->size_hints.base_width,
+                                 c->size_hints.inc_width);
+
+  *height = client_clamp_to_hints(*height,
+                                  c->size_hints.min_height,
+                                  c->size_hints.max_height,
+                                  c->size_hints.base_height,
+                                  c->size_hints.inc_height);
+}
+
+/*
  * Set tags for the client.
  */
 void
@@ -816,26 +1020,39 @@ client_show(xcb_window_t wnd)
 }
 
 /*
+ * Intern one atom. Startup only: a reply is a round trip, and the event loop
+ * does not exist yet.
+ */
+static xcb_atom_t
+client_intern_atom(const char* name)
+{
+  /* allow-blocking: startup, the event loop has not started yet */
+  xcb_intern_atom_reply_t* reply =
+      xcb_intern_atom_reply(dpy, xcb_intern_atom(dpy, 0, (uint16_t) strlen(name), name), NULL);
+  if (reply == NULL) {
+    LOG_ERROR("Failed to intern the %s atom", name);
+    return XCB_ATOM_NONE;
+  }
+
+  xcb_atom_t atom = reply->atom;
+  free(reply);
+  return atom;
+}
+
+/*
  * Intern the atoms the client code needs but xcb does not predefine.
  */
 void
 client_atoms_init(void)
 {
-  if (dpy == NULL || wm_state_atom != XCB_ATOM_NONE)
+  if (dpy == NULL)
     return;
 
-  static const char name[] = "WM_STATE";
+  if (wm_state_atom == XCB_ATOM_NONE)
+    wm_state_atom = client_intern_atom("WM_STATE");
 
-  /* allow-blocking: startup, the event loop has not started yet */
-  xcb_intern_atom_reply_t* reply =
-      xcb_intern_atom_reply(dpy, xcb_intern_atom(dpy, 0, sizeof(name) - 1, name), NULL);
-  if (reply == NULL) {
-    LOG_ERROR("Failed to intern the WM_STATE atom");
-    return;
-  }
-
-  wm_state_atom = reply->atom;
-  free(reply);
+  if (wm_normal_hints_atom == XCB_ATOM_NONE)
+    wm_normal_hints_atom = client_intern_atom("WM_NORMAL_HINTS");
 }
 
 /*

@@ -11,16 +11,18 @@
  *
  * Build:  make tools/xclient
  * Usage:  xclient [-n COUNT] [-t TITLE] [-W WIDTH] [-H HEIGHT] [-s SLEEP]
- *                 [-l LIFETIME] [-c CLASS] [-o] [-h]
+ *                 [-l LIFETIME] [-c CLASS] [-M MINWxMINH] [-o] [-h]
  *
  * -n COUNT     number of windows to create (default 1)
  * -t TITLE     window title prefix; each window is TITLE-<index>
  * -c CLASS     WM_CLASS/res_name and res_class (default "xclient")
  * -W/-H        requested width/height of each window (default 400x300)
+ * -M WxH       minimum size in WM_NORMAL_HINTS, in pixels (default: none)
  * -s SLEEP     sleep seconds between creating windows (default 0)
  * -y           wait for the server to process each map before printing its id
- * -l LIFETIME  exit after this many seconds (default: run until killed)
+ * -M MINWxMINH write WM_NORMAL_HINTS asking for a minimum size
  * -o           create override-redirect windows, which a WM must leave alone
+ * -l LIFETIME  exit after this many seconds (default: run until killed)
  * -h           print this help
  *
  * Each created window's XID is printed to stdout when -v is given, so a
@@ -100,7 +102,13 @@ set_class(xcb_window_t win, const char* res_name, const char* res_class)
 
 static xcb_window_t
 create_window(
-    const char* title, const char* klass, uint32_t width, uint32_t height, bool override_redirect)
+    const char* title,
+    const char* klass,
+    uint32_t    width,
+    uint32_t    height,
+    bool        override_redirect,
+    uint32_t    min_width,
+    uint32_t    min_height)
 {
   xcb_window_t win = xcb_generate_id(conn);
 
@@ -136,9 +144,24 @@ create_window(
   set_title(win, title);
   set_class(win, klass, klass);
 
-  /* Normal gravity so the WM decides placement. */
-  uint32_t gravity = XCB_GRAVITY_NORTH_WEST;
-  set_prop32(win, XCB_ATOM_WM_NORMAL_HINTS, XCB_ATOM_WM_SIZE_HINTS, &gravity, 1);
+  /* WM_NORMAL_HINTS is a fixed 18-slot struct, which is what Xlib's
+     XSetWMNormalHints() writes: every slot present, and the values a flag does
+     not name left at zero. A reader takes min_width from slot 5 whether or not
+     PMinSize is set, so the fields cannot be packed in their flag order. */
+  int32_t normal_hints[18];
+  memset(normal_hints, 0, sizeof(normal_hints));
+  normal_hints[0]  = 1 << 9;   /* PWinGravity */
+  normal_hints[17] = XCB_GRAVITY_NORTH_WEST;
+  if (min_width > 0 || min_height > 0) {
+    normal_hints[0] |= 1 << 4; /* PMinSize */
+    normal_hints[5] = (int32_t) min_width;
+    normal_hints[6] = (int32_t) min_height;
+  }
+  set_prop32(win,
+             XCB_ATOM_WM_NORMAL_HINTS,
+             XCB_ATOM_WM_SIZE_HINTS,
+             (const uint32_t*) normal_hints,
+             18);
 
   /* Report a client list entry so EWMH-aware tools see this window. */
   uint32_t pid = (uint32_t) getpid();
@@ -158,6 +181,8 @@ main(int argc, char** argv)
   const char* klass             = "xclient";
   uint32_t    width             = 400;
   uint32_t    height            = 300;
+  uint32_t    min_width         = 0;
+  uint32_t    min_height        = 0;
   int         sleep_s           = 0;
   int         lifetime          = 0;
   bool        verbose           = false;
@@ -165,7 +190,7 @@ main(int argc, char** argv)
   bool        override_redirect = false;
 
   int opt;
-  while ((opt = getopt(argc, argv, "n:t:c:W:H:s:l:voyh")) != -1) {
+  while ((opt = getopt(argc, argv, "n:t:c:W:H:M:s:l:voyh")) != -1) {
     switch (opt) {
     case 'n':
       count = atoi(optarg);
@@ -181,6 +206,12 @@ main(int argc, char** argv)
       break;
     case 'H':
       height = (uint32_t) atoi(optarg);
+      break;
+    case 'M':
+      if (sscanf(optarg, "%ux%u", &min_width, &min_height) != 2) {
+        fprintf(stderr, "xclient: -M wants WIDTHxHEIGHT, got '%s'\n", optarg);
+        return 1;
+      }
       break;
     case 's':
       sleep_s = atoi(optarg);
@@ -200,7 +231,7 @@ main(int argc, char** argv)
     case 'h':
     default:
       printf("usage: xclient [-n COUNT] [-t TITLE] [-c CLASS] [-W WIDTH] "
-             "[-H HEIGHT] [-s SLEEP] [-l LIFETIME] [-v] [-y] [-o] [-h]\n");
+             "[-H HEIGHT] [-M MINWxMINH] [-s SLEEP] [-l LIFETIME] [-v] [-y] [-o] [-h]\n");
       return opt == 'h' ? 0 : 1;
     }
   }
@@ -240,7 +271,7 @@ main(int argc, char** argv)
   for (int i = 0; i < count; i++) {
     char buf[256];
     snprintf(buf, sizeof(buf), "%s-%d", title, i + 1);
-    wins[i] = create_window(buf, klass, width, height, override_redirect);
+    wins[i] = create_window(buf, klass, width, height, override_redirect, min_width, min_height);
     if (sync) {
       /* A request from this client is processed in order, so the reply proves
          the server has seen the map and redirected it. */

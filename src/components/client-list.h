@@ -20,8 +20,9 @@
  *
  * Requests Sent:
  * - REQ_MONITOR_TILE - after a client is managed, unmanaged, or destroyed,
- *   so the monitor's remaining windows are rearranged
- *
+ *   so the monitor's remaining windows are rearranged; and again when a
+ *   client's size hints arrive after the first layout
+ * *
  * Acceptance Criteria:
  * [x] New window appears -> Client created -> added to list
  * [x] Window destroyed -> Client removed -> list cleaned
@@ -153,5 +154,15 @@ uint32_t client_list_managed_count(void);
  * Check if a window is managed.
  */
 bool client_list_is_managed(xcb_window_t window);
+
+/*
+ * Take the size hints replies that have arrived and re-tile the monitors whose
+ * clients they change.
+ *
+ * A property reply is not an event, so nothing dispatches it: the event loop
+ * calls this once per iteration, after it has drained the events. A client is
+ * laid out before its hints are known, and this is what corrects that layout.
+ */
+void client_list_poll_size_hints(void);
 
 #endif /* _COMPONENT_CLIENT_LIST_H_ */

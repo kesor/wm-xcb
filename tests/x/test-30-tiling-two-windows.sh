@@ -24,4 +24,37 @@ for id in "${ids[@]}"; do
   check_ge "window $id has a real size (px²)" "1000" "$((w * h))"
 done
 
+# A window's border is drawn inside its bounding box, so a client that is given
+# an area has to be configured with that area minus a border on each side. What
+# that buys is visible here: the two windows meet exactly, with no gap between
+# them and no overlap of the borders, and the pair reaches both screen edges.
+read -r ax ay aw ah <<<"$(rect_of "${ids[0]}")"
+read -r bx by bw bh <<<"$(rect_of "${ids[1]}")"
+# The newest client is the master, and the master is the left column; which id
+# that is does not matter here, so order the two by position instead.
+if [ "$ax" -le "$bx" ]; then
+  left_x=$ax
+  left_y=$ay
+  left_w=$aw
+  left_h=$ah
+  right_x=$bx
+  right_w=$bw
+else
+  left_x=$bx
+  left_y=$by
+  left_w=$bw
+  left_h=$bh
+  right_x=$ax
+  right_w=$aw
+fi
+border=$(border_of "${ids[0]}")
+check_ge "the WM gave the window a border (px)" "1" "$border"
+check_eq "the left window starts at the screen edge" "0" "$left_x"
+check_eq "the right window starts where the left one's border ends" \
+  "$((left_x + left_w + 2 * border))" "$right_x"
+check_eq "the pair fills the screen width, borders included" \
+  "$sw" "$((right_x + right_w + 2 * border))"
+check_eq "the pair fills the screen height, borders included" \
+  "$sh" "$((left_y + left_h + 2 * border))"
+
 finish

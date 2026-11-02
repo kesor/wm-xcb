@@ -450,10 +450,14 @@ test_managed_client_lands_on_monitor(void)
   assert(client_get_monitor(c) == m);
   assert(c->tags == MONITOR_TAG_MASK(2));
 
-  /* Tile: the master area is mfact of the monitor, full height */
+  /* Tile: the only client is master and there is no stack, so it gets the whole
+   * monitor. The window is that area minus one border on each side, because X
+   * draws the border inside the window's bounding box. */
   tiling_tile_monitor(m);
-  assert(c->width == (uint16_t) (m->width * tiling_get_default_mfact()));
-  assert(c->height == m->height);
+  uint16_t border = c->border_width;
+  assert(border > 0);
+  assert(c->width == m->width - 2 * border);
+  assert(c->height == m->height - 2 * border);
 
   client_list_component_shutdown();
   xcb_handler_shutdown();

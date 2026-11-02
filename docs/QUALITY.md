@@ -173,6 +173,10 @@ in `tests/quality/async-baseline.txt`.
 - **Baseline** — the calls that are known and tracked in beads. The script
   prints how many there are; the remaining ones are all in
   `bd list --parent wm-46k.2`.
+- **Not a violation** — `xcb_poll_for_reply()`, `xcb_poll_for_reply64()` and
+  `xcb_discard_reply()`. Their names end in `_reply`, and libxcb documents all
+  three as not waiting: the first two return 0 while the reply has not arrived.
+  Flagging them would tell the author to waiver the call the rule asks for.
 
 A violation that is in neither fails. That is the point: the file only shrinks.
 Adding an entry is a deliberate act:
