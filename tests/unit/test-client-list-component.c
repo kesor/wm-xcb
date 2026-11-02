@@ -13,6 +13,17 @@
 #include "test-wm.h"
 #include "wm-hub.h"
 
+/* Counts EVT_CLIENT_UNMANAGED so a test can tell the WM hiding a window from a
+ * client taking its window away. */
+static uint32_t unmanaged_events;
+
+static void
+unmanaged_listener(Event e)
+{
+  (void) e;
+  unmanaged_events++;
+}
+
 /*
  * Test component initialization
  */
@@ -402,7 +413,14 @@ test_unmap_notify_unmanages_client(void)
     .window         = 700,
     .from_configure = 0,
   };
+
+  unmanaged_events = 0;
+  hub_subscribe(EVT_CLIENT_UNMANAGED, unmanaged_listener, NULL);
   xcb_handler_dispatch(&unmap_event);
+  hub_unsubscribe(EVT_CLIENT_UNMANAGED, unmanaged_listener);
+
+  /* A withdrawal is announced: the focus component moves focus away on it */
+  assert(unmanaged_events == 1);
 
   /* Client should no longer be managed or shown */
   assert(c != NULL && client_is_managed(c) == false);
@@ -410,6 +428,73 @@ test_unmap_notify_unmanages_client(void)
 
   /* Client still exists (just unmanaged) */
   assert(client_list_count() == 1);
+
+  /* Cleanup */
+  client_list_component_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test UNMAP_NOTIFY for a window the WM unmapped itself keeps the client
+ *
+ * Hiding the clients of a tag that is no longer shown unmaps them, and the tag
+ * manager clears `mapped` as it does. That unmap is not a withdrawal: clearing
+ * management here makes the client disappear from the WM, and showing the tag
+ * again has nothing to map back.
+ */
+void
+test_unmap_notify_of_a_wm_unmap_keeps_the_client(void)
+{
+  LOG_CLEAN("== Testing UNMAP_NOTIFY of a WM unmap keeps the client");
+
+  hub_init();
+  xcb_handler_init();
+  client_list_component_init();
+
+  xcb_create_notify_event_t create_event = {
+    .response_type     = 16, /* XCB_CREATE_NOTIFY */
+    .sequence          = 1,
+    .parent            = 100,
+    .window            = 800,
+    .width             = 100,
+    .height            = 100,
+    .override_redirect = 0,
+  };
+  xcb_handler_dispatch(&create_event);
+
+  xcb_map_request_event_t map_event = {
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 2,
+    .parent        = 100,
+    .window        = 800,
+  };
+  xcb_handler_dispatch(&map_event);
+
+  Client* c = client_get_by_window(800);
+  assert(c != NULL && client_is_managed(c) == true);
+  assert(c != NULL && client_is_mapped(c) == true);
+
+  /* What the tag manager does after it asks for the unmap */
+  client_set_mapped(c, false);
+
+  xcb_unmap_notify_event_t unmap_event = {
+    .response_type  = 18, /* XCB_UNMAP_NOTIFY */
+    .sequence       = 3,
+    .event          = 800,
+    .window         = 800,
+    .from_configure = 0,
+  };
+
+  unmanaged_events = 0;
+  hub_subscribe(EVT_CLIENT_UNMANAGED, unmanaged_listener, NULL);
+  xcb_handler_dispatch(&unmap_event);
+  hub_unsubscribe(EVT_CLIENT_UNMANAGED, unmanaged_listener);
+
+  assert(unmanaged_events == 0);
+  assert(c != NULL && client_is_managed(c) == true);
+  assert(c != NULL && client_is_mapped(c) == false);
+  assert(client_list_managed_count() == 1);
 
   /* Cleanup */
   client_list_component_shutdown();
@@ -666,6 +751,7 @@ TEST_GROUP(ClientListComponent, {
   test_map_request_sets_border_width();
   test_map_request_creates_client_if_not_exists();
   test_unmap_notify_unmanages_client();
+  test_unmap_notify_of_a_wm_unmap_keeps_the_client();
   test_managed_client_lands_on_monitor();
   test_multiple_clients();
   test_client_list_utility_functions();

@@ -184,7 +184,6 @@ stricter. The remaining known failures, as of the last refresh:
 
 | Test | Known failure, because |
 |------|-------------------------|
-| `test-50-tag-switch-keybinding` | the unmap a tag change causes also unmanages the client, so it never comes back |
 | `test-60-ewmh-root-properties` | no root properties are set |
 
 Write a test so that it cannot pass for the wrong reason: a precondition such as

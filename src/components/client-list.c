@@ -365,7 +365,17 @@ client_list_on_map_request(void* event)
 
 /*
  * Handle XCB_UNMAP_NOTIFY event.
- * Unmanages the window (removes from client list).
+ *
+ * Not every unmap is the client taking its window away. The WM unmaps windows
+ * itself to hide the clients of a tag that is no longer shown, and the tag
+ * manager clears the client's `mapped` flag as it sends that unmap. So an
+ * unmap of a window the WM does not believe is on screen is the WM's own, and
+ * the client stays managed: it comes back when its tag is shown again. Only an
+ * unmap of a window the WM has on screen is a withdrawal.
+ *
+ * The flag is the whole test, which puts a requirement on every path that
+ * unmaps a client: it has to clear `mapped` when it does, or the next tag
+ * switch forgets the client. tiling only ever shows windows.
  */
 void
 client_list_on_unmap_notify(void* event)
@@ -382,13 +392,26 @@ client_list_on_unmap_notify(void* event)
     return;
   }
 
-  /* Only emit unmanage event if client was managed */
-  if (client_is_managed(c)) {
-    client_set_managed(c, false);
-    client_set_mapped(c, false);
-    client_list_emit_event(EVT_CLIENT_UNMANAGED, c);
-    client_list_request_tile(client_get_monitor(c));
+  if (!client_is_managed(c)) {
+    LOG_DEBUG("Unmapped window %u is not managed, nothing to unmanage", e->window);
+    return;
   }
+
+  if (!client_is_mapped(c)) {
+    LOG_DEBUG("Window %u was unmapped by the WM, client stays managed", e->window);
+    return;
+  }
+
+  client_set_managed(c, false);
+  client_set_mapped(c, false);
+
+  /* ICCCM 4.1.3.1: a window its client withdrew is no longer managed, and
+   * other clients read that from WM_STATE, not from our client list. */
+  if (!client_set_wm_state(e->window, CLIENT_WM_STATE_WITHDRAWN))
+    LOG_WARN("WM_STATE atom missing, withdrawn window %u stays marked", e->window);
+
+  client_list_emit_event(EVT_CLIENT_UNMANAGED, c);
+  client_list_request_tile(client_get_monitor(c));
 
   LOG_DEBUG("Client unmanaged: window=%u", e->window);
 }

@@ -118,14 +118,17 @@ Short version, and the parts that stay true until they are fixed:
   every owner and fails if a name in `config.wm.def.h` is not registered after
   that. `main` exits non-zero when a module on its startup check does not come
   up, and a unit test runs that startup and asks each of those modules whether
-  it is up. The event loop blocks in `poll(2)` on the X connection plus a
-  signal wakeup pipe, so an idle WM costs no CPU, and SIGTERM ends it.
+  it is up. An unmap the WM causes itself, hiding the clients of a tag that is
+  no longer shown, leaves the client managed, so showing the tag again maps it
+  back; an unmap of a window the WM has on screen is the client withdrawing:
+  it is unmanaged, `WM_STATE` goes to `Withdrawn`, and
+  `EVT_CLIENT_UNMANAGED` is emitted. The event loop blocks in `poll(2)` on the
+  X connection plus a signal wakeup pipe, so an idle WM costs no CPU, and
+  SIGTERM ends it.
 - **Does not work:** it sets no EWMH root properties. Visible tags are stored
   twice: a tag view change updates the tag-view state machine, and a new client
   still copies its tags from `Monitor.tagset`, which no runtime path writes, so
-  every new client lands on tag 1. A window the WM unmaps itself - hiding a
-  client on a tag that is no longer shown - is treated as the client
-  withdrawing, so it does not come back when the tag is shown again.
+  every new client lands on tag 1.
 
 Do not take that from a document. Ask the tree:
 
