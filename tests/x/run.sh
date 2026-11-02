@@ -11,6 +11,12 @@
 #   --verbose             echo the WM log after a failed test
 #   --update-baseline     accept today's failures as known ones
 #
+# The WM it runs is the variant named by DEBUG and SANITIZE in the environment,
+# exactly as `make DEBUG=1` and `make SANITIZE=1` build it:
+#   make DEBUG=1 test-x
+# The first line of output names the variant, the binary and the log, so a run
+# never leaves you guessing which binary it was or where its log went.
+#
 # A failure that is listed in tests/quality/seam-baseline.txt is a known failure:
 # it is reported and does not fail the run. A failure that is not listed is new
 # and exits non-zero. The seam suite covers parts of the WM that are deliberately
@@ -63,7 +69,7 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     -h | --help)
-      sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+      awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"
       exit 0
       ;;
     *)
@@ -73,14 +79,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# Build first, quietly. These scripts execute ./wm from the tree root, and
-# nothing else rebuilds it, so a stale binary reports the behaviour of the
-# tree as it was and the result reads as a WM defect. When everything is
-# up to date this is one make invocation and a copy check.
-make -s -C "$ROOT_DIR" wm >/dev/null || {
-  echo "$(basename "$0"): the WM does not build; see make" >&2
-  exit 1
-}
+# shellcheck source=../scripts/lib/wm-variant.sh
+. "$ROOT_DIR/scripts/lib/wm-variant.sh"
 
 for cmd in Xephyr xdotool xprop; do
   command -v "$cmd" >/dev/null 2>&1 || {
@@ -89,10 +89,6 @@ for cmd in Xephyr xdotool xprop; do
   }
 done
 
-[ -x "$ROOT_DIR/wm" ] || {
-  echo "run.sh: build the WM first: make" >&2
-  exit 1
-}
 [ -x "$ROOT_DIR/tools/xclient" ] || {
   echo "run.sh: build the test client first: make tools/xclient" >&2
   exit 1
@@ -123,8 +119,16 @@ LOG_DIR="${TMPDIR:-/tmp}/wm-seam-tests"
 mkdir -p "$LOG_DIR"
 export WM_LOG="$LOG_DIR/wm.log"
 export TMPDIR_SEAM="$LOG_DIR"
-
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
+
+# Build first, quietly, and say which build it is. These scripts start the WM
+# themselves, and nothing else rebuilds it, so a stale binary reports the
+# behaviour of the tree as it was and the result reads as a WM defect. When
+# everything is up to date this is one make invocation and a copy check. This
+# runs after LOG_DIR exists because the line names the log the run writes, and
+# before Xephyr starts because that line is the first thing a reader wants.
+wm_build_variant "$WM_LOG" || exit 1
+
 XEPHYR_PID=""
 WM_PID=""
 
@@ -153,8 +157,14 @@ xdotool getdisplaygeometry >/dev/null 2>&1 || {
   exit 1
 }
 
-# stdbuf keeps LOG_DEBUG lines in the file when the WM is built with DEBUG=1.
-stdbuf -oL -eL "$ROOT_DIR/wm" >"$WM_LOG" 2>&1 &
+# stdbuf keeps LOG_DEBUG lines in the file when the WM is built with DEBUG=1;
+# the helper reports where that would stop a sanitize build from starting at
+# all.
+if [ "$WM_VARIANT_STDBUF" -eq 1 ]; then
+  stdbuf -oL -eL "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+else
+  "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+fi
 WM_PID=$!
 sleep 1
 kill -0 "$WM_PID" 2>/dev/null || {

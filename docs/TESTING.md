@@ -71,6 +71,29 @@ output. This is the build to use when you need to see what the WM decided.
 build stops compiling, treat that as a bug: it is the only way to read the
 event log.
 
+The nested-server scripts run the variant you name, so the debug log is one
+command away:
+
+```bash
+make DEBUG=1                       # build it, or let the script do it
+DEBUG=1 scripts/xephyr-test.sh --verbose
+make DEBUG=1 test-x                # the seam suite against the debug WM
+DEBUG=1 ./tests/x/run.sh           # the same thing spelled out
+```
+
+Each of those prints one line before it starts anything:
+
+```
+xephyr-test.sh: variant=debug (DEBUG=1 SANITIZE=0), binary=<repo>/build/debug/wm, log=<tmpdir>/wm-xephyr-test/wm.log
+```
+
+The variant, the binary that runs and the log it writes are in that line, so a
+run never leaves you guessing which build it used or where its output went. If
+that line says `variant=debug` and the log is still empty, the WM itself never
+logged and the binary is not the suspect. `SANITIZE=1` works the same way; that
+build runs without `stdbuf`, because ASan refuses to start when `stdbuf`'s
+preloaded library comes first.
+
 ### Build directories
 
 Each flag set compiles into its own directory under `build/`: `release`,
@@ -91,6 +114,7 @@ make test-x                 # all of tests/x/test-*.sh
 make test-x TEST_X_ARGS="--filter=tag"   # one file
 make test-x TEST_X_ARGS="--keep"         # leave the session running
 make test-x TEST_X_ARGS="--verbose"      # print the WM log for each failure
+make DEBUG=1 test-x         # the same suite against the debug WM
 ```
 
 A seam test asserts what the X server sees, not what the WM thinks: the window
@@ -193,7 +217,8 @@ DISPLAY=:2 tools/xclient -n 2 -v      # two bare X11 windows, prints their IDs
 
 Look at the Xephyr window. The WM tiles the two windows side by side; with one
 master client, the first window takes half the screen and the second fills the
-other half.
+other half. `./wm` is whichever variant was built last, so for a log with
+`DEBUG` lines build the debug one first: `make DEBUG=1`, then `DISPLAY=:2 ./wm`.
 
 Kill the session with `pkill -x Xephyr`, or kill the PIDs you started. Do not
 `pkill -f wm`; the pattern matches your own shell command line and kills the
@@ -255,7 +280,8 @@ spawns N `xclient` windows, waits 4 s, then checks in order:
 Exit status 0 means all checks passed. Logs go to `$TMPDIR/wm-xephyr-test/` (`wm.log`, `xclient.log`,
 `xephyr.log`). `nix develop` sets `TMPDIR` to a per-shell directory, so it is
 usually not plain `/tmp`. `--keep` leaves the session running so you can look
-at it; the script prints the WM pid and display in that case.
+at it; the script prints the WM pid and display in that case. The first line
+names the variant, the binary and the log, as described under *Debug build*.
 
 This is written as the acceptance test for the X11 output path. Check 2 passes
 since the WM maps windows on `MapRequest`; checks 3 and 4 wait for tiling
@@ -359,7 +385,7 @@ event arrives.
 | nested screen is black | the WM died before it mapped anything, or this is a stale session | `scripts/xephyr-test.sh --verbose`, read `wm.log` |
 | `xterm: cannot load font` | Xephyr has no usable fonts | use `tools/xclient` |
 | `xdotool: command not found` | not in the dev shell | `direnv allow` or `nix develop` |
-| WM dies silently at startup | `-DDEBUG` build not used, so the reason was never printed | `make DEBUG=1` and rerun |
+| WM dies silently at startup | `-DDEBUG` build not used, so the reason was never printed | check the variant on the first line of the run, then rerun with `DEBUG=1`, or with `DEBUG=1 scripts/xephyr-test.sh --verbose` |
 | `scripts/xephyr-test.sh` cannot find `wm` | not built | `make && make tools/xclient` |
 
 ---
