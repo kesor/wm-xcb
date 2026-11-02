@@ -116,6 +116,7 @@ make test-x TEST_X_ARGS="--filter=tag"   # one file
 make test-x TEST_X_ARGS="--keep"         # leave the session running
 make test-x TEST_X_ARGS="--verbose"      # print the WM log for each failure
 make DEBUG=1 test-x         # the same suite against the debug WM
+make SANITIZE=1 test-x      # the same suite against the sanitized WM
 ```
 
 A seam test asserts what the X server sees, not what the WM thinks: the window
