@@ -21,7 +21,7 @@ model.*
 
 | Layer | When | Time | Runs |
 |-------|------|------|------|
-| `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, beads export, formatting, build, unit tests, async rule |
+| `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, workflow, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~80 s | the above plus the flake evaluation, the seam suite, the sanitize gate, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push --force` with the beads job excluded |
@@ -87,6 +87,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | flake | `scripts/check-flake.sh` | the dev shell in `flake.nix` evaluates for this system, so a syntax error, a moved attribute or a package that no longer exists fails here and not at the next `direnv allow` |
 | unit | `make test` | the unit suite across hub, state machines, targets, components |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
+| workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
@@ -211,7 +212,9 @@ LEFTHOOK_EXCLUDE=beads lefthook run pre-push --force   # without the beads expor
 scripts/check-seam.sh       # the seam suite as the push gate runs it
 scripts/check-flake.sh      # the dev shell in flake.nix evaluates
 make test-x                 # the same suite, spelled out (needs a display)
-scripts/check-sanitize.sh   # the unit suite under the sanitizers, against the leak baselinescripts/check-sanitize-x.sh # the WM in a nested server under the sanitizers
+scripts/check-sanitize.sh   # the unit suite under the sanitizers, against the leak baseline
+scripts/check-sanitize-x.sh # the WM in a nested server under the sanitizers
+scripts/check-workflow.sh   # every .github/workflows/ file parses
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
 ```

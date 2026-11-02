@@ -88,6 +88,7 @@
               # Quality gates: .beads/hooks/* call 'lefthook run <hook>'.
               # See docs/QUALITY.md.
               lefthook
+              actionlint # scripts/check-workflow.sh parses .github/workflows/
             ];
           };
         };

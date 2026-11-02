@@ -10,7 +10,7 @@
 # core.hooksPath and these gates stop running. docs/QUALITY.md explains it.
 #
 # Layers, fastest first:
-#   pre-commit  ~5s     paths, docs, test-src, bead-refs, formatting, build, unit, async, beads
+#   pre-commit  ~5s     paths, docs, test-src, bead-refs, workflow, formatting, build, unit, async, beads
 #   commit-msg  instant  commit message rules
 #   pre-push    ~65s    the above, plus the flake evaluation, the seam suite and the -pedantic debug build
 #   CI                   pre-push --force (beads excluded), plus seam and sanitize-x
@@ -29,6 +29,14 @@ pre-commit:
     paths:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory. Use a repo-relative path or <placeholder>."
+
+    # CI is this file run from a workflow, so a workflow that does not parse
+    # removes every gate at once and says nothing. A worker cannot push to see
+    # the run, so the check has to happen here.
+    workflow:
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: ./scripts/check-workflow.sh {staged_files}
+      fail_text: "A workflow file does not parse. Run scripts/check-workflow.sh; a broken file here means the next push runs no gates at all."
 
     test-src:
       glob: "tests/unit/test-*.c"
@@ -81,6 +89,10 @@ pre-push:
     flake:
       run: ./scripts/check-flake.sh
       fail_text: "flake.nix does not evaluate. Fix the dev shell: it is what make, every gate and every agent in this tree runs in."
+
+    workflow:
+      run: ./scripts/check-workflow.sh
+      fail_text: "A workflow file does not parse. A broken file here means the push runs no gates at all."
 
     paths:
       run: ./scripts/check-paths.sh
