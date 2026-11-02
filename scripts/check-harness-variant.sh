@@ -5,11 +5,13 @@
 #
 # Usage: scripts/check-harness-variant.sh [--verbose]
 #
-# scripts/xephyr-test.sh and tests/x/run.sh start the WM themselves, so they
-# build it themselves. A plain `make wm` in such a script builds whatever the
-# Makefile's default is, which is release, so a DEBUG=1 run got a release binary,
-# an empty log, and the conclusion that the event never happened. Two workers
-# paid for that discovery by hand-rolling a Xephyr session instead.
+# scripts/xephyr-test.sh, tests/x/run.sh and scripts/perf-test.sh start the WM
+# themselves, so they build it themselves. A plain `make wm` in such a script
+# builds whatever the Makefile's default is, which is release, so a DEBUG=1 run
+# got a release binary, an empty log, and the conclusion that the event never
+# happened. Two workers paid for that discovery by hand-rolling a Xephyr session
+# instead. A measurement is the same defect with a number on it: perf-test.sh
+# used ./wm, which is whichever variant was built last.
 #
 # So this asks the shared builder, scripts/lib/wm-variant.sh, for each variant
 # and checks four things: the line it prints names the variant, the binary and
@@ -63,7 +65,7 @@ pass() {
 TMP_LOG="$(mktemp)"
 trap 'rm -f "$TMP_LOG"' EXIT
 
-HARNESSES=(scripts/xephyr-test.sh tests/x/run.sh)
+HARNESSES=(scripts/xephyr-test.sh tests/x/run.sh scripts/perf-test.sh)
 
 # A harness that calls make itself can build a variant other than the one it
 # was asked for, which is the defect this gate exists for. The builder is the
@@ -162,7 +164,7 @@ else
 fi
 
 if [ "$FOUND" -eq 0 ]; then
-  echo "check-harness-variant: both harnesses build and report the variant they were asked for"
+  echo "check-harness-variant: every harness builds and reports the variant it was asked for"
   exit 0
 fi
 echo "check-harness-variant: $FOUND problem(s)."

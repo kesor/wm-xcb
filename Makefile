@@ -38,7 +38,7 @@ else
 endif
 
 # Address and UB sanitizers: make clean && make SANITIZE=1
-# Useful for the unit tests (valgrind ./test) and for a live session.
+# Useful for the unit tests (valgrind build/release/test) and for a live session.
 ifeq ($(strip $(SANITIZE)),1)
 	CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer -g
 	LDFLAGS += -fsanitize=address,undefined
@@ -89,6 +89,7 @@ TEST_SRC = \
 	tests/unit/test-registry.c \
 	tests/unit/test-runner.c \
 	tests/unit/test-wm-hub.c \
+	tests/unit/test-wm-log.c \
 	tests/unit/test-wm-xcb-handler.c \
 	tests/unit/test-wm-monitor.c \
 	tests/unit/test-wm-tag.c \
@@ -134,8 +135,20 @@ $(BUILD_DIR)/$(NAME): $(OBJ)
 # already there. scripts/xephyr-test.sh and tests/x/run.sh do not use this
 # target; they build and run build/<variant>/wm so a harness run does not
 # replace ./wm.
+#
+# The replace goes through a temporary name in the same directory and a rename.
+# `cp` onto a path that is being executed fails with ETXTBSY, which made the
+# build exit non-zero and left the previous binary in place, so the next session
+# ran a WM that did not contain the change. A rename swaps the directory entry:
+# a WM that is already running keeps the inode it started with, and the next one
+# starts the new binary.
+#
+# The same recipe removes a root ./test. That copy is no longer refreshed, and
+# one left by an older build would still run and print a count from the tree
+# that produced it.
 $(NAME): $(BUILD_DIR)/$(NAME) FORCE
-	@cmp -s $< $@ || cp $< $@
+	@cmp -s $< $@ || { cp $< $@.tmp && mv -f $@.tmp $@; }
+	@rm -f test
 
 FORCE:
 
@@ -175,12 +188,17 @@ check: format tidy
 $(BUILD_DIR)/test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 	${CC} -o $@ $^ ${LDFLAGS}
 
+# No test binary at the tree root. A root copy only got refreshed by this
+# target, so a plain `make` left the previous one in place and running ./test
+# printed a count from an older tree that looked like a real count. The suite
+# runs the variant's own binary instead, and `make test` is the only way to run
+# it. Removing ./test here covers a `make test` that did not also build wm.
 test: $(BUILD_DIR)/test FORCE
-	@cmp -s $< $@ || cp $< $@
-	./test
+	@rm -f test
+	$(BUILD_DIR)/test
 
 clean:
-	rm -rf build $(NAME) test compile_commands.json compile_flags.txt tools/xclient
+	rm -rf build $(NAME) $(NAME).tmp test compile_commands.json compile_flags.txt tools/xclient
 
 # Point git at the committed hooks once per clone. The hook files live in
 # .githooks/ and call lefthook, which runs the gates in lefthook.yml.

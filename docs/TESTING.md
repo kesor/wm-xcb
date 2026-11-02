@@ -13,8 +13,10 @@
 ## 0. What runs automatically
 
 `lefthook` runs the gates on every commit and push; CI runs the same commands.
-See [QUALITY.md](QUALITY.md). The sections below are the layers you run by hand
-while working.
+The seam suite (`make test-x`) is one of the push gates, through
+`scripts/check-seam.sh`: it starts Xvfb when there is no `DISPLAY`, and fails
+rather than skipping when neither is available. See [QUALITY.md](QUALITY.md).
+The sections below are the layers you run by hand while working.
 
 ## 1. Environment
 
@@ -36,7 +38,9 @@ the test tools: `Xephyr` (from `xorg-server`), `xvfb`, `xdotool`, `xprop`,
 A tool the harnesses need but the shell lacks is fixed in `flake.nix`, in the
 same commit as the recipe that needs it. Each worktree carries its own copy of
 `flake.nix`, so the tool appears in that worktree after `direnv allow` or
-`nix develop` again, not in the shell that is already running.
+`nix develop` again, not in the shell that is already running. `scripts/check-flake.sh`
+evaluates the shell without entering it, which is what catches a broken
+`flake.nix` before the next session finds it; the push gate runs the same check.
 
 Rule of thumb: anything you run against the WM needs the same shell the WM was
 built in, because the binary links the store paths of that shell's libraries.
@@ -95,9 +99,13 @@ xephyr-test.sh: variant=debug (DEBUG=1 SANITIZE=0), binary=<repo>/build/debug/wm
 The variant, the binary that runs and the log it writes are in that line, so a
 run never leaves you guessing which build it used or where its output went. If
 that line says `variant=debug` and the log is still empty, the WM itself never
-logged and the binary is not the suspect. `SANITIZE=1` works the same way; that
-build runs without `stdbuf`, because ASan refuses to start when `stdbuf`'s
-preloaded library comes first.
+logged and the binary is not the suspect. `SANITIZE=1` works the same way.
+
+The WM flushes each log line as it writes it, so a log from a WM that was killed
+rather than shut down is complete up to the last line it wrote. That matters for
+the harnesses, which stop the WM with a signal, and it means the log needs no
+`stdbuf` wrapper: the sanitize builds cannot have one anyway, because ASan
+refuses to start when another library is preloaded ahead of its runtime.
 
 ### Build directories
 
@@ -105,9 +113,20 @@ Each flag set compiles into its own directory under `build/`: `release`,
 `release-sanitize`, `debug`, `debug-sanitize`. So `make`, `make SANITIZE=1` and
 `make DEBUG=1` can be alternated in one checkout with no `make clean` in
 between, and no build reuses another variant's objects. Whatever was built
-last by `make` is copied to `./wm` and `./test`. A manual `./wm` and the flake
-read that copy. `scripts/xephyr-test.sh` and `tests/x/run.sh` do not: they run
+last by `make` is copied to `./wm`, which is what a manual `./wm` and the flake
+read. `scripts/xephyr-test.sh` and `tests/x/run.sh` do not: they run
 `build/<variant>/wm` and leave `./wm` alone. `make clean` removes every variant.
+
+The test binary has no copy at the tree root. `make` and `make test` remove a
+`./test` left by an earlier build, because that copy is no longer refreshed and
+running it would print a count from the tree that produced it. Run the suite
+through `make test`, or name the variant binary directly when you want to put
+it under `valgrind`.
+
+The copies `./wm` gets are replaced by writing a temporary file and renaming it
+over `./wm`, so a `make` while a WM started from `./wm` is still running exits 0
+instead of failing on a busy file. The running WM keeps the binary it started
+with: restart it before you read its log and expect the change to be in it.
 
 `scripts/check-build-variants.sh` is the gate for this (see `docs/QUALITY.md`).
 
@@ -130,8 +149,8 @@ is where the WM said it would be, `_NET_CLIENT_LIST` exists. Those are the
 assertions the unit tests cannot make.
 
 `scripts/xephyr-test.sh` is the earlier single-scenario version of the same idea;
-prefer `make test-x`, and keep the old script only because several beads issues
-name it.
+prefer `make test-x`, which also runs before every push, and keep the old script
+only because several beads issues name it.
 
 `tests/x/run.sh` starts one Xephyr and one WM for the whole run, then runs each
 file as a separate process with `DISPLAY`, `WM_PID`, `WM_LOG` and `ROOT_DIR`
@@ -227,6 +246,11 @@ master client, the first window takes half the screen and the second fills the
 other half. `./wm` is whichever variant was built last, so for a log with
 `DEBUG` lines build the debug one first: `make DEBUG=1`, then `DISPLAY=:2 ./wm`.
 
+Kill the WM before you rebuild. `make` replaces `./wm` by renaming a new file
+over it, so the build no longer fails while the WM runs, and the WM you started
+keeps running the binary it started with: a log that does not show the change
+you just made is usually the old process, not a missing event.
+
 Kill the session with `pkill -x Xephyr`, or kill the PIDs you started. Do not
 `pkill -f wm`; the pattern matches your own shell command line and kills the
 shell.
@@ -313,7 +337,11 @@ since the WM maps windows on `MapRequest`; checks 3 and 4 wait for tiling
 scripts/perf-test.sh [--windows N] [--display :N] [--keep]
 ```
 
-It starts the same way as `xephyr-test.sh` and prints five numbers:
+It starts the same way as `xephyr-test.sh`: it builds the WM variant named by
+`DEBUG` and `SANITIZE`, prints the line that names the variant, the binary and
+the log, and runs that binary. The baseline below was measured on the release
+build; a debug build is `-O0` and its numbers are not comparable with it, which
+is why the variant is in the output. It then prints five numbers:
 
 | Number | How it is measured | Why it matters |
 |--------|--------------------|----------------|
@@ -358,10 +386,12 @@ valgrind --leak-check=full --track-origins=yes --log-file=/tmp/vg.log \
   env DISPLAY=:2 ./wm
 ```
 
-`valgrind` is in the dev shell. For the unit tests instead:
+`valgrind` is in the dev shell. For the unit tests instead, name the variant
+binary; `make test` builds it and runs it, and needs no root copy to do that:
 
 ```bash
-valgrind --leak-check=full ./test
+make test                                  # builds and runs build/release/test
+valgrind --leak-check=full build/release/test
 ```
 
 AddressSanitizer and UBSan (rebuild with `SANITIZE=1`):
@@ -375,8 +405,9 @@ DISPLAY=:2 ./wm
 `SANITIZE=1` adds `-fsanitize=address,undefined -fno-omit-frame-pointer -g` to
 both compile and link. `make SANITIZE=1` alone builds only `wm`, so the test
 binary needs `make test SANITIZE=1`. Measured 2026-11-01 after the hub registry
-fix: `./test` passes all assertions and LeakSanitizer prints no summary, so the
-exit status is the answer. `detect_leaks=1` is set to match the CI sanitize job.
+fix: the test binary passes all assertions and LeakSanitizer prints no summary,
+so the exit status is the answer. `detect_leaks=1` is set to match the CI
+sanitize job.
 
 Remember that `./wm` is now the instrumented binary: run `make` to put the
 plain one back. The objects do not need cleaning, see *Build directories*
@@ -444,7 +475,7 @@ event arrives.
 | any component | its `tests/unit/test-*.c` file under `make test`, plus `scripts/xephyr-test.sh` |
 | anything in the manage/map/tile path | `scripts/xephyr-test.sh --windows 2 --verbose` and `--windows 5` |
 | event loop, focus, or key handling | `make check-async`, `scripts/perf-test.sh` for idle CPU, plus a manual session to press keys |
-| memory-owning code (clients, monitors, SMs) | `valgrind ./test` and a `--windows 50` run |
+| memory-owning code (clients, monitors, SMs) | `valgrind build/release/test` and a `--windows 50` run |
 
 Every change that touches behaviour should leave `make test` green and
 `scripts/xephyr-test.sh` at least as green as it was.

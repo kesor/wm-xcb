@@ -12,8 +12,8 @@
 # Layers, fastest first:
 #   pre-commit  ~5s     paths, docs, test-src, bead-refs, formatting, build, unit, async, beads
 #   commit-msg  instant  commit message rules
-#   pre-push    ~40s    the above, plus the -pedantic debug build
-#   CI                   everything, plus sanitizers and the seam tests
+#   pre-push    ~65s    the above, plus the flake evaluation, the seam suite and the -pedantic debug build
+#   CI                   everything, plus the sanitizers
 #
 # Adding a gate: put the command in a script under scripts/, list it here, and
 # add the same command to .github/workflows/quality.yml. docs/QUALITY.md has
@@ -73,6 +73,14 @@ pre-push:
     beads:
       run: bd hooks run pre-push
 
+    # The dev shell is what every other job here runs in, so a broken flake.nix
+    # is checked first and costs about a second. It only evaluates the shell; a
+    # package that stopped existing or an attribute that moved fails here rather
+    # than at the next session's direnv allow.
+    flake:
+      run: ./scripts/check-flake.sh
+      fail_text: "flake.nix does not evaluate. Fix the dev shell: it is what make, every gate and every agent in this tree runs in."
+
     paths:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory."
@@ -100,6 +108,15 @@ pre-push:
     unit:
       run: make test
       fail_text: "make test failed."
+
+    # The only check that looks at the running WM. It used to run only when the
+    # author or the reviewer chose to, so a branch that broke mapping, tiling,
+    # tags or the EWMH properties merged green. scripts/check-seam.sh starts
+    # Xvfb when there is no display; it fails rather than skipping when neither
+    # is available.
+    seam:
+      run: ./scripts/check-seam.sh
+      fail_text: "A new seam failure: something X should see is not there. Run 'make test-x TEST_X_ARGS=--verbose', and baseline a known failure deliberately or fix it."
 
     standalone:
       run: make test-standalone && make test-sm-standalone
