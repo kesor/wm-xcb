@@ -289,18 +289,22 @@ client_list_on_destroy_notify(void* event)
  * Geometry and stacking belong to the layout component; X places a newly
  * mapped window on top of its siblings, which is the order tiling wants.
  *
- * Without an X connection (unit tests) there is nothing to send, so the model
- * is updated by the caller and the server calls are skipped.
+ * Without an X connection (unit tests) there is nothing to send, so the server
+ * calls are skipped and only the model changes.
  */
 static void
 client_list_map_client(Client* c)
 {
+  /* The border width has to be a 4-byte value: xcb_configure_window() takes the
+   * value list as CARD32 and copies one per set mask bit, so a uint16_t here
+   * makes it read the two stack bytes next to the variable. */
+  uint32_t border = CLIENT_LIST_BORDER_WIDTH;
+  client_set_border_width(c, (uint16_t) border);
+
   if (dpy == NULL)
     return;
 
-  uint16_t border = CLIENT_LIST_BORDER_WIDTH;
   xcb_configure_window(dpy, c->window, XCB_CONFIG_WINDOW_BORDER_WIDTH, &border);
-  client_set_border_width(c, border);
 
   /* Pointer enter and leave are how the focus component learns which client
    * the pointer is over. Without this selection X walks up to the root, which

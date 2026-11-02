@@ -143,6 +143,7 @@ regression is invisible next to the standing list of unwired features.
 ```bash
 make test-x TEST_X_ARGS="--update-baseline"   # accept today's failures
 scripts/check-sanitize.sh --update-baseline  # accept today's leak sites
+scripts/check-sanitize-x.sh --update-baseline  # accept today's sites under a live WM
 ```
 
 Layout: the unit tests live in `tests/unit/`, the seam tests in `tests/x/`, and
@@ -364,6 +365,24 @@ exit status is the answer. `detect_leaks=1` is set to match the CI sanitize job.
 Remember that `./wm` is now the instrumented binary: run `make` to put the
 plain one back. The objects do not need cleaning, see *Build directories*
 above.
+
+The unit suite has no X connection, and the code that sends a request returns
+before it builds one without a display. To exercise the map, tile and focus
+path under the sanitizers there has to be a server:
+
+```bash
+scripts/check-sanitize-x.sh     # the WM in Xephyr, ASan and UBSan
+```
+
+It fails when the harness fails, when the WM log carries an ASan error, and
+when a leak site or UBSan report in that log is missing from
+`tests/quality/sanitize-x-baseline.txt`. The harness stops the WM with a signal,
+so that log holds whatever was still allocated at exit: known startup sites are
+baselined, and the list is meant to shrink.
+
+```bash
+scripts/check-sanitize-x.sh --update-baseline  # accept today's sites under a live WM
+```
 
 ### Following the syscalls
 
