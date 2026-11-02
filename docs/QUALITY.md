@@ -16,7 +16,7 @@ model.*
 |-------|------|------|------|
 | `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
-| `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build, the standalone tests, and the build variants |
+| `pre-push` | every push | ~15 s | the above plus the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run`, required: known failures are baselined |
 | CI `sanitize` | every push and PR | ~2 min | `make test SANITIZE=1` |
@@ -41,6 +41,7 @@ No CI job is advisory any more. The seam job could only become required once
 | sanitize | `scripts/check-sanitize.sh` | no *new* leak site under ASan; known ones come from `tests/quality/asan-baseline.txt` |
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
+| harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
 | seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
 
@@ -151,6 +152,7 @@ LEFTHOOK_EXCLUDE=beads lefthook run pre-push   # without the beads export
 make test-x                 # seam tests (needs a display; Xephyr handles that)
 make test SANITIZE=1        # sanitizers (builds the test binary too)
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
+scripts/check-harness-variant.sh  # the harnesses run the variant they report
 ```
 
 ## What is deliberately not a gate

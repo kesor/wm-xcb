@@ -11,6 +11,12 @@
 #   --keep        leave Xephyr, the WM, and the test windows running on exit
 #   --verbose     echo the WM log and every window geometry
 #
+# The WM it runs is the variant named by DEBUG and SANITIZE in the environment,
+# exactly as `make DEBUG=1` and `make SANITIZE=1` build it:
+#   DEBUG=1 scripts/xephyr-test.sh --verbose
+# The first line of output names the variant, the binary and the log, so a run
+# never leaves you guessing which binary it was or where its log went.
+#
 # Checks, in order:
 #   1. The WM stays alive for the whole run.
 #   2. Every test window ends up viewable (mapped by the WM).
@@ -50,7 +56,7 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     -h | --help)
-      sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+      awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"
       exit 0
       ;;
     *)
@@ -61,13 +67,15 @@ while [ $# -gt 0 ]; do
 done
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WM_BIN="$ROOT_DIR/wm"
 XCLIENT_BIN="$ROOT_DIR/tools/xclient"
 LOG_DIR="${TMPDIR:-/tmp}/wm-xephyr-test"
 mkdir -p "$LOG_DIR"
 WM_LOG="$LOG_DIR/wm.log"
 XCLIENT_LOG="$LOG_DIR/xclient.log"
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
+
+# shellcheck source=lib/wm-variant.sh
+. "$ROOT_DIR/scripts/lib/wm-variant.sh"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -82,14 +90,11 @@ need() {
     exit 1
   fi
 }
-# Build first, quietly. These scripts execute ./wm from the tree root, and
-# nothing else rebuilds it, so a stale binary reports the behaviour of the
-# tree as it was and the result reads as a WM defect. When everything is
-# up to date this is one make invocation and a copy check.
-make -s -C "$ROOT_DIR" wm >/dev/null || {
-  echo "$(basename "$0"): the WM does not build; see make" >&2
-  exit 1
-}
+# Build first, and say which build it is, before Xephyr starts. These scripts
+# start the WM themselves, and nothing else rebuilds it, so a stale binary
+# reports the behaviour of the tree as it was and the result reads as a WM
+# defect.
+wm_build_variant "$WM_LOG" || exit 1
 
 need Xephyr
 need xdotool
@@ -116,8 +121,8 @@ if [ -z "$DISPLAY_NUM" ]; then
 fi
 TEST_DISPLAY=":$DISPLAY_NUM"
 
-if [ ! -x "$WM_BIN" ]; then
-  echo "xephyr-test: $WM_BIN missing, run 'make' first" >&2
+if [ ! -x "$WM_VARIANT_BIN" ]; then
+  echo "xephyr-test: $WM_VARIANT_BIN missing, run 'make' first" >&2
   exit 1
 fi
 if [ ! -x "$XCLIENT_BIN" ]; then
@@ -162,8 +167,13 @@ if ! wait_for_display; then
   exit 1
 fi
 
-# stdbuf keeps DEBUG lines in the log when the WM is built with DEBUG=1.
-DISPLAY="$TEST_DISPLAY" stdbuf -oL -eL "$WM_BIN" >"$WM_LOG" 2>&1 &
+# stdbuf keeps DEBUG lines in the log when the WM is built with DEBUG=1; the
+# helper reports where that would stop a sanitize build from starting at all.
+if [ "$WM_VARIANT_STDBUF" -eq 1 ]; then
+  DISPLAY="$TEST_DISPLAY" stdbuf -oL -eL "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+else
+  DISPLAY="$TEST_DISPLAY" "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+fi
 WM_PID=$!
 sleep 1
 

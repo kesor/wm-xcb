@@ -1,7 +1,10 @@
 NAME = wm
 VERSION = 0.0.1
 
-DEBUG = 0
+# ?=, not =: a plain assignment here beats DEBUG in the environment, so
+# `DEBUG=1 make` would build release and say nothing about it. The explicit
+# `make DEBUG=1` form works either way.
+DEBUG ?= 0
 
 CC = gcc
 
@@ -125,10 +128,12 @@ $(BUILD_DIR)/%.o: %.c
 $(BUILD_DIR)/$(NAME): $(OBJ)
 	${CC} -o $@ $(OBJ) ${LDFLAGS}
 
-# The scripts and the flake read the binary from the tree root (tests/x/run.sh,
-# scripts/xephyr-test.sh), so it is copied out of the variant directory. The
-# copy runs on every build: switching variants has to replace the binary, and
-# mtimes cannot say which variant produced the one already there.
+# Manual ./wm and the flake read the tree-root copy, so this target copies the
+# variant binary out. The copy runs on every build: switching variants has to
+# replace the binary, and mtimes cannot say which variant produced the one
+# already there. scripts/xephyr-test.sh and tests/x/run.sh do not use this
+# target; they build and run build/<variant>/wm so a harness run does not
+# replace ./wm.
 $(NAME): $(BUILD_DIR)/$(NAME) FORCE
 	@cmp -s $< $@ || cp $< $@
 
@@ -193,14 +198,22 @@ print-src:
 print-test-src:
 	@echo $(TEST_SRC)
 
+# The name of the variant directory this invocation builds into. scripts/lib/
+# wm-variant.sh asks for it so a harness reports the variant make actually
+# built instead of re-deriving the name and drifting from this file.
+print-variant:
+	@echo $(BUILD_VARIANT)
+
 # Static check: no blocking call reachable from the event loop (docs/PHILOSOPHY.md 2.3)
 check-async:
 	@./scripts/check-async.sh $(if $(V),-v,)
 
 # Seam tests: assert what the X server sees, against a live WM in a nested
 # display. See docs/TESTING.md. Expect failures until the X11 output path works.
+# DEBUG and SANITIZE are passed on the command line, not exported, so they are
+# forwarded explicitly: `make DEBUG=1 test-x` has to run the debug WM.
 test-x: $(NAME) tools/xclient
-	./tests/x/run.sh $(TEST_X_ARGS)
+	DEBUG=$(DEBUG) SANITIZE=$(SANITIZE) ./tests/x/run.sh $(TEST_X_ARGS)
 
 # Standalone test (no XCB dependencies required)
 # FORCE because the binary is shared by the variants, like wm and test above.
