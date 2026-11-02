@@ -201,7 +201,7 @@ test: $(BUILD_DIR)/test FORCE
 	$(BUILD_DIR)/test
 
 clean:
-	rm -rf build $(NAME) $(NAME).tmp test compile_commands.json compile_flags.txt tools/xclient
+	rm -rf build $(NAME) $(NAME).tmp test compile_commands.json compile_flags.txt tools/xclient tools/xcb-ewmh-delay.so
 
 # Point git at the committed hooks once per clone. The hook files live in
 # .githooks/ and call lefthook, which runs the gates in lefthook.yml.
@@ -233,7 +233,7 @@ check-async:
 # display. See docs/TESTING.md. Expect failures until the X11 output path works.
 # DEBUG and SANITIZE are passed on the command line, not exported, so they are
 # forwarded explicitly: `make DEBUG=1 test-x` has to run the debug WM.
-test-x: $(NAME) tools/xclient
+test-x: $(NAME) tools/xclient tools/xcb-ewmh-delay.so
 	DEBUG=$(DEBUG) SANITIZE=$(SANITIZE) ./tests/x/run.sh $(TEST_X_ARGS)
 
 # Standalone test (no XCB dependencies required)
@@ -257,6 +257,11 @@ test-sm-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o $(filter-out %.c
 tools/xclient: tools/xclient.c
 	$(CC) $(PKG_CFLAGS) -o $@ $< $(PKG_LDFLAGS)
 
+# Preloaded by tests/x/test-86-queued-event.sh to hold one startup reply, so an
+# event can be in libxcb's queue when the socket is no longer readable.
+tools/xcb-ewmh-delay.so: tools/xcb-ewmh-delay.c
+	$(CC) $(PKG_CFLAGS) -shared -fPIC -o $@ $< -ldl
+
 # ---------------------------------------------------------------------------
 # Docker build and test targets
 # ----------------------------------------------------------------------------
@@ -273,4 +278,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone check format tidy tools/xclient container-build container-run container-test container-clean FORCE
+.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone check format tidy tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE

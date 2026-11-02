@@ -188,6 +188,16 @@ Write a test so that it cannot pass for the wrong reason: a precondition such as
 stops the test, not `check_eq`, which would let a later "the window is gone now"
 pass because it was never there.
 
+`test-86-queued-event.sh` is the exception to "one Xephyr for the whole run":
+it starts its own `Xvfb` and WM. The condition it checks cannot be produced after
+startup. libxcb reads ahead of `poll(2)`, so an event can sit in its queue while
+the socket is no longer readable; the test holds the first EWMH atom query with
+`tools/xcb-ewmh-delay.so` (an `LD_PRELOAD` shim), maps a window while the WM is
+held, then releases it. The reply wait reads that `MapRequest` into libxcb's
+queue, and a loop that only polls the socket never dispatches it. The shim is
+built by `make test-x`; it reads `WM_QUEUE_TEST_MARKER` and `WM_QUEUE_TEST_GO`
+and does nothing when either is unset.
+
 ---
 
 ## 3b. Static checks
@@ -280,6 +290,7 @@ make tools/xclient
 | `-s SEC` | sleep between window creations |
 | `-l SEC` | exit after SEC seconds instead of waiting to be killed |
 | `-v` | print each window ID |
+| `-y` | wait for the server to process each map before printing its ID |
 
 `xdotool` finds them: `DISPLAY=:2 xdotool search --onlyvisible --class xclient`.
 

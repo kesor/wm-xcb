@@ -215,18 +215,15 @@ wm_manage_all_clients()
   xcb_flush(dpy);
 }
 
+/* An event libxcb had already queued when the wait started. poll(2) reports
+   the socket, not that queue, so it would block with the event still queued. */
+static xcb_generic_event_t* queued_event = NULL;
+
 void
 wm_xcb_wait_for_events()
 {
   struct pollfd fds[2];
   int           timeout_ms = -1;
-
-  fds[0].fd      = xcb_get_file_descriptor(dpy);
-  fds[0].events  = POLLIN;
-  fds[0].revents = 0;
-  fds[1].fd      = signals_wakeup_fd();
-  fds[1].events  = POLLIN;
-  fds[1].revents = 0;
 
   /* poll(2) on a connection that has already failed returns at once for ever,
      which is the busy loop again: there is nothing left to wait for. */
@@ -235,6 +232,21 @@ wm_xcb_wait_for_events()
     running = 0;
     return;
   }
+
+  /* libxcb reads ahead: a reply wait during startup, or the flush at the end of
+     the last dispatch, can move an event into its queue while the socket stays
+     unreadable. Take that event now; handle_xcb_events() dispatches it before
+     the drain, and the next wait picks up anything a flush read. */
+  queued_event = xcb_poll_for_queued_event(dpy);
+  if (queued_event != NULL)
+    return;
+
+  fds[0].fd      = xcb_get_file_descriptor(dpy);
+  fds[0].events  = POLLIN;
+  fds[0].revents = 0;
+  fds[1].fd      = signals_wakeup_fd();
+  fds[1].events  = POLLIN;
+  fds[1].revents = 0;
 
   if (fds[1].fd < 0) {
     /* No wakeup pipe: a signal cannot interrupt the wait, so a timeout is the
@@ -248,28 +260,39 @@ wm_xcb_wait_for_events()
   signals_drain_wakeups();
 }
 
+static void
+dispatch_event(xcb_generic_event_t* event)
+{
+  /* Handle errors (response_type = 0) */
+  if (event->response_type == 0) {
+    error_details((xcb_generic_error_t*) event);
+    return;
+  }
+
+  /* Dispatch to registered handlers */
+  xcb_handler_dispatch(event);
+
+  /* Handle state events (e.g., running flag changes) */
+  handle_state_event(event);
+}
+
 void
 handle_xcb_events()
 {
   xcb_generic_event_t* event;
 
+  if (queued_event != NULL) {
+    event        = queued_event;
+    queued_event = NULL;
+    dispatch_event(event);
+    free(event);
+  }
+
   /* Drain everything X has already given us. poll(2) says the socket is
      readable, not that one event arrived: a later poll on a socket whose
      events are all in libxcb's own queue waits for the next one. */
   while ((event = xcb_poll_for_event(dpy)) != NULL) {
-    /* Handle errors (response_type = 0) */
-    if (event->response_type == 0) {
-      error_details((xcb_generic_error_t*) event);
-      free(event);
-      continue;
-    }
-
-    /* Dispatch to registered handlers */
-    xcb_handler_dispatch(event);
-
-    /* Handle state events (e.g., running flag changes) */
-    handle_state_event(event);
-
+    dispatch_event(event);
     free(event);
   }
 

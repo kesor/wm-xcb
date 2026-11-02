@@ -219,7 +219,15 @@ once. A connection that has already failed ends the loop: `poll(2)` on that
 socket returns at once, which is the busy-wait again. With no wakeup pipe, the
 wait uses a 250 ms timeout so a signal is still noticed.
 
+`poll(2)` reports the socket, not libxcb's own queue. libxcb reads ahead during
+a reply wait (the property and atom queries at startup) and during `xcb_flush()`,
+so an event can sit in that queue with nothing left to read on the socket. The
+wait takes such an event first and returns; the drain dispatches it before
+asking libxcb for more.
+
 ```c
+static xcb_generic_event_t* queued_event = NULL;
+
 void wm_xcb_wait_for_events(void) {
     struct pollfd fds[2] = {
         { .fd = xcb_get_file_descriptor(dpy), .events = POLLIN },
@@ -230,6 +238,11 @@ void wm_xcb_wait_for_events(void) {
         running = 0;
         return;
     }
+
+    /* An event libxcb already read is not visible to poll(2) on the socket. */
+    queued_event = xcb_poll_for_queued_event(dpy);
+    if (queued_event != NULL)
+        return;
 
     /* A signal handler cannot change what poll() is waiting on: a SIGTERM that
        lands before this call would leave the WM asleep and unstoppable. The
@@ -242,17 +255,18 @@ void wm_xcb_wait_for_events(void) {
 void handle_xcb_events(void) {
     xcb_generic_event_t* event;
 
+    if (queued_event != NULL) {
+        event        = queued_event;
+        queued_event = NULL;
+        dispatch_event(event);
+        free(event);
+    }
+
     /* Drain the queue: poll(2) reports that the socket is readable, and a poll
        on a socket whose events are all in libxcb's own queue waits for the next
        event instead of returning to this loop. */
     while ((event = xcb_poll_for_event(dpy)) != NULL) {
-        if (event->response_type == 0) {
-            error_details((xcb_generic_error_t*)event);
-            free(event);
-            continue;
-        }
-        xcb_handler_dispatch(event);
-        handle_state_event(event);
+        dispatch_event(event);
         free(event);
     }
 

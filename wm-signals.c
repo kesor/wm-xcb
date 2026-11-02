@@ -34,35 +34,28 @@ signal_wakeup(void)
 void
 sigchld(int unused)
 {
-  /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
-  if (signal(SIGCHLD, sigchld) == SIG_ERR)
-    LOG_ERROR("cannot install SIGCHLD event handler:");
-  while (0 < waitpid(-1, NULL, WNOHANG))
+  /* Only async-signal-safe calls: LOG_ERROR() takes the stdio lock, which the
+     interrupted code may already hold, and signal() is not on the safe list.
+     glibc does not reset the disposition, so there is nothing to reinstall.
+     waitpid(WNOHANG) reaps without waiting for a child that is still running. */
+  int saved_errno = errno;
+  while (waitpid(-1, NULL, WNOHANG) > 0)
     ;
+  errno = saved_errno;
 }
 
 void
 sigint(int unused)
 {
-  /* Restored at the end. signal_wakeup() saves errno around its own write;
-     the newline write before that call still replaces the interrupted errno
-     unless this save covers both. */
-  int               saved_errno = errno;
-  static const char newline     = '\n';
-  ssize_t           written;
-
   running = 0;
 
-  /* Only async-signal-safe calls here. printf and LOG_DEBUG take the stdio
-     lock, which the code this signal interrupted may already hold: the handler
-     would deadlock inside fprintf and the WM would never stop. write(2) is
-     safe, and the newline is what keeps a terminal prompt off the last log
-     line after ^C. */
-  written = write(STDOUT_FILENO, &newline, 1);
-  (void) written;
-
+  /* Only async-signal-safe calls here. write(2) to stdout can block when the
+     reader is not draining the pipe, and the handler runs on the loop's
+     thread: the loop would never reach poll() again, so the wakeup byte would
+     not help. LOG_DEBUG and printf take the stdio lock and deadlock the same
+     way the code this signal interrupted may. The non-blocking pipe is the
+     only safe way to end the wait. */
   signal_wakeup();
-  errno = saved_errno;
 }
 
 static void

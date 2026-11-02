@@ -18,6 +18,7 @@
  * -c CLASS     WM_CLASS/res_name and res_class (default "xclient")
  * -W/-H        requested width/height of each window (default 400x300)
  * -s SLEEP     sleep seconds between creating windows (default 0)
+ * -y           wait for the server to process each map before printing its id
  * -l LIFETIME  exit after this many seconds (default: run until killed)
  * -h           print this help
  *
@@ -149,9 +150,10 @@ main(int argc, char** argv)
   int         sleep_s  = 0;
   int         lifetime = 0;
   bool        verbose  = false;
+  bool        sync     = false;
 
   int opt;
-  while ((opt = getopt(argc, argv, "n:t:c:W:H:s:l:vh")) != -1) {
+  while ((opt = getopt(argc, argv, "n:t:c:W:H:s:l:vyh")) != -1) {
     switch (opt) {
     case 'n':
       count = atoi(optarg);
@@ -177,10 +179,13 @@ main(int argc, char** argv)
     case 'v':
       verbose = true;
       break;
+    case 'y':
+      sync = true;
+      break;
     case 'h':
     default:
       printf("usage: xclient [-n COUNT] [-t TITLE] [-c CLASS] [-W WIDTH] "
-             "[-H HEIGHT] [-s SLEEP] [-l LIFETIME] [-v] [-h]\n");
+             "[-H HEIGHT] [-s SLEEP] [-l LIFETIME] [-v] [-y] [-h]\n");
       return opt == 'h' ? 0 : 1;
     }
   }
@@ -221,6 +226,11 @@ main(int argc, char** argv)
     char buf[256];
     snprintf(buf, sizeof(buf), "%s-%d", title, i + 1);
     wins[i] = create_window(buf, klass, width, height);
+    if (sync) {
+      /* A request from this client is processed in order, so the reply proves
+         the server has seen the map and redirected it. */
+      free(xcb_get_input_focus_reply(conn, xcb_get_input_focus(conn), NULL));
+    }
     if (verbose)
       printf("0x%08x %s\n", wins[i], buf);
     if (sleep_s > 0 && i + 1 < count)
