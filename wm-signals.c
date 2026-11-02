@@ -44,7 +44,12 @@ sigchld(int unused)
 void
 sigint(int unused)
 {
-  static const char newline = '\n';
+  /* Restored at the end. signal_wakeup() saves errno around its own write;
+     the newline write before that call still replaces the interrupted errno
+     unless this save covers both. */
+  int               saved_errno = errno;
+  static const char newline     = '\n';
+  ssize_t           written;
 
   running = 0;
 
@@ -53,10 +58,11 @@ sigint(int unused)
      would deadlock inside fprintf and the WM would never stop. write(2) is
      safe, and the newline is what keeps a terminal prompt off the last log
      line after ^C. */
-  ssize_t written = write(STDOUT_FILENO, &newline, 1);
+  written = write(STDOUT_FILENO, &newline, 1);
   (void) written;
 
   signal_wakeup();
+  errno = saved_errno;
 }
 
 static void

@@ -215,7 +215,9 @@ void xcb_handler_shutdown(void);
 The loop blocks, it does not spin. `wm_xcb_wait_for_events()` waits in `poll(2)`
 on the X connection's file descriptor and on the read end of the signal wakeup
 pipe; `handle_xcb_events()` then dispatches everything that arrived and flushes
-once.
+once. A connection that has already failed ends the loop: `poll(2)` on that
+socket returns at once, which is the busy-wait again. With no wakeup pipe, the
+wait uses a 250 ms timeout so a signal is still noticed.
 
 ```c
 void wm_xcb_wait_for_events(void) {
@@ -224,10 +226,16 @@ void wm_xcb_wait_for_events(void) {
         { .fd = signals_wakeup_fd(),          .events = POLLIN },
     };
 
+    if (xcb_connection_has_error(dpy) != 0) {
+        running = 0;
+        return;
+    }
+
     /* A signal handler cannot change what poll() is waiting on: a SIGTERM that
        lands before this call would leave the WM asleep and unstoppable. The
        handler writes a byte to the second fd instead. */
-    poll(fds, 2, -1);
+    int timeout_ms = fds[1].fd < 0 ? 250 : -1;
+    poll(fds, 2, timeout_ms);
     signals_drain_wakeups();
 }
 
@@ -244,6 +252,7 @@ void handle_xcb_events(void) {
             continue;
         }
         xcb_handler_dispatch(event);
+        handle_state_event(event);
         free(event);
     }
 

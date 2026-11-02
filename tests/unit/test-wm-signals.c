@@ -21,12 +21,33 @@
 #include "wm-running.h"
 #include "wm-signals.h"
 
+static void (*previous_sigint)(int);
+static void (*previous_sigterm)(int);
+
 static int
 is_readable(int fd, int timeout_ms)
 {
   struct pollfd pfd = { .fd = fd, .events = POLLIN, .revents = 0 };
 
   return poll(&pfd, 1, timeout_ms) > 0;
+}
+
+static void
+remember_signal_dispositions(void)
+{
+  /* setup_signals() replaces these for the whole process. Leaving SIGTERM
+     caught makes the test binary ignore the signal used to stop a hung run. */
+  previous_sigint = signal(SIGINT, SIG_DFL);
+  signal(SIGINT, previous_sigint);
+  previous_sigterm = signal(SIGTERM, SIG_DFL);
+  signal(SIGTERM, previous_sigterm);
+}
+
+static void
+restore_signal_dispositions(void)
+{
+  signal(SIGINT, previous_sigint);
+  signal(SIGTERM, previous_sigterm);
 }
 
 void
@@ -43,6 +64,10 @@ test_setup_signals_creates_a_nonblocking_wakeup_fd(void)
   int flags = fcntl(fd, F_GETFL, 0);
   assert(flags >= 0);
   assert((flags & O_NONBLOCK) != 0);
+
+  flags = fcntl(fd, F_GETFD, 0);
+  assert(flags >= 0);
+  assert((flags & FD_CLOEXEC) != 0);
 }
 
 void
@@ -82,16 +107,20 @@ test_a_second_setup_keeps_the_same_pipe(void)
   assert(signals_wakeup_fd() == first);
 
   /* The handler still writes to the fd the loop waits on. */
+  sig_atomic_t was_running = running;
+
   signals_drain_wakeups();
   assert(raise(SIGTERM) == 0);
   assert(is_readable(first, 100));
   signals_drain_wakeups();
 
-  running = 1;
+  running = was_running;
 }
 
 TEST_GROUP(SignalWakeup, {
+  remember_signal_dispositions();
   test_setup_signals_creates_a_nonblocking_wakeup_fd();
   test_sigterm_sets_running_and_wakes_the_loop();
   test_a_second_setup_keeps_the_same_pipe();
+  restore_signal_dispositions();
 });
