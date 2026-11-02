@@ -188,6 +188,16 @@ Write a test so that it cannot pass for the wrong reason: a precondition such as
 stops the test, not `check_eq`, which would let a later "the window is gone now"
 pass because it was never there.
 
+`test-86-queued-event.sh` is the exception to "one Xephyr for the whole run":
+it starts its own `Xvfb` and WM. The condition it checks cannot be produced after
+startup. libxcb reads ahead of `poll(2)`, so an event can sit in its queue while
+the socket is no longer readable; the test holds the first EWMH atom query with
+`tools/xcb-ewmh-delay.so` (an `LD_PRELOAD` shim), maps a window while the WM is
+held, then releases it. The reply wait reads that `MapRequest` into libxcb's
+queue, and a loop that only polls the socket never dispatches it. The shim is
+built by `make test-x`; it reads `WM_QUEUE_TEST_MARKER` and `WM_QUEUE_TEST_GO`
+and does nothing when either is unset.
+
 ---
 
 ## 3b. Static checks
@@ -204,22 +214,27 @@ compiled cannot produce findings, then flags calls that block:
 | Pattern | Why it is flagged |
 |---------|-------------------|
 | `xcb_*_reply()`, `xcb_wait_for_reply()`, `xcb_request_check()` | synchronous round trip: the loop waits for the server |
-| `xcb_poll_for_event()` | polling instead of blocking burns a core |
 | `read()` | a callback must not wait on a child's pipe |
 | `waitpid()` without `WNOHANG` | blocking wait on a child |
 | `sleep()`, `usleep()`, `nanosleep()` | anything that sleeps stops every client |
 
+`xcb_poll_for_event()` is not on the list. It returns NULL instead of waiting,
+which is what the loop does to drain the events libxcb queued after `poll(2)`
+reported the connection readable, and a grep cannot tell that from the spin it
+replaced. Busy-waiting is measured instead: `tests/x/test-85-idle-cpu.sh` in the
+seam suite, and the idle CPU line of `scripts/perf-test.sh`.
+
 A call is waived when it, or the two lines above it, carries
-`allow-blocking: <reason>`. The marker is the record of why the wait is safe,
-usually startup code that runs before the loop exists. Comments that mention a
+`allow-blocking: <reason>`. The marker is the record of why the wait is safe:
+startup code that runs before the loop exists, or the non-blocking read of the
+signal wakeup pipe in `signals_drain_wakeups()`. Comments that mention a
 blocking function are ignored, so prose cannot produce a false positive.
 
 The script prints the current counts. Every violation is the debt tracked in
-`bd list --parent wm-46k.2`: the busy-wait in `handle_xcb_events()`, the
-property-handler path through `print_atom_name()` and
-`ewmh_check_wm_state_fullscreen()`, the RandR handler path through
-`monitor_manager_update_crtc_geometry()` and its two helpers, and the blocking
-`read()`/`waitpid()` pair in `launcher_run_dmenu()`.
+`bd list --parent wm-46k.2`: the property-handler path through
+`print_atom_name()` and `ewmh_check_wm_state_fullscreen()`, the RandR handler
+path through `monitor_manager_update_crtc_geometry()` and its two helpers, and
+the blocking `read()`/`waitpid()` pair in `launcher_run_dmenu()`.
 
 The check is meant to reach zero by removing the violations, not by adding
 markers. A new marker needs a reason that would satisfy a reviewer: "startup,
@@ -275,6 +290,7 @@ make tools/xclient
 | `-s SEC` | sleep between window creations |
 | `-l SEC` | exit after SEC seconds instead of waiting to be killed |
 | `-v` | print each window ID |
+| `-y` | wait for the server to process each map before printing its ID |
 
 `xdotool` finds them: `DISPLAY=:2 xdotool search --onlyvisible --class xclient`.
 
@@ -340,29 +356,33 @@ It starts the same way as `xephyr-test.sh`: it builds the WM variant named by
 `DEBUG` and `SANITIZE`, prints the line that names the variant, the binary and
 the log, and runs that binary. The baseline below was measured on the release
 build; a debug build is `-O0` and its numbers are not comparable with it, which
-is why the variant is in the output. It then prints five numbers:
+is why the variant is in the output. It then prints these numbers:
 
 | Number | How it is measured | Why it matters |
 |--------|--------------------|----------------|
-| idle CPU | `/proc/<wm pid>/stat` utime+stime over 2 s wall (Linux) | the WM must cost nothing when nothing happens |
+| idle CPU | `/proc/<wm pid>/stat` utime+stime over 2 s wall (Linux) | the WM must cost nothing when nothing happens; over the script's budget the run fails |
 | burst CPU | utime+stime delta while N windows are created | cost of the manage path per window |
 | per window | burst CPU / N | comparable across window counts |
 | time to tile | wall clock until all N windows are viewable, polled every 10 ms, TIMEOUT at 5 s | the number a user feels |
 | RSS | `VmRSS` before/after the burst | leak and growth detection |
+| SIGTERM | wall clock from SIGTERM until the WM's `/proc` state is gone or `Z` | a loop that blocks must still be stoppable |
 
-Baseline measured 2026-11-01 (1280x800 Xephyr, 5 and 10 windows):
+Measured 2026-11-02 (1280x800 Xephyr, release build, 5 windows):
 
 ```
-idle CPU: 1990 ms over 2000 ms wall          <- busy-wait loop, see STATUS §4.7
-time to tile: TIMEOUT (5000 ms); 0 of 5 viewable
-burst CPU: 5010 ms
-RSS: 2840 kB before, 2840 kB after
+idle CPU: 0 ms over 2000 ms wall (budget 20 ms)
+time to tile: 12 ms for 5 windows (2.4 ms per window)
+burst CPU: 0 ms (0.00 ms per window)
+RSS: 2864 kB before, 2864 kB after (0 kB growth)
+SIGTERM: WM exited in 8 ms
 ```
 
-So today the number to beat is "100% of a core doing nothing". After the loop is
-fixed, idle CPU should be a few milliseconds over 2 s. A reasonable target for
-time to tile is under 50 ms for 10 windows, which is roughly one X round trip
-per client on a local socket.
+Idle CPU is a budget, not a baseline: the loop blocks in `poll(2)`, so anything
+above a few milliseconds over the window means it is spinning again, and the
+script fails the run rather than leaving the number for someone to compare by
+eye. `tests/x/test-85-idle-cpu.sh` asserts the same thing inside the seam suite.
+The wall clock numbers are the machine's: time to tile is roughly one X round
+trip per client on a local socket.
 
 What these numbers do not cover, and what to add when it matters:
 
@@ -451,9 +471,9 @@ scripts/check-sanitize-x.sh --update-baseline  # accept today's sites under a li
 strace -f -e trace=poll,read,write,recvmsg,sendmsg -p "$(pgrep -x wm)"
 ```
 
-The busy-wait loop shows up as a continuous stream of `poll`/`recvmsg`
-returning `EAGAIN`. After the fix, the same trace should be silent until an X
-event arrives.
+A busy-wait loop shows up as a continuous stream of `poll`/`recvmsg`
+returning `EAGAIN`. A loop that blocks is silent until an X event or a signal
+arrives, and one `poll` that returns is what wakes it.
 
 ---
 

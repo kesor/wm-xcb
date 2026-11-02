@@ -16,18 +16,21 @@
 # burst CPU are not comparable with the release baseline in docs/TESTING.md.
 #
 # What is measured (all numbers printed with units):
-#   idle CPU      WM CPU time consumed over 2 s with no activity
+#   idle CPU      WM CPU time consumed over 2 s with no activity; more than
+#                 IDLE_BUDGET_MS means the loop is not blocking, and fails
 #   burst CPU     WM CPU time consumed while N windows are created
 #   per window    burst CPU / N
 #   time to tile  wall clock from spawning N windows until all N are viewable
 #                 and non-overlapping, or TIMEOUT after 5 s
 #   RSS           WM resident memory after the burst
+#   SIGTERM       how long the WM takes to exit after SIGTERM
 #
 # What is not measured, and how to get it later: per-event service time and X
 # round trips. Those need counters inside the WM (see docs/TESTING.md).
 #
-# Exit status: 0 if a measurement ran to completion, 1 if the WM exited or the
-#             windows never reached a tiled state (reported as TIMEOUT).
+# Exit status: 0 if a measurement ran to completion, 1 if the WM exited, the
+#             windows never reached a tiled state (reported as TIMEOUT), idle
+#             CPU went over the budget, or SIGTERM did not stop the WM.
 
 set -uo pipefail
 
@@ -37,6 +40,11 @@ KEEP=0
 SCREEN_W=1280
 SCREEN_H=800
 TILE_TIMEOUT_MS=5000
+# The loop blocks in poll(2) while nothing happens, so a correct WM spends
+# milliseconds here. A second or more means it is spinning again.
+IDLE_BUDGET_MS=20
+IDLE_WINDOW_MS=2000
+TERM_TIMEOUT_MS=2000
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -164,6 +172,10 @@ if ! kill -0 "$WM_PID" 2>/dev/null; then
   echo "perf-test: WM exited during startup, see $WM_LOG" >&2
   exit 1
 fi
+if [ ! -r "/proc/$WM_PID/stat" ]; then
+  echo "perf-test: no /proc/$WM_PID/stat, so CPU time cannot be measured on this platform" >&2
+  exit 1
+fi
 
 echo "nested display: $TEST_DISPLAY  screen: ${SCREEN_W}x${SCREEN_H}  windows: $WINDOWS"
 
@@ -171,7 +183,8 @@ echo "nested display: $TEST_DISPLAY  screen: ${SCREEN_W}x${SCREEN_H}  windows: $
 cpu0=$(wm_cpu_ms)
 sleep 2
 cpu1=$(wm_cpu_ms)
-echo "idle CPU: $((cpu1 - cpu0)) ms over 2000 ms wall"
+idle_cpu=$((cpu1 - cpu0))
+echo "idle CPU: ${idle_cpu} ms over ${IDLE_WINDOW_MS} ms wall (budget ${IDLE_BUDGET_MS} ms)"
 
 # --- burst ----------------------------------------------------------------
 rss_before=$(wm_rss_kb)
@@ -213,8 +226,43 @@ fi
 echo "burst CPU: ${burst_cpu} ms ($(awk -v c="$burst_cpu" -v n="$WINDOWS" 'BEGIN{printf "%.2f", c/n}') ms per window)"
 echo "RSS: ${rss_before} kB before, ${rss_after} kB after ($((rss_after - rss_before)) kB growth)"
 
+verdict=0
 if [ "$tiled" -ne 1 ]; then
   echo "RESULT: INCOMPLETE - the WM does not map or tile windows, so the tiling number is a timeout"
+  verdict=1
+fi
+
+# --- SIGTERM --------------------------------------------------------------
+# A loop that blocks stops when the signal arrives, because the handler writes
+# the wakeup byte. One that ignores the signal cannot be stopped without
+# SIGKILL, which loses the shutdown path and the log.
+term_start=$(now_ms)
+kill -TERM "$WM_PID" 2>/dev/null
+term_exited=0
+while [ $(( $(now_ms) - term_start )) -lt "$TERM_TIMEOUT_MS" ]; do
+  # A child that has exited is a zombie until it is reaped, so kill -0 keeps
+  # succeeding. State Z is what an exited child looks like in /proc.
+  state=$(awk '{print $3}' "/proc/$WM_PID/stat" 2>/dev/null)
+  if [ -z "$state" ] || [ "$state" = "Z" ]; then
+    term_exited=1
+    break
+  fi
+  sleep 0.01
+done
+term_ms=$(( $(now_ms) - term_start ))
+if [ "$term_exited" -eq 1 ]; then
+  echo "SIGTERM: WM exited in ${term_ms} ms"
+else
+  echo "SIGTERM: WM still running ${TERM_TIMEOUT_MS} ms after SIGTERM"
+  verdict=1
+fi
+
+if [ "$idle_cpu" -gt "$IDLE_BUDGET_MS" ]; then
+  echo "RESULT: FAIL - idle CPU ${idle_cpu} ms over ${IDLE_WINDOW_MS} ms wall: the loop does not block"
+  exit 1
+fi
+if [ "$verdict" -ne 0 ]; then
+  echo "RESULT: FAIL - see the lines above"
   exit 1
 fi
 echo "RESULT: OK"

@@ -11,6 +11,5 @@ src/actions/launcher.c|waitpid(pid, &status, 0);
 src/actions/launcher.c|while (read(pipefd[0], cmd, sizeof(cmd)) > 0)
 src/components/monitor-manager.c|xcb_randr_get_crtc_info_reply_t* reply = xcb_randr_get_crtc_info_reply(dpy, cookie, NULL);
 src/components/monitor-manager.c|xcb_randr_get_output_info_reply_t* reply = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
-wm-xcb.c|xcb_generic_event_t* event = xcb_poll_for_event(dpy);
 wm-xcb-ewmh.c|xcb_get_atom_name_reply_t* reply = xcb_get_atom_name_reply(dpy, cookie, NULL);
 wm-xcb-ewmh.c|xcb_get_property_reply_t* reply = xcb_get_property_reply(dpy, cookie, NULL);

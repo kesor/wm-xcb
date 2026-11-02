@@ -98,7 +98,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh`, `tests/x/run.sh` and `scripts/perf-test.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
-| seam | `scripts/check-seam.sh` (`make test-x`) | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run. Runs before every push; starts Xvfb when there is no display, and fails rather than skipping when neither is available |
+| seam | `scripts/check-seam.sh` (`make test-x`) | X behaviour: mapped, tiled, focused, tags, EWMH, events already read into libxcb's queue, and idle CPU stays under the budget. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run. Runs before every push; starts Xvfb when there is no display, and fails rather than skipping when neither is available |
 | sanitize | `scripts/check-sanitize.sh` | no leak site or UBSan report missing from `tests/quality/asan-baseline.txt`, and the suite that produced the log ran under ASan. `detect_leaks` and `leak_check_at_exit` are forced on, and `suppressions=` and `log_path=` are dropped, in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 | sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: the run reports `variant=release-sanitize`, no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. `detect_leaks` and `leak_check_at_exit` are forced on, and `suppressions=` and `log_path=` are dropped, in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 
@@ -170,8 +170,9 @@ in `tests/quality/async-baseline.txt`.
 
 - **Waiver** — a comment `allow-blocking: <reason>` on the line or the two above
   it. For code that cannot block: startup paths before the loop runs.
-- **Baseline** — the calls that are known and tracked in beads. Nine today, all
-  in `bd list --parent wm-46k.2`.
+- **Baseline** — the calls that are known and tracked in beads. The script
+  prints how many there are; the remaining ones are all in
+  `bd list --parent wm-46k.2`.
 
 A violation that is in neither fails. That is the point: the file only shrinks.
 Adding an entry is a deliberate act:

@@ -98,27 +98,29 @@ void keybinding_handler(void* event) {
 
 ### XCB Infrastructure Dispatches Directly
 
-The event loop in `wm-xcb.c` routes events to registered handlers:
+The event loop in `wm-xcb.c` routes events to registered handlers. It waits in
+`poll(2)` first, so the dispatch below only runs when there is something to
+dispatch. `poll(2)` does not see an event libxcb has already read into its own
+queue, so the wait takes that event first and the dispatch handles it before the
+drain; `xcb-integration.md` has the full loop.
 
 ```c
 void handle_xcb_events() {
-    xcb_generic_event_t* event = xcb_poll_for_event(dpy);
-    if (!event) return;
-    
-    /* Handle errors (response_type = 0) */
-    if (event->response_type == 0) {
-        error_details((xcb_generic_error_t*)event);
+    xcb_generic_event_t* event;
+
+    if (queued_event != NULL) {
+        event        = queued_event;
+        queued_event = NULL;
+        dispatch_event(event);
         free(event);
-        return;
     }
-    
-    /* Dispatch to registered handlers */
-    xcb_handler_dispatch(event);
-    
-    /* Handle state events (e.g., running flag changes) */
-    handle_state_event(event);
-    
-    free(event);
+
+    while ((event = xcb_poll_for_event(dpy)) != NULL) {
+        dispatch_event(event);
+        free(event);
+    }
+
+    xcb_flush(dpy);
 }
 ```
 
