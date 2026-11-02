@@ -109,7 +109,7 @@ Short version, and the parts that stay true until they are fixed:
   The event loop polls instead of blocking, so it burns a core while idle.
   Visible tags are stored twice: a tag view change updates the tag-view state
   machine, and a new client still copies its tags from `Monitor.tagset`, which
-  nothing in `src/` writes, so every new client lands on tag 1.
+  no runtime path writes, so every new client lands on tag 1.
 
 Do not take that from a document. Ask the tree:
 
