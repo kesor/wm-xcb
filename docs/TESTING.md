@@ -99,9 +99,13 @@ xephyr-test.sh: variant=debug (DEBUG=1 SANITIZE=0), binary=<repo>/build/debug/wm
 The variant, the binary that runs and the log it writes are in that line, so a
 run never leaves you guessing which build it used or where its output went. If
 that line says `variant=debug` and the log is still empty, the WM itself never
-logged and the binary is not the suspect. `SANITIZE=1` works the same way; that
-build runs without `stdbuf`, because ASan refuses to start when `stdbuf`'s
-preloaded library comes first.
+logged and the binary is not the suspect. `SANITIZE=1` works the same way.
+
+The WM flushes each log line as it writes it, so a log from a WM that was killed
+rather than shut down is complete up to the last line it wrote. That matters for
+the harnesses, which stop the WM with a signal, and it means the log needs no
+`stdbuf` wrapper: the sanitize builds cannot have one anyway, because ASan
+refuses to start when another library is preloaded ahead of its runtime.
 
 ### Build directories
 

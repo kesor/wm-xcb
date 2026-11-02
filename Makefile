@@ -89,6 +89,7 @@ TEST_SRC = \
 	tests/unit/test-registry.c \
 	tests/unit/test-runner.c \
 	tests/unit/test-wm-hub.c \
+	tests/unit/test-wm-log.c \
 	tests/unit/test-wm-xcb-handler.c \
 	tests/unit/test-wm-monitor.c \
 	tests/unit/test-wm-tag.c \
