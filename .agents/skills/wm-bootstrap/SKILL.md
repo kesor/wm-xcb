@@ -150,6 +150,19 @@ starts a run, waits, reviews it on a different model family, and notifies;
 alone. `worker.sh --help` is the flag list; this file does not repeat it, because
 a copy here rots while the real one changes.
 
+It lives beside the main checkout in a directory named `ai-workers-for-wm/`, so
+from a worktree created under `.worktrees/<bead>/` it is
+`../../../ai-workers-for-wm/`. It is not on `PATH` and not in this tree.
+
+`worker.sh`, `README.md`, `HANDOFF.md` and `PROCESS.md` in that directory are
+safe to read: the flags, the defaults, the worktree layout and the rules for the
+session that dispatches are all written there. They are the harness's own
+project, so a worker reads them and does not edit them, and this repository never
+gets a copy of one. A fact a document here needs — a flag, a default, a prompt
+line — is read from those files. If it cannot be confirmed there, ask for it in
+the final message instead of writing it from memory: a wrong line in a document
+about the harness is the one mistake a worker cannot check.
+
 Two things it cannot decide for you:
 
 - **One bead per worker, run in parallel.** Small batches review better: a
