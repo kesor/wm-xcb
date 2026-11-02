@@ -12,8 +12,8 @@
 # Layers, fastest first:
 #   pre-commit  ~5s     paths, docs, test-src, bead-refs, formatting, build, unit, async, beads
 #   commit-msg  instant  commit message rules
-#   pre-push    ~40s    the above, plus the -pedantic debug build
-#   CI                   everything, plus sanitizers and the seam tests
+#   pre-push    ~70s    the above, plus the seam suite and the -pedantic debug build
+#   CI                   everything, plus the sanitizers
 #
 # Adding a gate: put the command in a script under scripts/, list it here, and
 # add the same command to .github/workflows/quality.yml. docs/QUALITY.md has
@@ -100,6 +100,15 @@ pre-push:
     unit:
       run: make test
       fail_text: "make test failed."
+
+    # The only check that looks at the running WM. It used to run only when the
+    # author or the reviewer chose to, so a branch that broke mapping, tiling,
+    # tags or the EWMH properties merged green. scripts/check-seam.sh starts
+    # Xvfb when there is no display; it fails rather than skipping when neither
+    # is available.
+    seam:
+      run: ./scripts/check-seam.sh
+      fail_text: "A new seam failure: something X should see is not there. Run 'make test-x TEST_X_ARGS=--verbose', and baseline a known failure deliberately or fix it."
 
     standalone:
       run: make test-standalone && make test-sm-standalone

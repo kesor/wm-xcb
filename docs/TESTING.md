@@ -13,8 +13,10 @@
 ## 0. What runs automatically
 
 `lefthook` runs the gates on every commit and push; CI runs the same commands.
-See [QUALITY.md](QUALITY.md). The sections below are the layers you run by hand
-while working.
+The seam suite (`make test-x`) is one of the push gates, through
+`scripts/check-seam.sh`: it starts Xvfb when there is no `DISPLAY`, and fails
+rather than skipping when neither is available. See [QUALITY.md](QUALITY.md).
+The sections below are the layers you run by hand while working.
 
 ## 1. Environment
 
@@ -130,8 +132,8 @@ is where the WM said it would be, `_NET_CLIENT_LIST` exists. Those are the
 assertions the unit tests cannot make.
 
 `scripts/xephyr-test.sh` is the earlier single-scenario version of the same idea;
-prefer `make test-x`, and keep the old script only because several beads issues
-name it.
+prefer `make test-x`, which also runs before every push, and keep the old script
+only because several beads issues name it.
 
 `tests/x/run.sh` starts one Xephyr and one WM for the whole run, then runs each
 file as a separate process with `DISPLAY`, `WM_PID`, `WM_LOG` and `ROOT_DIR`
