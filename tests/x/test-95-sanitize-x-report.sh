@@ -9,7 +9,7 @@
 # it cannot test here is that the harness line comes from a real run; that is
 # what the gate does in CI.
 source "$(dirname "$0")/lib.sh"
-# shellcheck source=../scripts/lib/sanitize-x-report.sh
+# shellcheck source=../../scripts/lib/sanitize-x-report.sh
 . "$ROOT_DIR/scripts/lib/sanitize-x-report.sh"
 
 DIR="$TMPDIR_SEAM/sanitize-x-report"
@@ -112,5 +112,26 @@ check_eq "log_path= is dropped from ASAN_OPTIONS" 0 \
   "$(printf '%s' "$ASAN_OPTIONS" | grep -c 'log_path')"
 check_eq "suppressions= is dropped from LSAN_OPTIONS" "leak_check_at_exit=1" "$LSAN_OPTIONS"
 check_eq "other options survive the scrub" "print_stacktrace=1" "$UBSAN_OPTIONS"
+
+# The runtime also splits on colon and whitespace. A comma-only scrub leaves
+# suppressions= in place when another key precedes it, and the report stays hidden.
+ASAN_OPTIONS="halt_on_error=0:suppressions=$DIR/ignore.txt:log_path=$DIR/asan"
+LSAN_OPTIONS="print_suppressions=0 suppressions=$DIR/ignore.txt"
+sanitize_x_scrub_options ASAN_OPTIONS
+sanitize_x_scrub_options LSAN_OPTIONS
+check_eq "colon-separated suppressions= and log_path= are dropped" "halt_on_error=0" "$ASAN_OPTIONS"
+check_eq "space-separated suppressions= is dropped" "print_suppressions=0" "$LSAN_OPTIONS"
+
+UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1"
+sanitize_x_scrub_options UBSAN_OPTIONS
+check_eq "a colon-separated option that is not dropped survives" \
+  "print_stacktrace=1,halt_on_error=1" "$UBSAN_OPTIONS"
+
+# The gate runs under set -u and calls the scrub on variables the caller never set.
+unset ASAN_OPTIONS
+set -u
+sanitize_x_scrub_options ASAN_OPTIONS
+set +u
+check_eq "an unset option string scrubs to empty" "" "${ASAN_OPTIONS-}"
 
 finish

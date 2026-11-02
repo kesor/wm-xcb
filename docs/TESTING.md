@@ -127,8 +127,7 @@ make SANITIZE=1 test-x      # the same suite against the sanitized WM
 A seam test asserts what the X server sees, not what the WM thinks: the window
 is viewable, `WM_STATE` is `Normal`, two windows do not overlap, the input focus
 is where the WM said it would be, `_NET_CLIENT_LIST` exists. Those are the
-assertions the unit tests cannot make, and every failure names the beads issue
-that owns the defect.
+assertions the unit tests cannot make.
 
 `scripts/xephyr-test.sh` is the earlier single-scenario version of the same idea;
 prefer `make test-x`, and keep the old script only because several beads issues

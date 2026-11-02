@@ -25,22 +25,28 @@
 
 # sanitize_x_scrub_options <environment variable name>
 #   Drops suppressions= and log_path= from the named sanitizer option string and
-#   writes the result back. Reads as a whole-string rewrite so the caller can
-#   then append the keys the gate forces; options are read left to right and the
-#   last value of a repeated key wins, so a key that survives here would beat a
-#   forced one anyway.
+#   writes the result back. The runtime splits that string on colon, comma, and
+#   whitespace, so a comma-only split leaves either key in place when another
+#   key precedes it. Either key turns a real report into silence, and appending
+#   detect_leaks=1 does not undo that: those two are not flags the forced suffix
+#   can override. Surviving keys are rejoined with commas, which the runtime
+#   accepts as a separator, so the caller can then append the keys the gate forces.
 sanitize_x_scrub_options() {
   local name=$1 value items=() kept=() item
-  value=${!name:-}
-  IFS=, read -ra items <<<"$value"
+  value=${!name-}
+  IFS=$' \t\n:,' read -r -a items <<<"$value"
   for item in "${items[@]}"; do
     case "$item" in
       '' | suppressions=* | log_path=*) continue ;;
     esac
     kept+=("$item")
   done
-  local IFS=,
-  printf -v "$name" '%s' "${kept[*]}"
+  if [ "${#kept[@]}" -eq 0 ]; then
+    printf -v "$name" '%s' ''
+  else
+    local IFS=,
+    printf -v "$name" '%s' "${kept[*]}"
+  fi
   export "${name?}"
 }
 
