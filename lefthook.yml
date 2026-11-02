@@ -12,7 +12,7 @@
 # Layers, fastest first:
 #   pre-commit  ~5s     paths, docs, test-src, bead-refs, formatting, build, unit, async, beads
 #   commit-msg  instant  commit message rules
-#   pre-push    ~70s    the above, plus the seam suite and the -pedantic debug build
+#   pre-push    ~65s    the above, plus the flake evaluation, the seam suite and the -pedantic debug build
 #   CI                   everything, plus the sanitizers
 #
 # Adding a gate: put the command in a script under scripts/, list it here, and

@@ -16,7 +16,7 @@ model.*
 |-------|------|------|------|
 | `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
-| `pre-push` | every push | ~70 s | the above plus the flake evaluation, the seam suite, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
+| `pre-push` | every push | ~65 s | the above plus the flake evaluation, the seam suite, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run`, required: known failures are baselined |
 | CI `sanitize` | every push and PR | ~2 min | `make test SANITIZE=1` |
