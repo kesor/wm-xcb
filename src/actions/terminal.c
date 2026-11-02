@@ -161,6 +161,15 @@ terminal_init(void)
 }
 
 /*
+ * Check if the module is initialized (for the startup check)
+ */
+bool
+terminal_is_initialized(void)
+{
+  return initialized;
+}
+
+/*
  * Shutdown the terminal module.
  * Unregisters the action and frees custom terminal string.
  */

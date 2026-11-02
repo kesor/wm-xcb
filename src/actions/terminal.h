@@ -32,6 +32,11 @@ void terminal_init(void);
 void terminal_shutdown(void);
 
 /*
+ * Check if the module is initialized (for the startup check)
+ */
+bool terminal_is_initialized(void);
+
+/*
  * Action callback for spawning a terminal.
  *
  * This function:

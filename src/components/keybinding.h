@@ -27,6 +27,8 @@
 
 #include "wm-hub.h"
 
+#define KEYBINDING_COMPONENT_NAME "keybinding"
+
 /*
  * Key binding action types (legacy enum for backward compatibility)
  * New code should use action name strings directly.
@@ -152,6 +154,11 @@ uint32_t keybinding_get_count(void);
  * Called by hub during component registration
  */
 void keybinding_init(void);
+
+/*
+ * Check if the component is initialized (for the startup check)
+ */
+bool keybinding_is_initialized(void);
 
 /*
  * Shutdown the keybinding component

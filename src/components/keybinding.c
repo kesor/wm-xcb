@@ -54,7 +54,7 @@ static bool initialized = false;
  * requests that THIS component handles, not requests it sends.
  */
 HubComponent keybinding_component = {
-  .name                  = "keybinding",
+  .name                  = KEYBINDING_COMPONENT_NAME,
   .requests              = NULL, /* We don't handle requests, we send them */
   .accepted_target_names = NULL, /* We don't adopt targets */
   .accepted_targets      = NULL,
@@ -96,6 +96,15 @@ keybinding_init(void)
 }
 
 /*
+ * Check if the component is initialized (for the startup check)
+ */
+bool
+keybinding_is_initialized(void)
+{
+  return initialized;
+}
+
+/*
  * Shutdown the keybinding component
  */
 void
@@ -117,7 +126,7 @@ keybinding_shutdown(void)
   action_registry_shutdown();
 
   /* Unregister from hub */
-  hub_unregister_component("keybinding");
+  hub_unregister_component(KEYBINDING_COMPONENT_NAME);
 
   initialized = false;
   LOG_DEBUG("Keybinding component shutdown complete");

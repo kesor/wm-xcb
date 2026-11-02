@@ -20,6 +20,8 @@
  * Handles display detection via RandR.
  * Listens to XCB_RANDR_NOTIFY events and manages Monitor targets.
  */
+#define MONITOR_MANAGER_COMPONENT_NAME "monitor-manager"
+
 extern HubComponent monitor_manager_component;
 
 /*
@@ -32,6 +34,11 @@ extern HubComponent monitor_manager_component;
  * This function is idempotent - multiple calls are safe.
  */
 void monitor_manager_init(void);
+
+/*
+ * Check if the component is initialized (for the startup check)
+ */
+bool monitor_manager_is_initialized(void);
 
 /*
  * Shutdown the monitor manager.

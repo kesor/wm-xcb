@@ -30,6 +30,9 @@ extern xcb_connection_t* dpy;
 #define RANDR_DISCONNECTED 1
 #define RANDR_UNKNOWN      2
 
+/* Set only once the handler is registered and the outputs are discovered */
+static bool initialized = false;
+
 /* Forward declarations */
 static void monitor_manager_executor(struct HubRequest* req);
 static void monitor_manager_xcb_handler(void* event);
@@ -63,13 +66,22 @@ static const char* monitor_manager_target_names[] = {
  * Monitor Manager Component
  */
 HubComponent monitor_manager_component = {
-  .name                  = "monitor-manager",
+  .name                  = MONITOR_MANAGER_COMPONENT_NAME,
   .requests              = monitor_manager_requests,
   .accepted_target_names = monitor_manager_target_names,
   .accepted_targets      = NULL,
   .executor              = monitor_manager_executor,
   .registered            = false,
 };
+
+/*
+ * Check if the component is initialized (for the startup check)
+ */
+bool
+monitor_manager_is_initialized(void)
+{
+  return initialized;
+}
 
 /*
  * Get the monitor manager component.
@@ -132,6 +144,7 @@ monitor_manager_init(void)
    */
   monitor_manager_discover_outputs();
 
+  initialized = true;
   LOG_INFO("Monitor manager component initialized");
 }
 
@@ -151,8 +164,9 @@ monitor_manager_shutdown(void)
    */
 
   /* Unregister from hub */
-  hub_unregister_component("monitor-manager");
+  hub_unregister_component(MONITOR_MANAGER_COMPONENT_NAME);
 
+  initialized = false;
   LOG_INFO("Monitor manager component shut down");
 }
 

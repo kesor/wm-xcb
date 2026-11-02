@@ -25,17 +25,19 @@
 /*
  * Pertag component - registered with hub for adoption
  */
-static RequestType  pertag_requests[]     = { 0 }; /* No requests */
-static const char*  pertag_target_names[] = { "monitor", NULL };
-static HubComponent pertag_component      = {
-       .name                  = "pertag",
-       .requests              = pertag_requests,
-       .accepted_target_names = pertag_target_names,
-       .accepted_targets      = NULL,
-       .executor              = NULL, /* No requests */
-       .on_adopt              = pertag_on_adopt,
-       .on_unadopt            = pertag_on_unadopt,
-       .registered            = false,
+static RequestType pertag_requests[]     = { 0 }; /* No requests */
+static const char* pertag_target_names[] = { "monitor", NULL };
+static bool        initialized           = false;
+
+static HubComponent pertag_component = {
+  .name                  = PERTAG_COMPONENT_NAME,
+  .requests              = pertag_requests,
+  .accepted_target_names = pertag_target_names,
+  .accepted_targets      = NULL,
+  .executor              = NULL, /* No requests */
+  .on_adopt              = pertag_on_adopt,
+  .on_unadopt            = pertag_on_unadopt,
+  .registered            = false,
 };
 
 /*
@@ -58,10 +60,20 @@ pertag_component_init(void)
 
   /* Check if registration succeeded */
   if (pertag_component.registered) {
+    initialized = true;
     LOG_DEBUG("Pertag component registered with hub");
   } else {
     LOG_WARN("Pertag component registration failed");
   }
+}
+
+/*
+ * Check if the component is initialized (for the startup check)
+ */
+bool
+pertag_component_is_initialized(void)
+{
+  return initialized;
 }
 
 /*
@@ -70,11 +82,15 @@ pertag_component_init(void)
 void
 pertag_component_shutdown(void)
 {
+  /* hub_shutdown() drops the registry entry without calling this, so the early
+   * return still has to clear the module's own state. */
   if (!pertag_component.registered) {
+    initialized = false;
     return;
   }
 
-  hub_unregister_component("pertag");
+  hub_unregister_component(PERTAG_COMPONENT_NAME);
+  initialized = false;
   LOG_DEBUG("Pertag component unregistered from hub");
 }
 
