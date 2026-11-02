@@ -1,4 +1,7 @@
+#include <errno.h>
+#include <poll.h>
 #include <stdlib.h>
+#include <string.h>
 #include <xcb/errors.h>
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
@@ -7,6 +10,7 @@
 #include "src/xcb/xcb-handler.h"
 #include "wm-log.h"
 #include "wm-running.h"
+#include "wm-signals.h"
 #include "wm-states.h"
 #include "wm-xcb-events.h"
 #include "wm-xcb.h"
@@ -212,26 +216,62 @@ wm_manage_all_clients()
 }
 
 void
-handle_xcb_events()
+wm_xcb_wait_for_events()
 {
-  xcb_generic_event_t* event = xcb_poll_for_event(dpy);
-  if (event == NULL)
-    return;
+  struct pollfd fds[2];
+  int           timeout_ms = -1;
 
-  /* Handle errors (response_type = 0) */
-  if (event->response_type == 0) {
-    error_details((xcb_generic_error_t*) event);
-    free(event);
+  fds[0].fd      = xcb_get_file_descriptor(dpy);
+  fds[0].events  = POLLIN;
+  fds[0].revents = 0;
+  fds[1].fd      = signals_wakeup_fd();
+  fds[1].events  = POLLIN;
+  fds[1].revents = 0;
+
+  /* poll(2) on a connection that has already failed returns at once for ever,
+     which is the busy loop again: there is nothing left to wait for. */
+  if (xcb_connection_has_error(dpy) != 0) {
+    LOG_ERROR("the X connection is gone: %d", xcb_connection_has_error(dpy));
+    running = 0;
     return;
   }
 
-  /* Dispatch to registered handlers */
-  xcb_handler_dispatch(event);
+  if (fds[1].fd < 0) {
+    /* No wakeup pipe: a signal cannot interrupt the wait, so a timeout is the
+       only way SIGTERM is ever noticed. */
+    timeout_ms = 250;
+  }
 
-  /* Handle state events (e.g., running flag changes) */
-  handle_state_event(event);
+  if (poll(fds, 2, timeout_ms) < 0 && errno != EINTR)
+    LOG_ERROR("poll on the X connection failed: %s", strerror(errno));
 
-  free(event);
+  signals_drain_wakeups();
+}
+
+void
+handle_xcb_events()
+{
+  xcb_generic_event_t* event;
+
+  /* Drain everything X has already given us. poll(2) says the socket is
+     readable, not that one event arrived: a later poll on a socket whose
+     events are all in libxcb's own queue waits for the next one. */
+  while ((event = xcb_poll_for_event(dpy)) != NULL) {
+    /* Handle errors (response_type = 0) */
+    if (event->response_type == 0) {
+      error_details((xcb_generic_error_t*) event);
+      free(event);
+      continue;
+    }
+
+    /* Dispatch to registered handlers */
+    xcb_handler_dispatch(event);
+
+    /* Handle state events (e.g., running flag changes) */
+    handle_state_event(event);
+
+    free(event);
+  }
 
   /* Handlers queue requests and change the window tree; one flush per
    * iteration sends them without waiting on a reply (PHILOSOPHY 2.3). */

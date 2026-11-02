@@ -25,6 +25,7 @@ XCB (X C Bindings) is the X server communication layer. This document explains h
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       Event Loop                                    │
+│   poll(2) on the X fd + the signal wakeup pipe, then drain:         │
 │   xcb_poll_for_event() → xcb_generic_event_t*                       │
 └─────────────────────────────────────────────────────────────────────┘
                               │
@@ -211,35 +212,54 @@ void xcb_handler_shutdown(void);
 
 ### Event Loop Integration
 
+The loop blocks, it does not spin. `wm_xcb_wait_for_events()` waits in `poll(2)`
+on the X connection's file descriptor and on the read end of the signal wakeup
+pipe; `handle_xcb_events()` then dispatches everything that arrived and flushes
+once.
+
 ```c
-void handle_xcb_events(xcb_connection_t* conn) {
-    xcb_generic_event_t* event = xcb_poll_for_event(conn);
-    if (!event) return;
-    
-    // Handle XCB errors (response_type == 0)
-    if (event->response_type == 0) {
-        error_details((xcb_generic_error_t*)event);
+void wm_xcb_wait_for_events(void) {
+    struct pollfd fds[2] = {
+        { .fd = xcb_get_file_descriptor(dpy), .events = POLLIN },
+        { .fd = signals_wakeup_fd(),          .events = POLLIN },
+    };
+
+    /* A signal handler cannot change what poll() is waiting on: a SIGTERM that
+       lands before this call would leave the WM asleep and unstoppable. The
+       handler writes a byte to the second fd instead. */
+    poll(fds, 2, -1);
+    signals_drain_wakeups();
+}
+
+void handle_xcb_events(void) {
+    xcb_generic_event_t* event;
+
+    /* Drain the queue: poll(2) reports that the socket is readable, and a poll
+       on a socket whose events are all in libxcb's own queue waits for the next
+       event instead of returning to this loop. */
+    while ((event = xcb_poll_for_event(dpy)) != NULL) {
+        if (event->response_type == 0) {
+            error_details((xcb_generic_error_t*)event);
+            free(event);
+            continue;
+        }
+        xcb_handler_dispatch(event);
         free(event);
-        return;
     }
-    
-    // Dispatch to registered handlers
-    xcb_handler_dispatch(event);
-    
-    free(event);
+
+    xcb_flush(dpy);
 }
 
 int main(void) {
     // ...
+    setup_signals();     // installs the handlers and creates the wakeup pipe
     xcb_handler_init();
-    
+
     while (running) {
-        xcb_flush(conn);
-        handle_xcb_events(conn);
-        handle_signals();
-        // ...
+        wm_xcb_wait_for_events();
+        handle_xcb_events();
     }
-    
+
     xcb_handler_shutdown();
     // ...
 }

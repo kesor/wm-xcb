@@ -59,11 +59,16 @@ if [ "${#SOURCES[@]}" -eq 0 ]; then
 fi
 
 # pattern|what the reader should do instead
+#
+# xcb_poll_for_event() is deliberately not on this list. Returning NULL instead
+# of waiting is exactly what an event loop does after poll(2) tells it the
+# connection is readable, and a grep cannot tell that drain from the spin it
+# replaced. Busy-waiting is measured instead: tests/x/test-85-idle-cpu.sh in the
+# seam suite and the idle CPU number in scripts/perf-test.sh.
 RULES=(
   'xcb_[a-z_]*_reply\(|synchronous X round trip: use the cookie and handle the reply as an event, or restructure so no reply is needed'
   'xcb_wait_for_reply\(|synchronous X round trip'
   'xcb_request_check\(|synchronous X round trip'
-  'xcb_poll_for_event\(|polling instead of blocking burns a core: block in xcb_wait_for_event() or poll(2)'
   '\bread\(|blocking read: a callback must not wait for a child process'
   'waitpid\(|blocking wait on a child: reap asynchronously, or pass WNOHANG'
   '\busleep\(|\bsleep\(|nanosleep\(|sleep inside the window manager stalls every client'

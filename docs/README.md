@@ -110,9 +110,9 @@ Short version, and the parts that stay true until they are fixed:
   every owner and fails if a name in `config.wm.def.h` is not registered after
   that. `main` exits non-zero when a module on its startup check does not come
   up, and a unit test runs that startup and asks each of those modules whether
-  it is up.
-- **Does not work:** it sets no EWMH root properties. The event loop polls
-  instead of blocking, so it burns a core while idle. Visible tags are stored
+  it is up. The event loop blocks in `poll(2)` on the X connection plus a
+  signal wakeup pipe, so an idle WM costs no CPU, and SIGTERM ends it.
+- **Does not work:** it sets no EWMH root properties. Visible tags are stored
   twice: a tag view change updates the tag-view state machine, and a new client
   still copies its tags from `Monitor.tagset`, which no runtime path writes, so
   every new client lands on tag 1. A window the WM unmaps itself - hiding a

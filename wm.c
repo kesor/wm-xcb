@@ -35,8 +35,10 @@ main(int argc, char** argv)
     return 1;
   }
 
-  /* Main event loop */
+  /* Main event loop: block until X or a signal has something, then dispatch
+   * everything that arrived. */
   while (running) {
+    wm_xcb_wait_for_events();
     handle_xcb_events();
   }
 

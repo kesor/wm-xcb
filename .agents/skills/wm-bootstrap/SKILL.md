@@ -18,9 +18,8 @@ patch to shared functions. State lives in state machines on targets.
 The framework is built and unit-tested, and windows reach the screen: a window
 is mapped on `MapRequest` with a border and `WM_STATE=Normal`, and the visible
 clients of the selected monitor are tiled. What is still missing is keys, the X
-input focus, and the EWMH root properties, and the event loop polls instead of
-blocking. So "make it work" means the X11 output path, which is epic `wm-4f6`
-and the top of the priority list.
+input focus, and the EWMH root properties. So "make it work" means the X11
+output path, which is epic `wm-4f6` and the top of the priority list.
 
 `docs/README.md#current-state` is the list of what does and does not work, and
 each gap is a beads issue. Do not restate it here, and do not call the project
