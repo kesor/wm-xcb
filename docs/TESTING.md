@@ -109,9 +109,19 @@ Each flag set compiles into its own directory under `build/`: `release`,
 `release-sanitize`, `debug`, `debug-sanitize`. So `make`, `make SANITIZE=1` and
 `make DEBUG=1` can be alternated in one checkout with no `make clean` in
 between, and no build reuses another variant's objects. Whatever was built
-last by `make` is copied to `./wm` and `./test`. A manual `./wm` and the flake
-read that copy. `scripts/xephyr-test.sh` and `tests/x/run.sh` do not: they run
+last by `make` is copied to `./wm`, which is what a manual `./wm` and the flake
+read. `scripts/xephyr-test.sh` and `tests/x/run.sh` do not: they run
 `build/<variant>/wm` and leave `./wm` alone. `make clean` removes every variant.
+
+The test binary has no copy at the tree root. `make test` runs
+`build/<variant>/test`, so a `./test` left behind by an earlier build cannot
+report a count from a tree that has moved on. Run the suite through `make test`,
+or name the variant binary directly when you want to put it under `valgrind`.
+
+The copies `./wm` gets are replaced by writing a temporary file and renaming it
+over `./wm`, so a `make` while a WM started from `./wm` is still running exits 0
+instead of failing on a busy file. The running WM keeps the binary it started
+with: restart it before you read its log and expect the change to be in it.
 
 `scripts/check-build-variants.sh` is the gate for this (see `docs/QUALITY.md`).
 
@@ -230,6 +240,11 @@ Look at the Xephyr window. The WM tiles the two windows side by side; with one
 master client, the first window takes half the screen and the second fills the
 other half. `./wm` is whichever variant was built last, so for a log with
 `DEBUG` lines build the debug one first: `make DEBUG=1`, then `DISPLAY=:2 ./wm`.
+
+Kill the WM before you rebuild. `make` replaces `./wm` by renaming a new file
+over it, so the build no longer fails while the WM runs, and the WM you started
+keeps running the binary it started with: a log that does not show the change
+you just made is usually the old process, not a missing event.
 
 Kill the session with `pkill -x Xephyr`, or kill the PIDs you started. Do not
 `pkill -f wm`; the pattern matches your own shell command line and kills the
@@ -362,10 +377,12 @@ valgrind --leak-check=full --track-origins=yes --log-file=/tmp/vg.log \
   env DISPLAY=:2 ./wm
 ```
 
-`valgrind` is in the dev shell. For the unit tests instead:
+`valgrind` is in the dev shell. For the unit tests instead, name the variant
+binary; `make test` builds it and runs it, and needs no root copy to do that:
 
 ```bash
-valgrind --leak-check=full ./test
+make test                                  # builds and runs build/release/test
+valgrind --leak-check=full build/release/test
 ```
 
 AddressSanitizer and UBSan (rebuild with `SANITIZE=1`):
@@ -379,8 +396,9 @@ DISPLAY=:2 ./wm
 `SANITIZE=1` adds `-fsanitize=address,undefined -fno-omit-frame-pointer -g` to
 both compile and link. `make SANITIZE=1` alone builds only `wm`, so the test
 binary needs `make test SANITIZE=1`. Measured 2026-11-01 after the hub registry
-fix: `./test` passes all assertions and LeakSanitizer prints no summary, so the
-exit status is the answer. `detect_leaks=1` is set to match the CI sanitize job.
+fix: the test binary passes all assertions and LeakSanitizer prints no summary,
+so the exit status is the answer. `detect_leaks=1` is set to match the CI
+sanitize job.
 
 Remember that `./wm` is now the instrumented binary: run `make` to put the
 plain one back. The objects do not need cleaning, see *Build directories*
@@ -448,7 +466,7 @@ event arrives.
 | any component | its `tests/unit/test-*.c` file under `make test`, plus `scripts/xephyr-test.sh` |
 | anything in the manage/map/tile path | `scripts/xephyr-test.sh --windows 2 --verbose` and `--windows 5` |
 | event loop, focus, or key handling | `make check-async`, `scripts/perf-test.sh` for idle CPU, plus a manual session to press keys |
-| memory-owning code (clients, monitors, SMs) | `valgrind ./test` and a `--windows 50` run |
+| memory-owning code (clients, monitors, SMs) | `valgrind build/release/test` and a `--windows 50` run |
 
 Every change that touches behaviour should leave `make test` green and
 `scripts/xephyr-test.sh` at least as green as it was.
