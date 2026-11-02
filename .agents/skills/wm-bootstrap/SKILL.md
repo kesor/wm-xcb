@@ -201,6 +201,13 @@ beads in your final message. This is how the traps below stop being traps.
   robot footer. The git author is the only attribution.
 - **No personal paths**: this repository is public. `scripts/check-paths.sh`
   fails on `/home/<user>` and `~/src`-style paths.
+- **`bd setup <tool>` writes its own copy of the beads workflow.** The one in
+  `AGENTS.md` is the one that stays; `bd setup cursor` had put a second block in
+  `.cursor/rules/beads.mdc` with a git policy that contradicts this repository's
+  harness, and it is gone. Running `bd setup` for a tool nobody here uses adds a
+  copy back, and `bd setup <tool> --check` reports an incomplete integration
+  after `--remove` as well as before the first install, so it cannot tell you
+  whether to run the setup or to leave it alone.
 - **Do not push, and do not rewrite published history,** unless asked.
 
 ## Definition of done
