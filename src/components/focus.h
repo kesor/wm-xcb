@@ -5,9 +5,10 @@
  * Manages the focus state machine for tracking which client has focus.
  *
  * Component lifecycle:
- * - on_init(): register ENTER_NOTIFY handler
+ * - on_init(): register ENTER_NOTIFY and LEAVE_NOTIFY handlers, subscribe to the
+ *   focus and client-list events
  * - on_adopt(): create SM instance for client
- * - listener: raw-write to SM on XCB events
+ * - listener: raw-write to SM on XCB events, apply the result to X
  *
  * XCB Events Handled:
  * - XCB_ENTER_NOTIFY - mouse entered client window (focus gained)
@@ -17,11 +18,20 @@
  * - EVT_CLIENT_FOCUSED - client gained focus
  * - EVT_CLIENT_UNFOCUSED - client lost focus
  *
+ * Events Subscribed:
+ * - EVT_CLIENT_FOCUSED, EVT_CLIENT_UNFOCUSED - applied with
+ *   xcb_set_input_focus; the root window takes focus back when no client is
+ *   focused
+ * - EVT_CLIENT_MANAGED - the new client takes focus
+ * - EVT_CLIENT_UNMANAGED, EVT_CLIENT_DESTROYED - focus moves to the newest
+ *   remaining client, or to the root window when none is left
+ *
  * Acceptance Criteria:
  * [x] Mouse entering client window triggers focus
  * [x] Mouse leaving client window unfocuses it
  * [x] State machine transitions correctly
  * [x] Event is emitted on focus change
+ * [x] The X input focus follows the state machine
  */
 
 #ifndef _COMPONENT_FOCUS_H_

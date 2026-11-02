@@ -96,7 +96,10 @@ Short version, and the parts that stay true until they are fixed:
   to the selected monitor with that monitor's visible tags, tiling that
   monitor's visible clients when a window is managed or unmanaged, and tracking
   which client the pointer is over: a managed window selects pointer enter and
-  leave, and the focus component raw-writes `FocusSM` from those events. The
+  leave, and the focus component raw-writes `FocusSM` from those events and
+  points the X input focus at the focused window with `xcb_set_input_focus`;
+  a newly managed client takes focus, and the newest remaining client takes it
+  back when the focused one is unmanaged or destroyed. The
   keys in `config.wm.def.h` are grabbed on the root window when the keybinding
   component starts, with the CapsLock and NumLock masks a press can carry, and
   grabbed again on `MappingNotify`, so a press reaches the component that owns
@@ -108,13 +111,13 @@ Short version, and the parts that stay true until they are fixed:
   that. `main` exits non-zero when a module on its startup check does not come
   up, and a unit test runs that startup and asks each of those modules whether
   it is up.
-- **Does not work:** it never calls `xcb_set_input_focus`, so the X input focus
-  stays wherever the client left it even though `FocusSM` follows the pointer;
-  it sets no EWMH root properties. The event loop polls instead of blocking, so
-  it burns a core while idle. Visible tags are stored twice: a tag view change
-  updates the tag-view state machine, and a new client still copies its tags
-  from `Monitor.tagset`, which no runtime path writes, so every new client lands
-  on tag 1.
+- **Does not work:** it sets no EWMH root properties. The event loop polls
+  instead of blocking, so it burns a core while idle. Visible tags are stored
+  twice: a tag view change updates the tag-view state machine, and a new client
+  still copies its tags from `Monitor.tagset`, which no runtime path writes, so
+  every new client lands on tag 1. A window the WM unmaps itself - hiding a
+  client on a tag that is no longer shown - is treated as the client
+  withdrawing, so it does not come back when the tag is shown again.
 
 Do not take that from a document. Ask the tree:
 
