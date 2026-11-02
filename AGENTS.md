@@ -16,11 +16,13 @@ Reference: dwm, analyzed extensively for design patterns. A dwm checkout is not
 part of this repository; if you keep one next to this checkout it is at
 `../dwm/`.
 
+Start with `.agents/skills/wm-bootstrap/SKILL.md`. It says where the tree
+stands, maps the code, lists the gates, and names the traps that have already
+cost time. This file holds the rules; that one holds the state.
+
 ---
 
 ## Key Documents
-
-### Start Here
 
 | Document | Purpose |
 |----------|---------|
@@ -32,37 +34,15 @@ part of this repository; if you keep one next to this checkout it is at
 | `.agents/skills/wm-5s/SKILL.md` | How to file harness friction as beads while you work |
 | `.agents/skills/wm-review/SKILL.md` | Reviewing a `work/<bead>` branch: depth by module, verdict format, fix-or-record |
 | `docs/VISION.md` | Why this project exists |
+| `docs/architecture/README.md` | Index to the architecture documents |
 | `docs/architecture/overview.md` | Core concepts and architecture |
+| `docs/extensions/README.md` | Index to the extension designs |
 | `plans/wm-architecture.md` | Phased implementation plan |
 | `bd list --type=epic` | Current work breakdown |
-| `.github/ISSUE_TEMPLATE/prd.yml` | Product Requirements Document |
 
-### Architecture Documents
-
-```
-docs/architecture/
-├── README.md           # Index to architecture docs
-├── overview.md         # Core concepts, event/request flows
-├── hub.md             # Hub: registry, router, event bus
-├── state-machine.md    # State machine framework
-├── component.md       # Component design
-├── target.md          # Target design (Client, Monitor)
-└── decisions.md       # Decision log with rationale
-```
-
-### Extension Designs
-
-```
-docs/extensions/
-├── README.md     # Index to all extensions
-├── gap.md        # Gaps between tiled windows
-├── pertag.md     # Per-tag layouts
-├── floatpos.md   # Rule-based floating position
-├── urgency.md    # Urgency hints
-├── bstack.md     # Bottom-stack tiling
-├── cfact.md      # Per-client relative sizing
-└── ... (13 extensions total)
-```
+`docs/README.md` and `docs/architecture/README.md` index the documents. Do not
+copy an index into this file: a second copy drifts, and the copy an agent reads
+first is the one that sends it to a path that no longer exists.
 
 ---
 
@@ -138,79 +118,31 @@ Each component handles its own XCB events:
 
 ---
 
-## How to Start an Agent
+## Working on a Bead
 
-### Spawn a New Agent
-
-Use the spawn script, from the repository root:
-
-```bash
-./scripts/spawn-agent.sh <issue_number>
-```
-
-This:
-1. Creates a git worktree from the main repo
-2. Copies docs, plans, and vendor to the worktree
-3. Opens a new tmux window
-4. Runs pi with the task file
-
-### Continue/Fix a PR
-
-When code review comments are added to a PR:
+Work is tracked in beads. GitHub is closed out: every issue there is closed,
+every pull request merged, and new work starts as a bead.
 
 ```bash
-./scripts/spawn-agent.sh <PR_number> --fix
+bd ready                        # unblocked work, in priority order
+bd show <bead-id>               # description, acceptance criteria, blockers
+bd comments <bead-id>           # what an earlier review or attempt found
+bd update <bead-id> --claim     # take it, so the next session sees it is taken
+bd comment <bead-id> "..."      # what you found, for whoever continues
 ```
 
-This:
-1. Finds the existing worktree for the PR's branch
-2. Fetches PR comments from GitHub
-3. Creates a fix task file
-4. Resumes the pi session (or starts new if needed)
+Read the comments before you plan. `bd show` does not print them, and an earlier
+review may have left the finding that changes the design.
 
-### Continue Existing Work
+`bd edit` opens an editor and blocks an agent. Never use it.
 
-```bash
-./scripts/spawn-agent.sh <issue_or_pr> --continue
-```
+One bead per branch, named `work/<bead-id>`. How a worker is spawned, and what
+it may run, is `.agents/skills/wm-bootstrap/SKILL.md`, "Spawning workers". That
+harness (`worker.sh`) is not part of this repository.
 
----
-
-## Working on an Issue
-
-### 1. Read the Task File
-
-Each issue has a task file: `task-issue-<N>.txt`
-
-```bash
-cat task-issue-2.txt
-```
-
-### 2. Read the Architecture
-
-Before implementing, read:
-```bash
-docs/architecture/overview.md
-docs/architecture/hub.md
-docs/architecture/state-machine.md
-docs/architecture/component.md
-docs/architecture/target.md
-```
-
-### 3. Check the Implementation Plan
-
-```bash
-plans/wm-architecture.md
-```
-
-### 4. Look at Existing Code
-
-Follow existing code style:
-```bash
-wm-window-list.c    # Linked list patterns
-wm-log.c           # Logging patterns
-wm-states.c        # Existing state machine (for reference)
-```
+A worker never pushes, merges, or closes its own bead. The commits stay on
+`work/<bead-id>`, and a review decides what happens to them: see
+`.agents/skills/wm-review/SKILL.md`.
 
 ---
 
@@ -218,8 +150,11 @@ wm-states.c        # Existing state machine (for reference)
 
 ### Code Style
 - Follow existing patterns in the codebase
-- Use C99 with `-std=c99 -pedantic`
-- Format with `clang-format --style=file`
+- The Makefile passes no `-std` flag, so the code compiles under the compiler's
+  default dialect. What binds is `-pedantic` in the `make DEBUG=1` build: it
+  rejects the GNU-only constructs that dialect would otherwise allow, so keep
+  that build green
+- Format with `clang-format --style=file` (`make format`)
 - Use `LOG_DEBUG()`, `LOG_ERROR()`, `LOG_FATAL()` for logging
 
 ### State Machines
@@ -234,105 +169,40 @@ wm-states.c        # Existing state machine (for reference)
 - Provide SM templates that targets adopt
 - Emit events through hub when SMs transition
 
-### Git Workflow
-```bash
-# Create branch
-git checkout -b issue-<N>-<description>
+### Where the Code Lives
 
-# Commit with issue reference
-git commit -m "feat(hub): implement component (Issue #N)"
+The code map is the "Where the code lives" table in
+`.agents/skills/wm-bootstrap/SKILL.md`. That table is the only copy, because a
+copy here sent agents to `src/hub/` and `src/listeners/`, which do not exist.
 
-# Push
-git push origin issue-<N>-<description>
-```
+Precedent to copy, module by module:
 
-### Creating PRs
-```bash
-gh pr create \
-  --repo kesor/wm-xcb \
-  --base master \
-  --title "feat(hub): implement component (Issue #N)" \
-  --body "Implements GitHub issue #N: Title
-
-## Changes
-- List of changes
-
-## Testing
-- How to test"
-```
+- `src/components/client-list.c` — a component: registration, XCB handlers, state
+- `src/target/client.c` — a target: holds its state machines by name, owns the client list
+- `src/xcb/xcb-handler.c` — the handler registry a component registers into
+- `wm-hub.c` — registry, request router, event bus
+- `wm-log.c` — logging
 
 ---
 
-## Directory Structure
+## Tests
 
-```
-wm/
-├── src/
-│   ├── hub/           # Hub implementation (future)
-│   ├── sm/            # State machine framework (future)
-│   ├── components/    # Built-in components (future)
-│   └── listeners/     # Event listeners (future)
-├── docs/
-│   ├── architecture/  # Architecture documentation
-│   └── extensions/    # Extension designs
-├── scripts/
-│   └── spawn-agent.sh # Spawn agent script
-├── plans/
-│   └── wm-architecture.md  # Implementation plan
-└── (existing code)
-```
+Two suites, both run from the repository root:
 
----
-
-## Test Files
-
-Write tests following existing patterns:
 ```bash
-test-wm-window-list.c    # Existing test example
+make test                            # unit suite, prints "Total: N passed, M failed"
+make tools/xclient && make test-x    # seam suite: what the X server sees
 ```
 
-Run tests:
-```bash
-make clean && make test
-```
+Unit tests are `tests/unit/test-*.c`. A file registers its test group from a
+constructor, so a file missing from `TEST_SRC` in the Makefile compiles nowhere
+and its assertions never run; `scripts/check-test-src.sh` fails the commit
+instead. The seam tests are `tests/x/test-*.sh`: they start a nested X server
+and assert against a live WM.
 
----
-
-## Useful Commands
-
-### Check GitHub Issues
-```bash
-gh issue list --repo kesor/wm-xcb --state open
-```
-
-### Check PR Status
-```bash
-gh pr list --repo kesor/wm-xcb --state open
-```
-
-### Fetch PR Comments
-```bash
-gh api repos/kesor/wm-xcb/pulls/<PR>/comments --jq '.[] | .body'
-```
-
-### Attach to tmux Window
-```bash
-tmux attach -t issue-<N>
-```
-
-### List Active tmux Windows
-```bash
-tmux list-windows | grep issue
-```
-
----
-
-## Key GitHub Links
-
-- **Repo**: https://github.com/kesor/wm-xcb
-- **Issues**: https://github.com/kesor/wm-xcb/issues
-- **PRs**: https://github.com/kesor/wm-xcb/pulls
-- **Kanban Board**: https://github.com/users/kesor/projects/1
+Copy the shape from `tests/unit/test-client-list-component.c` for a component
+and `tests/unit/test-wm-tag.c` for a target. `docs/TESTING.md` has the debug
+build, the seam harness, the sanitizer runs, and the performance measurement.
 
 ---
 
@@ -594,9 +464,10 @@ void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULL
 
 ## When You're Done
 
-The commit hook runs the gates in `lefthook.yml` for you (build, unit tests,
-formatting, async rule, commit message). Do not skip them with `--no-verify`; if
-a gate fails, fix the cause. If the hook is missing, run `make hooks` once.
+The commit hook runs the gates in `lefthook.yml` for you (paths, docs, test-src,
+bead refs, formatting, build, unit tests, async rule, commit message). Do not
+skip them with `--no-verify`; if a gate fails, fix the cause. If the hook is
+missing, run `make hooks` once.
 
 1. Make sure tests pass: `make test`
 2. If the change touches windows, focus, keys, or X properties, run the seam
@@ -607,9 +478,14 @@ a gate fails, fix the cause. If the hook is missing, run `make hooks` once.
 3. Run the static async check: `make check-async`. It must report zero new
    violations; a waiver (`allow-blocking: <reason>`) needs a real reason.
 4. Format code: `make format`
-5. Commit with meaningful message
-6. Push to your branch
-7. Create PR referencing the issue
+5. Commit one topic: the subject says what changed, the body says why. A commit
+   that names a tracker id instead of the reason is against the rule above.
+6. Hand off in the final message: the files you changed, the commit, the
+   `make test` result, the seam result if you ran it, the friction beads you
+   filed, and anything you could not do.
+
+A worker does not push and does not merge; what happens to the branch is a
+review decision.
 
 Never add quality checks by hand in a one-off command. `docs/QUALITY.md` has the
 four-step recipe so the check runs for everyone from then on.
@@ -622,7 +498,7 @@ label `friction`.
 ---
 
 *For architectural questions, refer to `docs/architecture/`*
-*For implementation guidance, refer to `plans/wm-architecture.md`*
+*For implementation guidance, refer to `docs/IMPLEMENTATION-ROADMAP.md`*
 
 ---
 
@@ -632,7 +508,7 @@ label `friction`.
 
 Before killing tmux sessions or windows, CHECK if an agent is actively working:
 - `tmux list-windows` — see all windows
-- `tmux capture-pane` — check if agent is processing
+- `tmux capture-pane` — check if an agent is processing
 - If uncertain, ASK the user first
 
 ### Worktrees Are Precious
@@ -642,20 +518,12 @@ Worktrees contain agent progress. Before removing or cleaning:
 - Check if agent is using the worktree
 - If agent is working, DO NOT delete the worktree
 
-### The spawn-agent Script Has Quirks
+### Overlapping Beads
 
-- Use `git fetch origin` at start, create worktrees from `origin/master`
-- Worktrees sit next to the main checkout, named `<checkout>-issue-N`
-- The tmux session is `wm-issues` with windows named `issue-N` or `pr-N`
-- Each worktree carries its own `flake.nix`, so `nix develop` works from inside it
-- Session name in pi is verbose — use `tmux attach -t wm-issues` then select window
-
-### File Conflict Prevention
-
-Phase 1 (Hub) should have been ONE branch — both registry (#2) and event bus (#3) modified the same files. Future parallel work should:
-- Check what files unmerged PRs modify
-- Avoid starting work that touches the same core files
-- Or establish single-writer ownership for core files
+Two beads that touch the same files conflict, whichever branch lands second.
+Before starting, look at what the other open beads touch; when they overlap on
+`wm.c`, `wm-hub.c`, or a component's init, run them in order instead of in
+parallel.
 
 ---
 
