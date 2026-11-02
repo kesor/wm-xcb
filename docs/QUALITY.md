@@ -7,6 +7,13 @@ model.*
 > `.github/workflows/quality.yml` runs the same commands in CI. A gate is added
 > in one place and called from both. If a check cannot be reduced to a command
 > that gives the same answer twice, it does not belong here.
+>
+> CI calls `lefthook run pre-push --force`. Without `--force` lefthook computes
+> the files a push touched, and a CI checkout has no push range: the branch tip
+> is the commit already checked out, the file list is empty, and lefthook skips
+> every command and reports success. `docs/QUALITY.md` said CI runs the same
+> commands; it did not, until the flag was there. The job's runtime is the
+> check: tens of seconds means the gates ran.
 
 ---
 
@@ -17,9 +24,8 @@ model.*
 | `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~65 s | the above plus the flake evaluation, the seam suite, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
-| CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
+| CI `gates` | every push and PR | ~2 min | `lefthook run pre-push --force` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run`, required: known failures are baselined |
-| CI `sanitize` | every push and PR | ~2 min | `make test SANITIZE=1` |
 | CI `sanitize-x` | every push and PR | ~1 min | `scripts/check-sanitize-x.sh` under `xvfb-run`: the WM in a nested server under ASan and UBSan |
 
 No CI job is advisory any more. The seam job could only become required once
@@ -35,14 +41,15 @@ invocation. The upload fails the job when that directory is empty: an artifact
 step that quietly uploads nothing removes the evidence from exactly the run
 that needs it.
 
-The `sanitize` and `sanitize-x` jobs cover different code because they can
-reach different code: the unit suite runs with no X connection, and the map,
-tile and focus requests return before they are built without one. A 2-byte
-value passed where XCB reads 4 left every gate green and aborted the WM on the
-first `MapRequest`. `sanitize-x` is not in `lefthook.yml` because it rebuilds
-the tree under the sanitizers and takes about a minute; the seam suite it sits
-next to is a push gate, and needs no display of its own because
-`scripts/check-seam.sh` starts Xvfb when `DISPLAY` is unset.
+The sanitizer coverage is split the same way the code is. The unit suite runs
+with no X connection, and the map, tile and focus requests return before they
+are built without one, so the `sanitize` gate inside the gates job cannot see
+them: a 2-byte value passed where XCB reads 4 left every gate green and aborted
+the WM on the first `MapRequest`. The `sanitize-x` job covers that half by
+running a real WM in a nested server under ASan and UBSan. It is not in
+`lefthook.yml` because it rebuilds the tree under the sanitizers and takes about
+a minute; the seam suite it sits next to is a push gate, and needs no display of
+its own because `scripts/check-seam.sh` starts Xvfb when `DISPLAY` is unset.
 
 A baseline records debt, so fixing a baselined site means updating the baseline
 in the same commit: an entry left behind says a defect is still there when it is
@@ -185,9 +192,9 @@ to leave it out, not to add a heuristic.
 
 ```bash
 make hooks                  # once per clone; points git at .githooks/
-lefthook run pre-push       # every gate that runs before a push
+lefthook run pre-push --force   # every gate that runs before a push, changed files or not
 lefthook run pre-commit     # just the commit-time gates
-LEFTHOOK_EXCLUDE=beads lefthook run pre-push   # without the beads export
+LEFTHOOK_EXCLUDE=beads lefthook run pre-push --force   # without the beads export
 scripts/check-seam.sh       # the seam suite as the push gate runs it
 scripts/check-flake.sh      # the dev shell in flake.nix evaluates
 make test-x                 # the same suite, spelled out (needs a display)

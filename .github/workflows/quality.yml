@@ -39,8 +39,16 @@ jobs:
             experimental-features = nix-command flakes
       # LEFTHOOK_EXCLUDE=beads: the beads Dolt database is local state and is
       # not in the checkout, so its hook has nothing to run against here.
+      #
+      # --force: lefthook builds the pre-push file list from the refs git hands
+      # it on stdin. A CI checkout gets none, so it falls back to diffing against
+      # the remote branch, which is the commit already checked out, and the list
+      # comes out empty. An empty list makes lefthook skip every command, and the
+      # job reports success after a fraction of a second having run nothing.
+      # --force runs the commands regardless of the file list. The step's runtime
+      # is the signal: tens of seconds means the gates ran, seconds does not.
       - name: quality gates
-        run: nix develop --command env LEFTHOOK_EXCLUDE=beads lefthook run pre-push
+        run: nix develop --command env LEFTHOOK_EXCLUDE=beads lefthook run pre-push --force --no-auto-install
 
   seam:
     name: seam tests (what X sees)
