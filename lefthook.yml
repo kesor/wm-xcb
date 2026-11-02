@@ -17,8 +17,9 @@
 #
 # Adding a gate: put the command in a script under scripts/ and list it here.
 # The CI gates job runs this file with --force, so a hook gate needs no
-# workflow edit. A gate that needs a display is a job in
-# .github/workflows/quality.yml. docs/QUALITY.md has the checklist.
+# workflow edit. docs/QUALITY.md has the checklist. The seam and sanitize-x
+# jobs in .github/workflows/quality.yml upload logs and run the sanitizer
+# rebuild; they are not there because a gate needs a display.
 
 pre-commit:
   parallel: false

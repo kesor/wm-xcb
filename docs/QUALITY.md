@@ -235,8 +235,10 @@ left behind says a defect is still there when it is not.
    pre-push --force`, so the command from step 2 runs in CI. Pasting that
    command into `.github/workflows/quality.yml` as well is a second
    implementation; the unit-suite sanitizer job was that, and it ignored
-   `tests/quality/asan-baseline.txt`. A gate that needs a display cannot be a
-   hook. Add a job for it in the workflow, as `seam` and `sanitize-x` are.
+   `tests/quality/asan-baseline.txt`. The seam and sanitize-x jobs are not that
+   kind of copy: seam uploads the logs the hook run does not keep, and
+   sanitize-x is not a hook because it rebuilds under the sanitizers. Neither
+   needs a display of its own; the harness starts a private Xvfb.
 4. Add a row to the table above, and to `docs/TESTING.md` if a person would run
    it by hand.
 
@@ -253,7 +255,7 @@ LEFTHOOK_EXCLUDE=beads lefthook run pre-push --force   # without the beads expor
 scripts/check-seam.sh       # the seam suite as the push gate runs it
 scripts/check-flake.sh      # the dev shell in flake.nix evaluates
 scripts/check-shellcheck.sh # the shell lint, against its baseline
-make test-x                 # the same suite, spelled out (needs a display)
+make test-x                 # the same suite, spelled out; starts a private Xvfb
 scripts/check-sanitize.sh   # the unit suite under the sanitizers, against the leak baseline
 scripts/check-sanitize-x.sh # the WM in a nested server under the sanitizers
 scripts/check-workflow.sh   # every .github/workflows/ file parses

@@ -26,6 +26,8 @@
 #     WM_SESSION_DISPLAY      the DISPLAY the run was started with, or empty
 #   The line is left in WM_PARENT_DISPLAY_LINE so a caller can record it without
 #   capturing stdout, the way scripts/lib/wm-variant.sh leaves WM_VARIANT_LINE.
+#   Nest into WM_PARENT_DISPLAY, not into DISPLAY: a caller that has already
+#   started a nested server has pointed DISPLAY at that server.
 #
 #   When the process has no private display yet and WM_USE_SESSION_DISPLAY=1 is
 #   not set, this does not return: it re-executes the script under xvfb-run with
@@ -41,7 +43,7 @@
 #   outlive a hermetic run: a session kept for inspection is the one case that
 #   wants WM_USE_SESSION_DISPLAY=1 as well.
 wm_parent_display() {
-  local script session
+  local script session parent
   script=$(basename "$0")
   session=${DISPLAY:-}
 
@@ -63,15 +65,23 @@ wm_parent_display() {
   # A harness that another harness started (the seam suite runs
   # scripts/xephyr-test.sh) nests into the display the outer run owns. Starting
   # a second Xvfb there would leave a server per level for no gain, and the
-  # outer one is killed when the outermost script exits. This is also the branch
-  # the re-executed script itself takes: xvfb-run has already set DISPLAY.
-  if [ "${WM_PRIVATE_PARENT_DISPLAY:-0}" = "1" ] && [ -n "$session" ]; then
-    WM_PARENT_DISPLAY=$session
-    WM_PARENT_DISPLAY_KIND=private
-    WM_PARENT_DISPLAY_LINE="$script: parent display = $WM_PARENT_DISPLAY (private Xvfb), session display = ${WM_SESSION_DISPLAY:-none}"
-    export WM_PARENT_DISPLAY WM_PARENT_DISPLAY_KIND
-    echo "$WM_PARENT_DISPLAY_LINE"
-    return 0
+  # outer one is killed when the outermost script exits.
+  #
+  # Prefer WM_PARENT_DISPLAY when it is already set. run.sh points DISPLAY at
+  # the nested server before it runs tests, so the current DISPLAY is the
+  # server under test, not the private parent. The re-executed script itself
+  # has no WM_PARENT_DISPLAY yet: xvfb-run has set DISPLAY, and that is the
+  # parent.
+  if [ "${WM_PRIVATE_PARENT_DISPLAY:-0}" = "1" ]; then
+    parent=${WM_PARENT_DISPLAY:-$session}
+    if [ -n "$parent" ]; then
+      WM_PARENT_DISPLAY=$parent
+      WM_PARENT_DISPLAY_KIND=private
+      WM_PARENT_DISPLAY_LINE="$script: parent display = $WM_PARENT_DISPLAY (private Xvfb), session display = ${WM_SESSION_DISPLAY:-none}"
+      export WM_PARENT_DISPLAY WM_PARENT_DISPLAY_KIND
+      echo "$WM_PARENT_DISPLAY_LINE"
+      return 0
+    fi
   fi
 
   if ! command -v xvfb-run >/dev/null 2>&1 || ! command -v Xvfb >/dev/null 2>&1; then
@@ -87,6 +97,10 @@ wm_parent_display() {
   # -a picks a display number nothing else is using, and the screen is the
   # geometry the nested server gets anyway, so the parent's size cannot change
   # what a test measures.
+  # Drop a caller-exported WM_PARENT_DISPLAY. The re-executed script prefers
+  # that variable over DISPLAY, and a stale value would name the session
+  # instead of the server xvfb-run is about to start.
+  unset WM_PARENT_DISPLAY WM_PARENT_DISPLAY_KIND
   exec xvfb-run -a -s "-screen 0 ${WM_PARENT_SCREEN:-1280x800x24}" \
     env WM_PRIVATE_PARENT_DISPLAY=1 "${BASH:-bash}" "$0" "$@"
 }

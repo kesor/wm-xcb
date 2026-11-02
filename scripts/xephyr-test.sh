@@ -18,10 +18,11 @@
 # variant, the binary and the log, so a run never leaves you guessing which
 # binary it was, where its log went, or which display it used.
 #
-# The parent display Xephyr draws into is a private Xvfb this run starts, so the
-# session is left alone; see scripts/lib/private-display.sh. --keep leaves the
-# session on that private display, which nobody can see, so looking at a run by
-# eye means both:
+# The parent display Xephyr draws into is WM_PARENT_DISPLAY: a private Xvfb
+# this run starts, or the one an outer harness already started. See
+# scripts/lib/private-display.sh. --keep leaves the session on that display,
+# which nobody can see unless it is the session's, so looking at a run by eye
+# means both:
 #   WM_USE_SESSION_DISPLAY=1 scripts/xephyr-test.sh --keep
 #
 # Checks, in order:
@@ -174,7 +175,9 @@ wait_for_display() {
   return 1
 }
 
-"$(command -v Xephyr)" "$TEST_DISPLAY" -screen "${SCREEN_W}x${SCREEN_H}" -noreset \
+# DISPLAY may be a nested server a caller already started. The parent to draw
+# into is the one the helper named.
+DISPLAY="$WM_PARENT_DISPLAY" "$(command -v Xephyr)" "$TEST_DISPLAY" -screen "${SCREEN_W}x${SCREEN_H}" -noreset \
   >"$XEPHYR_LOG" 2>&1 &
 XEPHYR_PID=$!
 

@@ -22,6 +22,11 @@ check_eq "xephyr-test.sh names the debug variant" 1 \
   "$(grep -c '^xephyr-test.sh: variant=debug ' "$OUT")"
 check_eq "xephyr-test.sh runs the debug binary" 1 \
   "$(grep -c "binary=$ROOT_DIR/build/debug/wm," "$OUT")"
+# run.sh has pointed DISPLAY at the nested server by the time this runs. The
+# harness must still draw into the private parent, or its Xephyr is a client
+# of the WM this suite is testing.
+check_eq "xephyr-test.sh nests into the suite's private parent" "$WM_PARENT_DISPLAY" \
+  "$(sed -n 's/^xephyr-test.sh: parent display = \([^ ]*\) .*/\1/p' "$OUT" | head -n 1)"
 
 HARNESS_LOG=$(sed -n 's/^xephyr-test.sh: .*log=//p' "$OUT" | head -n 1)
 check_nonempty "xephyr-test.sh reports its log path" "$HARNESS_LOG"
