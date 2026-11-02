@@ -357,28 +357,22 @@ void cleanup(Component* comp) {
 ```
 
 ### 8. Event Type Collisions (4+ occurrences)
-- **Symptom**: Two components using same event ID (e.g., both use 20)
-- **Fix**: EVT_* values must be globally unique across ALL components. Check ALL existing enum definitions.
+- **Symptom**: Two components using the same event ID, so each receives the other's events, or an id past the event bus table, which is dropped
+- **Fix**: Take the component's range from `src/event-types.h`. Do not pick a fresh number.
 
 ```c
-// BAD: Collides with fullscreen events (EVT_FULLSCREEN_EXITED = 21)
+// BAD: a fresh number can land on another component's event
 enum ComponentEvents {
-    EVT_TAG_CHANGED = 21,  // Collision!
+    EVT_TAG_CHANGED = 20,
 };
 
-// GOOD: Check ALL component headers, use unique value in 0..63 range
-// grep -r "EVT_" src/components/ | grep "= [0-9]"
+// GOOD: start from the range this component owns
 enum ComponentEvents {
-    EVT_TAG_CHANGED = 22,  // After checking no component uses 22
+    EVT_TAG_CHANGED = EVT_TAG_MANAGER_BASE + 0,
 };
 ```
 
-**How to check for collisions:**
-```bash
-grep -rn "EVT_" src/components/ src/actions/ --include="*.h" | grep -E "= [0-9]+"
-```
-
-The hub event bus supports values 0 to `MAX_EVENT_TYPES-1` (currently 64).
+`hub_emit()` logs an error and drops a value at or above `HUB_MAX_EVENT_TYPES`. `tests/unit/test-event-types.c` fails when two listed constants share a value or a constant leaves its range. A new constant has to be added to that list, or the test does not see it.
 
 ### 9. API Contract Violations (6+ occurrences)
 - **Symptom**: Functions don't do what comments say, ownership unclear

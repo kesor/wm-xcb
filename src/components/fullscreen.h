@@ -30,6 +30,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
+#include "src/event-types.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -54,9 +55,9 @@ typedef enum FullscreenState {
  * Fullscreen events emitted on state transitions
  */
 typedef enum FullscreenEvent {
-  EVT_FULLSCREEN_ENTERED = 20,
-  EVT_FULLSCREEN_EXITED  = 21,
-  EVT_FULLSCREEN_FAILED  = 22,
+  EVT_FULLSCREEN_ENTERED = EVT_FULLSCREEN_BASE + 0,
+  EVT_FULLSCREEN_EXITED  = EVT_FULLSCREEN_BASE + 1,
+  EVT_FULLSCREEN_FAILED  = EVT_FULLSCREEN_BASE + 2,
 } FullscreenEvent;
 
 /*
