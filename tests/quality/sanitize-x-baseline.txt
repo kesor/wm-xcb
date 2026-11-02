@@ -5,4 +5,3 @@
 # does. Remove entries as the defects are fixed: the list is meant to
 # shrink. Leak entries are file|function, UBSan entries are
 # file|runtime error: <message>.
-wm-xcb-ewmh.c|setup_ewmh

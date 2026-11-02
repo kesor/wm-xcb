@@ -25,7 +25,11 @@ setup_ewmh()
 void
 destruct_ewmh()
 {
+  /* init_atoms allocates the screen list and one _NET_WM_CM_Sn atom per
+     screen inside the struct; free() alone loses them. */
+  xcb_ewmh_connection_wipe(ewmh);
   free(ewmh);
+  ewmh = NULL;
 }
 
 void
