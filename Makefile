@@ -161,8 +161,8 @@ FORCE:
 compile-commands: clean
 	@bear -- $(MAKE) -k CC=clang all
 
-# Format every tracked C source and header. Same file list as format-check.sh,
-# so the fixer and the gate never disagree.
+# Format every C source and header, tracked or about to be. Same file list as
+# format-check.sh, so the fixer and the gate never disagree.
 format:
 	./scripts/format-check.sh --fix
 
