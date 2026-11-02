@@ -78,6 +78,7 @@
               xvfb-run
               xprop
               xrandr
+              xset # the seam suite reads the NumLock state from it
               xdotool
               xterm
               dmenu

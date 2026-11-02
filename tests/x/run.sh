@@ -82,7 +82,7 @@ done
 # shellcheck source=../../scripts/lib/wm-variant.sh
 . "$ROOT_DIR/scripts/lib/wm-variant.sh"
 
-for cmd in Xephyr xdotool xprop; do
+for cmd in Xephyr xdotool xprop xset; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "run.sh: missing '$cmd'. Start the dev shell: direnv allow" >&2
     exit 1

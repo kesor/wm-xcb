@@ -198,6 +198,53 @@ test_keybinding_xcb_handler_registration(void)
             xcb_handler_count_for_type(XCB_KEY_PRESS),
             xcb_handler_count_for_type(XCB_KEY_RELEASE));
 
+  /* A keyboard remap has to re-grab the keys, so the component listens for it */
+  assert(xcb_handler_count_for_type(XCB_MAPPING_NOTIFY) > 0);
+
+  keybinding_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test: the modifier bits lookup ignores are the ones the server reported.
+ *
+ * A press made with NumLock on carries the NumLock modifier bit in `state`,
+ * and no binding asks for it. The component passes in the bit the server uses
+ * for Num_Lock; without an X connection the compiled-in default (CapsLock and
+ * Mod2) stays in force, and init resets the mask.
+ */
+void
+test_keybinding_ignored_modifiers(void)
+{
+  LOG_CLEAN("== Testing keybinding ignored modifiers");
+
+  hub_init();
+  xcb_handler_init();
+  keybinding_init();
+
+  /* Without X, grabbing reads no modifier map and leaves the default in force */
+  keybinding_grab_keys();
+
+  const KeyBinding* binding = keybinding_lookup(XCB_MOD_MASK_4 | XCB_MOD_MASK_2, 36);
+  assert(binding != NULL && strcmp(binding->action, "terminal.spawn") == 0);
+
+  /* A server that reports Num_Lock on Mod5 */
+  keybinding_binding_set_ignored_modifiers(XCB_MOD_MASK_LOCK | XCB_MOD_MASK_5);
+  binding = keybinding_lookup(XCB_MOD_MASK_4 | XCB_MOD_MASK_5, 36);
+  assert(binding != NULL && strcmp(binding->action, "terminal.spawn") == 0);
+
+  /* A bit that was not named is still significant */
+  binding = keybinding_lookup(XCB_MOD_MASK_4 | XCB_MOD_MASK_3, 36);
+  assert(binding == NULL);
+
+  /* And the mask the component did not override is back to the default */
+  keybinding_binding_set_ignored_modifiers(XCB_MOD_MASK_LOCK | XCB_MOD_MASK_2);
+  binding = keybinding_lookup(XCB_MOD_MASK_4 | XCB_MOD_MASK_5, 36);
+  assert(binding == NULL);
+  binding = keybinding_lookup(XCB_MOD_MASK_4 | XCB_MOD_MASK_2, 36);
+  assert(binding != NULL && strcmp(binding->action, "terminal.spawn") == 0);
+
   keybinding_shutdown();
   xcb_handler_shutdown();
   hub_shutdown();
@@ -398,6 +445,7 @@ TEST_GROUP(KeybindingComponent, {
   test_keybinding_lookup_exact();
   test_keybinding_lookup_unknown();
   test_keybinding_modifier_normalization();
+  test_keybinding_ignored_modifiers();
   test_keybinding_tag_bindings();
   test_keybinding_xcb_handler_registration();
   test_keybinding_get_bindings();

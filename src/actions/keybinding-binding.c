@@ -23,13 +23,23 @@ static uint32_t          binding_count = 0;
 static bool              initialized   = false;
 
 /*
+ * Modifier bits a key press may carry that the binding did not ask for:
+ * CapsLock is always Lock, and NumLock is Mod2 on a standard XKB keymap. A
+ * server that reports a different NumLock bit overrides that half through
+ * keybinding_binding_set_ignored_modifiers().
+ */
+#define KEYBINDING_DEFAULT_IGNORED_MODIFIERS (XCB_MOD_MASK_LOCK | XCB_MOD_MASK_2)
+
+static uint32_t ignored_modifiers = KEYBINDING_DEFAULT_IGNORED_MODIFIERS;
+
+/*
  * Internal: find binding index by modifiers and keycode
  */
 static int32_t
 find_binding_index(uint32_t modifiers, xcb_keycode_t keycode)
 {
   /* Normalize modifiers */
-  uint32_t normalized = modifiers & ~(XCB_MOD_MASK_LOCK | XCB_MOD_MASK_2);
+  uint32_t normalized = modifiers & ~ignored_modifiers;
 
   for (uint32_t i = 0; i < binding_count; i++) {
     const KeyBinding* b = bindings[i];
@@ -37,7 +47,7 @@ find_binding_index(uint32_t modifiers, xcb_keycode_t keycode)
       continue;
 
     /* Normalize binding's modifiers */
-    uint32_t binding_normalized = b->modifiers & ~(XCB_MOD_MASK_LOCK | XCB_MOD_MASK_2);
+    uint32_t binding_normalized = b->modifiers & ~ignored_modifiers;
 
     if (binding_normalized == normalized && b->keycode == keycode) {
       return (int32_t) i;
@@ -86,8 +96,15 @@ keybinding_binding_init(void)
 
   LOG_DEBUG("Initializing keybinding binding system");
   memset(bindings, 0, sizeof(bindings));
-  binding_count = 0;
-  initialized   = true;
+  binding_count     = 0;
+  ignored_modifiers = KEYBINDING_DEFAULT_IGNORED_MODIFIERS;
+  initialized       = true;
+}
+
+void
+keybinding_binding_set_ignored_modifiers(uint32_t mask)
+{
+  ignored_modifiers = mask;
 }
 
 void
