@@ -220,8 +220,12 @@ nobody is punished for improving the tree.
    and prints `file:line` or the failing thing. No network, no model.
 2. Add it to the right layer in `lefthook.yml` with a `fail_text` that says what
    to do about it.
-3. Add the same command to the matching job in
-   `.github/workflows/quality.yml`.
+3. A hook gate needs no workflow edit. The `gates` job runs `lefthook run
+   pre-push --force`, so the command from step 2 runs in CI. Pasting that
+   command into `.github/workflows/quality.yml` as well is a second
+   implementation; the unit-suite sanitizer job was that, and it ignored
+   `tests/quality/asan-baseline.txt`. A gate that needs a display cannot be a
+   hook. Add a job for it in the workflow, as `seam` and `sanitize-x` are.
 4. Add a row to the table above, and to `docs/TESTING.md` if a person would run
    it by hand.
 
