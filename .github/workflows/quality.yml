@@ -2,11 +2,16 @@ name: quality
 
 # Every gate in docs/QUALITY.md runs here. The gate list itself lives in
 # lefthook.yml, and this workflow calls the same commands, so a gate added for
-# a commit hook is not silently missing from CI.
+# a commit hook is not silently missing from CI. The two nested-server jobs are
+# the exception: they need a display, so they are steps here and not hooks.
 #
 # The seam job is required because tests/x/run.sh now separates known failures
 # (tests/quality/seam-baseline.txt) from new ones: a red seam job means this
 # branch broke something, which is exactly what a required gate should say.
+#
+# The sanitize-x job exists because the sanitize job below runs the unit suite,
+# and without a display the X calls return before they build a request. Only a
+# live WM in a nested server can show a memory error in the map path.
 
 on:
   push:
@@ -64,3 +69,19 @@ jobs:
             make clean >/dev/null
             ASAN_OPTIONS=detect_leaks=1 make test SANITIZE=1
           '
+
+  sanitize-x:
+    name: the WM in a nested X server under ASan and UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: X harness under ASan and UBSan
+        run: nix develop --command xvfb-run -a scripts/check-sanitize-x.sh
+      - name: sanitize report and WM log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitize-x-logs
+          path: /tmp/wm-xephyr-test/
+          if-no-files-found: ignore

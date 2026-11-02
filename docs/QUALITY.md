@@ -20,10 +20,19 @@ model.*
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run`, required: known failures are baselined |
 | CI `sanitize` | every push and PR | ~2 min | `make test SANITIZE=1` |
+| CI `sanitize-x` | every push and PR | ~1 min | `scripts/check-sanitize-x.sh` under `xvfb-run`: the WM in a nested server under ASan and UBSan |
 
 No CI job is advisory any more. The seam job could only become required once
 `tests/x/run.sh` could tell a known failure from a new one; the baseline in
 `tests/quality/seam-baseline.txt` is what makes its verdict mean something.
+
+The `sanitize` and `sanitize-x` jobs cover different code because they can
+reach different code: the unit suite runs with no X connection, and the map,
+tile and focus requests return before they are built without one. A 2-byte
+value passed where XCB reads 4 left every gate green and aborted the WM on the
+first `MapRequest`. `sanitize-x` is not in `lefthook.yml` because it needs a
+display and a nested X server, the same reason the seam tests are a CI job
+rather than a hook.
 
 ## The gates
 
@@ -44,6 +53,7 @@ No CI job is advisory any more. The seam job could only become required once
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
 | seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
+| sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt` |
 
 ## Where the hooks live
 
@@ -150,7 +160,8 @@ lefthook run pre-push       # every gate that runs before a push
 lefthook run pre-commit     # just the commit-time gates
 LEFTHOOK_EXCLUDE=beads lefthook run pre-push   # without the beads export
 make test-x                 # seam tests (needs a display; Xephyr handles that)
-make test SANITIZE=1        # sanitizers (builds the test binary too)
+make test SANITIZE=1        # the unit suite under the sanitizers
+scripts/check-sanitize-x.sh # the WM in a nested server under the sanitizers
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
 ```
