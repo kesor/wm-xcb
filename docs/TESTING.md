@@ -379,7 +379,16 @@ It fails when the harness fails, when the WM log carries an ASan error, and
 when a leak site or UBSan report in that log is missing from
 `tests/quality/sanitize-x-baseline.txt`. The harness stops the WM with a signal,
 so that log holds whatever was still allocated at exit: known startup sites are
-baselined, and the list is meant to shrink.
+baselined, and the list is meant to shrink. Fixing a baselined site means
+updating the baseline in the same commit.
+
+A run that reports nothing is not a clean run until the gate has ruled out the
+reasons for it. The harness line must name `variant=release-sanitize`, because
+an uninstrumented binary writes a log with no report in it. `suppressions=` and
+`log_path=` are dropped from the sanitizer options before the harness starts,
+because either one turns a real report into silence. And a baseline with
+entries next to a log with no report fails, because that is either the fixes
+landing without their baseline update or the sanitizer never running.
 
 ```bash
 scripts/check-sanitize-x.sh --update-baseline  # accept today's sites under a live WM

@@ -20,7 +20,20 @@
 # Leaks are baselined rather than fatal because the harness stops the WM with a
 # signal, so LeakSanitizer reports whatever was still allocated at that moment,
 # startup included. A site that is not in the baseline is new, which is the
-# point: the list only shrinks.
+# point: the list only shrinks. Fixing a baselined site means updating the
+# baseline in the same commit, which is the policy the other two baselines
+# follow.
+#
+# Silence is not a verdict, so the gate refuses three ways of producing it.
+# The run must report variant=release-sanitize: an uninstrumented binary writes
+# a log with no report in it, and no line in that log says the sanitizer never
+# started. suppressions= and log_path= are dropped from ASAN_OPTIONS,
+# LSAN_OPTIONS and UBSAN_OPTIONS before the harness starts, so a caller cannot
+# hide a report with an environment variable or a suppression file. And a
+# baseline with entries next to a log with no report fails: the fixes landed
+# without their baseline update, or the sanitizer did not run, and the log
+# cannot say which. The judgement itself lives in
+# scripts/lib/sanitize-x-report.sh, so it can be tested against recorded output.
 #
 # Needs what the harness needs: Xephyr, xdotool, xprop, and a display for
 # Xephyr to draw into. CI runs it under xvfb-run, next to the seam job.
@@ -50,14 +63,20 @@ for arg in "$@"; do
   esac
 done
 
+export SANITIZE_X_VERBOSE=$VERBOSE
+# shellcheck source=lib/sanitize-x-report.sh
+. "$ROOT_DIR/scripts/lib/sanitize-x-report.sh"
+
+for option_var in ASAN_OPTIONS LSAN_OPTIONS UBSAN_OPTIONS; do
+  sanitize_x_scrub_options "$option_var"
+done
+
 # The leak report is the exit-time one, so it is only complete if the harness
-# lets the WM exit rather than killing it outright. ${VAR:-default} only fills
-# in an unset variable, so a caller who exported detect_leaks=0 or
-# leak_check_at_exit=0 would keep that value. The option strings are read left
-# to right and the last value of a repeated key wins, so the caller's options
-# stay and these two keys are appended. LeakSanitizer options override
-# AddressSanitizer's leak flags, which is why the same keys are forced on
-# LSAN_OPTIONS and not only on ASAN_OPTIONS.
+# lets the WM exit rather than killing it outright. The option strings are read
+# left to right and the last value of a repeated key wins, so these two keys are
+# appended after the scrub and beat anything the caller left. LeakSanitizer
+# options override AddressSanitizer's leak flags, which is why the same keys are
+# forced on LSAN_OPTIONS and not only on ASAN_OPTIONS.
 export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS,}detect_leaks=1,leak_check_at_exit=1"
 export LSAN_OPTIONS="${LSAN_OPTIONS:+$LSAN_OPTIONS,}detect_leaks=1,leak_check_at_exit=1"
 
@@ -74,7 +93,9 @@ trap 'rm -f "$OUT"' EXIT
 echo "check-sanitize-x: running scripts/xephyr-test.sh against the SANITIZE=1 build"
 # nix develop sets TMPDIR to a private directory. The harness writes its log
 # under $TMPDIR, and the CI upload looks at /tmp/wm-xephyr-test.
-TMPDIR=/tmp SANITIZE=1 "$ROOT_DIR/scripts/xephyr-test.sh" >"$OUT" 2>&1
+# DEBUG is dropped rather than forwarded: the gate says which variant it ran,
+# and debug-sanitize would make that line depend on the caller's environment.
+env -u DEBUG TMPDIR=/tmp SANITIZE=1 "$ROOT_DIR/scripts/xephyr-test.sh" >"$OUT" 2>&1
 rc=$?
 cat "$OUT"
 if [ "$rc" -ne 0 ]; then
@@ -82,57 +103,9 @@ if [ "$rc" -ne 0 ]; then
   exit 1
 fi
 
-LOG=$(sed -n 's/^xephyr-test.sh: .*log=//p' "$OUT" | head -n 1)
-if [ ! -f "$LOG" ]; then
-  echo "check-sanitize-x: the harness named no readable log, so the run cannot be checked" >&2
-  exit 1
-fi
-
-# A fatal ASan error is never accepted: an entry in the baseline says "this
-# allocation site is known", not "reading past a buffer is fine".
-if grep -q 'ERROR: AddressSanitizer:' "$LOG"; then
-  echo "check-sanitize-x: the WM log carries an AddressSanitizer error:"
-  grep -A12 -m1 'ERROR: AddressSanitizer:' "$LOG"
-  echo "check-sanitize-x: see $LOG"
-  exit 1
-fi
-
-# One site per leak: the first stack frame that is a file in this repository,
-# keyed by file and function. The line number is not part of the key, for the
-# same reason as in check-sanitize.sh: it moves with any edit above it.
-leak_sites() {
-  awk -v root="$ROOT_DIR/" '
-    /^(Direct|Indirect) leak of/ { pending = 1; next }
-    pending && /^[ \t]*#[0-9]+/ {
-      fn = ""; loc = ""
-      for (i = 1; i < NF; i++) {
-        if ($i == "in") { fn = $(i + 1); loc = $(i + 2); break }
-      }
-      sub(/:[0-9]+$/, "", loc)
-      if (fn != "" && loc ~ /\.(c|h)$/ && index(loc, root) == 1) {
-        print substr(loc, length(root) + 1) "|" fn
-        pending = 0
-      }
-      next
-    }
-    { pending = 0 }
-  ' "$1" | sort -u
-}
-
-# A UBSan report does not stop the program, so nothing else in the run would
-# notice it: the message is what gets baselined, not the file.
-ubsan_sites() {
-  sed "s|^$ROOT_DIR/||" "$1" |
-    sed -nE 's#^([^ :]+\.(c|h)):[0-9]+:[0-9]+: runtime error: (.*)$#\1|runtime error: \3#p' |
-    sort -u
-}
-
-mapfile -t SITES < <({ leak_sites "$LOG"; ubsan_sites "$LOG"; } | sort -u)
-
-if [ "${#SITES[@]}" -eq 0 ]; then
-  echo "check-sanitize-x: no sanitizer report at all"
-  exit 0
-fi
+# The verdict needs the log the harness wrote, not a log this script guessed.
+LOG=$(sanitize_x_trust "$OUT") || exit 1
+mapfile -t SITES < <(sanitize_x_sites "$LOG")
 
 if [ "$UPDATE" -eq 1 ]; then
   mkdir -p "$(dirname "$BASELINE")"
@@ -144,43 +117,10 @@ if [ "$UPDATE" -eq 1 ]; then
     echo "# does. Remove entries as the defects are fixed: the list is meant to"
     echo "# shrink. Leak entries are file|function, UBSan entries are"
     echo "# file|runtime error: <message>."
-    printf '%s\n' "${SITES[@]}"
+    [ "${#SITES[@]}" -eq 0 ] || printf '%s\n' "${SITES[@]}"
   } >"$BASELINE"
   echo "check-sanitize-x: baseline updated with ${#SITES[@]} site(s)"
   exit 0
 fi
 
-declare -A KNOWN=()
-if [ -f "$BASELINE" ]; then
-  while IFS= read -r line; do
-    case "$line" in '' | '#'*) continue ;; esac
-    KNOWN["$line"]=1
-  done <"$BASELINE"
-fi
-
-NEW=0
-declare -A SEEN=()
-for site in "${SITES[@]}"; do
-  SEEN["$site"]=1
-  if [ -n "${KNOWN[$site]:-}" ]; then
-    [ "$VERBOSE" -eq 1 ] && printf '  known  %s\n' "$site"
-    continue
-  fi
-  NEW=$((NEW + 1))
-  printf '  NEW REPORT  %s\n' "$site"
-done
-
-STALE=0
-for site in "${!KNOWN[@]}"; do
-  [ -z "${SEEN[$site]:-}" ] && STALE=$((STALE + 1)) && printf '  stale baseline entry: %s\n' "$site"
-done
-
-echo "check-sanitize-x: ${#SITES[@]} site(s), $NEW new"
-[ "$STALE" -gt 0 ] && echo "check-sanitize-x: $STALE stale baseline entrie(s); run --update-baseline to drop them"
-
-if [ "$NEW" -gt 0 ]; then
-  echo "A new sanitizer report from a live WM: fix it, or run --update-baseline and say why it is deferred."
-  echo "The WM log is $LOG"
-  exit 1
-fi
-exit 0
+sanitize_x_verify "$OUT" "$BASELINE"
