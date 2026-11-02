@@ -17,9 +17,9 @@
 /*
  * Border drawn around a managed window. config.def.h has the same value in
  * default_borders.width, but including it here would copy the whole compiled-in
- * configuration into this file, unused. The tiling component writes the same
- * width from its own default, so a change to the configured border has to be
- * made in both places until one path reads config.def.h for both.
+ * configuration into this file, unused. This is the only place that sets a
+ * client's border width: the layout subtracts whatever is on the client, so a
+ * change to the configured border has to be made here and in config.def.h.
  */
 #define CLIENT_LIST_BORDER_WIDTH 1
 

@@ -145,6 +145,13 @@ screen_size() {
   xdotool getdisplaygeometry 2>/dev/null | awk '{print $1, $2}'
 }
 
+# border_of <window-id> - the border width X reports for the window. xdotool
+# reports a window's inside size and its outer corner, so the border is the only
+# part of its footprint it does not print.
+border_of() {
+  xwininfo -id "$1" 2>/dev/null | awk -F: '/Border width/{print $2+0; exit}'
+}
+
 # overlap_pairs <id>... - prints the number of overlapping window pairs
 overlap_pairs() {
   local ids=("$@") i j count=0

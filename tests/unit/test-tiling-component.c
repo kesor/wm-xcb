@@ -29,6 +29,21 @@
 #define TEST_MONITOR_HEIGHT 600
 #define TEST_MASTER_WIDTH   (TEST_MONITOR_WIDTH / 2)
 
+/* The box a window covers on screen, border included. X draws the border
+ * inside the window's bounding box, whose origin is the configured x and y, so
+ * the inside size plus one border on each side is the whole footprint. */
+static uint32_t
+outer_width(const Client* c)
+{
+  return (uint32_t) c->width + (uint32_t) c->border_width * 2;
+}
+
+static uint32_t
+outer_height(const Client* c)
+{
+  return (uint32_t) c->height + (uint32_t) c->border_width * 2;
+}
+
 static void
 map_test_window(xcb_window_t window)
 {
@@ -151,8 +166,12 @@ test_manage_triggers_tiling(void)
   if (c != NULL) {
     assert(c->x == m->x);
     assert(c->y == m->y);
-    assert(c->width == TEST_MASTER_WIDTH);
-    assert(c->height == TEST_MONITOR_HEIGHT);
+    /* Mapped clients carry the border from the map path, and the window is the
+     * area minus a border on each side. With nothing in the stack the master
+     * area is the whole monitor. */
+    assert(c->border_width == 1);
+    assert(outer_width(c) == TEST_MONITOR_WIDTH);
+    assert(outer_height(c) == TEST_MONITOR_HEIGHT);
   }
 
   tiling_component_shutdown();
@@ -185,11 +204,11 @@ test_unmanage_triggers_tiling(void)
 
   Client* stack = client_get_by_window(1002);
   assert_or_abort(stack != NULL);
-  assert(stack->height == TEST_MONITOR_HEIGHT / 2);
+  assert(outer_height(stack) == TEST_MONITOR_HEIGHT / 2);
 
   unmap_test_window(1001);
 
-  assert(stack->height == TEST_MONITOR_HEIGHT);
+  assert(outer_height(stack) == TEST_MONITOR_HEIGHT);
 
   tiling_component_shutdown();
   client_list_component_shutdown();
@@ -228,8 +247,8 @@ test_monitor_tile_action_retiles(void)
 
   assert(c->x == 0);
   assert(c->y == 0);
-  assert(c->width == TEST_MASTER_WIDTH);
-  assert(c->height == TEST_MONITOR_HEIGHT);
+  assert(outer_width(c) == TEST_MONITOR_WIDTH);
+  assert(outer_height(c) == TEST_MONITOR_HEIGHT);
 
   tiling_component_shutdown();
   client_list_component_shutdown();
@@ -262,8 +281,8 @@ test_monitor_tile_keybinding(void)
 
   client_set_geometry(c, 7, 9, 123, 45);
   assert(keybinding_binding_execute(XCB_MOD_MASK_4, 31) == true);
-  assert(c->width == TEST_MASTER_WIDTH);
-  assert(c->height == TEST_MONITOR_HEIGHT);
+  assert(outer_width(c) == TEST_MONITOR_WIDTH);
+  assert(outer_height(c) == TEST_MONITOR_HEIGHT);
 
   tiling_component_shutdown();
   client_list_component_shutdown();
@@ -382,10 +401,54 @@ test_client_tag_move_triggers_tiling(void)
   hub_shutdown();
 }
 
+/*
+ * Test: tiled clients cover their areas edge to edge. A neighbour starts where
+ * the previous window's border ends, so the monitor has no gap and no overlap.
+ */
+void
+test_tiled_clients_touch(void)
+{
+  LOG_CLEAN("== Testing tiled clients touch instead of overlapping by a border");
+
+  hub_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_component_init();
+  tiling_component_init();
+
+  Monitor* m = create_test_monitor();
+  map_test_window(1300);
+  map_test_window(1301);
+  map_test_window(1302);
+
+  /* The list holds the newest client first, and that is the master. */
+  Client* master       = client_get_by_window(1302);
+  Client* stack_top    = client_get_by_window(1301);
+  Client* stack_bottom = client_get_by_window(1300);
+  assert_or_abort(master != NULL && stack_top != NULL && stack_bottom != NULL);
+
+  assert(stack_top->x == master->x + (int16_t) outer_width(master));
+  assert(outer_width(master) + outer_width(stack_top) == TEST_MONITOR_WIDTH);
+
+  assert(stack_bottom->y == stack_top->y + (int16_t) outer_height(stack_top));
+  assert(outer_height(stack_top) + outer_height(stack_bottom) == TEST_MONITOR_HEIGHT);
+  assert(outer_height(master) == TEST_MONITOR_HEIGHT);
+  assert(master->y == m->y);
+
+  tiling_component_shutdown();
+  client_list_component_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(TilingComponent, {
   test_monitor_tile_action_registered();
   test_monitor_gets_layout_sm_on_adoption();
   test_manage_triggers_tiling();
+  test_tiled_clients_touch();
   test_unmanage_triggers_tiling();
   test_monitor_tile_action_retiles();
   test_monitor_tile_keybinding();
