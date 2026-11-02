@@ -36,8 +36,11 @@
 # scripts/lib/sanitize-x-report.sh. The scrub and the site verdict live in
 # scripts/lib/sanitize-report.sh, which the unit gate reads too.
 #
-# Needs what the harness needs: Xephyr, xdotool, xprop, and a display for
-# Xephyr to draw into. CI runs it under xvfb-run, next to the seam job.
+# Needs what the harness needs: Xephyr, xdotool, xprop, and a parent display for
+# Xephyr to draw into. That display is a private Xvfb, started here through
+# scripts/lib/private-display.sh and handed to the harness, so the gate draws
+# nothing on the session. CI needs no display of its own for the same reason; it
+# used to wrap this script in xvfb-run.
 #
 # Exit status: 0 when the run is clean, 1 otherwise.
 
@@ -49,6 +52,7 @@ cd "$ROOT_DIR"
 BASELINE="$ROOT_DIR/tests/quality/sanitize-x-baseline.txt"
 UPDATE=0
 VERBOSE=0
+CHECK_ARGS=("$@")
 for arg in "$@"; do
   case "$arg" in
     --update-baseline) UPDATE=1 ;;
@@ -67,6 +71,14 @@ done
 export SANITIZE_VERBOSE=$VERBOSE
 # shellcheck source=lib/sanitize-x-report.sh
 . "$ROOT_DIR/scripts/lib/sanitize-x-report.sh"
+# shellcheck source=lib/private-display.sh
+. "$ROOT_DIR/scripts/lib/private-display.sh"
+
+# Before anything starts: the helper re-executes this script under xvfb-run, and
+# the harness it runs later inherits that display rather than starting a second
+# one. The arguments are the ones this invocation was given, not what the loop
+# above left of them.
+wm_parent_display "${CHECK_ARGS[@]}" || exit 1
 
 for option_var in ASAN_OPTIONS LSAN_OPTIONS UBSAN_OPTIONS; do
   sanitize_scrub_options "$option_var"

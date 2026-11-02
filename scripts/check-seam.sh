@@ -9,11 +9,15 @@
 # and focus path, and before this gate it ran when the author or the reviewer
 # remembered to run it. A defect on that path merged green twice.
 #
-# tests/x/run.sh starts Xephyr, which needs a host display to draw into. When
-# there is none, the run goes under xvfb-run instead of being skipped: a gate
-# whose silence reads as a pass is worse than no gate, and the CI runner is the
-# machine that has no display and needs the check most. When neither a display
-# nor xvfb-run is available the script fails and names what is missing.
+# tests/x/run.sh starts Xephyr, which needs a parent display to draw into. That
+# display is a private Xvfb this run starts, never the session's, so a gate run
+# cannot put windows on the screen someone is working on and cannot answer
+# differently because that screen is a different depth or wedged. It used to be
+# xvfb-run only when DISPLAY was unset, which meant the local run was not the run
+# CI performed. scripts/lib/private-display.sh owns the rule;
+# WM_USE_SESSION_DISPLAY=1 is the documented way back to the session display.
+# When no private display is possible the script fails and names what is
+# missing, because a gate whose silence reads as a pass is worse than no gate.
 #
 # The baseline in tests/quality/seam-baseline.txt keeps the verdict meaningful:
 # a failure listed there is known and does not fail the run, and a failure that
@@ -44,14 +48,8 @@ if ! command -v Xephyr >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ -z "${DISPLAY:-}" ]; then
-  if ! command -v xvfb-run >/dev/null 2>&1; then
-    echo "check-seam: DISPLAY is unset and xvfb-run is not on PATH, so Xephyr has" >&2
-    echo "check-seam: no host display to draw into. Set DISPLAY or install xvfb-run." >&2
-    exit 1
-  fi
-  echo "check-seam: DISPLAY is unset, running the seam suite under xvfb-run"
-  exec xvfb-run -a "$0"
-fi
+# shellcheck source=lib/private-display.sh
+. "$ROOT_DIR/scripts/lib/private-display.sh"
+wm_parent_display "$@" || exit 1
 
 exec make test-x

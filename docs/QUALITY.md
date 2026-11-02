@@ -25,8 +25,8 @@ model.*
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~80 s | the above plus the flake evaluation, the shell lint, the seam suite, the sanitize gate, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push --force` with the beads job excluded |
-| CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run`, required: known failures are baselined |
-| CI `sanitize-x` | every push and PR | ~1 min | `scripts/check-sanitize-x.sh` under `xvfb-run`: the WM in a nested server under ASan and UBSan |
+| CI `seam` | every push and PR | ~1 min | `make test-x` on the private Xvfb the run starts, required: known failures are baselined |
+| CI `sanitize-x` | every push and PR | ~1 min | `scripts/check-sanitize-x.sh`: the WM in a nested server under ASan and UBSan |
 
 No CI job is advisory any more. The seam job could only become required once
 `tests/x/run.sh` could tell a known failure from a new one; the baseline in
@@ -49,7 +49,7 @@ the WM on the first `MapRequest`. The `sanitize-x` job covers that half by
 running a real WM in a nested server under ASan and UBSan. It is not in
 `lefthook.yml` because it rebuilds the tree under the sanitizers and takes about
 a minute; the seam suite it sits next to is a push gate, and needs no display of
-its own because `scripts/check-seam.sh` starts Xvfb when `DISPLAY` is unset.
+its own because `scripts/check-seam.sh` starts a private Xvfb for every run.
 
 The unit suite under the sanitizers is the `sanitize` gate in the `gates` job,
 not a job of its own. A job that ran `make test SANITIZE=1` raw was red from the
@@ -98,7 +98,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh`, `tests/x/run.sh` and `scripts/perf-test.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
-| seam | `scripts/check-seam.sh` (`make test-x`) | X behaviour: mapped, tiled, focused, tags, EWMH, events already read into libxcb's queue, and idle CPU stays under the budget. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run. Runs before every push; starts Xvfb when there is no display, and fails rather than skipping when neither is available |
+| seam | `scripts/check-seam.sh` (`make test-x`) | X behaviour: mapped, tiled, focused, tags, EWMH, events already read into libxcb's queue, and idle CPU stays under the budget. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run. Runs before every push on a private Xvfb it starts itself (`WM_USE_SESSION_DISPLAY=1` draws on the session instead), and fails rather than skipping when that server cannot start |
 | sanitize | `scripts/check-sanitize.sh` | no leak site or UBSan report missing from `tests/quality/asan-baseline.txt`, and the suite that produced the log ran under ASan. `detect_leaks` and `leak_check_at_exit` are forced on, and `suppressions=` and `log_path=` are dropped, in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 | sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: the run reports `variant=release-sanitize`, no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. `detect_leaks` and `leak_check_at_exit` are forced on, and `suppressions=` and `log_path=` are dropped, in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 

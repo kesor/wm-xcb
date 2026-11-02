@@ -131,9 +131,10 @@ pre-push:
 
     # The only check that looks at the running WM. It used to run only when the
     # author or the reviewer chose to, so a branch that broke mapping, tiling,
-    # tags or the EWMH properties merged green. scripts/check-seam.sh starts
-    # Xvfb when there is no display; it fails rather than skipping when neither
-    # is available.
+    # tags or the EWMH properties merged green. scripts/check-seam.sh starts a
+    # private Xvfb for the Xephyr it nests, so a run draws nothing on the desktop
+    # it runs on, and it fails rather than skipping when that server cannot
+    # start.
     seam:
       run: ./scripts/check-seam.sh
       fail_text: "A new seam failure: something X should see is not there. Run 'make test-x TEST_X_ARGS=--verbose', and baseline a known failure deliberately or fix it."
