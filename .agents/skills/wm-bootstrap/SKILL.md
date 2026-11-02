@@ -139,7 +139,7 @@ task. `bd edit` opens an editor and blocks an agent — never use it.
 
 ## Spawning workers (optional)
 
-A local harness (`worker.sh`, not part of this repository) runs one bead per git
+A local harness (`worker.sh`, not part of this repository) runs one worker per git
 worktree inside a tmux window with a `pi` agent. `auto <bead-id> [--merge]`
 starts a run, waits, reviews it on a different model family, and notifies;
 `inbox` shows what is in flight with the verdict; `review` runs the review

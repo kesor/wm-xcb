@@ -467,10 +467,9 @@ void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULL
 ## When You're Done
 
 The commit hook runs the gates in `lefthook.yml` for you (beads export, paths,
-docs, bead refs, formatting, build, unit tests, async rule, commit message).
-Do not skip them with `--no-verify`; if a gate fails, fix the cause. If the
-hook is missing, run `make hooks` once. Adding a unit test is not covered by
-that list: run `scripts/check-test-src.sh`, as the Tests section says.
+docs, test-src, bead refs, formatting, build, unit tests, async rule, commit
+message). Do not skip them with `--no-verify`; if a gate fails, fix the cause.
+If the hook is missing, run `make hooks` once.
 
 1. Make sure tests pass: `make test`
 2. If the change touches windows, focus, keys, or X properties, run the seam
