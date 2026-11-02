@@ -72,18 +72,23 @@ For testing mechanics, `docs/TESTING.md`. For the gate list, `docs/QUALITY.md`.
 |------|---------|----------|
 | build | `make` | it compiles |
 | unit | `make test` | the unit suite |
-| seam | `make test-x` | what X sees: mapped, tiled, focused, tags, EWMH |
+| seam | `make test-x` | what X sees: mapped, tiled, focused, tags, EWMH; a failure missing from `tests/quality/seam-baseline.txt` fails the run |
 | async | `make check-async` | no new blocking call (baseline in `tests/quality/`) |
 | paths | `scripts/check-paths.sh` | no home directory or personal source tree in a public repo |
 | format | `scripts/format-check.sh` | clang-format clean; `make format` fixes |
 | commit-msg | `scripts/check-commit-msg.sh` | no AI attribution trailers |
 | debug | `make clean && make DEBUG=1` | the `-pedantic` build stays green |
 
-The hooks in `.githooks/` run these; CI runs the same commands. `make test-x`
-currently fails by design — every failure names the beads issue that owns the
-defect. Do
-not weaken a test to make it green; fix the defect or leave the failure and say
-so.
+The hooks in `.githooks/` run these; CI runs the same commands.
+
+`make test-x` does not fail by design. `tests/x/run.sh` compares the failures it
+saw against `tests/quality/seam-baseline.txt`: an assertion listed there is
+reported as a known failure and does not change the exit status, and an
+assertion missing from there is new and exits non-zero. The summary line says
+`N passed, M known failed, K new failed`, and `K` is the number to act on. Do
+not weaken a test to make it green; fix the defect, or accept today's failures
+with `make test-x TEST_X_ARGS="--update-baseline"` and say in a bead which
+defect the new entry stands for.
 
 ## Work organisation (beads)
 

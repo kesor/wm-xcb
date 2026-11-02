@@ -600,8 +600,10 @@ a gate fails, fix the cause. If the hook is missing, run `make hooks` once.
 
 1. Make sure tests pass: `make test`
 2. If the change touches windows, focus, keys, or X properties, run the seam
-   tests too: `make tools/xclient && make test-x`. They assert what X sees, and
-   they are expected to fail only for defects that have a beads issue.
+   tests too: `make tools/xclient && make test-x`. They assert what X sees. A
+   failure listed in `tests/quality/seam-baseline.txt` is known and does not
+   fail the run; a failure missing from that file is new, exits non-zero, and
+   is yours to fix or to baseline deliberately.
 3. Run the static async check: `make check-async`. It must report zero new
    violations; a waiver (`allow-blocking: <reason>`) needs a real reason.
 4. Format code: `make format`

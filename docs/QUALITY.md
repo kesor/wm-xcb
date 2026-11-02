@@ -42,6 +42,24 @@ first `MapRequest`. `sanitize-x` is not in `lefthook.yml` because it needs a
 display and a nested X server, the same reason the seam tests are a CI job
 rather than a hook.
 
+A baseline records debt, so fixing a baselined site means updating the baseline
+in the same commit: an entry left behind says a defect is still there when it is
+not. `check-sanitize-x.sh` enforces the same thing from the other side, and
+refuses the other ways a sanitizer run can report nothing:
+
+- The harness line must name `variant=release-sanitize`. An uninstrumented
+  binary writes a log with no report in it, and nothing in that log says so.
+- `suppressions=` and `log_path=` are dropped from `ASAN_OPTIONS`,
+  `LSAN_OPTIONS` and `UBSAN_OPTIONS` before the harness starts. Either one turns
+  a real report into silence, and the gate's job is to see the report.
+- A baseline with entries next to a log with no report fails. That is either the
+  fixes landing without their baseline update or the sanitizer never running,
+  and the log cannot say which.
+
+That verdict lives in `scripts/lib/sanitize-x-report.sh` rather than in the gate,
+and `tests/x/test-95-sanitize-x-report.sh` feeds it recorded output, so each
+refusal is pinned by a test that needs no X server.
+
 ## The gates
 
 | Gate | Command | What it proves |
@@ -61,7 +79,7 @@ rather than a hook.
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
 | seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
-| sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. `detect_leaks` and `leak_check_at_exit` are forced on in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
+| sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: the run reports `variant=release-sanitize`, no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. `detect_leaks` and `leak_check_at_exit` are forced on, and `suppressions=` and `log_path=` are dropped, in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 
 ## Where the hooks live
 
