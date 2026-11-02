@@ -60,7 +60,7 @@ rather than a hook.
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
 | seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
-| sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt` |
+| sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. Leak detection is forced on whatever `ASAN_OPTIONS` the caller has |
 
 ## Where the hooks live
 

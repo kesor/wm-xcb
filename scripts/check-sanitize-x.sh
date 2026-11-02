@@ -52,9 +52,12 @@ done
 
 # The leak report is the exit-time one, so it is only complete if the harness
 # lets the WM exit rather than killing it outright. detect_leaks=1 is the
-# default on Linux; set it anyway so a caller's ASAN_OPTIONS cannot turn the
-# leak half of this gate off by accident.
-export ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1}"
+# default on Linux, but a caller's ASAN_OPTIONS can switch it off, and the
+# ${VAR:-default} form only fills in an unset variable. So the caller's options
+# are kept and this one is appended after them: ASan reads the string left to
+# right and the last value of a repeated key wins, which leaves no way to turn
+# the leak half of this gate off from outside it.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS,}detect_leaks=1"
 
 # The harness refuses to run without the test client, and `make clean` in CI
 # removes it.
