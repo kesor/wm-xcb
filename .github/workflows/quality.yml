@@ -48,14 +48,14 @@ jobs:
       - uses: actions/checkout@v5
       - uses: cachix/install-nix-action@v31
       - name: seam tests under a virtual host display
-        run: nix develop --command xvfb-run -a make test-x
+        run: nix develop --command env TMPDIR=/tmp xvfb-run -a make test-x
       - name: seam test logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: seam-test-logs
           path: /tmp/wm-seam-tests/
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   sanitize:
     name: address and UB sanitizers
@@ -84,4 +84,4 @@ jobs:
         with:
           name: sanitize-x-logs
           path: /tmp/wm-xephyr-test/
-          if-no-files-found: ignore
+          if-no-files-found: error

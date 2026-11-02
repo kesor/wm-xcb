@@ -26,6 +26,13 @@ No CI job is advisory any more. The seam job could only become required once
 `tests/x/run.sh` could tell a known failure from a new one; the baseline in
 `tests/quality/seam-baseline.txt` is what makes its verdict mean something.
 
+The two nested-server jobs upload their logs as artifacts. Both pin
+`TMPDIR=/tmp` on the run line and upload from under `/tmp`, because `nix
+develop` points `TMPDIR` at a private per-shell directory and the harnesses
+write their logs under `$TMPDIR`. The upload fails the job when the directory
+is empty: an artifact step that quietly uploads nothing removes the evidence
+from exactly the run that needs it.
+
 The `sanitize` and `sanitize-x` jobs cover different code because they can
 reach different code: the unit suite runs with no X connection, and the map,
 tile and focus requests return before they are built without one. A 2-byte
