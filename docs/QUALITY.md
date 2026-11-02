@@ -16,7 +16,7 @@ model.*
 |-------|------|------|------|
 | `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
-| `pre-push` | every push | ~70 s | the above plus the seam suite, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
+| `pre-push` | every push | ~70 s | the above plus the flake evaluation, the seam suite, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
 | CI `gates` | every push and PR | ~2 min | `lefthook run pre-push` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` under `xvfb-run`, required: known failures are baselined |
 | CI `sanitize` | every push and PR | ~2 min | `make test SANITIZE=1` |
@@ -67,6 +67,7 @@ refusal is pinned by a test that needs no X server.
 | Gate | Command | What it proves |
 |------|---------|----------------|
 | build | `make -j$(nproc)` | the tree compiles |
+| flake | `scripts/check-flake.sh` | the dev shell in `flake.nix` evaluates for this system, so a syntax error, a moved attribute or a package that no longer exists fails here and not at the next `direnv allow` |
 | unit | `make test` | the unit suite across hub, state machines, targets, components |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
@@ -188,6 +189,7 @@ lefthook run pre-push       # every gate that runs before a push
 lefthook run pre-commit     # just the commit-time gates
 LEFTHOOK_EXCLUDE=beads lefthook run pre-push   # without the beads export
 scripts/check-seam.sh       # the seam suite as the push gate runs it
+scripts/check-flake.sh      # the dev shell in flake.nix evaluates
 make test-x                 # the same suite, spelled out (needs a display)
 make test SANITIZE=1        # the unit suite under the sanitizers
 scripts/check-sanitize-x.sh # the WM in a nested server under the sanitizers

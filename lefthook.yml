@@ -73,6 +73,14 @@ pre-push:
     beads:
       run: bd hooks run pre-push
 
+    # The dev shell is what every other job here runs in, so a broken flake.nix
+    # is checked first and costs about a second. It only evaluates the shell; a
+    # package that stopped existing or an attribute that moved fails here rather
+    # than at the next session's direnv allow.
+    flake:
+      run: ./scripts/check-flake.sh
+      fail_text: "flake.nix does not evaluate. Fix the dev shell: it is what make, every gate and every agent in this tree runs in."
+
     paths:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory."

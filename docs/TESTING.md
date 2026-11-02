@@ -38,7 +38,9 @@ the test tools: `Xephyr` (from `xorg-server`), `xvfb`, `xdotool`, `xprop`,
 A tool the harnesses need but the shell lacks is fixed in `flake.nix`, in the
 same commit as the recipe that needs it. Each worktree carries its own copy of
 `flake.nix`, so the tool appears in that worktree after `direnv allow` or
-`nix develop` again, not in the shell that is already running.
+`nix develop` again, not in the shell that is already running. `scripts/check-flake.sh`
+evaluates the shell without entering it, which is what catches a broken
+`flake.nix` before the next session finds it; the push gate runs the same check.
 
 Rule of thumb: anything you run against the WM needs the same shell the WM was
 built in, because the binary links the store paths of that shell's libraries.
