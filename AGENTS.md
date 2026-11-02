@@ -131,8 +131,8 @@ bd update <bead-id> --claim     # take it, so the next session sees it is taken
 bd comment <bead-id> "..."      # what you found, for whoever continues
 ```
 
-Read the comments before you plan. `bd show` does not print them, and an earlier
-review may have left the finding that changes the design.
+Read the comments before you plan. `bd show` prints them. An earlier review
+may have left the finding that changes the design.
 
 `bd edit` opens an editor and blocks an agent. Never use it.
 
@@ -196,9 +196,10 @@ make tools/xclient && make test-x    # seam suite: what the X server sees
 
 Unit tests are `tests/unit/test-*.c`. A file registers its test group from a
 constructor, so a file missing from `TEST_SRC` in the Makefile compiles nowhere
-and its assertions never run; `scripts/check-test-src.sh` fails the commit
-instead. The seam tests are `tests/x/test-*.sh`: they start a nested X server
-and assert against a live WM.
+and its assertions never run. Run `scripts/check-test-src.sh`. The pre-commit
+glob `test-*.c` does not match `tests/unit/test-*.c`, so the commit is not
+rejected. The pre-push hook runs the script with no glob. The seam tests are
+`tests/x/test-*.sh`: they start a nested X server and assert against a live WM.
 
 Copy the shape from `tests/unit/test-client-list-component.c` for a component
 and `tests/unit/test-wm-tag.c` for a target. `docs/TESTING.md` has the debug
@@ -464,10 +465,11 @@ void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULL
 
 ## When You're Done
 
-The commit hook runs the gates in `lefthook.yml` for you (paths, docs, test-src,
-bead refs, formatting, build, unit tests, async rule, commit message). Do not
-skip them with `--no-verify`; if a gate fails, fix the cause. If the hook is
-missing, run `make hooks` once.
+The commit hook runs the gates in `lefthook.yml` for you (beads export, paths,
+docs, bead refs, formatting, build, unit tests, async rule, commit message).
+Do not skip them with `--no-verify`; if a gate fails, fix the cause. If the
+hook is missing, run `make hooks` once. Adding a unit test is not covered by
+that list: run `scripts/check-test-src.sh`, as the Tests section says.
 
 1. Make sure tests pass: `make test`
 2. If the change touches windows, focus, keys, or X properties, run the seam
