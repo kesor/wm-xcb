@@ -11,7 +11,7 @@
  *
  * Build:  make tools/xclient
  * Usage:  xclient [-n COUNT] [-t TITLE] [-W WIDTH] [-H HEIGHT] [-s SLEEP]
- *                 [-l LIFETIME] [-c CLASS] [-h]
+ *                 [-l LIFETIME] [-c CLASS] [-o] [-h]
  *
  * -n COUNT     number of windows to create (default 1)
  * -t TITLE     window title prefix; each window is TITLE-<index>
@@ -20,6 +20,7 @@
  * -s SLEEP     sleep seconds between creating windows (default 0)
  * -y           wait for the server to process each map before printing its id
  * -l LIFETIME  exit after this many seconds (default: run until killed)
+ * -o           create override-redirect windows, which a WM must leave alone
  * -h           print this help
  *
  * Each created window's XID is printed to stdout when -v is given, so a
@@ -98,15 +99,25 @@ set_class(xcb_window_t win, const char* res_name, const char* res_class)
 }
 
 static xcb_window_t
-create_window(const char* title, const char* klass, uint32_t width, uint32_t height)
+create_window(
+    const char* title, const char* klass, uint32_t width, uint32_t height, bool override_redirect)
 {
   xcb_window_t win = xcb_generate_id(conn);
 
-  uint32_t mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
-  uint32_t values[2];
-  values[0] = screen->black_pixel;
-  values[1] = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY |
-              XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE;
+  /* The value list follows the order of the mask bits, and
+     XCB_CW_OVERRIDE_REDIRECT sits between XCB_CW_BACK_PIXEL and
+     XCB_CW_EVENT_MASK. */
+  uint32_t mask = XCB_CW_BACK_PIXEL;
+  uint32_t values[3];
+  uint32_t next  = 0;
+  values[next++] = screen->black_pixel;
+  if (override_redirect) {
+    mask |= XCB_CW_OVERRIDE_REDIRECT;
+    values[next++] = 1;
+  }
+  mask |= XCB_CW_EVENT_MASK;
+  values[next++] = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY |
+                   XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE;
 
   xcb_create_window(conn,
                     XCB_COPY_FROM_PARENT,
@@ -142,18 +153,19 @@ create_window(const char* title, const char* klass, uint32_t width, uint32_t hei
 int
 main(int argc, char** argv)
 {
-  int         count    = 1;
-  const char* title    = "xclient";
-  const char* klass    = "xclient";
-  uint32_t    width    = 400;
-  uint32_t    height   = 300;
-  int         sleep_s  = 0;
-  int         lifetime = 0;
-  bool        verbose  = false;
-  bool        sync     = false;
+  int         count             = 1;
+  const char* title             = "xclient";
+  const char* klass             = "xclient";
+  uint32_t    width             = 400;
+  uint32_t    height            = 300;
+  int         sleep_s           = 0;
+  int         lifetime          = 0;
+  bool        verbose           = false;
+  bool        sync              = false;
+  bool        override_redirect = false;
 
   int opt;
-  while ((opt = getopt(argc, argv, "n:t:c:W:H:s:l:vyh")) != -1) {
+  while ((opt = getopt(argc, argv, "n:t:c:W:H:s:l:voyh")) != -1) {
     switch (opt) {
     case 'n':
       count = atoi(optarg);
@@ -182,10 +194,13 @@ main(int argc, char** argv)
     case 'y':
       sync = true;
       break;
+    case 'o':
+      override_redirect = true;
+      break;
     case 'h':
     default:
       printf("usage: xclient [-n COUNT] [-t TITLE] [-c CLASS] [-W WIDTH] "
-             "[-H HEIGHT] [-s SLEEP] [-l LIFETIME] [-v] [-y] [-h]\n");
+             "[-H HEIGHT] [-s SLEEP] [-l LIFETIME] [-v] [-y] [-o] [-h]\n");
       return opt == 'h' ? 0 : 1;
     }
   }
@@ -225,7 +240,7 @@ main(int argc, char** argv)
   for (int i = 0; i < count; i++) {
     char buf[256];
     snprintf(buf, sizeof(buf), "%s-%d", title, i + 1);
-    wins[i] = create_window(buf, klass, width, height);
+    wins[i] = create_window(buf, klass, width, height, override_redirect);
     if (sync) {
       /* A request from this client is processed in order, so the reply proves
          the server has seen the map and redirected it. */
