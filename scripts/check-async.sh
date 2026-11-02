@@ -114,6 +114,15 @@ for f in "${SOURCES[@]}"; do
         continue
       fi
 
+      # xcb_poll_for_reply(), xcb_poll_for_reply64() and xcb_discard_reply()
+      # are named like the calls that wait, and libxcb documents them as not
+      # waiting: the first returns 0 while the reply has not arrived, the last
+      # throws a reply away. Flagging them would push the reader to waiver the
+      # very call the rule asks for.
+      if printf '%s' "$text" | grep -qE 'xcb_(poll_for_reply|poll_for_reply64|discard_reply)\('; then
+        continue
+      fi
+
       # A waiver sits on the line or the two above it, with a reason.
       start=$((line - 2))
       [ "$start" -lt 1 ] && start=1

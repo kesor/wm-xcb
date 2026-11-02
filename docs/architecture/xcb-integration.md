@@ -270,6 +270,12 @@ void handle_xcb_events(void) {
         free(event);
     }
 
+    /* A reply is not an event: libxcb keeps it in its queue until somebody
+       asks for it, so the deferred reads are drained here. xcb_poll_for_reply()
+       reports "not yet" instead of waiting, which is what lets the loop stay a
+       loop. */
+    client_list_poll_size_hints();
+
     xcb_flush(dpy);
 }
 

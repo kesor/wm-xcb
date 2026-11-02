@@ -444,11 +444,80 @@ test_tiled_clients_touch(void)
   hub_shutdown();
 }
 
+/*
+ * Test: size hints shape the size the layout gives a client
+ *
+ * A minimum larger than the area wins, because a window drawn smaller than it
+ * can draw is the worse outcome. A minimum that fits changes nothing: the
+ * window is still the area minus its border, so the tiling stays tight.
+ */
+void
+test_size_hints_shape_the_layout(void)
+{
+  LOG_CLEAN("== Testing size hints shape the tiled size");
+
+  hub_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_component_init();
+  tiling_component_init();
+
+  Monitor* m = create_test_monitor();
+  map_test_window(1400);
+  map_test_window(1401);
+
+  Client* master = client_get_by_window(1401);
+  Client* stack  = client_get_by_window(1400);
+  assert_or_abort(master != NULL && stack != NULL);
+
+  ClientSizeHints hints;
+  memset(&hints, 0, sizeof(hints));
+  hints.min_width  = 100;
+  hints.min_height = 100;
+  client_set_size_hints(master, &hints);
+  client_set_size_hints(stack, &hints);
+  hub_send_request(REQ_MONITOR_TILE, m->target.id);
+
+  assert(master->x + (int16_t) outer_width(master) == stack->x);
+  assert(outer_width(master) + outer_width(stack) == TEST_MONITOR_WIDTH);
+  assert(outer_height(master) == TEST_MONITOR_HEIGHT);
+
+  /* Wider than the monitor: the hint wins, and the client overruns instead of
+   * being drawn too small. */
+  memset(&hints, 0, sizeof(hints));
+  hints.min_width  = TEST_MONITOR_WIDTH + 200;
+  hints.min_height = TEST_MONITOR_HEIGHT + 100;
+  client_set_size_hints(master, &hints);
+  hub_send_request(REQ_MONITOR_TILE, m->target.id);
+
+  assert(master->width == TEST_MONITOR_WIDTH + 200);
+  assert(master->height == TEST_MONITOR_HEIGHT + 100);
+
+  /* A maximum caps the window even when there is more room. */
+  memset(&hints, 0, sizeof(hints));
+  hints.max_width  = 120;
+  hints.max_height = 90;
+  client_set_size_hints(master, &hints);
+  hub_send_request(REQ_MONITOR_TILE, m->target.id);
+
+  assert(master->width == 120);
+  assert(master->height == 90);
+
+  tiling_component_shutdown();
+  client_list_component_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(TilingComponent, {
   test_monitor_tile_action_registered();
   test_monitor_gets_layout_sm_on_adoption();
   test_manage_triggers_tiling();
   test_tiled_clients_touch();
+  test_size_hints_shape_the_layout();
   test_unmanage_triggers_tiling();
   test_monitor_tile_action_retiles();
   test_monitor_tile_keybinding();

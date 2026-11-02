@@ -7,6 +7,7 @@
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
 
+#include "src/components/client-list.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-log.h"
@@ -341,6 +342,11 @@ handle_xcb_events()
     dispatch_event(event);
     free(event);
   }
+
+  /* A property reply is not an event: libxcb keeps it in its queue until
+   * somebody asks for it. Client size hints arrive that way, and a window
+   * laid out before they were known has to be laid out again. */
+  client_list_poll_size_hints();
 
   /* Handlers queue requests and change the window tree; one flush per
    * iteration sends them without waiting on a reply (PHILOSOPHY 2.3). */

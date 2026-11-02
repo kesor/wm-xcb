@@ -464,6 +464,189 @@ test_client_wm_state_without_connection(void)
 }
 
 /*
+ * Test the WM_NORMAL_HINTS parser
+ *
+ * The property is a flag word and then only the fields the flags name, in
+ * ICCCM order. Reading one field too early sizes a window from the wrong
+ * value, so the parser is checked against a property that carries every field
+ * the layout uses, and against one that carries a middle subset.
+ */
+void
+test_client_size_hints_parse(void)
+{
+  LOG_CLEAN("== Testing the WM_NORMAL_HINTS parser");
+
+  ClientSizeHints hints;
+
+  uint32_t full[] = {
+    CLIENT_SIZE_HINT_P_MIN_SIZE | CLIENT_SIZE_HINT_P_MAX_SIZE |
+        CLIENT_SIZE_HINT_P_RESIZE_INC | CLIENT_SIZE_HINT_P_ASPECT |
+        CLIENT_SIZE_HINT_P_BASE_SIZE | CLIENT_SIZE_HINT_P_WIN_GRAVITY,
+    100,
+    50,  /* min */
+    800,
+    600, /* max */
+    8,
+    6,   /* resize increment */
+    1,
+    2,
+    4,
+    3,  /* aspect pairs */
+    20,
+    10, /* base */
+    1,  /* gravity */
+  };
+  assert(client_size_hints_from_property(full, sizeof(full) / sizeof(full[0]), &hints) == true);
+  assert(hints.min_width == 100);
+  assert(hints.min_height == 50);
+  assert(hints.max_width == 800);
+  assert(hints.max_height == 600);
+  assert(hints.inc_width == 8);
+  assert(hints.inc_height == 6);
+  assert(hints.base_width == 20);
+  assert(hints.base_height == 10);
+
+  /* Position and size are absent here, so min comes straight after the flags. */
+  uint32_t position_only[] = {
+    CLIENT_SIZE_HINT_US_POSITION | CLIENT_SIZE_HINT_US_SIZE | CLIENT_SIZE_HINT_P_MIN_SIZE,
+    7,
+    9,   /* x, y */
+    640,
+    480, /* width, height */
+    320,
+    200, /* min */
+  };
+  assert(client_size_hints_from_property(position_only, 7, &hints) == true);
+  assert(hints.min_width == 320);
+  assert(hints.min_height == 200);
+  assert(hints.max_width == 0);
+  assert(hints.inc_width == 0);
+
+  /* A property that stops before the fields its flags claim is malformed:
+   * nothing is taken from it. */
+  ClientSizeHints untouched;
+  memset(&untouched, 7, sizeof(untouched));
+  ClientSizeHints before      = untouched;
+  uint32_t        truncated[] = { CLIENT_SIZE_HINT_P_MIN_SIZE, 100 };
+  assert(client_size_hints_from_property(truncated, 2, &untouched) == false);
+  assert(memcmp(&untouched, &before, sizeof(untouched)) == 0);
+
+  /* No property at all: the client is unconstrained. */
+  assert(client_size_hints_from_property(NULL, 0, &hints) == false);
+}
+
+/*
+ * Test applying size hints to a size
+ *
+ * The layout has to be able to hand a client its area and get back a size the
+ * client can draw in. Minimum wins over the area, maximum caps it, and the
+ * increment counts from the base size.
+ */
+void
+test_client_apply_size_hints(void)
+{
+  LOG_CLEAN("== Testing size hints narrow a layout size");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+
+  Client* c = client_create(500);
+  assert_or_abort(c != NULL);
+
+  uint16_t w = 400;
+  uint16_t h = 300;
+  client_apply_size_hints(c, &w, &h);
+  assert(w == 400);
+  assert(h == 300);
+
+  ClientSizeHints hints;
+  memset(&hints, 0, sizeof(hints));
+  hints.min_width  = 500;
+  hints.min_height = 260;
+  client_set_size_hints(c, &hints);
+
+  w = 400;
+  h = 300;
+  client_apply_size_hints(c, &w, &h);
+  assert(w == 500);
+  assert(h == 300);
+
+  memset(&hints, 0, sizeof(hints));
+  hints.max_width  = 200;
+  hints.max_height = 100;
+  client_set_size_hints(c, &hints);
+
+  w = 400;
+  h = 300;
+  client_apply_size_hints(c, &w, &h);
+  assert(w == 200);
+  assert(h == 100);
+
+  /* 400 is 20 above a base of 30, and 20 is not a multiple of 16: the step
+   * rounds down, so the window stays inside the area it was given. */
+  memset(&hints, 0, sizeof(hints));
+  hints.base_width  = 30;
+  hints.base_height = 10;
+  hints.inc_width   = 16;
+  hints.inc_height  = 7;
+  client_set_size_hints(c, &hints);
+
+  w = 400;
+  h = 300;
+  client_apply_size_hints(c, &w, &h);
+  assert(w == 30 + 16 * 23);
+  assert(h == 10 + 7 * 41);
+
+  /* A size never collapses to nothing, whatever the hints say. */
+  memset(&hints, 0, sizeof(hints));
+  client_set_size_hints(c, &hints);
+  w = 0;
+  h = 0;
+  client_apply_size_hints(c, &w, &h);
+  assert(w == 1);
+  assert(h == 1);
+
+  client_destroy(c);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+/*
+ * Test the size hint read is skipped without an X connection
+ *
+ * The read is a request whose reply arrives later. With no connection there is
+ * nothing to send and nothing to read, and the client keeps the constraints it
+ * has, which are none.
+ */
+void
+test_client_size_hints_without_connection(void)
+{
+  LOG_CLEAN("== Testing the size hint read is skipped without an X connection");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+
+  Client* c = client_create(501);
+  assert_or_abort(c != NULL);
+
+  client_request_size_hints(c);
+  assert(c->size_hints_pending == false);
+  assert(client_poll_size_hints(c) == false);
+
+  uint16_t w = 400;
+  uint16_t h = 300;
+  client_apply_size_hints(c, &w, &h);
+  assert(w == 400);
+  assert(h == 300);
+
+  client_destroy(c);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+/*
  * Test client with monitor association
  *
  * A new client belongs to the selected monitor and carries that monitor's
@@ -585,6 +768,9 @@ TEST_GROUP(ClientTarget, {
   test_client_count_managed();
   test_client_duplicate_creation();
   test_client_wm_state_without_connection();
+  test_client_size_hints_parse();
+  test_client_apply_size_hints();
+  test_client_size_hints_without_connection();
   test_client_without_monitor();
   test_client_monitor_association();
   test_client_monitor_selection_and_fallback();

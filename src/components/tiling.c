@@ -469,10 +469,19 @@ tiling_place_client(Client* c, int16_t x, int16_t y, uint16_t w, uint16_t h)
 
   uint32_t inset = (uint32_t) c->border_width * 2;
 
+  uint16_t inner_width  = (uint16_t) (w > inset ? w - inset : 1);
+  uint16_t inner_height = (uint16_t) (h > inset ? h - inset : 1);
+
+  /* The client's own constraints come last: a window with a minimum size larger
+   * than the area it was given keeps that size and runs over its neighbour. The
+   * alternatives are drawing it smaller than it can draw or leaving a hole, and
+   * ICCCM gives the client the last word on its size. */
+  client_apply_size_hints(c, &inner_width, &inner_height);
+
   c->x      = x;
   c->y      = y;
-  c->width  = (uint16_t) (w > inset ? w - inset : 1);
-  c->height = (uint16_t) (h > inset ? h - inset : 1);
+  c->width  = inner_width;
+  c->height = inner_height;
 
   client_configure_from_struct(c);
 }

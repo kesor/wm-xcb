@@ -73,12 +73,19 @@ check_wm_alive() {
   fi
 }
 
-# spawn_client [count] [width] [height] [title-prefix]
+# spawn_client [count] [width] [height] [title-prefix] [extra xclient args...]
 # Starts tools/xclient and prints its window ids, one per line, on stdout.
+# The extra arguments are passed to xclient as they are, for the tests that need
+# it to publish something other than the defaults.
 spawn_client() {
   local count=${1:-1} width=${2:-400} height=${3:-300} title=${4:-seam}
+  local -a extra=()
+  if [ "$#" -gt 4 ]; then
+    shift 4
+    extra=("$@")
+  fi
   local out="$TMPDIR_SEAM/client-$count-$$-$RANDOM.txt"
-  "$XCLIENT" -n "$count" -W "$width" -H "$height" -t "$title" -c "$CLASS" -v \
+  "$XCLIENT" -n "$count" -W "$width" -H "$height" -t "$title" -c "$CLASS" -v "${extra[@]}" \
     >"$out" 2>&1 &
   # This function runs inside a command substitution (mapfile, $(...)), so a
   # shell variable would be set in a subshell and lost. The pid goes to a file

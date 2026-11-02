@@ -8,6 +8,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <xcb/xcbext.h>
 
 #include "../sm/sm-registry.h"
 #include "../sm/sm.h"
@@ -29,8 +30,10 @@
  */
 static Client client_sentinel;
 
-/* Set by client_atoms_init(), read by client_set_wm_state(). */
-static xcb_atom_t wm_state_atom = XCB_ATOM_NONE;
+/* Set by client_atoms_init(), read by client_set_wm_state() and by the size
+ * hint reader. */
+static xcb_atom_t wm_state_atom        = XCB_ATOM_NONE;
+static xcb_atom_t wm_normal_hints_atom = XCB_ATOM_NONE;
 
 static void
 client_properties_init(Client* c)
@@ -49,6 +52,11 @@ client_properties_init(Client* c)
   c->focusable    = true;
   c->mapped       = false;
   c->stack_mode   = XCB_STACK_MODE_ABOVE;
+
+  /* No hints until the window says otherwise: a client that sets none is
+   * unconstrained, not zero-sized. */
+  memset(&c->size_hints, 0, sizeof(c->size_hints));
+  c->size_hints_pending = false;
 
   /* Initialize SM storage */
   c->sms.machines = NULL;
@@ -626,6 +634,181 @@ client_set_border_width(Client* c, uint16_t border_width)
 }
 
 /*
+ * Size hints
+ */
+
+void
+client_set_size_hints(Client* c, const ClientSizeHints* hints)
+{
+  if (c == NULL || hints == NULL)
+    return;
+  c->size_hints = *hints;
+}
+
+/* A CARD32 hint into the 16-bit window size X takes. */
+static uint16_t
+client_hint_to_size(uint32_t value)
+{
+  return (uint16_t) (value > UINT16_MAX ? UINT16_MAX : value);
+}
+
+/*
+ * Read one width/height pair out of the property, or report that the property
+ * ends first.
+ */
+static bool
+client_hint_take_pair(
+    const uint32_t* values, uint32_t count, uint32_t* field, uint16_t* w, uint16_t* h)
+{
+  if (*field + 2 > count)
+    return false;
+
+  *w = client_hint_to_size(values[(*field)++]);
+  *h = client_hint_to_size(values[(*field)++]);
+  return true;
+}
+
+bool
+client_size_hints_from_property(const uint32_t* values, uint32_t count, ClientSizeHints* out)
+{
+  if (values == NULL || out == NULL || count == 0)
+    return false;
+
+  uint32_t        flags = values[0];
+  uint32_t        field = 1;
+  ClientSizeHints parsed;
+  memset(&parsed, 0, sizeof(parsed));
+
+  /* The flags say which fields follow, in this order. A field the client did
+   * not set is absent, not zero, so the reader has to skip by flag and not by
+   * position. */
+  if ((flags & (CLIENT_SIZE_HINT_US_POSITION | CLIENT_SIZE_HINT_P_POSITION)) != 0)
+    field += 2; /* x, y */
+  if ((flags & (CLIENT_SIZE_HINT_US_SIZE | CLIENT_SIZE_HINT_P_SIZE)) != 0)
+    field += 2; /* width, height */
+
+  /* A property shorter than its own flags claim is malformed, and reading past
+   * it would size the window from whatever value comes next. */
+  if ((flags & CLIENT_SIZE_HINT_P_MIN_SIZE) != 0 &&
+      !client_hint_take_pair(values, count, &field, &parsed.min_width, &parsed.min_height))
+    return false;
+
+  if ((flags & CLIENT_SIZE_HINT_P_MAX_SIZE) != 0 &&
+      !client_hint_take_pair(values, count, &field, &parsed.max_width, &parsed.max_height))
+    return false;
+
+  if ((flags & CLIENT_SIZE_HINT_P_RESIZE_INC) != 0 &&
+      !client_hint_take_pair(values, count, &field, &parsed.inc_width, &parsed.inc_height))
+    return false;
+
+  if ((flags & CLIENT_SIZE_HINT_P_ASPECT) != 0)
+    field += 4; /* min_aspect and max_aspect, a numerator and a denominator each */
+
+  if ((flags & CLIENT_SIZE_HINT_P_BASE_SIZE) != 0 &&
+      !client_hint_take_pair(values, count, &field, &parsed.base_width, &parsed.base_height))
+    return false;
+
+  *out = parsed;
+  return true;
+}
+
+void
+client_request_size_hints(Client* c)
+{
+  if (c == NULL || dpy == NULL || wm_normal_hints_atom == XCB_ATOM_NONE)
+    return;
+
+  /* Unchecked: an error must not travel to the event loop as a synthetic
+   * event, and a window that vanished can only fail here. The longest
+   * WM_SIZE_HINTS is 18 CARD32s; asking for that is asking for all of it. */
+  c->size_hints_cookie = xcb_get_property_unchecked(
+      dpy, 0, c->window, wm_normal_hints_atom, XCB_GET_PROPERTY_TYPE_ANY, 0, 18);
+  c->size_hints_pending = true;
+}
+
+bool
+client_poll_size_hints(Client* c)
+{
+  if (c == NULL || !c->size_hints_pending)
+    return false;
+
+  if (dpy == NULL) {
+    c->size_hints_pending = false;
+    return false;
+  }
+
+  void*                raw_reply = NULL;
+  xcb_generic_error_t* error     = NULL;
+
+  /* Not the reply-forcing call: this one reports "not yet" instead of waiting,
+   * so the event loop stays free. */
+  if (!xcb_poll_for_reply(dpy, c->size_hints_cookie.sequence, &raw_reply, &error)) {
+    return false;
+  }
+
+  c->size_hints_pending = false;
+
+  xcb_get_property_reply_t* reply = (xcb_get_property_reply_t*) raw_reply;
+  ClientSizeHints           parsed;
+  bool                      constrained = false;
+
+  if (reply != NULL && error == NULL && reply->format == 32) {
+    uint32_t count = (uint32_t) (xcb_get_property_value_length(reply) / (int) sizeof(uint32_t));
+
+    if (client_size_hints_from_property(xcb_get_property_value(reply), count, &parsed)) {
+      client_set_size_hints(c, &parsed);
+      constrained = parsed.min_width != 0 || parsed.min_height != 0 ||
+                    parsed.max_width != 0 || parsed.max_height != 0 ||
+                    parsed.base_width != 0 || parsed.base_height != 0 ||
+                    parsed.inc_width != 0 || parsed.inc_height != 0;
+    }
+  } else if (error != NULL) {
+    LOG_DEBUG("WM_NORMAL_HINTS read failed for window %u", c->window);
+  }
+
+  free(error);
+  free(reply);
+
+  return constrained;
+}
+
+/* One dimension against the client's hints. */
+static uint16_t
+client_clamp_to_hints(uint32_t size, uint16_t min, uint16_t max, uint16_t base, uint16_t inc)
+{
+  /* The increment counts from the base size, so the part above the base is
+   * what has to be a multiple of it. Rounding down keeps the window inside
+   * the area the layout gave it; the minimum then wins over both. */
+  if (inc > 1 && size > base)
+    size = base + ((size - base) / inc) * inc;
+  if (max > 0 && size > max)
+    size = max;
+  if (min > 0 && size < min)
+    size = min;
+
+  return (uint16_t) (size == 0 ? 1 : size);
+}
+
+void
+client_apply_size_hints(const Client* c, uint16_t* width, uint16_t* height)
+{
+  if (c == NULL || width == NULL || height == NULL)
+    return;
+
+  *width = client_clamp_to_hints(*width,
+                                 c->size_hints.min_width,
+                                 c->size_hints.max_width,
+                                 c->size_hints.base_width,
+                                 c->size_hints.inc_width);
+
+  *height = client_clamp_to_hints(*height,
+                                  c->size_hints.min_height,
+                                  c->size_hints.max_height,
+                                  c->size_hints.base_height,
+                                  c->size_hints.inc_height);
+}
+
+/*
  * Set tags for the client.
  */
 void
@@ -816,26 +999,39 @@ client_show(xcb_window_t wnd)
 }
 
 /*
+ * Intern one atom. Startup only: a reply is a round trip, and the event loop
+ * does not exist yet.
+ */
+static xcb_atom_t
+client_intern_atom(const char* name)
+{
+  /* allow-blocking: startup, the event loop has not started yet */
+  xcb_intern_atom_reply_t* reply =
+      xcb_intern_atom_reply(dpy, xcb_intern_atom(dpy, 0, (uint16_t) strlen(name), name), NULL);
+  if (reply == NULL) {
+    LOG_ERROR("Failed to intern the %s atom", name);
+    return XCB_ATOM_NONE;
+  }
+
+  xcb_atom_t atom = reply->atom;
+  free(reply);
+  return atom;
+}
+
+/*
  * Intern the atoms the client code needs but xcb does not predefine.
  */
 void
 client_atoms_init(void)
 {
-  if (dpy == NULL || wm_state_atom != XCB_ATOM_NONE)
+  if (dpy == NULL)
     return;
 
-  static const char name[] = "WM_STATE";
+  if (wm_state_atom == XCB_ATOM_NONE)
+    wm_state_atom = client_intern_atom("WM_STATE");
 
-  /* allow-blocking: startup, the event loop has not started yet */
-  xcb_intern_atom_reply_t* reply =
-      xcb_intern_atom_reply(dpy, xcb_intern_atom(dpy, 0, sizeof(name) - 1, name), NULL);
-  if (reply == NULL) {
-    LOG_ERROR("Failed to intern the WM_STATE atom");
-    return;
-  }
-
-  wm_state_atom = reply->atom;
-  free(reply);
+  if (wm_normal_hints_atom == XCB_ATOM_NONE)
+    wm_normal_hints_atom = client_intern_atom("WM_NORMAL_HINTS");
 }
 
 /*

@@ -350,6 +350,12 @@ client_list_on_map_request(void* event)
     client_set_managed(c, true);
     client_list_map_client(c);
     client_set_mapped(c, true);
+
+    /* Ask for the size hints before the tile request. The reply is read one
+     * loop iteration later, and the layout it triggers then is the one that
+     * respects what the window asked for. */
+    client_request_size_hints(c);
+
     client_list_emit_event(EVT_CLIENT_MANAGED, c);
     client_list_request_tile(client_get_monitor(c));
   }
@@ -413,4 +419,24 @@ client_list_is_managed(xcb_window_t window)
 {
   Client* c = client_get_by_window(window);
   return c != NULL && client_is_managed(c);
+}
+
+/*
+ * Take the size hints replies that have arrived.
+ */
+void
+client_list_poll_size_hints(void)
+{
+  Client* c = client_list_sentinel()->next;
+
+  while (c != client_list_sentinel()) {
+    /* Snapshot the link: re-tiling does not remove clients today, but a
+     * request that does would leave this loop on a freed client. */
+    Client* next = c->next;
+
+    if (client_poll_size_hints(c) && client_is_managed(c))
+      client_list_request_tile(client_get_monitor(c));
+
+    c = next;
+  }
 }
