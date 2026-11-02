@@ -117,10 +117,11 @@ last by `make` is copied to `./wm`, which is what a manual `./wm` and the flake
 read. `scripts/xephyr-test.sh` and `tests/x/run.sh` do not: they run
 `build/<variant>/wm` and leave `./wm` alone. `make clean` removes every variant.
 
-The test binary has no copy at the tree root. `make test` runs
-`build/<variant>/test`, so a `./test` left behind by an earlier build cannot
-report a count from a tree that has moved on. Run the suite through `make test`,
-or name the variant binary directly when you want to put it under `valgrind`.
+The test binary has no copy at the tree root. `make` and `make test` remove a
+`./test` left by an earlier build, because that copy is no longer refreshed and
+running it would print a count from the tree that produced it. Run the suite
+through `make test`, or name the variant binary directly when you want to put
+it under `valgrind`.
 
 The copies `./wm` gets are replaced by writing a temporary file and renaming it
 over `./wm`, so a `make` while a WM started from `./wm` is still running exits 0

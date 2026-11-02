@@ -142,8 +142,13 @@ $(BUILD_DIR)/$(NAME): $(OBJ)
 # ran a WM that did not contain the change. A rename swaps the directory entry:
 # a WM that is already running keeps the inode it started with, and the next one
 # starts the new binary.
+#
+# The same recipe removes a root ./test. That copy is no longer refreshed, and
+# one left by an older build would still run and print a count from the tree
+# that produced it.
 $(NAME): $(BUILD_DIR)/$(NAME) FORCE
 	@cmp -s $< $@ || { cp $< $@.tmp && mv -f $@.tmp $@; }
+	@rm -f test
 
 FORCE:
 
@@ -187,12 +192,13 @@ $(BUILD_DIR)/test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 # target, so a plain `make` left the previous one in place and running ./test
 # printed a count from an older tree that looked like a real count. The suite
 # runs the variant's own binary instead, and `make test` is the only way to run
-# it.
+# it. Removing ./test here covers a `make test` that did not also build wm.
 test: $(BUILD_DIR)/test FORCE
+	@rm -f test
 	$(BUILD_DIR)/test
 
 clean:
-	rm -rf build $(NAME) test compile_commands.json compile_flags.txt tools/xclient
+	rm -rf build $(NAME) $(NAME).tmp test compile_commands.json compile_flags.txt tools/xclient
 
 # Point git at the committed hooks once per clone. The hook files live in
 # .githooks/ and call lefthook, which runs the gates in lefthook.yml.

@@ -1,9 +1,10 @@
 name: quality
 
-# Every gate in docs/QUALITY.md runs here. The gate list itself lives in
-# lefthook.yml, and this workflow calls the same commands, so a gate added for
-# a commit hook is not silently missing from CI. The two nested-server jobs are
-# the exception: they need a display, so they are steps here and not hooks.
+# Every gate in docs/QUALITY.md runs here. The gate list lives in lefthook.yml,
+# and the gates job runs that list, so a hook gate is not missing from CI. The
+# seam suite is in that list and also has its own job, which uploads the logs.
+# sanitize-x is the nested-server job that is not a hook: it rebuilds under the
+# sanitizers, which pre-push does not.
 #
 # The seam job is required because tests/x/run.sh now separates known failures
 # (tests/quality/seam-baseline.txt) from new ones: a red seam job means this
