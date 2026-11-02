@@ -44,10 +44,17 @@ sigchld(int unused)
 void
 sigint(int unused)
 {
+  static const char newline = '\n';
+
   running = 0;
 
-  printf("\n");
-  LOG_DEBUG("received interrupt signal.");
+  /* Only async-signal-safe calls here. printf and LOG_DEBUG take the stdio
+     lock, which the code this signal interrupted may already hold: the handler
+     would deadlock inside fprintf and the WM would never stop. write(2) is
+     safe, and the newline is what keeps a terminal prompt off the last log
+     line after ^C. */
+  ssize_t written = write(STDOUT_FILENO, &newline, 1);
+  (void) written;
 
   signal_wakeup();
 }
