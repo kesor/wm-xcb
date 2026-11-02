@@ -204,9 +204,10 @@ beads in your final message. This is how the traps below stop being traps.
   a `!` rule re-includes them.
 - **`git checkout -- <file>` restores from the index, not HEAD.** After staging,
   use `git checkout HEAD -- <file>`.
-- **Event ids are a shared number space** with no per-component namespace:
-  `EVT_TAG_CHANGED` collides with `EVT_FULLSCREEN_ENTERED` today, and the hub
-  drops anything above 63 silently.
+- **Event ids share one table.** A component takes the next free range in
+  `src/event-types.h` and starts its enum from that base. A fresh integer can
+  land on another component's event. `hub_emit()` logs and drops a value at or
+  above `HUB_MAX_EVENT_TYPES`.
 - **Adoption happens when a target is created**, so init order decides which
   components a monitor or client adopts (`wm.c`).
 - **No AI attribution anywhere**: no `Co-Authored-By`, no "generated with", no

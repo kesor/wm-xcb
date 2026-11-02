@@ -165,7 +165,7 @@ Short enough to check in review.
 | One flush per loop iteration | 2.3 | review |
 | Every request has a failure event | 2.2 | review: a request with only a success path is incomplete |
 | New behaviour is a registration, not an edit (see §2.4 test) | 2.4 | review |
-| Event ids come from the shared registry, never a fresh local enum | avoids the collisions already in the tree | `bd show wm-4f6.8` |
+| Event ids come from the shared registry, never a fresh local enum | two components that share a value receive each other's events | `src/event-types.h`, `tests/unit/test-event-types.c` |
 | `make test` green, `scripts/xephyr-test.sh` no worse than before | promise 4 | CI (planned) |
 | No AI attribution in commits, comments, or files | project rule | review |
 
