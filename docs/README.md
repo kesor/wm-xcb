@@ -1,6 +1,6 @@
 # wm/ Project Documentation
 
-*Last updated: 2026-11-01*
+*Last updated: 2026-11-02*
 
 ---
 
@@ -92,9 +92,12 @@ Short version, and the parts that stay true until they are fixed:
   suite passes.
 - **Works against X:** connecting, taking substructure redirect, RandR monitor
   discovery, tracking windows as `Client` targets, mapping a window on
-  `MapRequest` with a border and `WM_STATE=Normal`, attaching every new client
-  to the selected monitor with that monitor's visible tags, tiling that
-  monitor's visible clients when a window is managed or unmanaged, and tracking
+  `MapRequest` with a border and `WM_STATE=Normal`, adopting the windows that
+  were already on the display when the WM started, through that same map path,
+  so they are tiled and tracked too (an override-redirect window, or one its
+  client left unmapped, is skipped), attaching every new client to the selected
+  monitor with that monitor's visible tags, tiling that monitor's visible
+  clients when a window is managed or unmanaged, and tracking
   which client the pointer is over: a managed window selects pointer enter and
   leave, and the focus component raw-writes `FocusSM` from those events and
   points the X input focus at the focused window with `xcb_set_input_focus`;

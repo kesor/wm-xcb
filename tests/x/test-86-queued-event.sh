@@ -6,12 +6,13 @@
 # can move an event from the socket into that queue, and then poll(2) waits with
 # the event already queued. The loop has to look at the queue before it blocks.
 #
-# The startup path is the deterministic case. setup_ewmh() runs after the window
-# rescan and is the last startup step that waits for the server. This test holds
-# its first atom query with a preloaded shim, maps a window while the WM is
-# held, and then releases it. The reply wait that follows reads the MapRequest
-# into libxcb's queue with nothing left on the socket. A loop that only polls the
-# socket never dispatches it and the window never becomes viewable.
+# The startup path is the deterministic case. setup_ewmh() waits for the server
+# after substructure redirect is selected and before the adoption scan. This
+# test holds its first atom query with a preloaded shim, maps a window while the
+# WM is held, and then releases it. The map is redirected, so the window is not
+# viewable and the adoption scan skips it. The reply wait reads that MapRequest
+# into libxcb's queue, and a loop that only polls the socket never dispatches
+# it.
 #
 # This starts its own Xvfb and WM: the suite's WM is already past startup, and
 # the condition cannot be produced once the loop is running. The client is run
@@ -131,7 +132,7 @@ if [ "$held" -ne 1 ]; then
   finish
   exit 1
 fi
-pass "the WM is held after its startup rescan"
+pass "the WM is held in the startup atom query"
 
 DISPLAY="$QUEUE_DISPLAY" "$XCLIENT" -n 1 -y -v -W 300 -H 200 \
   -t queued -c "$CLASS" >"$CLIENT_OUT" 2>&1 &

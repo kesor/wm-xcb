@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <poll.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xcb/errors.h>
@@ -17,8 +18,6 @@
 
 xcb_connection_t* dpy;
 xcb_window_t      root;
-
-void wm_manage_all_clients();
 
 void
 error_details(xcb_generic_error_t* error)
@@ -134,8 +133,6 @@ setup_xcb()
 
   /* Note: root window is not a client */
 
-  wm_manage_all_clients();
-
   if (xcb_flush(dpy) <= 0)
     LOG_FATAL("failed to flush.");
 
@@ -161,65 +158,106 @@ destruct_xcb()
   xcb_disconnect(dpy);
 }
 
-void
-wm_manage_all_clients()
+/*
+ * Hand a window that already exists to the components as if the server had
+ * sent a MapRequest for it. A window that was created and mapped before the WM
+ * started never produces one, and the MapRequest handler is the only code that
+ * takes a window into the client model: it creates the Client target, maps the
+ * window with a border and WM_STATE, and asks for the monitor to be tiled.
+ * Repeating that work here would give the WM two manage paths that can drift,
+ * and calling the client-list component directly would make this file know
+ * which component manages a window.
+ */
+static void
+adopt_window(xcb_window_t window)
 {
-  static uint32_t values[3];
+  xcb_map_request_event_t event = {
+    .response_type = XCB_MAP_REQUEST,
+    .sequence      = 0,
+    .parent        = root,
+    .window        = window,
+  };
+  xcb_handler_dispatch(&event);
+}
 
-  // events we want to "hijack" from child windows
-  values[0] = 0 | XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
-
-  // 1. query all the window descendants of the root window
+/*
+ * Take over the windows that were on the display before the WM started.
+ *
+ * Runs after the components are initialized, not with the rest of the XCB
+ * setup: creating a Client registers a target, which is when the components
+ * attach their state machines to it, and the client is attached to a monitor,
+ * which monitor discovery has to have created. Adopting earlier leaves the
+ * clients without state machines and maps windows that nothing tiles.
+ */
+void
+wm_xcb_adopt_existing_windows(void)
+{
   xcb_query_tree_cookie_t tree_cookie = xcb_query_tree_unchecked(dpy, root);
   /* allow-blocking: startup, before the loop runs */
-  xcb_query_tree_reply_t* reply = xcb_query_tree_reply(dpy, tree_cookie, NULL);
-
-  if (!reply)
-    return;
-
-  // ALL the windows, includeing children of children.
-  xcb_window_t* children        = xcb_query_tree_children(reply);
-  uint16_t      children_length = xcb_query_tree_children_length(reply);
-  free(reply);
-
-  // 2. create a data structure to store the cookies for each xcb_query_tree call of child windows
-  xcb_query_tree_cookie_t* cookies = malloc(children_length * sizeof(xcb_query_tree_cookie_t));
-  if (!cookies) {
-    LOG_FATAL("could not allocate memory to store children cookies.");
+  xcb_query_tree_reply_t* tree = xcb_query_tree_reply(dpy, tree_cookie, NULL);
+  if (tree == NULL) {
+    LOG_WARN("could not read the window tree at startup: no window is adopted");
     return;
   }
 
-  // 3. query each child window for its own descendants & store the cookie
-  for (uint16_t i = 0; i < children_length; i++) {
-    xcb_window_t child = children[i];
-    cookies[i]         = xcb_query_tree_unchecked(dpy, child);
+  /* The children array is part of the reply, so the reply stays alive for as
+     long as the array is read. */
+  uint16_t      children_length = xcb_query_tree_children_length(tree);
+  xcb_window_t* children        = xcb_query_tree_children(tree);
+  if (children_length == 0) {
+    free(tree);
+    return;
   }
 
-  // 4. check the reply for each such cookie to find the parent of this window
+  xcb_get_window_attributes_cookie_t* cookies =
+      calloc(children_length, sizeof(xcb_get_window_attributes_cookie_t));
+  if (cookies == NULL) {
+    LOG_ERROR("could not allocate memory for the startup window attributes.");
+    free(tree);
+    return;
+  }
+
+  for (uint16_t i = 0; i < children_length; i++)
+    cookies[i] = xcb_get_window_attributes_unchecked(dpy, children[i]);
+
   for (uint16_t i = 0; i < children_length; i++) {
     xcb_window_t child = children[i];
 
-    // 5. get the reply for this child window
     /* allow-blocking: startup rescan, before the loop runs */
-    xcb_query_tree_reply_t* reply = xcb_query_tree_reply(dpy, cookies[i], NULL);
-    if (!reply)
+    xcb_get_window_attributes_reply_t* attr =
+        xcb_get_window_attributes_reply(dpy, cookies[i], NULL);
+    if (attr == NULL)
       continue;
 
-    // 6. check if the child window is a direct descendant of the root window
-    if (reply->parent == root) {
-      xcb_reparent_window(dpy, child, root, 0, 0);
-      xcb_change_window_attributes(dpy, child, XCB_CW_EVENT_MASK, values);
-      xcb_map_window(dpy, child);
+    bool override_redirect = attr->override_redirect;
+    bool viewable          = attr->map_state == XCB_MAP_STATE_VIEWABLE;
+    free(attr);
+
+    /* An override-redirect window is a menu, a tooltip or similar: the client
+       places it and the WM must keep its hands off it. A window that is not
+       viewable was deliberately left off screen by its client, and mapping it
+       would show a window nobody asked to see. */
+    if (override_redirect || !viewable)
+      continue;
+
+    if (client_get_by_window(child) != NULL) {
+      LOG_DEBUG("window %u is already a client, not adopting it again", child);
+      continue;
     }
 
-    // 7. free the reply for this child window
-    free(reply);
+    LOG_DEBUG("adopting window %u that existed before the WM started", child);
+    adopt_window(child);
   }
 
-  // 8. free the data structure that stores the cookies
   free(cookies);
+  free(tree);
 
-  xcb_flush(dpy);
+  /* Adoption queues the border, property, mapping and tiling requests. The
+     event loop only flushes after poll(2) reports an event, and poll(2) does
+     not report a pending output buffer, so without this the windows would keep
+     their old geometry until the first X event arrived. */
+  if (xcb_flush(dpy) <= 0)
+    LOG_ERROR("failed to flush the requests that adopt the existing windows");
 }
 
 void

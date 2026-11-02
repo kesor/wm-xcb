@@ -35,6 +35,11 @@ main(int argc, char** argv)
     return 1;
   }
 
+  /* Windows that were on the display before the WM started never send a
+   * MapRequest, so they are adopted here, once the components that give a
+   * client its state machines, monitor, and place in the layout are up. */
+  wm_xcb_adopt_existing_windows();
+
   /* Main event loop: block until X or a signal has something, then dispatch
    * everything that arrived. */
   while (running) {

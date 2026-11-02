@@ -188,15 +188,23 @@ Write a test so that it cannot pass for the wrong reason: a precondition such as
 stops the test, not `check_eq`, which would let a later "the window is gone now"
 pass because it was never there.
 
-`test-86-queued-event.sh` is the exception to "one Xephyr for the whole run":
-it starts its own `Xvfb` and WM. The condition it checks cannot be produced after
-startup. libxcb reads ahead of `poll(2)`, so an event can sit in its queue while
-the socket is no longer readable; the test holds the first EWMH atom query with
+Two files are the exception to "one Xephyr for the whole run" and start their
+own display, because the condition they check cannot be produced once the WM is
+already up: `test-86-queued-event.sh` and `test-88-adopt-existing-windows.sh`.
+
+`test-86-queued-event.sh` checks what a queued event does. libxcb reads ahead of
+`poll(2)`, so an event can sit in its queue while the socket is no longer
+readable; the test holds the first EWMH atom query with
 `tools/xcb-ewmh-delay.so` (an `LD_PRELOAD` shim), maps a window while the WM is
 held, then releases it. The reply wait reads that `MapRequest` into libxcb's
 queue, and a loop that only polls the socket never dispatches it. The shim is
 built by `make test-x`; it reads `WM_QUEUE_TEST_MARKER` and `WM_QUEUE_TEST_GO`
 and does nothing when either is unset.
+
+`test-88-adopt-existing-windows.sh` checks the startup scan: it maps two windows
+and an override-redirect window on a bare display, starts the WM afterwards, and
+asserts that the two are tiled and carry `WM_STATE=Normal` while the
+override-redirect window keeps its geometry and gets no `WM_STATE`.
 
 ---
 
@@ -291,6 +299,7 @@ make tools/xclient
 | `-l SEC` | exit after SEC seconds instead of waiting to be killed |
 | `-v` | print each window ID |
 | `-y` | wait for the server to process each map before printing its ID |
+| `-o` | create override-redirect windows, which a WM must leave alone |
 
 `xdotool` finds them: `DISPLAY=:2 xdotool search --onlyvisible --class xclient`.
 
