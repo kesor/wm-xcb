@@ -153,9 +153,16 @@ a copy here rots while the real one changes.
 
 Two things it cannot decide for you:
 
-- **Overlapping files.** `wm-4f6.1`, `wm-4f6.2`, `wm-4f6.3` and `wm-4f6.6` all
-  touch `client-list.c`, `wm.c`, and component init. Run those in order, or give
-  one worker several ids in one call.
+- **One bead per worker, run in parallel.** Small batches review better: a
+  single bead is a ten-minute review, five beads was an eighteen-minute review
+  at 70% of the reviewer's context. `worker.sh auto <bead>` as many times as
+  there are disjoint beads, staggered a minute or two apart.
+- **Overlapping files decide what "disjoint" means.** `worker.sh overlap <id>
+  <id> ...` reads each bead's description and comments for file paths and says
+  which are shared. Nothing shared: run them in parallel. Shared: run them in
+  order, or give one worker several ids in one call — the second merge stops on
+  a rebase conflict that a person resolves by hand, which puts an unreviewed
+  edit on a branch the reviewer already approved.
 - **Review.** Workers commit to `work/<bead-id>` and never push, merge, or close
   a bead. Merging is a human decision.
 

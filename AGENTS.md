@@ -524,9 +524,9 @@ Worktrees contain agent progress. Before removing or cleaning:
 ### Overlapping Beads
 
 Two beads that touch the same files conflict, whichever branch lands second.
-Before starting, look at what the other open beads touch; when they overlap on
-`wm.c`, `wm-hub.c`, or a component's init, run them in order instead of in
-parallel.
+Run one bead per worker, in parallel, and let `worker.sh overlap <id> <id>`
+decide what parallel means: it reads each bead's description and comments for
+file paths. Nothing shared, run them together; shared, run them in order.
 
 ---
 
