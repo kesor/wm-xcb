@@ -29,10 +29,9 @@
 #
 # Exit status: 0 if every test passed, 1 otherwise.
 #
-# The suite asserts what a user sees on the X server. The assertions that still
-# fail are the ones for key grabs, focus and the EWMH root properties; failures
-# that remain on an unwired tree are listed as known ones in
-# tests/quality/seam-baseline.txt.
+# The suite asserts what the X server sees. Assertions that still fail on
+# purpose are listed in tests/quality/seam-baseline.txt; a failure missing
+# from that file is new.
 
 set -uo pipefail
 
