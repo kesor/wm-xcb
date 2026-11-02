@@ -12,6 +12,11 @@
 # happened". The variant is passed as a command-line assignment, which beats any
 # default in the file, and the line that names it is printed here so a harness
 # cannot build one variant and report another.
+#
+# The target is build/<variant>/wm, not `wm`. The `wm` target copies the binary
+# onto ./wm, and the harness runs the path it prints, so that copy would replace
+# the binary a later manual ./wm starts with a variant the user did not ask make
+# for.
 
 # wm_build_variant <log-path>
 #   Builds build/<variant>/wm for the DEBUG and SANITIZE in the environment,
@@ -23,29 +28,37 @@
 #   would throw the paths away.
 wm_build_variant() {
   local log=$1 debug="${DEBUG:-0}" sanitize="${SANITIZE:-0}" variant
-  local script
+  local script build_log
   script=$(basename "$0")
 
   variant=$(make -s -C "$ROOT_DIR" print-variant DEBUG="$debug" SANITIZE="$sanitize") || {
     echo "$script: cannot read the build variant from make" >&2
     return 1
   }
-  if ! make -s -C "$ROOT_DIR" wm DEBUG="$debug" SANITIZE="$sanitize" >/dev/null; then
-    echo "$script: the WM does not build with DEBUG=$debug SANITIZE=$sanitize; see make" >&2
+  # A debug build prints -Wpedantic warnings. They have to stay off the
+  # terminal: the variant line is how a reader knows what ran, and it is the
+  # first line only if make's own output is not. A failed build still shows
+  # the compiler output. No EXIT trap here; the callers already have one.
+  build_log=$(mktemp) || return 1
+  if ! make -s -C "$ROOT_DIR" "build/$variant/wm" DEBUG="$debug" SANITIZE="$sanitize" >"$build_log" 2>&1; then
+    echo "$script: the WM does not build with DEBUG=$debug SANITIZE=$sanitize" >&2
+    cat "$build_log" >&2
+    rm -f "$build_log"
     return 1
   fi
+  rm -f "$build_log"
 
   WM_VARIANT_BIN="$ROOT_DIR/build/$variant/wm"
   if [ ! -x "$WM_VARIANT_BIN" ]; then
     echo "$script: make reported variant '$variant' but $WM_VARIANT_BIN is missing" >&2
     return 1
   fi
-  # stdbuf is what keeps DEBUG lines in the log when the WM is killed rather
-  # than exited, but it works by preloading a library, and ASan refuses to start
-  # unless its runtime comes first in that list ("ASan runtime does not come
-  # first in initial library list"). A sanitize build has no DEBUG lines to
-  # keep, so it runs without stdbuf rather than with a disabled link-order
-  # check.
+  # stdbuf keeps DEBUG lines in the log when the WM is killed rather than
+  # exited. It preloads a library, and ASan refuses to start unless its runtime
+  # comes first ("ASan runtime does not come first in initial library list").
+  # Every sanitize variant, including debug-sanitize, therefore runs without
+  # stdbuf. debug-sanitize still compiles LOG_DEBUG in; those lines are fully
+  # buffered when stdout is a file, and a kill can drop them.
   case "$variant" in
     *-sanitize) WM_VARIANT_STDBUF=0 ;;
     *) WM_VARIANT_STDBUF=1 ;;

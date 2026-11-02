@@ -90,10 +90,10 @@ need() {
     exit 1
   fi
 }
-# Build first, quietly, and say which build it is. These scripts start the
-# WM themselves, and nothing else rebuilds it, so a stale binary reports the
-# behaviour of the tree as it was and the result reads as a WM defect. When
-# everything is up to date this is one make invocation and a copy check.
+# Build first, and say which build it is, before Xephyr starts. These scripts
+# start the WM themselves, and nothing else rebuilds it, so a stale binary
+# reports the behaviour of the tree as it was and the result reads as a WM
+# defect.
 wm_build_variant "$WM_LOG" || exit 1
 
 need Xephyr

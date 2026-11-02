@@ -100,8 +100,9 @@ Each flag set compiles into its own directory under `build/`: `release`,
 `release-sanitize`, `debug`, `debug-sanitize`. So `make`, `make SANITIZE=1` and
 `make DEBUG=1` can be alternated in one checkout with no `make clean` in
 between, and no build reuses another variant's objects. Whatever was built
-last is copied to `./wm` and `./test`, which is where the scripts and the flake
-read them; `make clean` removes every variant.
+last by `make` is copied to `./wm` and `./test`. A manual `./wm` and the flake
+read that copy. `scripts/xephyr-test.sh` and `tests/x/run.sh` do not: they run
+`build/<variant>/wm` and leave `./wm` alone. `make clean` removes every variant.
 
 `scripts/check-build-variants.sh` is the gate for this (see `docs/QUALITY.md`).
 

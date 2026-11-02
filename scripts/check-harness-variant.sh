@@ -12,12 +12,14 @@
 # paid for that discovery by hand-rolling a Xephyr session instead.
 #
 # So this asks the shared builder, scripts/lib/wm-variant.sh, for each variant
-# and checks three things: the line it prints names the variant, the binary and
-# the log; the binary it names is the one that variant produces; and neither
-# harness builds the WM behind its back. A release binary cannot carry the
-# DEBUG log literals (LOG_DEBUG compiles to nothing) and an ASan binary carries
-# __asan_init, so both are visible in the binary itself without starting a
-# server.
+# and checks four things: the line it prints names the variant, the binary and
+# the log; the binary it names is the one that variant produces; neither
+# harness builds the WM behind its back; and ./wm is left alone. The `wm`
+# target copies onto ./wm, and the builder must not use it: a gate whose last
+# case is SANITIZE=1 would otherwise leave the ASan binary where a manual ./wm
+# starts. A release binary cannot carry the DEBUG log literals (LOG_DEBUG
+# compiles to nothing) and an ASan binary carries __asan_init, so both are
+# visible in the binary itself without starting a server.
 #
 # The end-to-end half - a DEBUG=1 harness run whose log actually holds DEBUG
 # lines - lives in tests/x/test-90-harness-variant.sh, because it needs a
@@ -71,11 +73,24 @@ for harness in "${HARNESSES[@]}"; do
     fail "$harness does not build through scripts/lib/wm-variant.sh, so its variant is whatever it chooses"
     continue
   fi
+  if ! grep -qF '"$WM_VARIANT_BIN"' "$harness"; then
+    fail "$harness does not start the binary the builder names"
+  fi
   pass "$harness builds through the shared builder"
   while IFS= read -r hit; do
     fail "$harness runs make itself: ${hit#"$harness:"}"
   done < <(grep -nE '^[^#]*\b(make|gmake)\b[^#]*\bwm\b' "$harness")
 done
+
+# The builder must not replace ./wm. The harnesses run build/<variant>/wm.
+# The `wm` target copies onto ./wm, so a DEBUG=1 harness run, and this gate,
+# would replace the binary a later manual start picks up.
+ROOT_WM="$ROOT_DIR/wm"
+if [ -e "$ROOT_WM" ]; then
+  WM_BEFORE=$(md5sum "$ROOT_WM")
+else
+  WM_BEFORE="absent"
+fi
 
 # variant | DEBUG | SANITIZE | marker inside the binary
 CASES=(
@@ -134,6 +149,17 @@ for spec in "${CASES[@]}"; do
   esac
   pass "$want_variant binary is what the line says it is"
 done
+
+if [ -e "$ROOT_WM" ]; then
+  WM_AFTER=$(md5sum "$ROOT_WM")
+else
+  WM_AFTER="absent"
+fi
+if [ "$WM_BEFORE" = "$WM_AFTER" ]; then
+  pass "./wm was not replaced"
+else
+  fail "the builder replaced ./wm ($WM_BEFORE -> $WM_AFTER); build build/<variant>/wm, not the wm copy target"
+fi
 
 if [ "$FOUND" -eq 0 ]; then
   echo "check-harness-variant: both harnesses build and report the variant they were asked for"

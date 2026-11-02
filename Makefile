@@ -128,10 +128,12 @@ $(BUILD_DIR)/%.o: %.c
 $(BUILD_DIR)/$(NAME): $(OBJ)
 	${CC} -o $@ $(OBJ) ${LDFLAGS}
 
-# The scripts and the flake read the binary from the tree root (tests/x/run.sh,
-# scripts/xephyr-test.sh), so it is copied out of the variant directory. The
-# copy runs on every build: switching variants has to replace the binary, and
-# mtimes cannot say which variant produced the one already there.
+# Manual ./wm and the flake read the tree-root copy, so this target copies the
+# variant binary out. The copy runs on every build: switching variants has to
+# replace the binary, and mtimes cannot say which variant produced the one
+# already there. scripts/xephyr-test.sh and tests/x/run.sh do not use this
+# target; they build and run build/<variant>/wm so a harness run does not
+# replace ./wm.
 $(NAME): $(BUILD_DIR)/$(NAME) FORCE
 	@cmp -s $< $@ || cp $< $@
 

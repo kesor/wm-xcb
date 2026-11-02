@@ -41,7 +41,7 @@ No CI job is advisory any more. The seam job could only become required once
 | sanitize | `scripts/check-sanitize.sh` | no *new* leak site under ASan; known ones come from `tests/quality/asan-baseline.txt` |
 | debug build | `make clean && make DEBUG=1 && make test` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c` |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
-| harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, and print the variant, the binary and the log before they start |
+| harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh` and `tests/x/run.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
 | seam | `make test-x` | X behaviour: mapped, tiled, focused, tags, EWMH. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run |
 | sanitize | `make test SANITIZE=1` | memory and UB errors; no leak allowed |
 

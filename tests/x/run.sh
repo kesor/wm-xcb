@@ -79,7 +79,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# shellcheck source=../scripts/lib/wm-variant.sh
+# shellcheck source=../../scripts/lib/wm-variant.sh
 . "$ROOT_DIR/scripts/lib/wm-variant.sh"
 
 for cmd in Xephyr xdotool xprop; do
@@ -121,10 +121,9 @@ export WM_LOG="$LOG_DIR/wm.log"
 export TMPDIR_SEAM="$LOG_DIR"
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
 
-# Build first, quietly, and say which build it is. These scripts start the WM
+# Build first, and say which build it is. These scripts start the WM
 # themselves, and nothing else rebuilds it, so a stale binary reports the
-# behaviour of the tree as it was and the result reads as a WM defect. When
-# everything is up to date this is one make invocation and a copy check. This
+# behaviour of the tree as it was and the result reads as a WM defect. This
 # runs after LOG_DIR exists because the line names the log the run writes, and
 # before Xephyr starts because that line is the first thing a reader wants.
 wm_build_variant "$WM_LOG" || exit 1

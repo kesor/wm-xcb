@@ -124,7 +124,7 @@ pre-push:
 
     harness-variant:
       run: ./scripts/check-harness-variant.sh
-      fail_text: "A harness built a variant other than the one it was asked for. Build through scripts/lib/wm-variant.sh so a DEBUG=1 run really is a debug WM and says so."
+      fail_text: "A harness built a variant other than the one it was asked for, or replaced ./wm while doing it. Build build/<variant>/wm through scripts/lib/wm-variant.sh so a DEBUG=1 run really is a debug WM, says so, and leaves ./wm alone."
 
 post-checkout:
   commands:
