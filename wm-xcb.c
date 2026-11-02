@@ -142,6 +142,10 @@ setup_xcb()
   LOG_DEBUG("root window id: %d", root);
 }
 
+/* An event libxcb had already queued when the wait started. poll(2) reports
+   the socket, not that queue, so it would block with the event still queued. */
+static xcb_generic_event_t* queued_event = NULL;
+
 void
 destruct_xcb()
 {
@@ -150,6 +154,9 @@ destruct_xcb()
 
   /* Tear down any remaining managed clients before disconnecting XCB */
   client_list_shutdown();
+
+  free(queued_event);
+  queued_event = NULL;
 
   xcb_disconnect(dpy);
 }
@@ -215,10 +222,6 @@ wm_manage_all_clients()
   xcb_flush(dpy);
 }
 
-/* An event libxcb had already queued when the wait started. poll(2) reports
-   the socket, not that queue, so it would block with the event still queued. */
-static xcb_generic_event_t* queued_event = NULL;
-
 void
 wm_xcb_wait_for_events()
 {
@@ -237,6 +240,11 @@ wm_xcb_wait_for_events()
      the last dispatch, can move an event into its queue while the socket stays
      unreadable. Take that event now; handle_xcb_events() dispatches it before
      the drain, and the next wait picks up anything a flush read. */
+  if (queued_event != NULL) {
+    /* A second wait without a handle would leak the event already held. */
+    free(queued_event);
+    queued_event = NULL;
+  }
   queued_event = xcb_poll_for_queued_event(dpy);
   if (queued_event != NULL)
     return;

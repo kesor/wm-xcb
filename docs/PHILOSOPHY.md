@@ -106,9 +106,9 @@ later as an event.
     reply is needed
   - one `xcb_flush()` per loop iteration, not one per call
   - the main loop blocks on `poll()` or `xcb_wait_for_event()`, never spins
-  - child processes (launcher, terminal) are `fork` + `exec`; a `SIGCHLD`
-    handler reaps with `waitpid(WNOHANG)`, which returns instead of waiting, and
-    uses only async-signal-safe calls
+  - child processes (launcher, terminal) are `fork` + `exec`. A `SIGCHLD`
+    handler, when one is installed, may only call async-signal-safe functions
+    and `waitpid(WNOHANG)` — not `LOG_*` and not `signal()` to reinstall itself
 - **For the user:** a stuck application, a slow dmenu, or a hotplug storm cannot
   stop the WM from handling keys. This is the difference between "my window
   manager froze" and "that app froze".
