@@ -158,7 +158,7 @@ Short enough to check in review.
 
 | Rule | Why | Where it is checked |
 |------|-----|---------------------|
-| No component calls another component | 2.1 | review; `scripts/review-agent.sh` |
+| No component calls another component | 2.1 | review, by a person or an agent: `.agents/skills/wm-review/SKILL.md` |
 | No state assignment outside `sm_raw_write` / `sm_transition` | 2.2 | review |
 | No `_reply()` in a handler or action | 2.3 | review + the async audit issue |
 | No blocking call in the loop: `poll`/`wait_for_event` only | 2.3 | `scripts/perf-test.sh` (idle CPU) |

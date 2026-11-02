@@ -136,7 +136,9 @@ may have left the finding that changes the design.
 
 `bd edit` opens an editor and blocks an agent. Never use it.
 
-One bead per branch, named `work/<bead-id>`. How a worker is spawned, and what
+One bead per branch is the usual case, named `work/<bead-id>`. Several beads
+share a branch when they touch the same files: the branch is named for the first
+id, and the prompt names them all. How a worker is spawned, and what
 it may run, is `.agents/skills/wm-bootstrap/SKILL.md`, "Spawning workers". That
 harness (`worker.sh`) is not part of this repository.
 
@@ -191,14 +193,13 @@ Two suites, both run from the repository root:
 
 ```bash
 make test                            # unit suite, prints "Total: N passed, M failed"
-make tools/xclient && make test-x    # seam suite: what the X server sees
+make test-x                          # seam suite: what the X server sees
 ```
 
 Unit tests are `tests/unit/test-*.c`. A file registers its test group from a
 constructor, so a file missing from `TEST_SRC` in the Makefile compiles nowhere
-and its assertions never run. Run `scripts/check-test-src.sh`. The pre-commit
-glob `test-*.c` does not match `tests/unit/test-*.c`, so the commit is not
-rejected. The pre-push hook runs the script with no glob. The seam tests are
+and its assertions never run. Run `scripts/check-test-src.sh`. The pre-commit and
+pre-push hooks both run it. The seam tests are
 `tests/x/test-*.sh`: they start a nested X server and assert against a live WM.
 
 Copy the shape from `tests/unit/test-client-list-component.c` for a component
@@ -466,14 +467,13 @@ void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULL
 ## When You're Done
 
 The commit hook runs the gates in `lefthook.yml` for you (beads export, paths,
-docs, bead refs, formatting, build, unit tests, async rule, commit message).
-Do not skip them with `--no-verify`; if a gate fails, fix the cause. If the
-hook is missing, run `make hooks` once. Adding a unit test is not covered by
-that list: run `scripts/check-test-src.sh`, as the Tests section says.
+docs, test-src, bead refs, formatting, build, unit tests, async rule, commit
+message). Do not skip them with `--no-verify`; if a gate fails, fix the cause.
+If the hook is missing, run `make hooks` once.
 
 1. Make sure tests pass: `make test`
 2. If the change touches windows, focus, keys, or X properties, run the seam
-   tests too: `make tools/xclient && make test-x`. They assert what X sees. A
+   tests too: `make test-x`. They assert what X sees. A
    failure listed in `tests/quality/seam-baseline.txt` is known and does not
    fail the run; a failure missing from that file is new, exits non-zero, and
    is yours to fix or to baseline deliberately.

@@ -13,7 +13,7 @@ This directory contains the authoritative documentation for the wm architecture.
 
 | Document | Purpose |
 |----------|---------|
-| **[overview.md](overview.md)** | High-level architecture, core concepts, directory structure |
+| **[overview.md](overview.md)** | High-level architecture and core concepts |
 | **[hub.md](hub.md)** | Hub implementation: registry, router, event bus, target resolution |
 | **[state-machine.md](state-machine.md)** | State machine framework: templates, transitions, guards, hooks |
 | **[component.md](component.md)** | Component design: executors, listeners, SM templates, lifecycle |
@@ -54,17 +54,10 @@ Keybinding → Hub (resolves target) → Component Executor → XCB → on succe
 
 ## Directory Structure
 
-```
-wm/
-├── src/
-│   ├── hub/           # Hub implementation
-│   ├── sm/            # State machine framework
-│   ├── target/        # Target infrastructure (Client, Monitor)
-│   ├── components/    # Built-in components
-│   └── listeners/     # Event listeners
-└── docs/
-    └── architecture/  # This directory
-```
+Where the code lives is one table, the "Where the code lives" table in
+`.agents/skills/wm-bootstrap/SKILL.md`. It is not copied here: a second copy
+disagrees with the tree eventually, and the copy an agent reads first is the
+one that sends it to a path that no longer exists.
 
 ---
 

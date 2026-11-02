@@ -114,9 +114,11 @@ Per issue:
 bd show <id>                     # description + acceptance criteria + blockers
 bd update <id> --claim           # or: --status=in_progress
 # ... work, commit ...
-bd close <id> --reason="what changed"
-bd dolt push                     # syncs the tracker through refs/dolt/data
 ```
+
+The merge runs after the review; it rebases, closes the bead and syncs the
+tracker through `refs/dolt/data`. A worker stops at in_progress: see
+"Definition of done".
 
 Rules: read the acceptance criteria before starting. A parent epic is not a
 task. `bd edit` opens an editor and blocks an agent — never use it.
@@ -132,14 +134,17 @@ task. `bd edit` opens an editor and blocks an agent — never use it.
    call.
 4. Run the gates: `make test`, `make test-x`, `make check-async`,
    `scripts/format-check.sh`. Fix causes, not symptoms.
-5. Commit one topic: subject says what changed, body says why. Then close the
-   bead and `bd dolt push`.
+5. Commit one topic: subject says what changed, body says why. Leave the bead
+   in_progress and say in the final message what is done; the merge closes it.
 
 ## Spawning workers (optional)
 
-A local harness (`worker.sh`, not part of this repository) runs one bead per git
-worktree inside a tmux window with a `pi` agent, on the `dynamic/ds` model:
-`worker.sh start <bead-id>`, then `status`, `resume`, `merge`, `drop`, `gc`.
+A local harness (`worker.sh`, not part of this repository) runs one worker per git
+worktree inside a tmux window with a `pi` agent. `auto <bead-id> [--merge]`
+starts a run, waits, reviews it on a different model family, and notifies;
+`inbox` shows what is in flight with the verdict; `review` runs the review
+alone. `worker.sh --help` is the flag list; this file does not repeat it, because
+a copy here rots while the real one changes.
 
 Two things it cannot decide for you:
 
@@ -164,6 +169,11 @@ beads in your final message. This is how the traps below stop being traps.
 - **`make DEBUG=1` is the only way to read the event log**, and `-pedantic`
   there is what caught a zero-length array. Keep that build green.
 - **`xdotool search --onlyvisible`** is the quickest "did the WM map it" check.
+- **`pkill -f <pattern>` kills the shell that runs it** when the pattern appears
+  in its own command line: two self-kills, exit code 143, on one branch, and one
+  of them took the log grep with it and produced a wrong conclusion. Use
+  `pkill -x <name>`, `tmux kill-window -t wm:<i>`, `pgrep -af` to look first, or
+  the pid.
 - **Seam tests pass for the wrong reason easily.** "The window is hidden now"
   must not be satisfied by a window that was never shown.
 - **`.gitignore` has `test-*`**, which silently ignores new test scripts unless
@@ -186,5 +196,7 @@ beads in your final message. This is how the traps below stop being traps.
 - Acceptance criteria from `bd show` are met, not approximated.
 - `make test` green; `make check-async` shows no new violations;
   `make test-x` no worse than before; formatting clean.
-- The bead is closed with a reason that says what changed, and pushed.
+- The worker leaves the bead in_progress and says in its final message what is
+  done and what is not. The bead is closed, and the tracker synced, by the
+  merge: it happens after the review, and neither is a worker's step.
 - Anything deliberately left out is stated in the final message, not implied.
