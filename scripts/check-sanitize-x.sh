@@ -67,7 +67,9 @@ OUT=$(mktemp) || exit 1
 trap 'rm -f "$OUT"' EXIT
 
 echo "check-sanitize-x: running scripts/xephyr-test.sh against the SANITIZE=1 build"
-SANITIZE=1 "$ROOT_DIR/scripts/xephyr-test.sh" >"$OUT" 2>&1
+# nix develop sets TMPDIR to a private directory. The harness writes its log
+# under $TMPDIR, and the CI upload looks at /tmp/wm-xephyr-test.
+TMPDIR=/tmp SANITIZE=1 "$ROOT_DIR/scripts/xephyr-test.sh" >"$OUT" 2>&1
 rc=$?
 cat "$OUT"
 if [ "$rc" -ne 0 ]; then
