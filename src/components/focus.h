@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
+#include "src/event-types.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -65,8 +66,8 @@ typedef enum FocusState {
  * Focus events emitted on state transitions
  */
 typedef enum FocusEvent {
-  EVT_CLIENT_UNFOCUSED = 30, /* Client lost focus */
-  EVT_CLIENT_FOCUSED   = 31, /* Client gained focus */
+  EVT_CLIENT_UNFOCUSED = EVT_FOCUS_BASE + 0, /* Client lost focus */
+  EVT_CLIENT_FOCUSED   = EVT_FOCUS_BASE + 1, /* Client gained focus */
 } FocusEvent;
 
 /*

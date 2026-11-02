@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
+#include "src/event-types.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -56,7 +57,7 @@ typedef enum LayoutState {
  * Layout events emitted on state transitions
  */
 typedef enum LayoutEvent {
-  EVT_LAYOUT_CHANGED = 40,
+  EVT_LAYOUT_CHANGED = EVT_TILING_BASE + 0,
 } LayoutEvent;
 
 /*
