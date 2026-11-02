@@ -60,14 +60,15 @@ wm_components_init(void)
   keybinding_init();
   fullscreen_component_init();
   client_list_component_init();
-  /* pertag and tag-manager store state machines on monitors, and adoption
-   * happens when the monitor target is registered. Both go before
-   * monitor_manager_init() creates the monitors. */
+  /* pertag, tag-manager, and tiling store state on monitors, and adoption runs
+   * when the monitor target is registered. All three go before
+   * monitor_manager_init() creates the monitors: a component registered after
+   * the discovery never reaches the monitors it already created. */
   pertag_component_init();
   tag_manager_component_init();
+  tiling_component_init();
   monitor_manager_init();
   focus_component_init();
-  tiling_component_init();
 
   /* Both actions need the registry keybinding_init created */
   launcher_init();

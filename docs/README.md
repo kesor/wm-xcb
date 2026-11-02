@@ -103,10 +103,12 @@ Short version, and the parts that stay true until they are fixed:
   keys in `config.wm.def.h` are grabbed on the root window when the keybinding
   component starts, with the CapsLock and NumLock masks a press can carry, and
   grabbed again on `MappingNotify`, so a press reaches the component that owns
-  it. The tag-manager component starts before monitor discovery, so every
-  monitor is adopted with a tag-view state machine and `tag-manager.view`,
-  `tag-manager.toggle`, and `tag-manager.client-move` are in the registry. The
-  components `main` starts register the actions they own. A unit test inits
+  it. The tag-manager and tiling components start before monitor discovery, so
+  every monitor is adopted with a tag-view and a layout state machine, and
+  `tag-manager.view`, `tag-manager.toggle`, and `tag-manager.client-move` are
+  in the registry. A unit test runs the startup order and fails if a component
+  that adopts a monitor registers after the monitor manager. The components
+  `main` starts register the actions they own. A unit test inits
   every owner and fails if a name in `config.wm.def.h` is not registered after
   that. `main` exits non-zero when a module on its startup check does not come
   up, and a unit test runs that startup and asks each of those modules whether

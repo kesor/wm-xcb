@@ -56,6 +56,7 @@ static TilingComponent tiling_component = {
            .accepted_target_names = (const char*[]) { "monitor", NULL },
            .accepted_targets      = NULL,
            .executor              = NULL,
+           .on_adopt              = tiling_on_adopt,
            .registered            = false,
            },
   .initialized     = false,
@@ -242,6 +243,35 @@ tiling_get_sm(Monitor* m)
 
   LOG_DEBUG("Created layout SM for monitor output=%u", m->output);
   return sm;
+}
+
+/*
+ * Adoption hook - give a monitor its layout state machine.
+ *
+ * Tiling does not run here: a monitor is registered before its geometry is
+ * known, so there is nothing to arrange yet. Creating the machine now means a
+ * monitor that was never adopted can be told apart from one that was, by
+ * reading the monitor's storage instead of asking tiling to create on demand.
+ *
+ * There is no matching unadopt hook: the machine lives in the monitor's state
+ * machine storage, and destroying the monitor destroys it.
+ */
+void
+tiling_on_adopt(HubTarget* target)
+{
+  if (target == NULL || target->type_id != hub_get_target_type_id_by_name("monitor")) {
+    LOG_ERROR("tiling_on_adopt: invalid target");
+    return;
+  }
+
+  Monitor* m = (Monitor*) target;
+
+  if (tiling_get_sm(m) == NULL) {
+    LOG_ERROR("Failed to create layout state machine on adoption");
+    return;
+  }
+
+  LOG_DEBUG("Tiling component adopted by monitor: %" PRIu64, (uint64_t) target->id);
 }
 
 /*

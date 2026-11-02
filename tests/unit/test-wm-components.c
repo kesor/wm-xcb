@@ -93,6 +93,61 @@ test_every_wired_module_starts(void)
 }
 
 /*
+ * Test: every component that adopts a monitor registers before the monitor
+ * manager.
+ *
+ * Adoption runs when a monitor target is registered, and the monitor manager
+ * registers the monitors the startup discovery finds. A component registered
+ * after it never reaches those monitors: tiling was, and its layout state only
+ * appeared on the first tile request, while a monitor that arrived later in the
+ * session was adopted. The hub hands back compatible components in registration
+ * order, so the position in that list is the registration order.
+ */
+void
+test_monitor_components_register_before_the_monitor_manager(void)
+{
+  LOG_CLEAN("== Testing monitor components register before the monitor manager");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  tag_list_init();
+  monitor_list_init();
+  action_registry_shutdown();
+
+  assert(wm_components_init() == true);
+
+  HubComponent** comps      = hub_get_components_for_target_type_name("monitor");
+  int32_t        manager_at = -1;
+  for (uint32_t i = 0; comps != NULL && comps[i] != NULL; i++) {
+    if (strcmp(comps[i]->name, MONITOR_MANAGER_COMPONENT_NAME) == 0) {
+      manager_at = (int32_t) i;
+      break;
+    }
+  }
+  assert_or_abort(manager_at >= 0);
+
+  for (uint32_t i = 0; comps[i] != NULL; i++) {
+    if (comps[i]->on_adopt == NULL) {
+      continue;
+    }
+    LOG_CLEAN("  %s", comps[i]->name);
+    assert((int32_t) i < manager_at);
+  }
+
+  wm_components_shutdown();
+
+  monitor_list_shutdown();
+  tag_list_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
  * Register test group
  */
-TEST_GROUP(WMComponents, { test_every_wired_module_starts(); });
+TEST_GROUP(WMComponents, {
+  test_every_wired_module_starts();
+  test_monitor_components_register_before_the_monitor_manager();
+});
