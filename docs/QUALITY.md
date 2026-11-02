@@ -11,9 +11,9 @@ model.*
 > CI calls `lefthook run pre-push --force`. Without `--force` lefthook computes
 > the files a push touched, and a CI checkout has no push range: the branch tip
 > is the commit already checked out, the file list is empty, and lefthook skips
-> every command and reports success. `docs/QUALITY.md` said CI runs the same
-> commands; it did not, until the flag was there. The job's runtime is the
-> check: tens of seconds means the gates ran.
+> every command and reports success. The claim that CI runs the same commands
+> was false until the flag was there. The job's runtime is the check: tens of
+> seconds means the gates ran.
 
 ---
 
