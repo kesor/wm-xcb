@@ -105,7 +105,8 @@ TEST_SRC = \
 	tests/unit/test-launcher.c \
 	tests/unit/test-terminal.c \
 	tests/unit/test-tag-manager-component.c \
-	tests/unit/test-wm-xcb-ewmh.c
+	tests/unit/test-wm-xcb-ewmh.c \
+	tests/unit/test-event-types.c
 
 TEST_OBJ = $(TEST_SRC:%.c=$(BUILD_DIR)/%.o)
 
