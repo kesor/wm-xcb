@@ -37,6 +37,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
+#include "src/event-types.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
@@ -51,10 +52,10 @@
  * Components subscribe to these to react to client changes.
  */
 enum ClientListEventType {
-  EVT_CLIENT_CREATED,   /* Client was created and registered with hub */
-  EVT_CLIENT_DESTROYED, /* Client was destroyed and unregistered from hub */
-  EVT_CLIENT_MANAGED,   /* Client was added to the managed client list */
-  EVT_CLIENT_UNMANAGED, /* Client was removed from the managed client list */
+  EVT_CLIENT_CREATED   = EVT_CLIENT_LIST_BASE + 0, /* Client was created and registered with hub */
+  EVT_CLIENT_DESTROYED = EVT_CLIENT_LIST_BASE + 1, /* Client was destroyed and unregistered from hub */
+  EVT_CLIENT_MANAGED   = EVT_CLIENT_LIST_BASE + 2, /* Client was added to the managed client list */
+  EVT_CLIENT_UNMANAGED = EVT_CLIENT_LIST_BASE + 3, /* Client was removed from the managed client list */
 };
 
 /*
