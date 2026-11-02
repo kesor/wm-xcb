@@ -48,9 +48,42 @@ enum ClientSizeHintFlags {
 };
 
 /*
+ * WM_NORMAL_HINTS is a fixed xPropSizeHints, not a list of the fields its
+ * flags name: 18 CARD32 slots with the values a flag did not set left at zero.
+ * Xlib's XSetWMNormalHints() writes all 18 and XGetWMNormalHints() reads each
+ * field from its own offset, so a reader that walks the flags lands on the
+ * wrong value. Pre-ICCCM clients write the first 15 slots only, which is where
+ * base size and gravity would be.
+ */
+enum ClientSizeHintField {
+  CLIENT_SIZE_HINT_FLAGS       = 0,
+  CLIENT_SIZE_HINT_X           = 1,
+  CLIENT_SIZE_HINT_Y           = 2,
+  CLIENT_SIZE_HINT_WIDTH       = 3,
+  CLIENT_SIZE_HINT_HEIGHT      = 4,
+  CLIENT_SIZE_HINT_MIN_WIDTH   = 5,
+  CLIENT_SIZE_HINT_MIN_HEIGHT  = 6,
+  CLIENT_SIZE_HINT_MAX_WIDTH   = 7,
+  CLIENT_SIZE_HINT_MAX_HEIGHT  = 8,
+  CLIENT_SIZE_HINT_WIDTH_INC   = 9,
+  CLIENT_SIZE_HINT_HEIGHT_INC  = 10,
+  CLIENT_SIZE_HINT_ASPECT_MIN  = 11,
+  CLIENT_SIZE_HINT_ASPECT_MAX  = 14,
+  CLIENT_SIZE_HINT_BASE_WIDTH  = 15,
+  CLIENT_SIZE_HINT_BASE_HEIGHT = 16,
+  CLIENT_SIZE_HINT_GRAVITY     = 17,
+  CLIENT_SIZE_HINT_OLD_LENGTH  = 15,
+  CLIENT_SIZE_HINT_LENGTH      = 18,
+};
+
+/*
  * A window's size constraints, as the client asked for them.
  * Zero means the client set no constraint of that kind, which is what ICCCM
  * says a missing field means, so every field is usable without a flag.
+ *
+ * Base and minimum default to each other when a size is applied: ICCCM 4.1.2.3
+ * gives a client that sets only PMinSize that size as its base, and a client
+ * that sets only PBaseSize that size as its minimum.
  */
 typedef struct ClientSizeHints {
   uint16_t min_width;
@@ -310,13 +343,17 @@ void client_request_size_hints(Client* c);
 bool client_poll_size_hints(Client* c);
 
 /*
- * Parse the 32-bit values of a WM_NORMAL_HINTS property into constraints.
- * Values the client did not set stay at zero. Returns false when the property
- * is too short for the fields its flags claim, in which case `out` is left
- * untouched.
+ * Parse the values of a WM_NORMAL_HINTS property into constraints.
+ *
+ * The values are signed, because a client that writes a negative dimension
+ * means it as one and not as a size of 65535. A dimension the client did not
+ * set stays at zero. `count` is the number of CARD32 slots: 18 for the format
+ * Xlib writes, 15 for the pre-ICCCM one that has no base size. Returns false
+ * for any other length, and when a 15-slot property names a base size there is
+ * no slot for, in which case `out` is left untouched.
  */
 bool client_size_hints_from_property(
-    const uint32_t* values, uint32_t count, ClientSizeHints* out);
+    const int32_t* values, uint32_t count, ClientSizeHints* out);
 
 /*
  * Replace a client's constraints. Used by the reader above and by tests that
@@ -327,9 +364,10 @@ void client_set_size_hints(Client* c, const ClientSizeHints* hints);
 /*
  * Narrow a size to what the client's hints allow.
  *
- * Applies the size increment to the part above the base size, then the maximum
- * and then the minimum, which is the order ICCCM implies: a size that respects
- * the increment and still fits the range is what the client can draw in.
+ * Fills in the base and minimum that default to each other, applies the size
+ * increment to the part above the base size, then the maximum and then the
+ * minimum, which is the order ICCCM implies: a size that respects the
+ * increment and still fits the range is what the client can draw in.
  * Sizes are the inside size of the window; the border is added by the WM and is
  * not part of what the hints describe.
  */

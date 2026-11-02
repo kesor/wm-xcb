@@ -2,7 +2,10 @@
 # A client that names a minimum size larger than the area the layout gives it
 # keeps that size. The hint is read from WM_NORMAL_HINTS, and the layout runs
 # again once the reply arrives, so this also asserts that the second layout
-# reaches X.
+# reaches X. xclient writes the property the way Xlib's XSetWMNormalHints()
+# does: 18 slots with every field at its own offset, position and size zero
+# because no flag names them, and the minimum at slot 5. A reader that walks
+# the flags finds the zeros instead.
 source "$(dirname "$0")/lib.sh"
 
 MIN_W=1400

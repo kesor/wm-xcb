@@ -144,28 +144,24 @@ create_window(
   set_title(win, title);
   set_class(win, klass, klass);
 
-  /* Normal gravity so the WM decides placement, and a minimum size when the
-     caller asked for one. The property is a flag word followed by the fields
-     the flags name, in ICCCM order: min_width, min_height come first here, and
-     win_gravity is last. */
-  uint32_t hints[3];
-  uint32_t hint_count = 0;
-  uint32_t flags      = 1U << 9; /* PWinGravity */
+  /* WM_NORMAL_HINTS is a fixed 18-slot struct, which is what Xlib's
+     XSetWMNormalHints() writes: every slot present, and the values a flag does
+     not name left at zero. A reader takes min_width from slot 5 whether or not
+     PMinSize is set, so the fields cannot be packed in their flag order. */
+  int32_t normal_hints[18];
+  memset(normal_hints, 0, sizeof(normal_hints));
+  normal_hints[0]  = 1 << 9;   /* PWinGravity */
+  normal_hints[17] = XCB_GRAVITY_NORTH_WEST;
   if (min_width > 0 || min_height > 0) {
-    flags |= 1U << 4;            /* PMinSize */
-    hints[hint_count++] = min_width;
-    hints[hint_count++] = min_height;
+    normal_hints[0] |= 1 << 4; /* PMinSize */
+    normal_hints[5] = (int32_t) min_width;
+    normal_hints[6] = (int32_t) min_height;
   }
-  hints[hint_count++] = XCB_GRAVITY_NORTH_WEST;
-  uint32_t normal_hints[4];
-  normal_hints[0] = flags;
-  for (uint32_t i = 0; i < hint_count; i++)
-    normal_hints[i + 1] = hints[i];
   set_prop32(win,
              XCB_ATOM_WM_NORMAL_HINTS,
              XCB_ATOM_WM_SIZE_HINTS,
-             normal_hints,
-             hint_count + 1);
+             (const uint32_t*) normal_hints,
+             18);
 
   /* Report a client list entry so EWMH-aware tools see this window. */
   uint32_t pid = (uint32_t) getpid();
@@ -180,16 +176,16 @@ create_window(
 int
 main(int argc, char** argv)
 {
-  int         count      = 1;
-  const char* title      = "xclient";
-  const char* klass      = "xclient";
-  uint32_t    width      = 400;
-  uint32_t    height     = 300;
-  uint32_t    min_width  = 0;
-  uint32_t    min_height = 0;
-  int         sleep_s    = 0;
-  int         lifetime   = 0;
-  bool        verbose    = false;
+  int         count             = 1;
+  const char* title             = "xclient";
+  const char* klass             = "xclient";
+  uint32_t    width             = 400;
+  uint32_t    height            = 300;
+  uint32_t    min_width         = 0;
+  uint32_t    min_height        = 0;
+  int         sleep_s           = 0;
+  int         lifetime          = 0;
+  bool        verbose           = false;
   bool        sync              = false;
   bool        override_redirect = false;
 

@@ -357,6 +357,23 @@ client_create(xcb_window_t window)
   return c;
 }
 
+/*
+ * Drop a size hint read whose reply nobody will consume.
+ *
+ * An unchecked request keeps its reply in libxcb until somebody reads or
+ * discards it, and a client can be destroyed or ask again before the reply has
+ * arrived.
+ */
+static void
+client_discard_size_hints(Client* c)
+{
+  if (!c->size_hints_pending)
+    return;
+  if (dpy != NULL)
+    xcb_discard_reply(dpy, c->size_hints_cookie.sequence);
+  c->size_hints_pending = false;
+}
+
 void
 client_destroy(Client* c)
 {
@@ -396,6 +413,10 @@ client_destroy(Client* c)
     free(c->class_name);
     c->class_name = NULL;
   }
+
+  /* A DestroyNotify can arrive in the same batch as the MapRequest that asked
+   * for the hints, so the reply may still be on its way. */
+  client_discard_size_hints(c);
 
   /* Unregister from Hub */
   if (c->target.registered) {
@@ -645,68 +666,56 @@ client_set_size_hints(Client* c, const ClientSizeHints* hints)
   c->size_hints = *hints;
 }
 
-/* A CARD32 hint into the 16-bit window size X takes. */
+/* A CARD32 hint into the 16-bit window size X takes. A negative dimension is
+ * not a size, and reading it as unsigned would turn it into 65535. */
 static uint16_t
-client_hint_to_size(uint32_t value)
+client_hint_dimension(int32_t value)
 {
+  if (value <= 0)
+    return 0;
   return (uint16_t) (value > UINT16_MAX ? UINT16_MAX : value);
 }
 
-/*
- * Read one width/height pair out of the property, or report that the property
- * ends first.
- */
-static bool
-client_hint_take_pair(
-    const uint32_t* values, uint32_t count, uint32_t* field, uint16_t* w, uint16_t* h)
-{
-  if (*field + 2 > count)
-    return false;
-
-  *w = client_hint_to_size(values[(*field)++]);
-  *h = client_hint_to_size(values[(*field)++]);
-  return true;
-}
-
 bool
-client_size_hints_from_property(const uint32_t* values, uint32_t count, ClientSizeHints* out)
+client_size_hints_from_property(const int32_t* values, uint32_t count, ClientSizeHints* out)
 {
-  if (values == NULL || out == NULL || count == 0)
+  if (values == NULL || out == NULL)
     return false;
 
-  uint32_t        flags = values[0];
-  uint32_t        field = 1;
+  /* Only the two lengths WM_SIZE_HINTS has: the 18 slots Xlib writes and the
+   * 15 pre-ICCCM slots. A shorter property is not one, and reading slots the
+   * client never wrote would size the window from the server's leftovers. */
+  if (count != CLIENT_SIZE_HINT_OLD_LENGTH && count < CLIENT_SIZE_HINT_LENGTH)
+    return false;
+
+  uint32_t flags = (uint32_t) values[CLIENT_SIZE_HINT_FLAGS];
+
+  /* Fixed offsets: the fields are where xPropSizeHints puts them whether or
+   * not their flag is set, which is why a property of all-zero position and
+   * size still has min_width at slot 5. Only a flag decides a field is used. */
   ClientSizeHints parsed;
   memset(&parsed, 0, sizeof(parsed));
 
-  /* The flags say which fields follow, in this order. A field the client did
-   * not set is absent, not zero, so the reader has to skip by flag and not by
-   * position. */
-  if ((flags & (CLIENT_SIZE_HINT_US_POSITION | CLIENT_SIZE_HINT_P_POSITION)) != 0)
-    field += 2; /* x, y */
-  if ((flags & (CLIENT_SIZE_HINT_US_SIZE | CLIENT_SIZE_HINT_P_SIZE)) != 0)
-    field += 2; /* width, height */
-
-  /* A property shorter than its own flags claim is malformed, and reading past
-   * it would size the window from whatever value comes next. */
-  if ((flags & CLIENT_SIZE_HINT_P_MIN_SIZE) != 0 &&
-      !client_hint_take_pair(values, count, &field, &parsed.min_width, &parsed.min_height))
-    return false;
-
-  if ((flags & CLIENT_SIZE_HINT_P_MAX_SIZE) != 0 &&
-      !client_hint_take_pair(values, count, &field, &parsed.max_width, &parsed.max_height))
-    return false;
-
-  if ((flags & CLIENT_SIZE_HINT_P_RESIZE_INC) != 0 &&
-      !client_hint_take_pair(values, count, &field, &parsed.inc_width, &parsed.inc_height))
-    return false;
-
-  if ((flags & CLIENT_SIZE_HINT_P_ASPECT) != 0)
-    field += 4; /* min_aspect and max_aspect, a numerator and a denominator each */
-
-  if ((flags & CLIENT_SIZE_HINT_P_BASE_SIZE) != 0 &&
-      !client_hint_take_pair(values, count, &field, &parsed.base_width, &parsed.base_height))
-    return false;
+  if ((flags & CLIENT_SIZE_HINT_P_MIN_SIZE) != 0) {
+    parsed.min_width  = client_hint_dimension(values[CLIENT_SIZE_HINT_MIN_WIDTH]);
+    parsed.min_height = client_hint_dimension(values[CLIENT_SIZE_HINT_MIN_HEIGHT]);
+  }
+  if ((flags & CLIENT_SIZE_HINT_P_MAX_SIZE) != 0) {
+    parsed.max_width  = client_hint_dimension(values[CLIENT_SIZE_HINT_MAX_WIDTH]);
+    parsed.max_height = client_hint_dimension(values[CLIENT_SIZE_HINT_MAX_HEIGHT]);
+  }
+  if ((flags & CLIENT_SIZE_HINT_P_RESIZE_INC) != 0) {
+    parsed.inc_width  = client_hint_dimension(values[CLIENT_SIZE_HINT_WIDTH_INC]);
+    parsed.inc_height = client_hint_dimension(values[CLIENT_SIZE_HINT_HEIGHT_INC]);
+  }
+  if ((flags & CLIENT_SIZE_HINT_P_BASE_SIZE) != 0) {
+    /* The 15-slot form stops before the base size, so a property that names
+     * one is malformed rather than unconstrained. */
+    if (count < CLIENT_SIZE_HINT_LENGTH)
+      return false;
+    parsed.base_width  = client_hint_dimension(values[CLIENT_SIZE_HINT_BASE_WIDTH]);
+    parsed.base_height = client_hint_dimension(values[CLIENT_SIZE_HINT_BASE_HEIGHT]);
+  }
 
   *out = parsed;
   return true;
@@ -717,6 +726,8 @@ client_request_size_hints(Client* c)
 {
   if (c == NULL || dpy == NULL || wm_normal_hints_atom == XCB_ATOM_NONE)
     return;
+
+  client_discard_size_hints(c);
 
   /* Unchecked: an error must not travel to the event loop as a synthetic
    * event, and a window that vanished can only fail here. The longest
@@ -755,7 +766,8 @@ client_poll_size_hints(Client* c)
   if (reply != NULL && error == NULL && reply->format == 32) {
     uint32_t count = (uint32_t) (xcb_get_property_value_length(reply) / (int) sizeof(uint32_t));
 
-    if (client_size_hints_from_property(xcb_get_property_value(reply), count, &parsed)) {
+    if (client_size_hints_from_property(
+            (const int32_t*) xcb_get_property_value(reply), count, &parsed)) {
       client_set_size_hints(c, &parsed);
       constrained = parsed.min_width != 0 || parsed.min_height != 0 ||
                     parsed.max_width != 0 || parsed.max_height != 0 ||
@@ -776,6 +788,15 @@ client_poll_size_hints(Client* c)
 static uint16_t
 client_clamp_to_hints(uint32_t size, uint16_t min, uint16_t max, uint16_t base, uint16_t inc)
 {
+  /* ICCCM 4.1.2.3, as Xlib's XWMGeometry reads it: a client that sets only
+   * PMinSize means that size to be the base as well, and a client that sets
+   * only PBaseSize means it to be the minimum. A field the client left out is
+   * zero here, so the two defaults are each other. */
+  if (base == 0)
+    base = min;
+  if (min == 0)
+    min = base;
+
   /* The increment counts from the base size, so the part above the base is
    * what has to be a multiple of it. Rounding down keeps the window inside
    * the area the layout gave it; the minimum then wins over both. */
