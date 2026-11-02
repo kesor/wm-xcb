@@ -30,7 +30,7 @@ pre-commit:
       fail_text: "A committed file names a home directory. Use a repo-relative path or <placeholder>."
 
     test-src:
-      glob: "test-*.c"
+      glob: "tests/unit/test-*.c"
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC, so its assertions never run."
 

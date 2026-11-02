@@ -196,9 +196,8 @@ make tools/xclient && make test-x    # seam suite: what the X server sees
 
 Unit tests are `tests/unit/test-*.c`. A file registers its test group from a
 constructor, so a file missing from `TEST_SRC` in the Makefile compiles nowhere
-and its assertions never run. Run `scripts/check-test-src.sh`. The pre-commit
-glob `test-*.c` does not match `tests/unit/test-*.c`, so the commit is not
-rejected. The pre-push hook runs the script with no glob. The seam tests are
+and its assertions never run. Run `scripts/check-test-src.sh`. The pre-commit and
+pre-push hooks both run it. The seam tests are
 `tests/x/test-*.sh`: they start a nested X server and assert against a live WM.
 
 Copy the shape from `tests/unit/test-client-list-component.c` for a component
