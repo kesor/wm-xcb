@@ -7,9 +7,14 @@
 source "$(dirname "$0")/lib.sh"
 
 OUT="$TMPDIR_SEAM/harness-variant.out"
+# The variant is pinned here instead of inherited: `make SANITIZE=1 test-x`
+# exports SANITIZE to every test, and an inherited one turns this DEBUG=1 run
+# into debug-sanitize, which reports a different variant and binary than the
+# assertions below name. -u drops it, so the run is the same whatever the
+# caller asked make for.
 # The harness starts its own nested server and waits 4 s for windows; a run
 # that takes over two minutes is stuck, not slow.
-timeout 120 env DEBUG=1 "$ROOT_DIR/scripts/xephyr-test.sh" --windows 1 >"$OUT" 2>&1
+timeout 120 env -u SANITIZE DEBUG=1 "$ROOT_DIR/scripts/xephyr-test.sh" --windows 1 >"$OUT" 2>&1
 rc=$?
 
 check_eq "xephyr-test.sh DEBUG=1 exits 0" 0 "$rc"
