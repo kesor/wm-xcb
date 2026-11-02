@@ -74,6 +74,7 @@
 
               # Nested-X testing and measurement. See docs/TESTING.md.
               xorg-server # provides Xephyr and Xvfb
+              xwininfo
               xvfb-run
               xprop
               xrandr

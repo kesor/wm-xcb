@@ -30,8 +30,13 @@ nix develop
 
 The shell provides gcc, clang, clang-tools, bear, gdb, the libxcb family, and
 the test tools: `Xephyr` (from `xorg-server`), `xvfb`, `xdotool`, `xprop`,
-`xrandr`, `xterm`, `dmenu`, `imagemagick` (`import` for screenshots), `valgrind`,
-and `strace`.
+`xwininfo`, `xrandr`, `xterm`, `dmenu`, `imagemagick` (`import` for screenshots),
+`valgrind`, and `strace`.
+
+A tool the harnesses need but the shell lacks is fixed in `flake.nix`, in the
+same commit as the recipe that needs it. Each worktree carries its own copy of
+`flake.nix`, so the tool appears in that worktree after `direnv allow` or
+`nix develop` again, not in the shell that is already running.
 
 Rule of thumb: anything you run against the WM needs the same shell the WM was
 built in, because the binary links the store paths of that shell's libraries.
@@ -259,12 +264,23 @@ xdotool search --onlyvisible --class xclient      # windows the WM actually mapp
 xdotool getwindowgeometry --shell <id>            # X=, Y=, WIDTH=, HEIGHT=
 xprop -root                                       # EWMH properties the WM set
 xprop -id <id> WM_STATE                           # set by a WM on managed windows
+xwininfo -id <id>                                 # geometry, border width, map state
+xwininfo -id <id> -events                         # the event mask that window selected
+xwininfo -root -tree                              # the window tree under the root
 xrandr                                            # what the WM should see
 import -window root /tmp/shot.png                 # screenshot of the nested screen
 ```
 
 `xdotool search --onlyvisible` filters on `map_state == IsViewable`, so it is
 the quickest "did the WM map this" check.
+
+`xwininfo -id <window> -events` prints `Someone wants these events`, `Do not
+propagate these events` and `Override redirection?` for that window. The event
+mask decides what a focus, pointer or drag handler can see at all: a managed
+window that does not select `EnterWindow`/`LeaveWindow` sends `ENTER_NOTIFY` to
+the root instead, and the focus handler then sees a crossing that names the root
+rather than the client. `xprop` reports properties and not masks, and `xdotool`
+has no subcommand for them.
 
 ### Scripted session
 
@@ -414,7 +430,7 @@ event arrives.
 | Xephyr exits at once with `Server is already active for display N` | lock file from a crashed run | `ls /tmp/.X*-lock /tmp/.X11-unix/`, remove the stale pair, or use another display |
 | nested screen is black | the WM died before it mapped anything, or this is a stale session | `scripts/xephyr-test.sh --verbose`, read `wm.log` |
 | `xterm: cannot load font` | Xephyr has no usable fonts | use `tools/xclient` |
-| `xdotool: command not found` | not in the dev shell | `direnv allow` or `nix develop` |
+| `xdotool: command not found` | not in the dev shell | `direnv allow` or `nix develop`; if the package the recipe needs is not in `flake.nix` at all, add it to `buildInputs` and commit that with the recipe |
 | WM dies silently at startup | `-DDEBUG` build not used, so the reason was never printed | check the variant on the first line of the run, then rerun with `DEBUG=1`, or with `DEBUG=1 scripts/xephyr-test.sh --verbose` |
 | `scripts/xephyr-test.sh` cannot find `wm` | not built | `make && make tools/xclient` |
 
