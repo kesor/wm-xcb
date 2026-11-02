@@ -1,6 +1,9 @@
 # Plan: wm Architecture Implementation
 
-> Source PRD: `.github/ISSUE_TEMPLATE/prd.yml`
+> Status, order and open work live in the beads epics (`bd list --type=epic`).
+> This plan is the phase order those epics were cut from. The PRD it was written
+> against was filed as GitHub issues and went with them; it is not in this
+> repository, so there is nothing here to cite.
 
 ## Architectural Decisions
 
