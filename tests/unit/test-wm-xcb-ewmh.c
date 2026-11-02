@@ -3,6 +3,7 @@
  *
  * Tests:
  * - destruct_ewmh() releases the per-screen lists and clears the global
+ * - destruct_ewmh() is a no-op when the global is already unset
  */
 
 #include <stdlib.h>
@@ -41,6 +42,24 @@ test_ewmh_destruct_releases_per_screen_lists(void)
   assert(ewmh == NULL);
 }
 
+/*
+ * Test: a second destruct, or one before setup, does not touch the global
+ *
+ * xcb_ewmh_connection_wipe() dereferences its argument. free() did not, so
+ * the old destruct was safe to call when ewmh was NULL and the new one is
+ * not, unless it returns first.
+ */
+void
+test_ewmh_destruct_when_unset_is_a_no_op(void)
+{
+  LOG_CLEAN("  test_ewmh_destruct_when_unset_is_a_no_op...");
+
+  ewmh = NULL;
+  destruct_ewmh();
+  assert(ewmh == NULL);
+}
+
 TEST_GROUP(Ewmh, {
   test_ewmh_destruct_releases_per_screen_lists();
+  test_ewmh_destruct_when_unset_is_a_no_op();
 });
