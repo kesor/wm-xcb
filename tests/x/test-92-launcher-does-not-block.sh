@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # MOD+p must not stop the WM from handling keys while dmenu is open.
 #
-# run.sh puts a fake dmenu_run on PATH that writes nothing and stays open. That
-# is what the WM sees while a user looks at the prompt: a child holding a pipe
+# run.sh puts a fake dmenu on PATH that writes nothing and stays open. That is
+# what the WM sees while a user looks at the prompt: a child holding a pipe
 # open. How long MOD+2 takes to hide the tag-1 windows is the assertion. A
 # launcher that reads the pipe and waits for the child never returns to the
-# loop, so the tag view does not change until dmenu exits.
+# loop, so the tag view does not change until dmenu exits. The real dmenu grabs
+# the keyboard for as long as it runs, so this key delivery can only be measured
+# against the fake; what the fake shows is that the WM's loop is free.
 source "$(dirname "$0")/lib.sh"
 
 # Start from a known view. A previous test can leave another tag showing, and

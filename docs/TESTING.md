@@ -215,14 +215,18 @@ WM dispatches them in one drain. That is the ordering where a hide and a later
 show both run before the `UnmapNotify` the hide causes is read. The test resumes
 the WM on every exit path.
 
-`run.sh` puts a `dmenu_run` of its own at the front of `PATH`: a script that
-records its start in `$WM_SEAM_DMENU_STARTED` and then sleeps. A real dmenu needs
-fonts the nested server may not have, and a test that presses `MOD+p` wants a
-child that holds the pipe open, not a menu. `test-92-launcher-does-not-block.sh`
-uses it: it waits for the marker so an unstarted launcher cannot make the
-assertion pass on an idle WM, then requires `MOD+2` to hide the tag-1 window
-within 500 ms. `scripts/perf-test.sh` runs the same stage and fails the run when
-the key goes unanswered.
+`run.sh` puts a `dmenu` and a `dmenu_path` of its own at the front of `PATH`.
+The fake dmenu records its start in `$WM_SEAM_DMENU_STARTED` and then sleeps,
+writing nothing; the fake list source prints nothing. A real dmenu needs fonts
+the nested server may not have, and a test that presses `MOD+p` wants a child
+that holds the pipe open, not a menu. `test-92-launcher-does-not-block.sh` uses
+it: it waits for the marker so an unstarted launcher cannot make the assertion
+pass on an idle WM, then requires `MOD+2` to hide the tag-1 window within 500 ms.
+`scripts/perf-test.sh` runs the same stage and fails the run when the key goes
+unanswered. The fake does not grab the keyboard; a real dmenu does, so `MOD+2`
+would not reach the WM while a real prompt is up. What the stage measures is
+that the WM's loop still answers, which is the promise; the fake is the only
+dmenu that lets the test see it.
 
 ---
 
@@ -430,7 +434,7 @@ is why the variant is in the output. It then prints these numbers:
 | per window | burst CPU / N | comparable across window counts |
 | time to tile | wall clock until all N windows are viewable, polled every 10 ms, TIMEOUT at 5 s | the number a user feels |
 | RSS | `VmRSS` before/after the burst | leak and growth detection |
-| keys while dmenu is open | wall clock from `MOD+2` until the tag-1 windows are hidden, with a `dmenu_run` that writes nothing | a launcher that waits for dmenu stops the loop, and over the budget the run fails |
+| keys while dmenu is open | wall clock from `MOD+2` until the tag-1 windows are hidden, with a `dmenu` that writes nothing | a launcher that waits for dmenu stops the loop, and over the budget the run fails |
 | SIGTERM | wall clock from SIGTERM until the WM's `/proc` state is gone or `Z` | a loop that blocks must still be stoppable |
 
 Measured 2026-11-03 (1280x800 Xephyr, release build, 5 windows):

@@ -22,17 +22,15 @@
 #include "wm-xcb.h"
 
 /*
- * Track test results
+ * The shared counters, so a failed assertion here fails `make test`. A private
+ * pair would print a failure and still let the run exit zero.
  */
-static int pass_count = 0;
-static int fail_count = 0;
-
 #define ASSERT(cond, msg)                                             \
   do {                                                                \
     if (cond) {                                                       \
-      pass_count++;                                                   \
+      tests_passed++;                                                 \
     } else {                                                          \
-      fail_count++;                                                   \
+      tests_failed++;                                                 \
       fprintf(stderr, "FAIL: %s (%s:%d)\n", msg, __FILE__, __LINE__); \
     }                                                                 \
   } while (0)
@@ -44,11 +42,10 @@ static int fail_count = 0;
   } while (0)
 
 /*
- * A directory this test puts its own dmenu_run in, and the PATH it replaced.
+ * A directory this test puts its own dmenu in, and the PATH it replaced.
  */
-static char fake_bin[512]    = { 0 };
-static char saved_path[4096] = { 0 };
-static bool path_saved       = false;
+static char  fake_bin[512] = { 0 };
+static char* saved_path    = NULL;
 
 static bool
 fake_bin_ready(void)
@@ -65,9 +62,14 @@ fake_bin_ready(void)
     return false;
   }
 
+  /* Copied, not held in a fixed buffer: this environment's PATH is longer than
+     any reasonable buffer, and a truncated copy silently hides `sh`. */
   const char* path = getenv("PATH");
-  snprintf(saved_path, sizeof saved_path, "%s", path != NULL ? path : "");
-  path_saved = true;
+  saved_path       = strdup(path != NULL ? path : "");
+  if (saved_path == NULL) {
+    fake_bin[0] = '\0';
+    return false;
+  }
   return true;
 }
 
@@ -93,20 +95,40 @@ write_fake_script(const char* name, const char* body)
   return chmod(file, 0755) == 0;
 }
 
+/* Writes an executable script named `name` into `dir`. */
+static bool
+write_script_in(const char* dir, const char* name, const char* body)
+{
+  char  file[700];
+  FILE* script;
+
+  snprintf(file, sizeof file, "%s/%s", dir, name);
+  script = fopen(file, "w");
+  if (script == NULL)
+    return false;
+
+  fputs("#!/bin/sh\n", script);
+  fputs(body, script);
+  fclose(script);
+
+  return chmod(file, 0755) == 0;
+}
+
 /*
- * Puts a dmenu_run that runs `body` at the front of PATH.
+ * Puts a dmenu that runs `body` at the front of PATH, with its command list
+ * source next to it.
  *
- * Every install gets its own directory. Overwriting a script a child is still
- * running from fails with ETXTBSY, and the earlier test's dmenu is still open
- * when the next test starts.
+ * The launcher runs `dmenu_path | dmenu`, so both names have to resolve to this
+ * directory; a `dmenu_run` here would never be executed. Every install gets its
+ * own directory. Overwriting a script a child is still running from fails with
+ * ETXTBSY, and the earlier test's dmenu is still open when the next test
+ * starts.
  */
 static bool
 install_fake_dmenu(const char* body)
 {
   static int installs = 0;
   char       dir[620];
-  char       file[700];
-  FILE*      script;
 
   if (!fake_bin_ready())
     return false;
@@ -117,16 +139,9 @@ install_fake_dmenu(const char* body)
   if (mkdir(dir, 0700) != 0)
     return false;
 
-  snprintf(file, sizeof file, "%s/dmenu_run", dir);
-  script = fopen(file, "w");
-  if (script == NULL)
+  if (!write_script_in(dir, "dmenu", body))
     return false;
-
-  fputs("#!/bin/sh\n", script);
-  fputs(body, script);
-  fclose(script);
-
-  if (chmod(file, 0755) != 0)
+  if (!write_script_in(dir, "dmenu_path", ":\n"))
     return false;
 
   size_t with_fake_length = strlen(dir) + strlen(saved_path) + 2;
@@ -143,7 +158,7 @@ install_fake_dmenu(const char* body)
 static void
 restore_real_path(void)
 {
-  if (path_saved)
+  if (saved_path != NULL)
     setenv("PATH", saved_path, 1);
 }
 
@@ -305,6 +320,9 @@ test_launcher_returns_before_dmenu_exits(void)
   launcher_init();
   ASSERT(install_fake_dmenu("sleep 2\n"), "fake dmenu should be installed");
 
+  launcher_failures = 0;
+  hub_subscribe(EVT_LAUNCHER_FAILED, count_launcher_failure, NULL);
+
   struct timespec start, end;
   clock_gettime(CLOCK_MONOTONIC, &start);
   bool started = launcher_action_launch(NULL);
@@ -320,9 +338,11 @@ test_launcher_returns_before_dmenu_exits(void)
   /* A second request while the prompt is open would fight over the keyboard. */
   ASSERT(!launcher_action_launch(NULL), "a second launch while dmenu is open should be refused");
   ASSERT(launcher_is_running(), "the second request should leave the open dmenu alone");
+  ASSERT(launcher_failures == 0, "refusing a second prompt is not a failed launch");
 
   launcher_shutdown();
   ASSERT(!launcher_is_running(), "shutdown should stop watching dmenu");
+  hub_unsubscribe(EVT_LAUNCHER_FAILED, count_launcher_failure);
   hub_shutdown();
   action_registry_shutdown();
   restore_real_path();
@@ -344,7 +364,7 @@ test_launcher_selection_starts_the_command(void)
   snprintf(runner, sizeof runner, "%s/selected-runner", fake_bin);
   unlink(marker);
 
-  snprintf(dmenu, sizeof dmenu, "touch %s\n", marker);
+  snprintf(dmenu, sizeof dmenu, "echo run >> %s\n", marker);
   ASSERT(write_fake_script("selected-runner", dmenu), "runner script should be written");
 
   snprintf(dmenu, sizeof dmenu, "echo %s\n", runner);
@@ -371,6 +391,18 @@ test_launcher_selection_starts_the_command(void)
 
   ASSERT(selected, "the selected command should have run");
   ASSERT(launcher_failures == 0, "a selection is not a failure");
+
+  /* The runner records each start. dmenu_run would run the selection in its
+     own shell and the WM would run it again; the pipe carries the line to the
+     WM alone, so there is exactly one start. */
+  char  runs[64] = { 0 };
+  FILE* log      = fopen(marker, "r");
+  if (log != NULL) {
+    size_t read_bytes = fread(runs, 1, sizeof runs - 1, log);
+    runs[read_bytes]  = '\0';
+    fclose(log);
+  }
+  ASSERT(strcmp(runs, "run\n") == 0, "the selection should run exactly once");
 
   launcher_shutdown();
   hub_unsubscribe(EVT_LAUNCHER_FAILED, count_launcher_failure);
@@ -426,7 +458,8 @@ run_launcher_tests(void)
   RUN_TEST(test_launcher_selection_starts_the_command);
   RUN_TEST(test_launcher_no_selection_emits_failure);
 
-  printf("\n  [PASS] %d passed, [FAIL] %d failed\n\n", pass_count, fail_count);
+  free(saved_path);
+  saved_path = NULL;
 }
 
 /*

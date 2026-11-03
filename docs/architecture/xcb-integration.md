@@ -223,10 +223,12 @@ which is the busy-wait again. With no wakeup pipe, the wait uses a 250 ms
 timeout so a signal is still noticed.
 
 An event source is how a module waits on a child without waiting. The launcher
-forks dmenu, registers the read end of the pipe, and returns; the handler runs
-when `poll(2)` says there is something to read, reads until `EAGAIN` or the end
-of file, and removes itself. A handler that leaves its descriptor readable makes
-the loop spin, so it has to drain it.
+forks a shell running `dmenu_path | dmenu`, registers the read end of that
+pipeline's stdout, and returns; the handler runs when `poll(2)` says there is
+something to read, reads until `EAGAIN` or the end of file, and removes itself.
+The line dmenu printed is the selection, and the WM runs it in its own fork. A
+handler that leaves its descriptor readable makes the loop spin, so it has to
+drain it.
 
 `poll(2)` reports the socket, not libxcb's own queue. libxcb reads ahead during
 a reply wait (the property and atom queries at startup) and during `xcb_flush()`,

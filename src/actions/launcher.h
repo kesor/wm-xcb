@@ -30,9 +30,11 @@
 /*
  * Launcher events on the hub.
  *
- * EVT_LAUNCHER_FAILED: dmenu closed without a selection, or the launcher could
- * not start at all. Fired on the loop, never from the action that asked for the
- * launch, because the answer arrives later.
+ * EVT_LAUNCHER_FAILED: the prompt closed without a selection, or the launcher
+ * could not start at all. The first is fired from the loop, when the pipe
+ * reaches its end; the second from the action, because it is known before the
+ * action returns. A second launch while a prompt is open is neither: it is
+ * refused without an event, since the open prompt still owes its own answer.
  */
 enum LauncherEvents {
   EVT_LAUNCHER_FAILED = EVT_LAUNCHER_BASE + 0,
@@ -65,7 +67,8 @@ bool launcher_is_running(void);
  * Starts dmenu and returns; the command runs when the selection arrives.
  *
  * @param inv  Action invocation (target not used for this action)
- * @return     true when dmenu was started, false when it could not be
+ * @return     true when dmenu was started, false when it could not be started
+ *             or a prompt is already open
  */
 bool launcher_action_launch(ActionInvocation* inv);
 
@@ -74,7 +77,9 @@ bool launcher_action_launch(ActionInvocation* inv);
  * Returns once dmenu is running, not when it exits: the pipe is registered with
  * the event loop, which reads it.
  *
- * @return  true when dmenu was started, false otherwise
+ * @return  true when dmenu was started, false otherwise. This function emits
+ *          no event for any failure: the action reports a start failure, and a
+ *          prompt that is already open is a refusal rather than a failure.
  */
 bool launcher_run_dmenu(void);
 

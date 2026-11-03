@@ -61,9 +61,9 @@ static LauncherDmenuConfig dmenu_config = {
 static bool initialized = false;
 
 /*
- * Default dmenu command
+ * The prompt dmenu shows when the configuration names none.
  */
-#define DMENU_RUN "dmenu_run"
+#define DMENU_DEFAULT_PROMPT "Run: "
 
 /*
  * The dmenu that is open, if any.
@@ -191,6 +191,14 @@ launcher_action_launch(ActionInvocation* inv)
 {
   (void) inv;
 
+  if (launcher_is_running()) {
+    /* Two prompts would fight over the keyboard, so the second is refused. It
+       is not a failure: the open prompt still owes its own selection or
+       cancellation, and that is what EVT_LAUNCHER_FAILED reports. */
+    LOG_DEBUG("dmenu is already open: ignoring the second launch");
+    return false;
+  }
+
   if (!launcher_run_dmenu()) {
     /* No subscriber needs to know why: the action's return value carries the
        failure to the caller, and this event is for the components that show
@@ -305,8 +313,9 @@ launcher_pipe_readable(int fd, void* userdata)
 /*
  * Start dmenu and return immediately.
  *
- * The read end of the pipe is handed to the event loop, so the WM keeps
- * handling keys and X events until dmenu writes a selection or exits.
+ * The read end of the pipe is handed to the event loop, so the WM keeps running
+ * its loop until dmenu writes a selection or exits. dmenu itself holds the
+ * keyboard grab while it is up, so the keys a user presses then go to it.
  *
  * @return  true when dmenu was started, false otherwise
  */
@@ -350,13 +359,19 @@ launcher_run_dmenu(void)
 
     wm_xcb_close_connection_in_child();
 
-    const char* prompt = dmenu_config.prompt ? dmenu_config.prompt : "Run: ";
+    const char* prompt = dmenu_config.prompt ? dmenu_config.prompt : DMENU_DEFAULT_PROMPT;
 
-    /* execlp looks for dmenu_run in PATH, which itself uses dmenu_path */
-    execlp(DMENU_RUN, DMENU_RUN, "-p", prompt, (char*) NULL);
+    /* dmenu_run does not print the choice: it backgrounds
+       `dmenu_path | dmenu "$@" | $SHELL`, so the shell inside the script runs
+       the selection and this pipe carries whatever that program writes. Run
+       dmenu as the last stage here instead, with the list on its stdin: the
+       pipe then carries the selected line, and it reaches its end when the
+       menu closes. The selected command is run by launcher_spawn_command(),
+       which is the WM's own fork. */
+    execlp("sh", "sh", "-c", "dmenu_path | dmenu -p \"$1\"", "sh", prompt, (char*) NULL);
 
     /* If execlp returns, it failed */
-    LOG_ERROR("Child: failed to execute dmenu_run: %s", strerror(errno));
+    LOG_ERROR("Child: failed to execute dmenu: %s", strerror(errno));
     _exit(1);
   }
 
@@ -373,8 +388,10 @@ launcher_run_dmenu(void)
     return false;
   }
 
-  /* A child the WM forks later must not inherit the read end, or it keeps the
-     pipe open after dmenu is gone and the loop never reads the end of file. */
+  /* A program the WM starts while the prompt is open must not inherit the
+     read end: it would hold that descriptor for as long as it runs. Closing
+     the write end here, and leaving it to dmenu in the child, is what delivers
+     the end of file when the menu closes. */
   flags = fcntl(pipefd[0], F_GETFD, 0);
   if (flags >= 0)
     (void) fcntl(pipefd[0], F_SETFD, flags | FD_CLOEXEC);

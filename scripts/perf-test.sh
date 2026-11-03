@@ -83,17 +83,22 @@ mkdir -p "$LOG_DIR"
 WM_LOG="$LOG_DIR/wm.log"
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
 
-# MOD+p runs dmenu_run. The real one needs fonts a headless nested server does
-# not reliably provide; this one writes nothing and stays open, which is what
-# the WM sees while a user looks at the prompt.
+# MOD+p runs `dmenu_path | dmenu`. The real dmenu needs fonts a headless nested
+# server does not reliably provide; this one writes nothing and stays open,
+# which is what the WM sees while a user looks at the prompt.
 FAKE_BIN="$LOG_DIR/bin"
 mkdir -p "$FAKE_BIN"
-cat >"$FAKE_BIN/dmenu_run" <<FAKE_DMENU
+cat >"$FAKE_BIN/dmenu" <<FAKE_DMENU
 #!/bin/sh
 : >"$LOG_DIR/dmenu-started"
 sleep 5
 FAKE_DMENU
-chmod +x "$FAKE_BIN/dmenu_run"
+chmod +x "$FAKE_BIN/dmenu"
+cat >"$FAKE_BIN/dmenu_path" <<'FAKE_DMENU_PATH'
+#!/bin/sh
+:
+FAKE_DMENU_PATH
+chmod +x "$FAKE_BIN/dmenu_path"
 rm -f "$LOG_DIR/dmenu-started"
 PATH="$FAKE_BIN:$PATH"
 export PATH
