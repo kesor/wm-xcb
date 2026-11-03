@@ -492,8 +492,13 @@ fullscreen_sync_from_state_reply(xcb_window_t window, xcb_get_property_reply_t* 
 }
 
 /*
- * The loop's poll callback: read every answer that has arrived and keep the
- * rest for the next iteration.
+ * The loop's poll callback: apply the answers that have arrived, in the order
+ * the notifications were queued, and keep the rest for the next iteration.
+ *
+ * A later answer must not be applied before an earlier one. Both are ready by
+ * the time this runs when the two notifications arrived in one batch, and
+ * applying the newer one first leaves the state machine on the older reply. A
+ * reply that has not arrived stops the walk: the ones after it are later.
  */
 static void
 fullscreen_state_read_poll(void* userdata)
@@ -504,20 +509,21 @@ fullscreen_state_read_poll(void* userdata)
     state_read_count = 0;
   }
 
-  for (size_t i = state_read_count; i-- > 0;) {
+  while (state_read_count > 0) {
     void*                raw_reply = NULL;
     xcb_generic_error_t* error     = NULL;
 
     /* Not the reply-forcing call: this one reports "not yet" instead of
        waiting, so the loop stays free. */
-    if (!xcb_poll_for_reply(dpy, state_reads[i].cookie.sequence, &raw_reply, &error))
-      continue;
+    if (!xcb_poll_for_reply(dpy, state_reads[0].cookie.sequence, &raw_reply, &error))
+      break;
 
-    xcb_window_t window = state_reads[i].window;
+    xcb_window_t window = state_reads[0].window;
 
-    /* Order does not matter in this table: the loop walks it whole. */
-    state_reads[i] = state_reads[state_read_count - 1];
+    /* Drop this entry before applying. Applying can queue another read, and
+       that entry has to stay behind the ones still in flight. */
     state_read_count--;
+    memmove(state_reads, state_reads + 1, state_read_count * sizeof *state_reads);
 
     if (raw_reply != NULL && error == NULL)
       fullscreen_sync_from_state_reply(window, raw_reply);

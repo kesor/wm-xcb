@@ -131,8 +131,8 @@ Short version, and the parts that stay true until they are fixed:
   X connection, a signal wakeup pipe and the pipes modules register with it, so
   an idle WM costs no CPU, and SIGTERM ends it. A reply is read the same way: a
   client's size hints and `_NET_WM_STATE`, and the RandR output list and CRTC
-  geometry, are requested unchecked and picked up from a poll callback when the
-  server answers, so none of them stops the loop. `MOD+p` forks a shell that runs
+  geometry, are requested without waiting and picked up from a poll callback
+  when the server answers, so none of them stops the loop. `MOD+p` forks a shell that runs
   `dmenu_path | dmenu` and registers the read end of the pipeline's stdout as
   one of those sources: the chosen line is read when it arrives and the WM runs
   it, and a cancelled prompt emits a failure event instead of blocking. dmenu

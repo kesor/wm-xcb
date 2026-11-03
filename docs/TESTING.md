@@ -311,8 +311,9 @@ signal wakeup pipe in `signals_drain_wakeups()`. Comments that mention a
 blocking function are ignored, so prose cannot produce a false positive.
 
 The script prints the current counts. There are no violations left: the
-baseline that held them is empty, and every remaining wait is a startup path
-carrying `allow-blocking` with the reason it is safe to wait there.
+baseline that held them is empty, and every remaining wait carries
+`allow-blocking` with a reason. That reason is a startup path, where the loop
+does not exist yet, or a read of an `O_NONBLOCK` pipe.
 
 The launcher's read of dmenu's pipe is waived rather than excused: the read end
 is `O_NONBLOCK`, so it returns `EAGAIN` instead of waiting for dmenu to write,
