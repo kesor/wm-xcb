@@ -9,10 +9,11 @@
 # of this repository's files. A site listed in tests/quality/asan-baseline.txt is
 # known debt; a site that is not listed fails the check.
 #
-# Why a baseline rather than a clean run: the tag-manager and tiling test groups
-# only started running recently, and they leaked machines the monitor never
-# destroyed. A gate that is red for reasons nobody is fixing today teaches people
-# to ignore it. The baseline makes the number go down and nothing else.
+# Why a baseline at all: the tag-manager and tiling test groups only started
+# running recently, and they leaked machines the monitor never destroyed. A gate
+# that is red for reasons nobody is fixing today teaches people to ignore it.
+# The baseline made the number go down and nothing else. It is empty now, and it
+# stays as the place to record a site that has to wait for its fix.
 #
 # Silence is not a verdict, so the gate refuses the same shapes the nested-server
 # gate refuses, through the same library (scripts/lib/sanitize-report.sh):
