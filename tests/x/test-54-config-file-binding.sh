@@ -145,9 +145,15 @@ press_until super+F5 0 "MOD+F5 from the config file switched to tag 2"
 press_until super+F6 1 "MOD+F6 from the config file switched back to tag 1"
 
 # MOD+2 is in the compiled bindings and not in the file. The file replaced the
-# table, so the key must do nothing.
-press super+2
-sleep 0.4
+# table, so the key must do nothing. One synthetic press can be lost, and a
+# lost press would pass this check for the wrong reason, so press it several
+# times: a binding that is still there hides the window on the first press
+# that arrives and leaves it hidden.
+for _ in 1 2 3 4 5; do
+  press super+2
+  sleep 0.05
+done
+sleep 0.2
 check_eq "MOD+2 does nothing while the file supplies the bindings" "1" "$(count_viewable)"
 
 check_eq "the malformed line is reported once, with its line number" "1" \

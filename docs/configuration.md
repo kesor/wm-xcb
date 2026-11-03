@@ -2,20 +2,26 @@
 
 *Written 2026-11-03.*
 
-The window manager reads one text file at startup. It changes which keys are
-bound, which windows float, and what the tags are called, without a rebuild.
+The window manager reads one text file at startup. A `bind` line changes which
+keys are bound, without a rebuild. `float` and `tags` lines are read too; what
+they do not yet change is under each directive below.
 
 The compiled configuration (`config.def.h`, `config.wm.def.h`) stays in place
-wherever the file says nothing. A machine with no file at all runs the compiled
-one.
+for a directive the file does not use. A machine with no file at all runs the
+compiled one. A `bind` line replaces the compiled bindings, and a `float` line
+replaces the compiled float rules: the file is the whole list, not an addition
+to it.
 
 ## Where the file is
 
-The first of these that exists is used:
+The path is the first of these whose variable is set and non-empty:
 
-1. `$WM_CONFIG`, when the variable is set to a path
-2. `$XDG_CONFIG_HOME/wm/config`
-3. `$HOME/.config/wm/config`
+1. `$WM_CONFIG`
+2. `$XDG_CONFIG_HOME/wm/config`, when `$XDG_CONFIG_HOME` is set
+3. `$HOME/.config/wm/config`, when `$HOME` is set
+
+A variable that is set wins even when that path names no file. The WM does not
+fall through to the next one; a missing file means the compiled configuration.
 
 The file is read once, before the components start. A change takes effect on the
 next start; the running WM does not reread it. Reloading without a restart is
@@ -76,6 +82,10 @@ Windows that match the rule start floating instead of tiled. `class` and
 title. Fields on one line all have to match; a field left out does not take
 part. Quote a value that has spaces in it.
 
+A file with any `float` line replaces the compiled float rules, including the
+one for class `steam` and the ones whose title contains ` - Preferences` or
+` - Settings`. A file with none leaves those compiled rules in place.
+
 These rules are what `config_should_float()` answers with. Nothing in the
 manage path asks the question yet, so a `float` line currently changes no
 window's placement; it is read, checked, and kept for the code that will.
@@ -99,11 +109,14 @@ name on.
 
 ## When the file says something wrong
 
-Every line the parser cannot read is reported once, at startup, on stderr:
+A line the parser cannot read is reported once, at startup, on stderr:
 
 ```
 ERROR: config $HOME/.config/wm/config:4: unknown directive 'bogus': use bind, float or tags
 ```
+
+Past the errors the parser keeps, one more line says how many further lines
+were rejected, without their numbers.
 
 The line number is the one to open the file at. The line is skipped and the rest
 of the file still applies, so one typo costs one line, not the configuration.

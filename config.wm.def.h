@@ -1,8 +1,9 @@
 /*
  * config.wm.def.h - Default configuration for the window manager
  *
- * This is the WM-specific wiring layer. Users customize keybindings
- * in this file and recompile the window manager.
+ * This is the compiled fallback. A config file with bind lines replaces it;
+ * a missing file, or a file with no bind line, leaves these bindings in place.
+ * docs/configuration.md is the file a user edits instead of this header.
  *
  * This file:
  * 1. Includes wm-states.h for StateTransition types
