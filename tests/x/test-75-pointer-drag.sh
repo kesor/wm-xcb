@@ -9,10 +9,11 @@
 # rather than one jump.
 #
 # The client it drags is tiled, because nothing floats yet and this is the whole
-# of the pointer promise today. dwm's movemouse moves a tiled client the same
-# way and the next layout puts it back, which is what the assertion here reads.
-# A pointer component that moves only floating clients has to change this test
-# to float the client first, not to weaken the assertion.
+# of the pointer promise today. The assertion reads the geometry after the
+# button is released and requires it to have changed. A layout that puts the
+# tiled client back, which is what dwm's movemouse does on the next arrange,
+# fails here. A pointer component that moves only floating clients has to
+# change this test to float the client first, not to weaken the assertion.
 source "$(dirname "$0")/lib.sh"
 
 DRAG_X=120

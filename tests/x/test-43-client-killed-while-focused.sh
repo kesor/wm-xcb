@@ -38,6 +38,14 @@ pass "focus is on a managed client ($focused)"
 
 kill -KILL "$victim" 2>/dev/null
 
+# The server destroys the client's windows when the connection drops, which is
+# after kill returns. One immediate read fails on that delay, not on the WM.
+waited=0
+while [ "$waited" -lt 2000 ]; do
+  [ "$(count_viewable)" -eq 1 ] && break
+  sleep 0.02
+  waited=$((waited + 20))
+done
 check_eq "the killed client's window is gone" "1" "$(count_viewable)"
 if wait_focus "$survivor" 2000; then
   pass "focus moved to the surviving client ($survivor)"
