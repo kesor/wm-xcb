@@ -188,10 +188,11 @@ no EWMH root property: `_NET_SUPPORTED`, `_NET_CLIENT_LIST` and
 `_NET_CURRENT_DESKTOP` are open work, so a panel or an external tool sees only
 what it probes for itself.
 
-What the connection is used for today is reading. `ewmh_request_wm_state()` asks
-a client for its `_NET_WM_STATE` and returns the cookie; the caller reads the
-reply from a poll callback, because the `PropertyNotify` that prompted the read
-says the list changed and not what it now holds.
+`ewmh_request_wm_state()` asks a client for its `_NET_WM_STATE` and returns the
+cookie; the caller reads the reply from a poll callback, because the
+`PropertyNotify` that prompted the read says the list changed and not what it
+now holds. The same connection writes that property: fullscreen adds and removes
+`_NET_WM_STATE_FULLSCREEN` with `xcb_ewmh_request_change_wm_state()`.
 
 ---
 
