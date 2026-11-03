@@ -5,9 +5,3 @@
 # does. Remove entries as the defects are fixed: the list is meant to
 # shrink. Leak entries are file|function, UBSan entries are
 # file|runtime error: <message>.
-src/components/tag-manager.c|tag_manager_get_view_sm
-src/sm/sm-instance.c|sm_create
-src/sm/sm-instance.c|sm_hook_list_create
-src/target/client.c|client_create
-src/target/client.c|client_sm_set_internal
-src/target/monitor.c|monitor_sm_set_internal

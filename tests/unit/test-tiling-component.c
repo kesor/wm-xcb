@@ -339,7 +339,7 @@ test_tag_view_change_triggers_tiling(void)
 
   tiling_component_shutdown();
   tag_manager_component_shutdown();
-  client_list_component_shutdown();
+  client_list_shutdown();
   monitor_list_shutdown();
   action_registry_shutdown();
   xcb_handler_shutdown();
@@ -394,7 +394,7 @@ test_client_tag_move_triggers_tiling(void)
   tiling_component_shutdown();
   tag_manager_component_shutdown();
   focus_component_shutdown();
-  client_list_component_shutdown();
+  client_list_shutdown();
   monitor_list_shutdown();
   action_registry_shutdown();
   xcb_handler_shutdown();

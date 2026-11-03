@@ -109,6 +109,7 @@ sm_create(void* owner, SMTemplate* template, EventEmitter emit, void* emit_userd
   sm->owner         = owner;
   sm->template      = template;
   sm->data          = NULL;
+  sm->data_free     = NULL;
   sm->emit          = emit;
   sm->emit_userdata = emit_userdata;
 
@@ -139,6 +140,12 @@ sm_destroy(StateMachine* sm)
     return;
 
   LOG_DEBUG("Destroying StateMachine: %s", sm->name);
+
+  if (sm->data_free != NULL && sm->data != NULL) {
+    sm->data_free(sm->data);
+  }
+  sm->data      = NULL;
+  sm->data_free = NULL;
 
   /* Free hook lists */
   for (int i = 0; i < SM_HOOK_MAX; i++) {
@@ -356,5 +363,15 @@ sm_set_data(StateMachine* sm, void* data)
 {
   if (sm == NULL)
     return;
-  sm->data = data;
+  sm->data      = data;
+  sm->data_free = NULL;
+}
+
+void
+sm_set_owned_data(StateMachine* sm, void* data, SMDataFree free_fn)
+{
+  if (sm == NULL)
+    return;
+  sm->data      = data;
+  sm->data_free = free_fn;
 }

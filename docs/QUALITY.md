@@ -52,11 +52,12 @@ a minute; the seam suite it sits next to is a push gate, and needs no display of
 its own because `scripts/check-seam.sh` starts a private Xvfb for every run.
 
 The unit suite under the sanitizers is the `sanitize` gate in the `gates` job,
-not a job of its own. A job that ran `make test SANITIZE=1` raw was red from the
-first push: the suite leaks at allocation sites that
-`tests/quality/asan-baseline.txt` records, and only `scripts/check-sanitize.sh`
-reads that baseline. Two places asked the same question and answered
-differently, so the raw one is gone and the baseline is the single answer.
+not a job of its own. A job that ran `make test SANITIZE=1` raw reported every
+leak site, including the ones `tests/quality/asan-baseline.txt` deferred, and
+only `scripts/check-sanitize.sh` reads that baseline. Two places asked the same
+question and answered differently, so the raw one is gone and the gate is the
+single answer. The baseline holds no site now: the suite allocates nothing it
+leaves behind, so any report the gate sees is new and fails the push.
 
 A baseline records debt, so fixing a baselined site means updating the baseline
 in the same commit: an entry left behind says a defect is still there when it is
