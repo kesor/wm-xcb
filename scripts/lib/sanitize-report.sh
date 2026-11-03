@@ -130,7 +130,11 @@ sanitize_verify_sites() {
 
   if [ "${#sites[@]}" -eq 0 ]; then
     if [ "$known_count" -eq 0 ]; then
-      echo "$gate: no sanitizer report at all"
+      # The success line has to say it checked something. "no sanitizer report
+      # at all" was also the wording of the two refusals below, so a clean run
+      # read as a gate admitting it had checked nothing, and whoever read it
+      # went and verified the ASan runtime by hand.
+      echo "$gate: no sanitizer report, and the baseline is empty: nothing to check"
       return 0
     fi
     echo "$gate: the log carries no sanitizer report, but $baseline lists $known_count site(s)."

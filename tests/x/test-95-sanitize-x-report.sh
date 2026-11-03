@@ -87,7 +87,7 @@ check_eq "the refusal says the baseline expects a site" 1 \
 
 expect_verdict "no report next to an empty baseline is accepted" 0 release-sanitize "$CLEAN_LOG" "$EMPTY_BASELINE"
 check_eq "an empty log and an empty baseline is the one clean case" 1 \
-  "$(grep -c 'no sanitizer report at all' "$LAST")"
+  "$(grep -c 'no sanitizer report, and the baseline is empty: nothing to check' "$LAST")"
 
 expect_verdict "a UBSan report is a site" 1 release-sanitize "$UBSAN_LOG" "$EMPTY_BASELINE"
 check_eq "the UBSan site is keyed by file and message" 1 \

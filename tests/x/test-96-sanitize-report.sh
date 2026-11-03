@@ -98,6 +98,10 @@ check_eq "a baseline written from the run accepts that run" 0 "$?"
 echo "# Nothing known." >"$BASELINE"
 sanitize_verify_sites "$CLEAN_LOG" "$BASELINE" check-sanitize >"$LAST" 2>&1
 check_eq "a clean log next to an empty baseline passes" 0 "$?"
-check_eq "and says so" 1 "$(grep -c 'no sanitizer report at all' "$LAST")"
+# The success line says which case it accepted. "no sanitizer report at all"
+# was the wording of both refusals too, so a clean run read as a gate admitting
+# it had checked nothing.
+check_eq "and says what it accepted" 1 \
+  "$(grep -c 'no sanitizer report, and the baseline is empty: nothing to check' "$LAST")"
 
 finish
