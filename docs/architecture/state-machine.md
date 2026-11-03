@@ -73,6 +73,16 @@ typedef struct StateMachine {
 } StateMachine;
 ```
 
+### Trace
+
+Every machine keeps its last `SM_TRACE_DEPTH` (8) changes in a ring: the pair
+that changed, whether it was a raw write or a transition, what the guard
+answered, and which event went out. A refused transition is kept too, with
+`applied` false, so a request that did nothing is a record instead of a
+silence. `src/sm/sm-trace.h` defines the entry; `sm_trace_snapshot()` copies
+the ring oldest first. The ring is a fixed array inside the machine, so
+recording costs no allocation on a path that runs per event.
+
 ---
 
 ## SM Template Structure

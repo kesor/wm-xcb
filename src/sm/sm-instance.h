@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "sm-trace.h"
+
 /* Forward declarations (defined in sm-template.h) */
 typedef struct SMTemplate   SMTemplate;
 typedef struct StateMachine StateMachine;
@@ -57,6 +59,13 @@ struct StateMachine {
   SMHookList*  hooks[SM_HOOK_MAX]; /* hook lists for each phase */
   EventEmitter emit;               /* event emitter function (e.g., hub_emit) */
   void*        emit_userdata;      /* userdata passed to emit function */
+
+  /* Last SM_TRACE_DEPTH changes, for sm_trace_snapshot() and the state dump. */
+  struct {
+    SMTraceEntry entries[SM_TRACE_DEPTH];
+    uint32_t     count; /* entries recorded, saturates at SM_TRACE_DEPTH */
+    uint32_t     next;  /* slot the next entry is written to */
+  } trace;
 };
 
 /*

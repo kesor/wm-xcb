@@ -3,8 +3,61 @@
 #include "sm-instance.h"
 #include "sm-registry.h"
 #include "sm-template.h"
+#include "sm-trace.h"
 #include "wm-hub.h"
 #include "wm-log.h"
+
+/*
+ * Append one change to the machine's ring.
+ *
+ * The slot is overwritten in place and the ring never grows: a machine that
+ * transitions on every key press must not allocate from a code path the event
+ * loop runs.
+ */
+static void
+sm_trace_record(StateMachine* sm, uint32_t from_state, uint32_t to_state,
+                uint32_t emit_event, SMTraceVia via, SMTraceGuard guard,
+                bool applied)
+{
+  SMTraceEntry* entry = &sm->trace.entries[sm->trace.next];
+
+  entry->from_state = from_state;
+  entry->to_state   = to_state;
+  entry->emit_event = emit_event;
+  entry->via        = via;
+  entry->guard      = guard;
+  entry->applied    = applied;
+
+  sm->trace.next = (sm->trace.next + 1) % SM_TRACE_DEPTH;
+  if (sm->trace.count < SM_TRACE_DEPTH)
+    sm->trace.count++;
+}
+
+uint32_t
+sm_trace_count(StateMachine* sm)
+{
+  if (sm == NULL)
+    return 0;
+  return sm->trace.count;
+}
+
+uint32_t
+sm_trace_snapshot(StateMachine* sm, SMTraceEntry* out, uint32_t capacity)
+{
+  if (sm == NULL || out == NULL)
+    return 0;
+
+  uint32_t copy = sm->trace.count < capacity ? sm->trace.count : capacity;
+
+  /* trace.next is the oldest entry once the ring is full, and one past the
+     newest before that, so the newest `copy` entries start here either way. */
+  uint32_t first = (sm->trace.next + SM_TRACE_DEPTH - copy) % SM_TRACE_DEPTH;
+
+  for (uint32_t i = 0; i < copy; i++)
+    out[i] = sm->trace.entries[(first + i) % SM_TRACE_DEPTH];
+
+  return copy;
+}
 
 /*
  * Hook storage for each state machine instance
@@ -111,6 +164,8 @@ sm_create(void* owner, SMTemplate* template, EventEmitter emit, void* emit_userd
   sm->data          = NULL;
   sm->emit          = emit;
   sm->emit_userdata = emit_userdata;
+  sm->trace.count   = 0;
+  sm->trace.next    = 0;
 
   /* Allocate hook lists for each phase */
   for (int i = 0; i < SM_HOOK_MAX; i++) {
@@ -236,7 +291,12 @@ sm_raw_write(StateMachine* sm, uint32_t new_state)
   /* Emit transition event if a valid transition exists */
   SMTransition* t = sm_template_find_transition(
       sm->template, old_state, new_state);
-  sm_emit_event(sm, old_state, new_state, t ? t->emit_event : 0);
+  uint32_t emit_event = t ? t->emit_event : 0;
+
+  sm_trace_record(sm, old_state, new_state, emit_event,
+                  SM_VIA_RAW_WRITE, SM_GUARD_NONE, true);
+
+  sm_emit_event(sm, old_state, new_state, emit_event);
 }
 
 bool
@@ -252,6 +312,8 @@ sm_transition(StateMachine* sm, uint32_t target_state)
   if (t == NULL) {
     LOG_DEBUG("sm_transition: no valid transition %s: %u -> %u",
               sm->name, sm->current_state, target_state);
+    sm_trace_record(sm, sm->current_state, target_state, 0,
+                    SM_VIA_TRANSITION, SM_GUARD_NONE, false);
     return false;
   }
 
@@ -264,6 +326,8 @@ sm_transition(StateMachine* sm, uint32_t target_state)
     if (!sm_run_guard(sm, t->guard_fn, sm->data)) {
       LOG_DEBUG("sm_transition: guard '%s' rejected transition %s: %u -> %u",
                 t->guard_fn, sm->name, sm->current_state, target_state);
+      sm_trace_record(sm, sm->current_state, target_state, 0,
+                      SM_VIA_TRANSITION, SM_GUARD_REJECTED, false);
       return false;
     }
     LOG_DEBUG("sm_transition: guard '%s' passed for %s", t->guard_fn, sm->name);
@@ -281,6 +345,8 @@ sm_transition(StateMachine* sm, uint32_t target_state)
   if (t->action_fn != NULL) {
     if (!sm_run_action(sm, t->action_fn, sm->data)) {
       LOG_ERROR("sm_transition: action '%s' failed for %s", t->action_fn, sm->name);
+      sm_trace_record(sm, sm->current_state, target_state, 0,
+                      SM_VIA_TRANSITION, SM_GUARD_PASSED, false);
       return false;
     }
     LOG_DEBUG("sm_transition: executed action '%s' for %s", t->action_fn, sm->name);
@@ -292,6 +358,13 @@ sm_transition(StateMachine* sm, uint32_t target_state)
 
   /* Run post-action hooks */
   sm_hook_list_run(sm->hooks[SM_HOOK_POST_ACTION], sm);
+
+  /* Recorded before the event goes out, so a subscriber that dumps the machine
+     sees the change that caused its callback. */
+  sm_trace_record(sm, old_state, target_state, t->emit_event,
+                  SM_VIA_TRANSITION,
+                  t->guard_fn != NULL ? SM_GUARD_PASSED : SM_GUARD_NONE,
+                  true);
 
   /* Emit event */
   if (t->emit_event != 0) {
