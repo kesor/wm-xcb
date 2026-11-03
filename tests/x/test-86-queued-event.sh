@@ -57,7 +57,7 @@ if [ -z "$DISPLAY_NUM" ]; then
   exit 1
 fi
 
-VARIANT=$(make -s -C "$ROOT_DIR" print-variant DEBUG="${DEBUG:-0}" SANITIZE="${SANITIZE:-0}")
+VARIANT=$(make -s -C "$ROOT_DIR" print-variant DEBUG="${WM_SEAM_DEBUG:-0}" SANITIZE="${SANITIZE:-0}")
 WM_BIN="$ROOT_DIR/build/$VARIANT/wm"
 if [ ! -x "$WM_BIN" ]; then
   fail "the WM under test exists ($WM_BIN)"

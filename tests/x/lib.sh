@@ -19,7 +19,11 @@
 # any value, and run.sh is started with DEBUG=<variant> for the build it picks.
 # That trace is 375 lines per xdotool call, which drowns the assertions and, at
 # the call counts a drag test needs, overflows the output run.sh reads back.
-# run.sh has already chosen the variant by the time a test sources this file.
+# run.sh has already chosen the variant by the time a test sources this file, so
+# the value is kept under a name libxdo does not read, for the tests that start
+# a server of their own and need the same build.
+WM_SEAM_DEBUG=${DEBUG:-0}
+export WM_SEAM_DEBUG
 unset DEBUG
 
 XCLIENT="$ROOT_DIR/tools/xclient"
