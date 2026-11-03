@@ -150,6 +150,28 @@ zero-length row table is a GNU extension the `-pedantic` build rejects.
 not check the table, because the framework's own tests build machines the
 contract forbids on purpose.
 
+### The diagram, and what checks it
+
+The header that declares a template carries its diagram directly under a line
+naming the machine, one line per row, ending at the first empty comment line:
+
+```c
+/*
+ * State machine: focus
+ *   UNFOCUSED -> FOCUSED     event EVT_CLIENT_FOCUSED     guard focus_guard_can_focus
+ *   FOCUSED   -> UNFOCUSED   event EVT_CLIENT_UNFOCUSED   guard focus_guard_can_unfocus
+ *
+ * Prose below the diagram is for the reader and is not checked.
+ */
+SMTemplate* focus_sm_template_create(void);
+```
+
+`tests/unit/test-sm-templates.c` reads that block out of each header and fails
+when a declared state is missing from it or a declared row is not drawn. Rename
+a state or add a row and the diagram has to follow in the same commit. What the
+check cannot see is a line whose guard or event is wrong: that is what the
+review of a template change is for (`.agents/skills/wm-review/SKILL.md`).
+
 ---
 
 ## State Machine Operations

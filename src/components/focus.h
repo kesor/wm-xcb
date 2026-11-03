@@ -116,16 +116,20 @@ void focus_component_shutdown(void);
  */
 
 /*
+ * State machine: focus
+ *   UNFOCUSED -> FOCUSED     event EVT_CLIENT_FOCUSED     guard focus_guard_can_focus
+ *   FOCUSED   -> UNFOCUSED   event EVT_CLIENT_UNFOCUSED   guard focus_guard_can_unfocus
+ *
+ * The pointer decides: ENTER_NOTIFY raw-writes FOCUSED and LEAVE_NOTIFY
+ * raw-writes UNFOCUSED, because the pointer crossing is reality and not a
+ * request. A transition is what a keybinding asks for, so the guards apply
+ * there.
+ */
+SMTemplate* focus_sm_template_create(void);
+
+/*
  * Create the Focus State Machine template.
  * Returns a template that can be used to create FocusSM instances.
- *
- * Template states:
- *   FOCUS_STATE_UNFOCUSED (initial)
- *   FOCUS_STATE_FOCUSED
- *
- * Transitions:
- *   UNFOCUSED → FOCUSED (raw_write on ENTER_NOTIFY, emit: EVT_CLIENT_FOCUSED)
- *   FOCUSED → UNFOCUSED (raw_write on LEAVE_NOTIFY, emit: EVT_CLIENT_UNFOCUSED)
  */
 SMTemplate* focus_sm_template_create(void);
 

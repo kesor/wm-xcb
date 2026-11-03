@@ -8,6 +8,8 @@
  *  - a template with an unreachable state, or a row that emits nothing, fails
  *    validation and cannot be compiled from a table definition
  *  - every template the tree ships passes validation
+ *  - every template ships its text diagram in the header, and the diagram names
+ *    the states and rows the table has (PHILOSOPHY 5.10)
  *  - every row of every machine, driven for real, emits the event it names
  *
  * The walk tests use the component's own instance, so a guard that refuses a
@@ -17,6 +19,7 @@
 
 #include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
+#include <ctype.h>
 #include <string.h>
 
 #include "src/actions/action-registry.h"
@@ -179,6 +182,8 @@ test_validate_rejects_an_undeclared_initial_state(void)
 
 /* ==================== the templates this tree ships ==================== */
 
+static void check_diagram(const char* machine, const char* header_path, SMTemplate* tmpl);
+
 static void
 test_template_is_valid(const char* what, SMTemplate* tmpl)
 {
@@ -207,14 +212,17 @@ test_shipped_templates_are_valid(void)
 
   SMTemplate* focus_tmpl = focus_sm_template_create();
   test_template_is_valid("focus", focus_tmpl);
+  check_diagram("focus", "src/components/focus.h", focus_tmpl);
   sm_template_destroy(focus_tmpl);
 
   SMTemplate* fullscreen_tmpl = fullscreen_sm_template_create();
   test_template_is_valid("fullscreen", fullscreen_tmpl);
+  check_diagram("fullscreen", "src/components/fullscreen.h", fullscreen_tmpl);
   sm_template_destroy(fullscreen_tmpl);
 
   SMTemplate* connection_tmpl = connection_sm_template_create();
   test_template_is_valid("connection", connection_tmpl);
+  check_diagram("connection", "src/components/connection-sm.h", connection_tmpl);
   sm_template_destroy(connection_tmpl);
 
   Monitor* m = monitor_create(900);
@@ -223,15 +231,185 @@ test_shipped_templates_are_valid(void)
   StateMachine* view_sm = tag_manager_get_view_sm(m);
   assert_or_abort(view_sm != NULL);
   test_template_is_valid("tag-view", sm_get_template(view_sm));
+  check_diagram("tag-view", "src/components/tag-manager.h", sm_get_template(view_sm));
 
   StateMachine* layout_sm = tiling_get_sm(m);
   assert_or_abort(layout_sm != NULL);
   test_template_is_valid("layout", sm_get_template(layout_sm));
+  check_diagram("layout", "src/components/tiling.h", sm_get_template(layout_sm));
 
   monitor_destroy(m);
   monitor_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
+}
+
+/* ==================== the diagram next to the template ==================== */
+
+/*
+ * The convention: a template's doc comment opens with
+ *
+ *   State machine: <template name>
+ *   FROM -> TO      event <name>   guard <name>
+ *   ...
+ *
+ * and the diagram is those lines, up to the first empty comment line. Prose
+ * below that line is for the reader and is not checked, so it may name a state
+ * without the check mistaking it for the diagram. The lines have to be there
+ * because they are what a person reads when they open the header; the check is
+ * what keeps them equal to the table.
+ */
+static bool
+diagram_block(const char* header_path, const char* machine, char* out, size_t size)
+{
+  FILE* file = fopen(header_path, "r");
+  if (file == NULL) {
+    LOG_CLEAN("cannot read %s", header_path);
+    return false;
+  }
+
+  static char source[65536];
+  size_t      read = fread(source, 1, sizeof(source) - 1, file);
+  source[read]     = '\0';
+  fclose(file);
+
+  char marker[64];
+  snprintf(marker, sizeof(marker), "State machine: %s", machine);
+
+  const char* start = strstr(source, marker);
+  if (start == NULL)
+    return false;
+
+  /* The diagram ends at the first comment line that carries nothing after the
+     asterisk. */
+  const char* line = strchr(start, '\n');
+  const char* end  = NULL;
+  while (line != NULL) {
+    const char* next = strchr(line + 1, '\n');
+    const char* from = line + 1;
+    size_t      span = next != NULL ? (size_t) (next - from) : strlen(from);
+
+    char   trimmed[256];
+    size_t copy = span < sizeof(trimmed) - 1 ? span : sizeof(trimmed) - 1;
+    memcpy(trimmed, from, copy);
+    trimmed[copy] = '\0';
+
+    char* text = trimmed;
+    while (*text == ' ' || *text == '\t')
+      text++;
+    if (*text == '*')
+      text++;
+    while (*text == ' ' || *text == '\t')
+      text++;
+
+    bool blank = *text == '\0' || strncmp(text, "*/", 2) == 0;
+    if (blank) {
+      end = from;
+      break;
+    }
+
+    line = next;
+  }
+
+  if (end == NULL)
+    end = start + strlen(start);
+
+  size_t length = (size_t) (end - start);
+  if (length >= size)
+    length = size - 1;
+
+  memcpy(out, start, length);
+  out[length] = '\0';
+  return true;
+}
+
+/* Name match that does not fire on a longer name containing it: a diagram that
+   says TILES has not named the state TILE. */
+static bool
+has_word(const char* text, const char* word)
+{
+  size_t length = strlen(word);
+
+  for (const char* found = strstr(text, word); found != NULL; found = strstr(found + 1, word)) {
+    bool starts = found == text || !(isalnum((unsigned char) found[-1]) || found[-1] == '_');
+    bool ends   = !(isalnum((unsigned char) found[length]) || found[length] == '_');
+    if (starts && ends)
+      return true;
+  }
+
+  return false;
+}
+
+static bool
+line_draws_row(const char* line, size_t length, const char* from, const char* to)
+{
+  char buffer[512];
+
+  if (length >= sizeof(buffer))
+    length = sizeof(buffer) - 1;
+  memcpy(buffer, line, length);
+  buffer[length] = '\0';
+
+  if (!has_word(buffer, from) || !has_word(buffer, to))
+    return false;
+
+  /* Direction matters: the row is the state it leaves, then the state it
+     enters. A diagram that has them the other way is about another row. A row
+     that stays in its state has one position, so the comparison includes it. */
+  return strstr(buffer, from) <= strstr(buffer, to);
+}
+
+static bool
+diagram_draws_row(const char* block, const char* from, const char* to)
+{
+  const char* line = block;
+
+  while (line != NULL && *line != '\0') {
+    const char* end  = strchr(line, '\n');
+    size_t      size = end != NULL ? (size_t) (end - line) : strlen(line);
+
+    if (line_draws_row(line, size, from, to))
+      return true;
+
+    line = end != NULL ? end + 1 : NULL;
+  }
+
+  return false;
+}
+
+static void
+check_diagram(const char* machine, const char* header_path, SMTemplate* tmpl)
+{
+  LOG_CLEAN("== '%s' ships a diagram of itself", machine);
+
+  char* block = calloc(1, 8192);
+  assert_or_abort(block != NULL);
+
+  bool found = diagram_block(header_path, machine, block, 8192);
+  if (!found)
+    LOG_CLEAN("%s: no comment block starting 'State machine: %s'", header_path, machine);
+  assert(found == true);
+
+  for (uint32_t i = 0; i < tmpl->num_states; i++) {
+    const char* state = tmpl->states[i].name;
+    assert_or_abort(state != NULL);
+    if (!has_word(block, state))
+      LOG_CLEAN("%s: the diagram does not name state %s", header_path, state);
+    assert(has_word(block, state) == true);
+  }
+
+  for (uint32_t r = 0; r < tmpl->num_transitions; r++) {
+    const char* from = sm_template_state_name(tmpl, tmpl->transitions[r].from_state);
+    const char* to   = sm_template_state_name(tmpl, tmpl->transitions[r].to_state);
+    assert_or_abort(from != NULL);
+    assert_or_abort(to != NULL);
+
+    if (!diagram_draws_row(block, from, to))
+      LOG_CLEAN("%s: the diagram has no line '%s -> %s'", header_path, from, to);
+    assert(diagram_draws_row(block, from, to) == true);
+  }
+
+  free(block);
 }
 
 /* ==================== walking every declared row ==================== */

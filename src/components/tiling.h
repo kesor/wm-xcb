@@ -117,21 +117,17 @@ void tiling_component_shutdown(void);
  */
 
 /*
+ * State machine: layout
+ *   TILE   (one state, no transitions)
+ *
+ * There is no other layout yet, so there is nothing to leave TILE for. A second
+ * layout is a state here and the rows in and out of it, not a second machine.
+ */
+SMTemplate* layout_sm_template_create(void);
+
+/*
  * Create the Layout State Machine template.
  * Returns a template that can be used to create LayoutSM instances.
- *
- * Template states:
- *   LAYOUT_STATE_TILE      (initial) - standard tiling layout
- *   LAYOUT_STATE_MONOCLE   - one window fills the screen
- *   LAYOUT_STATE_FLOATING  - windows at their stored positions
- *
- * Transitions:
- *   TILE → MONOCLE  (emit: EVT_LAYOUT_MONOCLE_CHANGED, EVT_LAYOUT_CHANGED)
- *   MONOCLE → TILE  (emit: EVT_LAYOUT_TILE_CHANGED, EVT_LAYOUT_CHANGED)
- *   TILE → FLOATING (emit: EVT_LAYOUT_FLOATING_CHANGED, EVT_LAYOUT_CHANGED)
- *   FLOATING → TILE (emit: EVT_LAYOUT_TILE_CHANGED, EVT_LAYOUT_CHANGED)
- *   MONOCLE → FLOATING (emit: EVT_LAYOUT_FLOATING_CHANGED, EVT_LAYOUT_CHANGED)
- *   FLOATING → MONOCLE (emit: EVT_LAYOUT_MONOCLE_CHANGED, EVT_LAYOUT_CHANGED)
  */
 SMTemplate* layout_sm_template_create(void);
 

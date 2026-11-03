@@ -24,19 +24,6 @@
 #include "wm-log.h"
 
 /*
- * Tag Manager SM template name
- */
-#define TAG_VIEW_SM_NAME "tag-view"
-
-/*
- * Tag Manager SM states
- */
-enum {
-  TAG_VIEW_EMPTY  = 0, /* No tags visible */
-  TAG_VIEW_TAGGED = 1, /* One or more tags visible */
-};
-
-/*
  * Tag Manager SM template
  */
 static SMTemplate* cached_tag_view_template = NULL;
@@ -198,7 +185,7 @@ tag_view_sm_template_create(void)
   };
 
   static const SMTemplateDef def =
-      SM_TEMPLATE_DEF(TAG_VIEW_SM_NAME, TAG_VIEW_EMPTY, states, rows);
+      SM_TEMPLATE_DEF(TAG_MANAGER_SM_NAME, TAG_VIEW_EMPTY, states, rows);
 
   SMTemplate* tmpl = sm_template_from_def(&def);
   if (tmpl == NULL) {
@@ -218,7 +205,7 @@ tag_manager_get_view_sm(Monitor* m)
   if (m == NULL)
     return NULL;
 
-  StateMachine* sm = monitor_get_sm(m, TAG_VIEW_SM_NAME);
+  StateMachine* sm = monitor_get_sm(m, TAG_MANAGER_SM_NAME);
   if (sm != NULL)
     return sm;
 
@@ -251,7 +238,7 @@ tag_manager_get_view_sm(Monitor* m)
   sm->data = tag_mask;
 
   /* Store in monitor */
-  if (!monitor_set_sm(m, TAG_VIEW_SM_NAME, sm)) {
+  if (!monitor_set_sm(m, TAG_MANAGER_SM_NAME, sm)) {
     LOG_ERROR("Failed to store tag-view SM in monitor");
     sm_destroy(sm);
     return NULL;
@@ -273,7 +260,7 @@ tag_manager_get_visible_tags(Monitor* m)
   if (m == NULL)
     return 0;
 
-  StateMachine* sm = monitor_get_sm(m, TAG_VIEW_SM_NAME);
+  StateMachine* sm = monitor_get_sm(m, TAG_MANAGER_SM_NAME);
   if (sm == NULL || sm->data == NULL)
     return 0;
 
@@ -722,14 +709,14 @@ tag_manager_on_unadopt(HubTarget* target)
   Monitor* m = (Monitor*) target;
 
   /* Get the SM and free its data */
-  StateMachine* sm = monitor_get_sm(m, TAG_VIEW_SM_NAME);
+  StateMachine* sm = monitor_get_sm(m, TAG_MANAGER_SM_NAME);
   if (sm != NULL && sm->data != NULL) {
     free(sm->data);
     sm->data = NULL;
   }
 
   /* Clear from monitor */
-  monitor_set_sm(m, TAG_VIEW_SM_NAME, NULL);
+  monitor_set_sm(m, TAG_MANAGER_SM_NAME, NULL);
 
   LOG_DEBUG("Tag manager unadopted by monitor: %lu", (unsigned long) target->id);
 }

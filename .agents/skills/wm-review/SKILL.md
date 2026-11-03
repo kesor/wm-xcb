@@ -60,6 +60,11 @@ run; if it says "docs updated", read the doc.
    registration. Each has a gate — run them: `make test`, `make check-async`,
    `./scripts/format-check.sh`, `./scripts/check-docs.sh`, and `make test-x`
    when the diff touches windows, keys, focus, or X properties.
+   A new or changed state machine also gets the one check no gate makes: its
+   header diagram (`State machine: <name>`, one `FROM -> TO` line per row) must
+   still be true. The test compares the diagram with the table for the states
+   and the rows; it cannot tell that a line describes the wrong guard or the
+   wrong event, so read those against the table yourself.
 3. **Something left broken or half-done and not mentioned.** A behaviour change
    without a test, a document that now contradicts the code, a comment
    describing what the code no longer does, a defect the author noticed and only

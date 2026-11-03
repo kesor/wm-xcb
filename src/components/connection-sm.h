@@ -2,11 +2,13 @@
  * Connection State Machine Template
  *
  * Tracks the connection state of a Monitor (RandR output).
- * States: CONNECTED, DISCONNECTED
  *
- * Transitions:
- *   CONNECTED → DISCONNECTED (on output disconnect)
- *   DISCONNECTED → CONNECTED (on output reconnect)
+ * State machine: connection
+ *   DISCONNECTED -> CONNECTED     event EVT_MONITOR_CONNECTED
+ *   CONNECTED    -> DISCONNECTED  event EVT_MONITOR_DISCONNECTED
+ *
+ * No guards: RandR says the output is there or it is not, and the machine does
+ * not get a vote.
  */
 
 #ifndef _CONNECTION_SM_H_

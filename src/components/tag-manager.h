@@ -61,9 +61,8 @@ enum TagManagerEventType {
  * Tag Manager SM states
  */
 enum TagViewState {
-  TAG_VIEW_NONE     = 0, /* No tags visible (empty) */
-  TAG_VIEW_ONE      = 1, /* Exactly one tag visible */
-  TAG_VIEW_MULTIPLE = 2, /* Multiple tags visible (all-tags view) */
+  TAG_VIEW_EMPTY  = 0, /* No tag selected: nothing to show */
+  TAG_VIEW_TAGGED = 1, /* One or more tags selected */
 };
 
 /*
@@ -101,10 +100,21 @@ bool tag_manager_component_init(void);
 void tag_manager_component_shutdown(void);
 
 /*
+ * State machine: tag-view
+ *   EMPTY  -> TAGGED   event EVT_TAG_CHANGED
+ *   TAGGED -> EMPTY    event EVT_TAG_CHANGED
+ *   TAGGED -> TAGGED   event EVT_TAG_CHANGED
+ *
+ * The mask of visible tags is the machine's data, not its state: switching from
+ * tag 1 to tag 2 is the TAGGED self-loop, and it still has to tell subscribers
+ * so the clients on the old tag are hidden. No guards: every view is allowed.
+ */
+StateMachine* tag_manager_get_view_sm(Monitor* m);
+
+/*
  * Get the TagViewSM for a monitor.
  * Creates the SM on first access (on-demand allocation).
  */
-StateMachine* tag_manager_get_view_sm(Monitor* m);
 
 /*
  * Check if a client is visible based on its tags and the monitor's tag view.

@@ -109,16 +109,19 @@ void fullscreen_component_shutdown(void);
  */
 
 /*
+ * State machine: fullscreen
+ *   WINDOWED   -> FULLSCREEN   event EVT_FULLSCREEN_ENTERED   guard fs_guard_can_fullscreen
+ *   FULLSCREEN -> WINDOWED     event EVT_FULLSCREEN_EXITED    guard fs_guard_can_unfullscreen
+ *
+ * A client that is not managed cannot enter fullscreen; leaving it is always
+ * allowed, because a window that cannot be restored is worse than one that was
+ * never maximised.
+ */
+SMTemplate* fullscreen_sm_template_create(void);
+
+/*
  * Create the Fullscreen State Machine template.
  * Returns a template that can be used to create FullscreenSM instances.
- *
- * Template states:
- *   FULLSCREEN_STATE_WINDOWED    (initial)
- *   FULLSCREEN_STATE_FULLSCREEN
- *
- * Transitions:
- *   WINDOWED → FULLSCREEN (guard: can_fullscreen, action: enter_fullscreen, emit: EVT_FULLSCREEN_ENTERED)
- *   FULLSCREEN → WINDOWED (guard: can_unfullscreen, action: exit_fullscreen, emit: EVT_FULLSCREEN_EXITED)
  */
 SMTemplate* fullscreen_sm_template_create(void);
 
