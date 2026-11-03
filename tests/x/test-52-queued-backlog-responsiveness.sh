@@ -23,8 +23,6 @@ resume_wm() {
 }
 trap resume_wm EXIT
 
-press super+1
-sleep 0.3
 spawn_client 1 400 300 backlog >/dev/null
 require_visible 1 "the window is visible on tag 1"
 

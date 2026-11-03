@@ -14,9 +14,6 @@
 # target.
 source "$(dirname "$0")/lib.sh"
 
-press super+1
-sleep 0.3
-
 mapfile -t first < <(spawn_client 1 400 300 pointerfirst)
 mapfile -t second < <(spawn_client 1 400 300 pointersecond)
 require_visible 2 "both windows are viewable"

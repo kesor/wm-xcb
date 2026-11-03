@@ -8,9 +8,6 @@
 # nothing in the session can take it back.
 source "$(dirname "$0")/lib.sh"
 
-press super+1
-sleep 0.3
-
 # One window per process, so the pid recorded for a spawn is the client behind
 # exactly one of the window ids.
 mapfile -t first < <(spawn_client 1 400 300 killedfirst)

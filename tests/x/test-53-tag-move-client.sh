@@ -9,8 +9,6 @@ source "$(dirname "$0")/lib.sh"
 
 TARGET_TAG=2
 
-press super+1
-sleep 0.3
 mapfile -t ids < <(spawn_client 1 400 300 tagnmove)
 check_eq "one window created" "1" "${#ids[@]}"
 require_visible 1 "the client is visible on tag 1"
