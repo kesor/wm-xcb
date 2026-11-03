@@ -226,6 +226,14 @@ beads in your final message. This is how the traps below stop being traps.
   copy back, and `bd setup <tool> --check` reports an incomplete integration
   after `--remove` as well as before the first install, so it cannot tell you
   whether to run the setup or to leave it alone.
+- **A merge can end up on no ref.** The publish step pushes, then resets master
+  onto `origin/master`, so a merge made while that push was in flight is in
+  neither and the reset takes it away. The commit then exists only as an object,
+  and the next `git gc` removes it. When a bead is closed as merged and its
+  files are not on master, read `git reflog master` for its
+  `merge work/<bead>` line, pin the sha with
+  `git update-ref refs/local/recovered-<bead> <sha>`, then merge it back and say
+  so in the bead.
 - **Do not push, and do not rewrite published history,** unless asked.
 
 ## Definition of done
