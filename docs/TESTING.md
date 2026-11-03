@@ -14,9 +14,10 @@
 
 `lefthook` runs the gates on every commit and push; CI runs the same commands.
 The seam suite (`make test-x`) is one of the push gates, through
-`scripts/check-seam.sh`: it starts Xvfb when there is no `DISPLAY`, and fails
-rather than skipping when neither is available. See [QUALITY.md](QUALITY.md).
-The sections below are the layers you run by hand while working.
+`scripts/check-seam.sh`: it runs on a private Xvfb it starts itself, whatever
+`DISPLAY` says, and fails rather than skipping when that server cannot start.
+See [QUALITY.md](QUALITY.md). The sections below are the layers you run by hand
+while working.
 
 ## 1. Environment
 
@@ -90,16 +91,19 @@ make DEBUG=1 test-x                # the seam suite against the debug WM
 DEBUG=1 ./tests/x/run.sh           # the same thing spelled out
 ```
 
-Each harness run prints one line before it starts anything:
+`scripts/xephyr-test.sh` and `tests/x/run.sh` print two lines before they start
+anything: the parent display they will draw into, then the build they will run.
 
 ```
+xephyr-test.sh: parent display = :99 (private Xvfb), session display = :0
 xephyr-test.sh: variant=debug (DEBUG=1 SANITIZE=0), binary=<repo>/build/debug/wm, log=<tmpdir>/wm-xephyr-test/wm.log
 ```
 
-The variant, the binary that runs and the log it writes are in that line, so a
-run never leaves you guessing which build it used or where its output went. If
-that line says `variant=debug` and the log is still empty, the WM itself never
-logged and the binary is not the suspect. `SANITIZE=1` works the same way.
+The variant, the binary that runs and the log it writes are in the variant
+line, so a run never leaves you guessing which build it used or where its output
+went. If that line says `variant=debug` and the log is still empty, the WM
+itself never logged and the binary is not the suspect. `SANITIZE=1` works the
+same way.
 
 The WM flushes each log line as it writes it, so a log from a WM that was killed
 rather than shut down is complete up to the last line it wrote. That matters for
@@ -180,14 +184,36 @@ stricter. The remaining known failures, as of the last refresh:
 
 | Test | Known failure, because |
 |------|-------------------------|
-| `test-40-focus-on-manage` | no `xcb_set_input_focus` anywhere (4.4) |
-| `test-50-tag-switch-keybinding` | no key grab, so `KEY_PRESS` never arrives (4.5) |
 | `test-60-ewmh-root-properties` | no root properties are set |
 
 Write a test so that it cannot pass for the wrong reason: a precondition such as
 "the window is visible before I press the key" uses `require_visible`, which
 stops the test, not `check_eq`, which would let a later "the window is gone now"
 pass because it was never there.
+
+Two files are the exception to "one Xephyr for the whole run" and start their
+own display, because the condition they check cannot be produced once the WM is
+already up: `test-86-queued-event.sh` and `test-88-adopt-existing-windows.sh`.
+
+`test-86-queued-event.sh` checks what a queued event does. libxcb reads ahead of
+`poll(2)`, so an event can sit in its queue while the socket is no longer
+readable; the test holds the first EWMH atom query with
+`tools/xcb-ewmh-delay.so` (an `LD_PRELOAD` shim), maps a window while the WM is
+held, then releases it. The reply wait reads that `MapRequest` into libxcb's
+queue, and a loop that only polls the socket never dispatches it. The shim is
+built by `make test-x`; it reads `WM_QUEUE_TEST_MARKER` and `WM_QUEUE_TEST_GO`
+and does nothing when either is unset.
+
+`test-88-adopt-existing-windows.sh` checks the startup scan: it maps two windows
+and an override-redirect window on a bare display, starts the WM afterwards, and
+asserts that the two are tiled and carry `WM_STATE=Normal` while the
+override-redirect window keeps its geometry and gets no `WM_STATE`.
+
+`test-51-burst-tag-switch.sh` uses the suite's WM but stops it with `SIGSTOP`
+while it sends `super+2` and `super+1`, so both key presses are queued and the
+WM dispatches them in one drain. That is the ordering where a hide and a later
+show both run before the `UnmapNotify` the hide causes is read. The test resumes
+the WM on every exit path.
 
 ---
 
@@ -205,22 +231,27 @@ compiled cannot produce findings, then flags calls that block:
 | Pattern | Why it is flagged |
 |---------|-------------------|
 | `xcb_*_reply()`, `xcb_wait_for_reply()`, `xcb_request_check()` | synchronous round trip: the loop waits for the server |
-| `xcb_poll_for_event()` | polling instead of blocking burns a core |
 | `read()` | a callback must not wait on a child's pipe |
 | `waitpid()` without `WNOHANG` | blocking wait on a child |
 | `sleep()`, `usleep()`, `nanosleep()` | anything that sleeps stops every client |
 
+`xcb_poll_for_event()` is not on the list. It returns NULL instead of waiting,
+which is what the loop does to drain the events libxcb queued after `poll(2)`
+reported the connection readable, and a grep cannot tell that from the spin it
+replaced. Busy-waiting is measured instead: `tests/x/test-85-idle-cpu.sh` in the
+seam suite, and the idle CPU line of `scripts/perf-test.sh`.
+
 A call is waived when it, or the two lines above it, carries
-`allow-blocking: <reason>`. The marker is the record of why the wait is safe,
-usually startup code that runs before the loop exists. Comments that mention a
+`allow-blocking: <reason>`. The marker is the record of why the wait is safe:
+startup code that runs before the loop exists, or the non-blocking read of the
+signal wakeup pipe in `signals_drain_wakeups()`. Comments that mention a
 blocking function are ignored, so prose cannot produce a false positive.
 
 The script prints the current counts. Every violation is the debt tracked in
-`bd list --parent wm-46k.2`: the busy-wait in `handle_xcb_events()`, the
-property-handler path through `print_atom_name()` and
-`ewmh_check_wm_state_fullscreen()`, the RandR handler path through
-`monitor_manager_update_crtc_geometry()` and its two helpers, and the blocking
-`read()`/`waitpid()` pair in `launcher_run_dmenu()`.
+`bd list --parent wm-46k.2`: the property-handler path through
+`print_atom_name()` and `ewmh_check_wm_state_fullscreen()`, the RandR handler
+path through `monitor_manager_update_crtc_geometry()` and its two helpers, and
+the blocking `read()`/`waitpid()` pair in `launcher_run_dmenu()`.
 
 The check is meant to reach zero by removing the violations, not by adding
 markers. A new marker needs a reason that would satisfy a reviewer: "startup,
@@ -232,6 +263,37 @@ before the loop runs" is one; "it is probably fine" is not.
 
 Xephyr renders a second X server inside a window on your real session. The WM
 under test runs as the only WM on that second display.
+
+### The parent display
+
+Xephyr needs a parent display to draw its window into. `scripts/xephyr-test.sh`,
+`tests/x/run.sh`, `scripts/check-seam.sh` and `scripts/check-sanitize-x.sh` get
+a private Xvfb for it, started by the run itself, whether or not `DISPLAY` is
+set: no Xephyr window appears on the desktop you are working on, and the run
+answers the same on a display with another depth or a wedged server. The rule
+lives in `scripts/lib/private-display.sh`, and each run prints the display it
+used:
+
+```
+run.sh: parent display = :99 (private Xvfb), session display = :0
+```
+
+`tests/x/run.sh` also writes that line to `$TMPDIR_SEAM/parent-display.txt`, and
+`tests/x/test-91-private-parent-display.sh` fails when the display the run
+recorded is not the one it handed to its tests, or when it is the session's own.
+
+The escape hatch is `WM_USE_SESSION_DISPLAY=1`. It is for looking at a run by
+eye, and it also needs `--keep`, because the private server is killed with the
+run and a kept session on it would have nothing to draw into:
+
+```bash
+WM_USE_SESSION_DISPLAY=1 make test-x TEST_X_ARGS=--keep
+WM_USE_SESSION_DISPLAY=1 scripts/xephyr-test.sh --keep --verbose
+```
+
+`xvfb-run` and `Xvfb` come from the dev shell. Without them the scripts stop
+with a message naming what is missing rather than falling back to the session
+display: that fallback is what this replaced.
 
 ### Manual session
 
@@ -276,6 +338,8 @@ make tools/xclient
 | `-s SEC` | sleep between window creations |
 | `-l SEC` | exit after SEC seconds instead of waiting to be killed |
 | `-v` | print each window ID |
+| `-y` | wait for the server to process each map before printing its ID |
+| `-o` | create override-redirect windows, which a WM must leave alone |
 
 `xdotool` finds them: `DISPLAY=:2 xdotool search --onlyvisible --class xclient`.
 
@@ -322,8 +386,10 @@ spawns N `xclient` windows, waits 4 s, then checks in order:
 Exit status 0 means all checks passed. Logs go to `$TMPDIR/wm-xephyr-test/` (`wm.log`, `xclient.log`,
 `xephyr.log`). `nix develop` sets `TMPDIR` to a per-shell directory, so it is
 usually not plain `/tmp`. `--keep` leaves the session running so you can look
-at it; the script prints the WM pid and display in that case. The first line
-names the variant, the binary and the log, as described under *Debug build*.
+at it; the script prints the WM pid and display in that case, and that display
+is a private Xvfb nobody can see unless `WM_USE_SESSION_DISPLAY=1` puts it on
+yours. The lines that name the parent display, then the variant, the binary and
+the log, are described under *Debug build*.
 
 This is written as the acceptance test for the X11 output path. Check 2 passes
 since the WM maps windows on `MapRequest`; checks 3 and 4 wait for tiling
@@ -341,29 +407,33 @@ It starts the same way as `xephyr-test.sh`: it builds the WM variant named by
 `DEBUG` and `SANITIZE`, prints the line that names the variant, the binary and
 the log, and runs that binary. The baseline below was measured on the release
 build; a debug build is `-O0` and its numbers are not comparable with it, which
-is why the variant is in the output. It then prints five numbers:
+is why the variant is in the output. It then prints these numbers:
 
 | Number | How it is measured | Why it matters |
 |--------|--------------------|----------------|
-| idle CPU | `/proc/<wm pid>/stat` utime+stime over 2 s wall (Linux) | the WM must cost nothing when nothing happens |
+| idle CPU | `/proc/<wm pid>/stat` utime+stime over 2 s wall (Linux) | the WM must cost nothing when nothing happens; over the script's budget the run fails |
 | burst CPU | utime+stime delta while N windows are created | cost of the manage path per window |
 | per window | burst CPU / N | comparable across window counts |
 | time to tile | wall clock until all N windows are viewable, polled every 10 ms, TIMEOUT at 5 s | the number a user feels |
 | RSS | `VmRSS` before/after the burst | leak and growth detection |
+| SIGTERM | wall clock from SIGTERM until the WM's `/proc` state is gone or `Z` | a loop that blocks must still be stoppable |
 
-Baseline measured 2026-11-01 (1280x800 Xephyr, 5 and 10 windows):
+Measured 2026-11-02 (1280x800 Xephyr, release build, 5 windows):
 
 ```
-idle CPU: 1990 ms over 2000 ms wall          <- busy-wait loop, see STATUS §4.7
-time to tile: TIMEOUT (5000 ms); 0 of 5 viewable
-burst CPU: 5010 ms
-RSS: 2840 kB before, 2840 kB after
+idle CPU: 0 ms over 2000 ms wall (budget 20 ms)
+time to tile: 12 ms for 5 windows (2.4 ms per window)
+burst CPU: 0 ms (0.00 ms per window)
+RSS: 2864 kB before, 2864 kB after (0 kB growth)
+SIGTERM: WM exited in 8 ms
 ```
 
-So today the number to beat is "100% of a core doing nothing". After the loop is
-fixed, idle CPU should be a few milliseconds over 2 s. A reasonable target for
-time to tile is under 50 ms for 10 windows, which is roughly one X round trip
-per client on a local socket.
+Idle CPU is a budget, not a baseline: the loop blocks in `poll(2)`, so anything
+above a few milliseconds over the window means it is spinning again, and the
+script fails the run rather than leaving the number for someone to compare by
+eye. `tests/x/test-85-idle-cpu.sh` asserts the same thing inside the seam suite.
+The wall clock numbers are the machine's: time to tile is roughly one X round
+trip per client on a local socket.
 
 What these numbers do not cover, and what to add when it matters:
 
@@ -409,7 +479,10 @@ the binary exit non-zero with LeakSanitizer's summary even when every assertion
 passed. The suite leaks today at the allocation sites listed in
 `tests/quality/asan-baseline.txt`, so a raw run of the whole suite is not the
 check: `scripts/check-sanitize.sh` runs the same binary and fails only on a site
-that is not in the baseline.
+that is not in the baseline. It also drops `suppressions=` and `log_path=` from
+the sanitizer options, checks the binary it ran for the ASan runtime, and fails
+when the baseline lists sites and the log holds no report, for the reasons the
+nested-server gate below gives.
 
 Remember that `./wm` is now the instrumented binary: run `make` to put the
 plain one back. The objects do not need cleaning, see *Build directories*
@@ -436,7 +509,8 @@ an uninstrumented binary writes a log with no report in it. `suppressions=` and
 `log_path=` are dropped from the sanitizer options before the harness starts,
 because either one turns a real report into silence. And a baseline with
 entries next to a log with no report fails, because that is either the fixes
-landing without their baseline update or the sanitizer never running.
+landing without their baseline update or the sanitizer never running. That
+verdict is `scripts/lib/sanitize-report.sh`, shared with the unit-suite gate.
 
 ```bash
 scripts/check-sanitize-x.sh --update-baseline  # accept today's sites under a live WM
@@ -448,9 +522,9 @@ scripts/check-sanitize-x.sh --update-baseline  # accept today's sites under a li
 strace -f -e trace=poll,read,write,recvmsg,sendmsg -p "$(pgrep -x wm)"
 ```
 
-The busy-wait loop shows up as a continuous stream of `poll`/`recvmsg`
-returning `EAGAIN`. After the fix, the same trace should be silent until an X
-event arrives.
+A busy-wait loop shows up as a continuous stream of `poll`/`recvmsg`
+returning `EAGAIN`. A loop that blocks is silent until an X event or a signal
+arrives, and one `poll` that returns is what wakes it.
 
 ---
 
@@ -463,7 +537,9 @@ event arrives.
 | nested screen is black | the WM died before it mapped anything, or this is a stale session | `scripts/xephyr-test.sh --verbose`, read `wm.log` |
 | `xterm: cannot load font` | Xephyr has no usable fonts | use `tools/xclient` |
 | `xdotool: command not found` | not in the dev shell | `direnv allow` or `nix develop`; if the package the recipe needs is not in `flake.nix` at all, add it to `buildInputs` and commit that with the recipe |
-| WM dies silently at startup | `-DDEBUG` build not used, so the reason was never printed | check the variant on the first line of the run, then rerun with `DEBUG=1`, or with `DEBUG=1 scripts/xephyr-test.sh --verbose` |
+| WM dies silently at startup | `-DDEBUG` build not used, so the reason was never printed | check the variant line of the run, then rerun with `DEBUG=1`, or with `DEBUG=1 scripts/xephyr-test.sh --verbose` |
+| no Xephyr window appears anywhere | the run drew into its own private Xvfb, which is the default | read the parent-display line, or add `WM_USE_SESSION_DISPLAY=1` to watch it on your display |
+| `xvfb-run and Xvfb are not both on PATH` | not in the dev shell, and the session display is not used as a fallback | `direnv allow` or `nix develop`; `WM_USE_SESSION_DISPLAY=1` is the non-hermetic alternative |
 | `scripts/xephyr-test.sh` cannot find `wm` | not built | `make && make tools/xclient` |
 
 ---

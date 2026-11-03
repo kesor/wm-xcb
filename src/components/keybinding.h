@@ -27,6 +27,8 @@
 
 #include "wm-hub.h"
 
+#define KEYBINDING_COMPONENT_NAME "keybinding"
+
 /*
  * Key binding action types (legacy enum for backward compatibility)
  * New code should use action name strings directly.
@@ -131,6 +133,20 @@ void keybinding_handle_key_press(void* event);
 void keybinding_handle_key_release(void* event);
 
 /*
+ * Handle MAPPING_NOTIFY events
+ * Re-grabs the keys when the keyboard or modifier map changed
+ */
+void keybinding_handle_mapping_notify(void* event);
+
+/*
+ * Grab every configured binding on the root window, with the CapsLock and
+ * NumLock masks a press can carry. keybinding_init() calls this once the
+ * bindings are wired; a MappingNotify calls it again. Does nothing without an
+ * X connection.
+ */
+void keybinding_grab_keys(void);
+
+/*
  * Convert X event to key binding lookup
  * Returns the matching KeyBinding or NULL if not found
  */
@@ -152,6 +168,11 @@ uint32_t keybinding_get_count(void);
  * Called by hub during component registration
  */
 void keybinding_init(void);
+
+/*
+ * Check if the component is initialized (for the startup check)
+ */
+bool keybinding_is_initialized(void);
 
 /*
  * Shutdown the keybinding component

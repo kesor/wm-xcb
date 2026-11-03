@@ -13,7 +13,6 @@
 #include "test-registry.h"
 #include "test-target-client.h"
 #include "test-wm.h"
-#include "wm-components.h"
 #include "wm-hub.h"
 
 /*
@@ -617,36 +616,163 @@ test_unmanaged_client_not_focusable(void)
 }
 
 /*
- * The startup order is what makes the component exist at runtime: the
- * ENTER/LEAVE handlers and the focus actions are all registered inside
- * focus_component_init(). Run the same sequence the window manager runs and
- * check the component came out of it wired, then that shutdown undoes it.
+ * A client that is managed takes focus.
+ *
+ * Nothing else would point the server at a window mapped after startup: focus
+ * otherwise follows the pointer, which was already somewhere else.
  */
 void
-test_focus_component_starts_with_the_wm(void)
+test_focus_follows_managed_client(void)
 {
-  LOG_CLEAN("== Testing the startup order initializes the focus component");
+  LOG_CLEAN("== Testing a managed client takes focus");
 
   hub_init();
   sm_registry_init();
-  xcb_handler_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
 
-  wm_components_init();
+  Client* c = client_create(100);
+  assert_or_abort(c != NULL);
+  client_set_managed(c, true);
+  client_set_mapped(c, true);
 
-  assert(focus_component_is_initialized() == true);
-  assert(xcb_handler_count_for_type(XCB_ENTER_NOTIFY) >= 1);
-  assert(xcb_handler_count_for_type(XCB_LEAVE_NOTIFY) >= 1);
-  assert(hub_get_component_by_name(FOCUS_COMPONENT_NAME) != NULL);
-  assert(action_exists("focus.focus-current"));
-  assert(action_exists("focus.focus-prev"));
+  assert(focus_get_focused_window() == 0);
 
-  wm_components_shutdown();
+  hub_emit(EVT_CLIENT_MANAGED, c->target.id, NULL);
 
-  assert(focus_component_is_initialized() == false);
-  assert(xcb_handler_count_for_type(XCB_ENTER_NOTIFY) == 0);
-  assert(action_exists("focus.focus-current") == false);
+  assert(focus_get_focused_window() == 100);
+  assert(focus_is_focused(c) == true);
 
-  xcb_handler_shutdown();
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Focus moves to the newest remaining client when the focused one is unmapped.
+ */
+void
+test_focus_moves_when_focused_client_unmaps(void)
+{
+  LOG_CLEAN("== Testing focus moves when the focused client unmaps");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+
+  Client* older = client_create(100);
+  assert_or_abort(older != NULL);
+  Client* newer = client_create(200);
+  assert_or_abort(newer != NULL);
+
+  client_set_managed(older, true);
+  client_set_mapped(older, true);
+  client_set_managed(newer, true);
+  client_set_mapped(newer, true);
+
+  /* The order client-list manages them: the older window first */
+  hub_emit(EVT_CLIENT_MANAGED, older->target.id, NULL);
+  hub_emit(EVT_CLIENT_MANAGED, newer->target.id, NULL);
+
+  assert(focus_get_focused_window() == 200);
+
+  /* The order client-list uses: the flags go first, then the event */
+  client_set_managed(newer, false);
+  client_set_mapped(newer, false);
+  hub_emit(EVT_CLIENT_UNMANAGED, newer->target.id, NULL);
+
+  assert(focus_get_focused_window() == 100);
+  assert(focus_is_focused(older) == true);
+  assert(focus_is_focused(newer) == false);
+
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Focus moves off a client that is destroyed while it still looks managed and
+ * mapped: the client is unregistered after the event, not before it.
+ */
+void
+test_focus_moves_when_focused_client_is_destroyed(void)
+{
+  LOG_CLEAN("== Testing focus moves when the focused client is destroyed");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+
+  Client* older = client_create(100);
+  assert_or_abort(older != NULL);
+  Client* newer = client_create(200);
+  assert_or_abort(newer != NULL);
+
+  client_set_managed(older, true);
+  client_set_mapped(older, true);
+  client_set_managed(newer, true);
+  client_set_mapped(newer, true);
+
+  /* The order client-list manages them: the older window first */
+  hub_emit(EVT_CLIENT_MANAGED, older->target.id, NULL);
+  hub_emit(EVT_CLIENT_MANAGED, newer->target.id, NULL);
+
+  assert(focus_get_focused_window() == 200);
+
+  hub_emit(EVT_CLIENT_DESTROYED, newer->target.id, NULL);
+
+  assert(focus_get_focused_window() == 100);
+  assert(focus_is_focused(older) == true);
+
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * The last client leaving leaves nothing focused, and its machine stops
+ * claiming focus: the X focus goes back to the root window, which the unit
+ * tests cannot see without a connection.
+ */
+void
+test_focus_cleared_when_last_client_leaves(void)
+{
+  LOG_CLEAN("== Testing focus clears when the last client leaves");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+
+  Client* c = client_create(100);
+  assert_or_abort(c != NULL);
+  client_set_managed(c, true);
+  client_set_mapped(c, true);
+  hub_emit(EVT_CLIENT_MANAGED, c->target.id, NULL);
+  assert(focus_is_focused(c) == true);
+
+  client_set_managed(c, false);
+  client_set_mapped(c, false);
+  hub_emit(EVT_CLIENT_UNMANAGED, c->target.id, NULL);
+
+  assert(focus_get_focused_window() == 0);
+  assert(focus_is_focused(c) == false);
+
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
 }
@@ -668,5 +794,8 @@ TEST_GROUP(FocusComponent, {
   test_focus_current_action();
   test_focus_prev_action();
   test_unmanaged_client_not_focusable();
-  test_focus_component_starts_with_the_wm();
+  test_focus_follows_managed_client();
+  test_focus_moves_when_focused_client_unmaps();
+  test_focus_moves_when_focused_client_is_destroyed();
+  test_focus_cleared_when_last_client_leaves();
 });

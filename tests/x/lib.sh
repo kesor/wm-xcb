@@ -73,12 +73,19 @@ check_wm_alive() {
   fi
 }
 
-# spawn_client [count] [width] [height] [title-prefix]
+# spawn_client [count] [width] [height] [title-prefix] [extra xclient args...]
 # Starts tools/xclient and prints its window ids, one per line, on stdout.
+# The extra arguments are passed to xclient as they are, for the tests that need
+# it to publish something other than the defaults.
 spawn_client() {
   local count=${1:-1} width=${2:-400} height=${3:-300} title=${4:-seam}
+  local -a extra=()
+  if [ "$#" -gt 4 ]; then
+    shift 4
+    extra=("$@")
+  fi
   local out="$TMPDIR_SEAM/client-$count-$$-$RANDOM.txt"
-  "$XCLIENT" -n "$count" -W "$width" -H "$height" -t "$title" -c "$CLASS" -v \
+  "$XCLIENT" -n "$count" -W "$width" -H "$height" -t "$title" -c "$CLASS" -v "${extra[@]}" \
     >"$out" 2>&1 &
   # This function runs inside a command substitution (mapfile, $(...)), so a
   # shell variable would be set in a subshell and lost. The pid goes to a file
@@ -143,6 +150,13 @@ rect_of() {
 
 screen_size() {
   xdotool getdisplaygeometry 2>/dev/null | awk '{print $1, $2}'
+}
+
+# border_of <window-id> - the border width X reports for the window. xdotool
+# reports a window's inside size and its outer corner, so the border is the only
+# part of its footprint it does not print.
+border_of() {
+  xwininfo -id "$1" 2>/dev/null | awk -F: '/Border width/{print $2+0; exit}'
 }
 
 # overlap_pairs <id>... - prints the number of overlapping window pairs

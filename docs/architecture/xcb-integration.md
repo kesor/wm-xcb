@@ -25,6 +25,7 @@ XCB (X C Bindings) is the X server communication layer. This document explains h
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       Event Loop                                    │
+│   poll(2) on the X fd + the signal wakeup pipe, then drain:         │
 │   xcb_poll_for_event() → xcb_generic_event_t*                       │
 └─────────────────────────────────────────────────────────────────────┘
                               │
@@ -172,7 +173,7 @@ void monitor_manager_randr_handler(void* event) {
 | `XCB_CREATE_NOTIFY` | client-list | Create client target |
 | `XCB_DESTROY_NOTIFY` | client-list | Destroy client target |
 | `XCB_MAP_REQUEST` | client-list | Manage client |
-| `XCB_UNMAP_NOTIFY` | client-list | Unmanage client |
+| `XCB_UNMAP_NOTIFY` | client-list | Unmanage client, unless the WM asked for the unmap itself |
 | `XCB_CONFIGURE_REQUEST` | floating, tiling | May `hub_send_request()` |
 | `XCB_EXPOSE` | bar | `hub_emit(EVT_BAR_DRAW)` |
 | `XCB_RANDR_NOTIFY` | monitor-manager | `sm_raw_write()` to ConnectionSM |
@@ -211,35 +212,83 @@ void xcb_handler_shutdown(void);
 
 ### Event Loop Integration
 
+The loop blocks, it does not spin. `wm_xcb_wait_for_events()` waits in `poll(2)`
+on the X connection's file descriptor and on the read end of the signal wakeup
+pipe; `handle_xcb_events()` then dispatches everything that arrived and flushes
+once. A connection that has already failed ends the loop: `poll(2)` on that
+socket returns at once, which is the busy-wait again. With no wakeup pipe, the
+wait uses a 250 ms timeout so a signal is still noticed.
+
+`poll(2)` reports the socket, not libxcb's own queue. libxcb reads ahead during
+a reply wait (the property and atom queries at startup) and during `xcb_flush()`,
+so an event can sit in that queue with nothing left to read on the socket. The
+wait takes such an event first and returns; the drain dispatches it before
+asking libxcb for more.
+
 ```c
-void handle_xcb_events(xcb_connection_t* conn) {
-    xcb_generic_event_t* event = xcb_poll_for_event(conn);
-    if (!event) return;
-    
-    // Handle XCB errors (response_type == 0)
-    if (event->response_type == 0) {
-        error_details((xcb_generic_error_t*)event);
-        free(event);
+static xcb_generic_event_t* queued_event = NULL;
+
+void wm_xcb_wait_for_events(void) {
+    struct pollfd fds[2] = {
+        { .fd = xcb_get_file_descriptor(dpy), .events = POLLIN },
+        { .fd = signals_wakeup_fd(),          .events = POLLIN },
+    };
+
+    if (xcb_connection_has_error(dpy) != 0) {
+        running = 0;
         return;
     }
-    
-    // Dispatch to registered handlers
-    xcb_handler_dispatch(event);
-    
-    free(event);
+
+    /* An event libxcb already read is not visible to poll(2) on the socket. */
+    queued_event = xcb_poll_for_queued_event(dpy);
+    if (queued_event != NULL)
+        return;
+
+    /* A signal handler cannot change what poll() is waiting on: a SIGTERM that
+       lands before this call would leave the WM asleep and unstoppable. The
+       handler writes a byte to the second fd instead. */
+    int timeout_ms = fds[1].fd < 0 ? 250 : -1;
+    poll(fds, 2, timeout_ms);
+    signals_drain_wakeups();
+}
+
+void handle_xcb_events(void) {
+    xcb_generic_event_t* event;
+
+    if (queued_event != NULL) {
+        event        = queued_event;
+        queued_event = NULL;
+        dispatch_event(event);
+        free(event);
+    }
+
+    /* Drain the queue: poll(2) reports that the socket is readable, and a poll
+       on a socket whose events are all in libxcb's own queue waits for the next
+       event instead of returning to this loop. */
+    while ((event = xcb_poll_for_event(dpy)) != NULL) {
+        dispatch_event(event);
+        free(event);
+    }
+
+    /* A reply is not an event: libxcb keeps it in its queue until somebody
+       asks for it, so the deferred reads are drained here. xcb_poll_for_reply()
+       reports "not yet" instead of waiting, which is what lets the loop stay a
+       loop. */
+    client_list_poll_size_hints();
+
+    xcb_flush(dpy);
 }
 
 int main(void) {
     // ...
+    setup_signals();     // installs the handlers and creates the wakeup pipe
     xcb_handler_init();
-    
+
     while (running) {
-        xcb_flush(conn);
-        handle_xcb_events(conn);
-        handle_signals();
-        // ...
+        wm_xcb_wait_for_events();
+        handle_xcb_events();
     }
-    
+
     xcb_handler_shutdown();
     // ...
 }

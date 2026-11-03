@@ -17,9 +17,9 @@
 /*
  * Border drawn around a managed window. config.def.h has the same value in
  * default_borders.width, but including it here would copy the whole compiled-in
- * configuration into this file, unused. The tiling component writes the same
- * width from its own default, so a change to the configured border has to be
- * made in both places until one path reads config.def.h for both.
+ * configuration into this file, unused. This is the only place that sets a
+ * client's border width: the layout subtracts whatever is on the client, so a
+ * change to the configured border has to be made here and in config.def.h.
  */
 #define CLIENT_LIST_BORDER_WIDTH 1
 
@@ -350,6 +350,12 @@ client_list_on_map_request(void* event)
     client_set_managed(c, true);
     client_list_map_client(c);
     client_set_mapped(c, true);
+
+    /* Ask for the size hints before the tile request. The reply is read one
+     * loop iteration later, and the layout it triggers then is the one that
+     * respects what the window asked for. */
+    client_request_size_hints(c);
+
     client_list_emit_event(EVT_CLIENT_MANAGED, c);
     client_list_request_tile(client_get_monitor(c));
   }
@@ -359,7 +365,18 @@ client_list_on_map_request(void* event)
 
 /*
  * Handle XCB_UNMAP_NOTIFY event.
- * Unmanages the window (removes from client list).
+ *
+ * Not every unmap is the client taking its window away. The WM unmaps windows
+ * itself to hide the clients of a tag that is no longer shown, and client_hide()
+ * records each of those requests on the client. The notify that answers one is
+ * spent against the record and the client stays managed: showing the tag again
+ * maps it back. An unmap the WM did not ask for is a withdrawal.
+ *
+ * The record cannot be replaced by reading `mapped`, the flag the visibility
+ * code keeps: a batch of tag actions runs both a hide and a later show before
+ * the loop reads the notifies, so `mapped` is true for an unmap the WM caused.
+ * The count still remembers that one notify is owed, and the show does not
+ * touch it.
  */
 void
 client_list_on_unmap_notify(void* event)
@@ -376,13 +393,26 @@ client_list_on_unmap_notify(void* event)
     return;
   }
 
-  /* Only emit unmanage event if client was managed */
-  if (client_is_managed(c)) {
-    client_set_managed(c, false);
-    client_set_mapped(c, false);
-    client_list_emit_event(EVT_CLIENT_UNMANAGED, c);
-    client_list_request_tile(client_get_monitor(c));
+  if (!client_is_managed(c)) {
+    LOG_DEBUG("Unmapped window %u is not managed, nothing to unmanage", e->window);
+    return;
   }
+
+  if (client_take_pending_unmap(c)) {
+    LOG_DEBUG("Window %u was unmapped by the WM, client stays managed", e->window);
+    return;
+  }
+
+  client_set_managed(c, false);
+  client_set_mapped(c, false);
+
+  /* ICCCM 4.1.3.1: a window its client withdrew is no longer managed, and
+   * other clients read that from WM_STATE, not from our client list. */
+  if (!client_set_wm_state(e->window, CLIENT_WM_STATE_WITHDRAWN))
+    LOG_WARN("WM_STATE atom missing, withdrawn window %u stays marked", e->window);
+
+  client_list_emit_event(EVT_CLIENT_UNMANAGED, c);
+  client_list_request_tile(client_get_monitor(c));
 
   LOG_DEBUG("Client unmanaged: window=%u", e->window);
 }
@@ -413,4 +443,24 @@ client_list_is_managed(xcb_window_t window)
 {
   Client* c = client_get_by_window(window);
   return c != NULL && client_is_managed(c);
+}
+
+/*
+ * Take the size hints replies that have arrived.
+ */
+void
+client_list_poll_size_hints(void)
+{
+  Client* c = client_list_sentinel()->next;
+
+  while (c != client_list_sentinel()) {
+    /* Snapshot the link: re-tiling does not remove clients today, but a
+     * request that does would leave this loop on a freed client. */
+    Client* next = c->next;
+
+    if (client_poll_size_hints(c) && client_is_managed(c))
+      client_list_request_tile(client_get_monitor(c));
+
+    c = next;
+  }
 }

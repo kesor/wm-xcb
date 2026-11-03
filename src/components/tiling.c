@@ -56,6 +56,7 @@ static TilingComponent tiling_component = {
            .accepted_target_names = (const char*[]) { "monitor", NULL },
            .accepted_targets      = NULL,
            .executor              = NULL,
+           .on_adopt              = tiling_on_adopt,
            .registered            = false,
            },
   .initialized     = false,
@@ -245,6 +246,35 @@ tiling_get_sm(Monitor* m)
 }
 
 /*
+ * Adoption hook - give a monitor its layout state machine.
+ *
+ * Tiling does not run here: a monitor is registered before its geometry is
+ * known, so there is nothing to arrange yet. Creating the machine now means a
+ * monitor that was never adopted can be told apart from one that was, by
+ * reading the monitor's storage instead of asking tiling to create on demand.
+ *
+ * There is no matching unadopt hook: the machine lives in the monitor's state
+ * machine storage, and destroying the monitor destroys it.
+ */
+void
+tiling_on_adopt(HubTarget* target)
+{
+  if (target == NULL || target->type_id != hub_get_target_type_id_by_name("monitor")) {
+    LOG_ERROR("tiling_on_adopt: invalid target");
+    return;
+  }
+
+  Monitor* m = (Monitor*) target;
+
+  if (tiling_get_sm(m) == NULL) {
+    LOG_ERROR("Failed to create layout state machine on adoption");
+    return;
+  }
+
+  LOG_DEBUG("Tiling component adopted by monitor: %" PRIu64, (uint64_t) target->id);
+}
+
+/*
  * Get current layout state for a monitor
  */
 LayoutState
@@ -421,6 +451,42 @@ tiling_collect_clients(Monitor* m, uint32_t* count)
 }
 
 /*
+ * Give a client one area of the monitor.
+ *
+ * A window's border is drawn outside the window rectangle, so a client given
+ * the whole area as its width and height covers the area plus one border on
+ * every side, and its neighbour covers a border too: the two overlap by two
+ * borders. The client is configured with the area minus a border on each side
+ * instead, so the rectangle it covers including its border is exactly the
+ * area. Neighbours then touch, with no gap and no overlap. The border itself
+ * was set when the window was mapped and is not the layout's to choose.
+ */
+static void
+tiling_place_client(Client* c, int16_t x, int16_t y, uint16_t w, uint16_t h)
+{
+  if (c == NULL)
+    return;
+
+  uint32_t inset = (uint32_t) c->border_width * 2;
+
+  uint16_t inner_width  = (uint16_t) (w > inset ? w - inset : 1);
+  uint16_t inner_height = (uint16_t) (h > inset ? h - inset : 1);
+
+  /* The client's own constraints come last: a window with a minimum size larger
+   * than the area it was given keeps that size and runs over its neighbour. The
+   * alternatives are drawing it smaller than it can draw or leaving a hole, and
+   * ICCCM gives the client the last word on its size. */
+  client_apply_size_hints(c, &inner_width, &inner_height);
+
+  c->x      = x;
+  c->y      = y;
+  c->width  = inner_width;
+  c->height = inner_height;
+
+  client_configure_from_struct(c);
+}
+
+/*
  * Arrange clients using the tiled layout algorithm.
  */
 void
@@ -441,6 +507,12 @@ tiling_arrange(
   uint16_t mw, mh;
   tiling_master_geometry(m, nmaster, mfact, &mx, &my, &mw, &mh);
 
+  /* Nothing in the stack: the master clients are all there is, so they take
+   * the whole monitor. At mfact of it, a lone window would leave the rest of
+   * the screen empty. */
+  if (nstack == 0)
+    mw = m->width;
+
   /* Calculate stack area geometry */
   int16_t  sx, sy;
   uint16_t sw, sh;
@@ -454,14 +526,7 @@ tiling_arrange(
       if (c == NULL)
         continue;
 
-      c->x            = mx;
-      c->y            = (int16_t) (my + ((int32_t) i * (int32_t) h));
-      c->width        = mw;
-      c->height       = h;
-      c->border_width = 1;
-
-      /* Configure window via X */
-      client_configure_from_struct(c);
+      tiling_place_client(c, mx, (int16_t) (my + ((int32_t) i * (int32_t) h)), mw, h);
     }
   }
 
@@ -475,14 +540,7 @@ tiling_arrange(
         if (c == NULL)
           continue;
 
-        c->x            = sx;
-        c->y            = (int16_t) (sy + ((int32_t) i * (int32_t) h));
-        c->width        = sw;
-        c->height       = h;
-        c->border_width = 1;
-
-        /* Configure window via X */
-        client_configure_from_struct(c);
+        tiling_place_client(c, sx, (int16_t) (sy + ((int32_t) i * (int32_t) h)), sw, h);
       }
     } else {
       /* No stack area - tile in master */
@@ -493,14 +551,8 @@ tiling_arrange(
         if (c == NULL)
           continue;
 
-        c->x            = mx;
-        c->y            = (int16_t) (my + ((int32_t) offset + (int32_t) i * (int32_t) h));
-        c->width        = mw;
-        c->height       = h;
-        c->border_width = 1;
-
-        /* Configure window via X */
-        client_configure_from_struct(c);
+        tiling_place_client(
+            c, mx, (int16_t) (my + ((int32_t) offset + (int32_t) i * (int32_t) h)), mw, h);
       }
     }
   }
@@ -580,15 +632,7 @@ tiling_tile_client(Client* c)
   uint16_t mw, mh;
   tiling_master_geometry(m, nmaster, mfact, &mx, &my, &mw, &mh);
 
-  /* Position the client in master area */
-  c->x            = mx;
-  c->y            = my;
-  c->width        = mw;
-  c->height       = mh;
-  c->border_width = 1;
-
-  /* Configure window via X */
-  client_configure_from_struct(c);
+  tiling_place_client(c, mx, my, mw, mh);
 
   LOG_DEBUG("Tiled client window=%u in master area", c->window);
 }

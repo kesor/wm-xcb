@@ -11,11 +11,18 @@
 #   --verbose             echo the WM log after a failed test
 #   --update-baseline     accept today's failures as known ones
 #
+# The parent display Xephyr draws into is a private Xvfb this run starts, so the
+# run leaves the session alone; see scripts/lib/private-display.sh. That display
+# is killed with the run, so a session kept for inspection needs the session's
+# display as well:
+#   WM_USE_SESSION_DISPLAY=1 make test-x TEST_X_ARGS=--keep
+#
 # The WM it runs is the variant named by DEBUG and SANITIZE in the environment,
 # exactly as `make DEBUG=1` and `make SANITIZE=1` build it:
 #   make DEBUG=1 test-x
-# The first line of output names the variant, the binary and the log, so a run
-# never leaves you guessing which binary it was or where its log went.
+# The first line of output names the parent display the run nests into, and the
+# second the variant, the binary and the log, so a run never leaves you guessing
+# which binary it was, where its log went, or what it drew on.
 #
 # A failure that is listed in tests/quality/seam-baseline.txt is a known failure:
 # it is reported and does not fail the run. A failure that is not listed is new
@@ -29,12 +36,15 @@
 #
 # Exit status: 0 if every test passed, 1 otherwise.
 #
-# The suite asserts what a user sees on the X server. The assertions that still
-# fail are the ones for key grabs, focus and the EWMH root properties; failures
-# that remain on an unwired tree are listed as known ones in
-# tests/quality/seam-baseline.txt.
+# The suite asserts what the X server sees. Assertions that still fail on
+# purpose are listed in tests/quality/seam-baseline.txt; a failure missing
+# from that file is new.
 
 set -uo pipefail
+
+# The parent-display helper re-executes this script, so it needs the arguments
+# from before the loop below consumed them.
+SCRIPT_ARGS=("$@")
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export ROOT_DIR
@@ -81,8 +91,10 @@ done
 
 # shellcheck source=../../scripts/lib/wm-variant.sh
 . "$ROOT_DIR/scripts/lib/wm-variant.sh"
+# shellcheck source=../../scripts/lib/private-display.sh
+. "$ROOT_DIR/scripts/lib/private-display.sh"
 
-for cmd in Xephyr xdotool xprop; do
+for cmd in Xephyr xdotool xprop xset; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "run.sh: missing '$cmd'. Start the dev shell: direnv allow" >&2
     exit 1
@@ -94,13 +106,28 @@ done
   exit 1
 }
 
-# Xephyr draws into the session the caller is sitting in, so keep the host
-# display: overriding DISPLAY below is what the nested server must NOT inherit.
-HOST_DISPLAY="${DISPLAY:-}"
-[ -n "$HOST_DISPLAY" ] || {
-  echo "run.sh: DISPLAY is unset; Xephyr has no host X server to draw into" >&2
-  exit 1
-}
+# Xephyr draws into a parent display, and that display is a private Xvfb this
+# run starts rather than the one the caller is sitting in. The line naming it is
+# printed and recorded next to the logs, so a reader can tell a hermetic run from
+# one that drew on the session; test-91 asserts the recorded line matches the
+# display the run handed to its tests. This runs before the build because the
+# helper re-executes this script, and a build run twice prints the variant line
+# twice.
+wm_parent_display "${SCRIPT_ARGS[@]}" || exit 1
+
+LOG_DIR="${TMPDIR:-/tmp}/wm-seam-tests"
+mkdir -p "$LOG_DIR"
+export WM_LOG="$LOG_DIR/wm.log"
+export TMPDIR_SEAM="$LOG_DIR"
+XEPHYR_LOG="$LOG_DIR/xephyr.log"
+printf '%s\n' "$WM_PARENT_DISPLAY_LINE" >"$LOG_DIR/parent-display.txt"
+
+# Build first, and say which build it is. These scripts start the WM
+# themselves, and nothing else rebuilds it, so a stale binary reports the
+# behaviour of the tree as it was and the result reads as a WM defect. This
+# runs after LOG_DIR exists because the line names the log the run writes, and
+# before Xephyr starts because that line is what a reader looks for next.
+wm_build_variant "$WM_LOG" || exit 1
 
 DISPLAY_NUM=""
 for n in 2 3 4 5 6 7 8 9; do
@@ -115,25 +142,12 @@ done
 }
 export DISPLAY=":$DISPLAY_NUM"
 
-LOG_DIR="${TMPDIR:-/tmp}/wm-seam-tests"
-mkdir -p "$LOG_DIR"
-export WM_LOG="$LOG_DIR/wm.log"
-export TMPDIR_SEAM="$LOG_DIR"
-XEPHYR_LOG="$LOG_DIR/xephyr.log"
-
-# Build first, and say which build it is. These scripts start the WM
-# themselves, and nothing else rebuilds it, so a stale binary reports the
-# behaviour of the tree as it was and the result reads as a WM defect. This
-# runs after LOG_DIR exists because the line names the log the run writes, and
-# before Xephyr starts because that line is the first thing a reader wants.
-wm_build_variant "$WM_LOG" || exit 1
-
 XEPHYR_PID=""
 WM_PID=""
 
 cleanup() {
   if [ "$KEEP" -eq 1 ]; then
-    echo "run.sh: keeping session on $DISPLAY (wm pid $WM_PID)"
+    echo "run.sh: keeping session on $DISPLAY (wm pid $WM_PID, parent $WM_PARENT_DISPLAY)"
     return
   fi
   [ -n "$WM_PID" ] && kill "$WM_PID" 2>/dev/null
@@ -142,7 +156,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-DISPLAY="$HOST_DISPLAY" Xephyr "$DISPLAY" -screen "${SCREEN_W}x${SCREEN_H}" -noreset \
+DISPLAY="$WM_PARENT_DISPLAY" Xephyr "$DISPLAY" -screen "${SCREEN_W}x${SCREEN_H}" -noreset \
   >"$XEPHYR_LOG" 2>&1 &
 XEPHYR_PID=$!
 

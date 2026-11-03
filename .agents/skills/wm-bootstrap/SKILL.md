@@ -15,12 +15,16 @@ An X11 window manager in C over libxcb, built as a dwm alternative where a
 feature is a component that subscribes to events and sends requests, never a
 patch to shared functions. State lives in state machines on targets.
 
-The framework is built and unit-tested. **The window manager does not put
-windows on screen yet**: it never maps them, never grabs keys, never applies
-focus to X. So "make it work" means the X11 output path, which is epic
-`wm-4f6` and the top of the priority list. Do not describe the project as
-working; `docs/README.md#current-state` says what does and does not work, and
-each gap is a beads issue.
+The framework is built and unit-tested, and windows reach the screen: a window
+is mapped on `MapRequest` with a border and `WM_STATE=Normal`, and the visible
+clients of the selected monitor are tiled. What is still missing is keys, the X
+input focus, and the EWMH root properties. So "make it work" means the X11
+output path, which is epic `wm-4f6` and the top of the priority list.
+
+`docs/README.md#current-state` is the list of what does and does not work, and
+each gap is a beads issue. Do not restate it here, and do not call the project
+finished: this paragraph said windows were never mapped long after they were,
+because it was a second copy of that section.
 
 ## Start here
 
@@ -146,11 +150,31 @@ starts a run, waits, reviews it on a different model family, and notifies;
 alone. `worker.sh --help` is the flag list; this file does not repeat it, because
 a copy here rots while the real one changes.
 
+It lives beside the main checkout in a directory named `ai-workers-for-wm/`, so
+from a worktree created under `.worktrees/<bead>/` it is
+`../../../ai-workers-for-wm/`. It is not on `PATH` and not in this tree.
+
+`worker.sh`, `README.md`, `HANDOFF.md` and `PROCESS.md` in that directory are
+safe to read: the flags, the defaults, the worktree layout and the rules for the
+session that dispatches are all written there. They are the harness's own
+project, so a worker reads them and does not edit them, and this repository never
+gets a copy of one. A fact a document here needs — a flag, a default, a prompt
+line — is read from those files. If it cannot be confirmed there, ask for it in
+the final message instead of writing it from memory: a wrong line in a document
+about the harness is the one mistake a worker cannot check.
+
 Two things it cannot decide for you:
 
-- **Overlapping files.** `wm-4f6.1`, `wm-4f6.2`, `wm-4f6.3` and `wm-4f6.6` all
-  touch `client-list.c`, `wm.c`, and component init. Run those in order, or give
-  one worker several ids in one call.
+- **One bead per worker, run in parallel.** Small batches review better: a
+  single bead is a ten-minute review, five beads was an eighteen-minute review
+  at 70% of the reviewer's context. `worker.sh auto <bead>` as many times as
+  there are disjoint beads, staggered a minute or two apart.
+- **Overlapping files decide what "disjoint" means.** `worker.sh overlap <id>
+  <id> ...` reads each bead's description and comments for file paths and says
+  which are shared. Nothing shared: run them in parallel. Shared: run them in
+  order, or give one worker several ids in one call — the second merge stops on
+  a rebase conflict that a person resolves by hand, which puts an unreviewed
+  edit on a branch the reviewer already approved.
 - **Review.** Workers commit to `work/<bead-id>` and never push, merge, or close
   a bead. Merging is a human decision.
 
@@ -180,15 +204,23 @@ beads in your final message. This is how the traps below stop being traps.
   a `!` rule re-includes them.
 - **`git checkout -- <file>` restores from the index, not HEAD.** After staging,
   use `git checkout HEAD -- <file>`.
-- **Event ids are a shared number space** with no per-component namespace:
-  `EVT_TAG_CHANGED` collides with `EVT_FULLSCREEN_ENTERED` today, and the hub
-  drops anything above 63 silently.
+- **Event ids share one table.** A component takes the next free range in
+  `src/event-types.h` and starts its enum from that base. A fresh integer can
+  land on another component's event. `hub_emit()` logs and drops a value at or
+  above `HUB_MAX_EVENT_TYPES`.
 - **Adoption happens when a target is created**, so init order decides which
   components a monitor or client adopts (`wm.c`).
 - **No AI attribution anywhere**: no `Co-Authored-By`, no "generated with", no
   robot footer. The git author is the only attribution.
 - **No personal paths**: this repository is public. `scripts/check-paths.sh`
   fails on `/home/<user>` and `~/src`-style paths.
+- **`bd setup <tool>` writes its own copy of the beads workflow.** The one in
+  `AGENTS.md` is the one that stays; `bd setup cursor` had put a second block in
+  `.cursor/rules/beads.mdc` with a git policy that contradicts this repository's
+  harness, and it is gone. Running `bd setup` for a tool nobody here uses adds a
+  copy back, and `bd setup <tool> --check` reports an incomplete integration
+  after `--remove` as well as before the first install, so it cannot tell you
+  whether to run the setup or to leave it alone.
 - **Do not push, and do not rewrite published history,** unless asked.
 
 ## Definition of done

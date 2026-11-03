@@ -35,9 +35,9 @@ wm_build_variant() {
     return 1
   }
   # A debug build prints -Wpedantic warnings. They have to stay off the
-  # terminal: the variant line is how a reader knows what ran, and it is the
-  # first line only if make's own output is not. A failed build still shows
-  # the compiler output. No EXIT trap here; the callers already have one.
+  # terminal: the variant line is how a reader knows what ran, and make's own
+  # output would bury it. A failed build still shows the compiler output. No
+  # EXIT trap here; the callers already have one.
   build_log=$(mktemp) || return 1
   if ! make -s -C "$ROOT_DIR" "build/$variant/wm" DEBUG="$debug" SANITIZE="$sanitize" >"$build_log" 2>&1; then
     echo "$script: the WM does not build with DEBUG=$debug SANITIZE=$sanitize" >&2

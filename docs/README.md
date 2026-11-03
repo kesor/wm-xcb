@@ -1,6 +1,6 @@
 # wm/ Project Documentation
 
-*Last updated: 2026-11-01*
+*Last updated: 2026-11-02*
 
 ---
 
@@ -92,24 +92,44 @@ Short version, and the parts that stay true until they are fixed:
   suite passes.
 - **Works against X:** connecting, taking substructure redirect, RandR monitor
   discovery, tracking windows as `Client` targets, mapping a window on
-  `MapRequest` with a border and `WM_STATE=Normal`, attaching every new client
-  to the selected monitor with that monitor's visible tags, tiling that
-  monitor's visible clients when a window is managed or unmanaged, and tracking
+  `MapRequest` with a border and `WM_STATE=Normal`, adopting the windows that
+  were already on the display when the WM started, through that same map path,
+  so they are tiled and tracked too (an override-redirect window, or one its
+  client left unmapped, is skipped), attaching every new client to the selected
+  monitor with that monitor's visible tags, tiling that monitor's visible
+  clients when a window is managed or unmanaged so that each client's border
+  falls inside the area it was given - neighbours touch, and a client alone on
+  the monitor fills it - and honouring a client's minimum size from
+  `WM_NORMAL_HINTS` at the ICCCM's fixed offsets, and tracking
   which client the pointer is over: a managed window selects pointer enter and
-  leave, and the focus component raw-writes `FocusSM` from those events. The
-  tag-manager component starts before monitor discovery, so every monitor is
-  adopted with a tag-view state machine and `tag-manager.view`,
-  `tag-manager.toggle`, and `tag-manager.client-move` are in the registry. The
-  components `main` starts register the actions they own. A unit test inits
+  leave, and the focus component raw-writes `FocusSM` from those events and
+  points the X input focus at the focused window with `xcb_set_input_focus`;
+  a newly managed client takes focus, and the newest remaining client takes it
+  back when the focused one is unmanaged or destroyed. The
+  keys in `config.wm.def.h` are grabbed on the root window when the keybinding
+  component starts, with the CapsLock and NumLock masks a press can carry, and
+  grabbed again on `MappingNotify`, so a press reaches the component that owns
+  it. The tag-manager and tiling components start before monitor discovery, so
+  every monitor is adopted with a tag-view and a layout state machine, and
+  `tag-manager.view`, `tag-manager.toggle`, and `tag-manager.client-move` are
+  in the registry. A unit test runs the startup order and fails if a component
+  that adopts a monitor registers after the monitor manager. The components
+  `main` starts register the actions they own. A unit test inits
   every owner and fails if a name in `config.wm.def.h` is not registered after
-  that. No key is grabbed yet, so no keybinding can reach any of them from X.
-- **Does not work:** it never grabs keys, so no binding fires; it never calls
-  `xcb_set_input_focus`, so the X input focus stays wherever the client left it
-  even though `FocusSM` follows the pointer; it sets no EWMH root properties.
-  The event loop polls instead of blocking, so it burns a core while idle.
-  Visible tags are stored twice: a tag view change updates the tag-view state
-  machine, and a new client still copies its tags from `Monitor.tagset`, which
-  no runtime path writes, so every new client lands on tag 1.
+  that. `main` exits non-zero when a module on its startup check does not come
+  up, and a unit test runs that startup and asks each of those modules whether
+  it is up. An unmap the WM causes itself, hiding the clients of a tag that is
+  no longer shown, leaves the client managed, so showing the tag again maps it
+  back even when a later tag action has already shown the window again by the
+  time the unmap is read; an unmap the WM did not ask for is the client
+  withdrawing: it is unmanaged, `WM_STATE` goes to `Withdrawn`, and
+  `EVT_CLIENT_UNMANAGED` is emitted. The event loop blocks in `poll(2)` on the
+  X connection plus a signal wakeup pipe, so an idle WM costs no CPU, and
+  SIGTERM ends it.
+- **Does not work:** it sets no EWMH root properties. Visible tags are stored
+  twice: a tag view change updates the tag-view state machine, and a new client
+  still copies its tags from `Monitor.tagset`, which no runtime path writes, so
+  every new client lands on tag 1.
 
 Do not take that from a document. Ask the tree:
 

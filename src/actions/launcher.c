@@ -96,6 +96,15 @@ launcher_init(void)
 }
 
 /*
+ * Check if the module is initialized (for the startup check)
+ */
+bool
+launcher_is_initialized(void)
+{
+  return initialized;
+}
+
+/*
  * Shutdown the launcher module.
  * Unregisters the action.
  */

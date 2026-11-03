@@ -104,9 +104,9 @@ check_eq "a harness line naming no readable log fails" 1 "$?"
 ASAN_OPTIONS="suppressions=$DIR/ignore.txt,detect_leaks=1,log_path=$DIR/asan"
 LSAN_OPTIONS="leak_check_at_exit=1,suppressions=$DIR/ignore.txt"
 UBSAN_OPTIONS="print_stacktrace=1"
-sanitize_x_scrub_options ASAN_OPTIONS
-sanitize_x_scrub_options LSAN_OPTIONS
-sanitize_x_scrub_options UBSAN_OPTIONS
+sanitize_scrub_options ASAN_OPTIONS
+sanitize_scrub_options LSAN_OPTIONS
+sanitize_scrub_options UBSAN_OPTIONS
 check_eq "suppressions= is dropped from ASAN_OPTIONS" "detect_leaks=1" "$ASAN_OPTIONS"
 check_eq "log_path= is dropped from ASAN_OPTIONS" 0 \
   "$(printf '%s' "$ASAN_OPTIONS" | grep -c 'log_path')"
@@ -117,21 +117,29 @@ check_eq "other options survive the scrub" "print_stacktrace=1" "$UBSAN_OPTIONS"
 # suppressions= in place when another key precedes it, and the report stays hidden.
 ASAN_OPTIONS="halt_on_error=0:suppressions=$DIR/ignore.txt:log_path=$DIR/asan"
 LSAN_OPTIONS="print_suppressions=0 suppressions=$DIR/ignore.txt"
-sanitize_x_scrub_options ASAN_OPTIONS
-sanitize_x_scrub_options LSAN_OPTIONS
+sanitize_scrub_options ASAN_OPTIONS
+sanitize_scrub_options LSAN_OPTIONS
 check_eq "colon-separated suppressions= and log_path= are dropped" "halt_on_error=0" "$ASAN_OPTIONS"
 check_eq "space-separated suppressions= is dropped" "print_suppressions=0" "$LSAN_OPTIONS"
 
 UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1"
-sanitize_x_scrub_options UBSAN_OPTIONS
+sanitize_scrub_options UBSAN_OPTIONS
 check_eq "a colon-separated option that is not dropped survives" \
   "print_stacktrace=1,halt_on_error=1" "$UBSAN_OPTIONS"
 
 # The gate runs under set -u and calls the scrub on variables the caller never set.
 unset ASAN_OPTIONS
 set -u
-sanitize_x_scrub_options ASAN_OPTIONS
+sanitize_scrub_options ASAN_OPTIONS
 set +u
 check_eq "an unset option string scrubs to empty" "" "${ASAN_OPTIONS-}"
+
+# The gate has no set -e. A call to the removed name prints "command not found"
+# and continues, so the scrub never runs. This asserts the call site names the
+# function that exists.
+check_eq "the nested-server gate calls the shared scrub" 1 \
+  "$(grep -c 'sanitize_scrub_options' "$ROOT_DIR/scripts/check-sanitize-x.sh")"
+check_eq "the nested-server gate does not call the removed name" 0 \
+  "$(grep -c 'sanitize_x_scrub_options' "$ROOT_DIR/scripts/check-sanitize-x.sh")"
 
 finish

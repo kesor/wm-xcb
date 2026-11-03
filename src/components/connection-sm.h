@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 
+#include "../event-types.h"
 #include "../sm/sm-template.h"
 
 /*
@@ -28,8 +29,8 @@ typedef enum ConnectionState {
  * Connection State Machine events emitted on transitions
  */
 typedef enum ConnectionEvent {
-  EVT_MONITOR_DISCONNECTED = 100, /* Monitor output disconnected */
-  EVT_MONITOR_CONNECTED    = 101, /* Monitor output connected/reconnected */
+  EVT_MONITOR_DISCONNECTED = EVT_CONNECTION_BASE + 0, /* Monitor output disconnected */
+  EVT_MONITOR_CONNECTED    = EVT_CONNECTION_BASE + 1, /* Monitor output connected/reconnected */
 } ConnectionEvent;
 
 /*

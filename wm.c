@@ -26,10 +26,24 @@ main(int argc, char** argv)
   /* Initialize hub first */
   hub_init();
 
-  wm_components_init();
+  if (!wm_components_init()) {
+    LOG_ERROR("The window manager did not start: a component failed to initialize");
+    wm_components_shutdown();
+    destruct_state_machine();
+    destruct_ewmh();
+    destruct_xcb();
+    return 1;
+  }
 
-  /* Main event loop */
+  /* Windows that were on the display before the WM started never send a
+   * MapRequest, so they are adopted here, once the components that give a
+   * client its state machines, monitor, and place in the layout are up. */
+  wm_xcb_adopt_existing_windows();
+
+  /* Main event loop: block until X or a signal has something, then dispatch
+   * everything that arrived. */
   while (running) {
+    wm_xcb_wait_for_events();
     handle_xcb_events();
   }
 

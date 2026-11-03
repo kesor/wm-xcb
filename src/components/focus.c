@@ -9,11 +9,16 @@
  * - XCB listener for ENTER_NOTIFY and LEAVE_NOTIFY
  * - raw_write to SM on mouse enter/leave events
  * - Guards for transition validation
+ * - the X input focus: it subscribes to its own FOCUSED and UNFOCUSED events
+ *   and follows them with xcb_set_input_focus, gives focus to a client when it
+ *   is managed, and hands it to the newest remaining client when the focused
+ *   one leaves the list
  */
 
 #include <stdlib.h>
 #include <string.h>
 
+#include "src/components/client-list.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -21,6 +26,7 @@
 #include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
 #include "wm-log.h"
+#include "wm-xcb.h"
 
 #include "focus.h"
 #include "src/actions/action-registry.h"
@@ -399,6 +405,153 @@ focus_can_take_focus(const Client* c)
   return c != NULL && c->managed && c->focusable && c->mapped;
 }
 
+/*
+ * Tell the X server which window receives the keys. The state machine has
+ * already moved; this is the half the user feels, because the server keeps
+ * sending keys to the window it was told about last, whatever the WM decided.
+ *
+ * RevertToPointerRoot is dwm's choice too: when the focused window goes away
+ * without the WM hearing about it, focus returns to the window under the
+ * pointer instead of staying on a window that may not exist any more.
+ */
+static void
+focus_apply_window(xcb_window_t window)
+{
+  if (dpy == NULL)
+    return;
+
+  xcb_set_input_focus(dpy, XCB_INPUT_FOCUS_POINTER_ROOT, window, XCB_CURRENT_TIME);
+}
+
+/*
+ * Check whether any client holds focus right now.
+ *
+ * Read from the state machines rather than from focused_window: an unfocus
+ * event is emitted after the machine has moved, and the component's tracked
+ * window is only updated by the caller afterwards.
+ */
+static bool
+focus_any_client_focused(void)
+{
+  for (Client* c = client_list_get_head(); c != NULL; c = client_get_next(c)) {
+    StateMachine* sm = client_get_sm(c, FOCUS_COMPONENT_NAME);
+    if (sm != NULL && sm_get_state(sm) == FOCUS_STATE_FOCUSED)
+      return true;
+  }
+
+  return false;
+}
+
+/*
+ * Apply a focus transition to X.
+ *
+ * FOCUSED points the server at that window. UNFOCUSED hands it back to the
+ * root window, but only when no client holds focus: taking focus away from one
+ * client and giving it to another emits the new FOCUSED event first, and the
+ * server must not be pointed back at the root behind it.
+ */
+static void
+focus_on_sm_event(Event e)
+{
+  if (e.type == EVT_CLIENT_FOCUSED) {
+    focus_apply_window((xcb_window_t) e.target);
+    return;
+  }
+
+  if (!focus_any_client_focused())
+    focus_apply_window(root);
+}
+
+/*
+ * A newly managed client takes focus, the way dwm focuses in manage().
+ *
+ * Nothing else would ever point X at a window that was mapped after the WM
+ * started: focus follows the pointer, and the pointer was already somewhere.
+ */
+static void
+focus_on_client_managed(Event e)
+{
+  Client* c = client_get_by_window((xcb_window_t) e.target);
+
+  if (!focus_can_take_focus(c))
+    return;
+
+  focus_focus_client(c);
+}
+
+/*
+ * Pick the client focus falls back to when `skip` leaves the list: the newest
+ * one that can take it, which is the head of the list.
+ */
+static Client*
+focus_candidate_excluding(xcb_window_t skip)
+{
+  for (Client* c = client_list_get_head(); c != NULL; c = client_get_next(c)) {
+    if (c->window != skip && focus_can_take_focus(c))
+      return c;
+  }
+
+  return NULL;
+}
+
+/*
+ * The focused client was unmanaged or destroyed.
+ *
+ * Hand focus to the newest remaining client, or back to the root window when
+ * the last one goes: leaving it on a window the WM no longer manages is how a
+ * keystroke ends up in a window the user cannot see.
+ */
+static void
+focus_on_client_gone(Event e)
+{
+  xcb_window_t gone = (xcb_window_t) e.target;
+
+  if (gone == 0 || gone != focus_component.focused_window)
+    return;
+
+  Client* c = client_get_by_window(gone);
+  if (c != NULL) {
+    StateMachine* sm = client_get_sm(c, FOCUS_COMPONENT_NAME);
+    if (sm != NULL && sm_get_state(sm) == FOCUS_STATE_FOCUSED)
+      sm_raw_write(sm, FOCUS_STATE_UNFOCUSED);
+  }
+
+  focus_component.focused_window = 0;
+
+  Client* next = focus_candidate_excluding(gone);
+  if (next != NULL) {
+    focus_focus_client(next);
+    return;
+  }
+
+  focus_apply_window(root);
+}
+
+/*
+ * Follow the focus component's own state machine in X, and react to the client
+ * list events that decide who is focused. Both arrive through the hub, so the
+ * component keeps owning focus state and nobody has to call it.
+ */
+static void
+focus_subscribe_events(void)
+{
+  hub_subscribe(EVT_CLIENT_FOCUSED, focus_on_sm_event, NULL);
+  hub_subscribe(EVT_CLIENT_UNFOCUSED, focus_on_sm_event, NULL);
+  hub_subscribe(EVT_CLIENT_MANAGED, focus_on_client_managed, NULL);
+  hub_subscribe(EVT_CLIENT_UNMANAGED, focus_on_client_gone, NULL);
+  hub_subscribe(EVT_CLIENT_DESTROYED, focus_on_client_gone, NULL);
+}
+
+static void
+focus_unsubscribe_events(void)
+{
+  hub_unsubscribe(EVT_CLIENT_FOCUSED, focus_on_sm_event);
+  hub_unsubscribe(EVT_CLIENT_UNFOCUSED, focus_on_sm_event);
+  hub_unsubscribe(EVT_CLIENT_MANAGED, focus_on_client_managed);
+  hub_unsubscribe(EVT_CLIENT_UNMANAGED, focus_on_client_gone);
+  hub_unsubscribe(EVT_CLIENT_DESTROYED, focus_on_client_gone);
+}
+
 static Client*
 focus_current_candidate(void)
 {
@@ -649,6 +802,7 @@ focus_component_init(void)
       return true;
     }
     LOG_DEBUG("Component registered with hub, completing initialization");
+    focus_subscribe_events();
     focus_component.initialized = true;
     return true;
   }
@@ -674,6 +828,8 @@ focus_component_init(void)
   /* Register with hub */
   hub_register_component(&focus_component.base);
 
+  focus_subscribe_events();
+
   /* Register XCB handlers for ENTER_NOTIFY and LEAVE_NOTIFY */
   int result = 0;
 
@@ -695,6 +851,7 @@ focus_component_init(void)
     sm_unregister_guard("focus_guard_can_focus");
     sm_unregister_guard("focus_guard_can_unfocus");
     focus_unregister_actions();
+    focus_unsubscribe_events();
     /* Unregister from hub since we're not fully initialized */
     hub_unregister_component(FOCUS_COMPONENT_NAME);
     focus_component_reset();
@@ -724,6 +881,8 @@ focus_component_shutdown(void)
 
   /* Unregister XCB handlers */
   xcb_handler_unregister_component(&focus_component.base);
+
+  focus_unsubscribe_events();
 
   /* Unregister from hub */
   hub_unregister_component(FOCUS_COMPONENT_NAME);

@@ -14,9 +14,12 @@
  *
  * Layout Algorithm:
  * - Divides monitor into master area and stack
- * - Master area: first nmaster clients (default 1)
+ * - Master area: first nmaster clients (default 1), the whole monitor when
+ *   no client is left for the stack
  * - Stack: remaining clients arranged below/after master
  * - mfact controls master area ratio (0.0 - 1.0)
+ * - Each client is placed in an area minus its border, so the window plus its
+ *   border covers the area and neighbours touch
  *
  * Events Emitted:
  * - EVT_LAYOUT_CHANGED - emitted after layout changes
@@ -29,6 +32,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
+#include "src/event-types.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -53,7 +57,7 @@ typedef enum LayoutState {
  * Layout events emitted on state transitions
  */
 typedef enum LayoutEvent {
-  EVT_LAYOUT_CHANGED = 40,
+  EVT_LAYOUT_CHANGED = EVT_TILING_BASE + 0,
 } LayoutEvent;
 
 /*
@@ -143,6 +147,13 @@ SMTemplate* layout_sm_template_create(void);
 StateMachine* tiling_get_sm(Monitor* m);
 
 /*
+ * Adoption hook - creates the layout state machine for a monitor.
+ * Called by the hub when a monitor target is registered, and only for a
+ * target of type "monitor".
+ */
+void tiling_on_adopt(HubTarget* target);
+
+/*
  * Get current layout state for a monitor.
  * Returns LAYOUT_STATE_TILE if no SM exists.
  */
@@ -184,6 +195,7 @@ void tiling_tile_client(Client* c);
  * 3. For tiled clients:
  *    - Master clients: arrange vertically in master area
  *    - Stack clients: arrange in remaining area
+ *    - With no stack clients the master area is the whole monitor
  *
  * @param m  The monitor
  * @param master_clients  Array of clients for master area

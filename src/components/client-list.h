@@ -10,7 +10,8 @@
  * - XCB_DESTROY_NOTIFY - destroy Client, unregister from hub
  * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, select pointer
  *   enter/leave so the focus component sees them, map the window
- * - XCB_UNMAP_NOTIFY - unmanage Client
+ * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
+ *   itself to hide the client of a tag that is no longer shown
  *
  * Events Emitted:
  * - EVT_CLIENT_CREATED - emitted after client creation
@@ -20,8 +21,9 @@
  *
  * Requests Sent:
  * - REQ_MONITOR_TILE - after a client is managed, unmanaged, or destroyed,
- *   so the monitor's remaining windows are rearranged
- *
+ *   so the monitor's remaining windows are rearranged; and again when a
+ *   client's size hints arrive after the first layout
+ * *
  * Acceptance Criteria:
  * [x] New window appears -> Client created -> added to list
  * [x] Window destroyed -> Client removed -> list cleaned
@@ -36,6 +38,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
+#include "src/event-types.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
@@ -50,10 +53,10 @@
  * Components subscribe to these to react to client changes.
  */
 enum ClientListEventType {
-  EVT_CLIENT_CREATED,   /* Client was created and registered with hub */
-  EVT_CLIENT_DESTROYED, /* Client was destroyed and unregistered from hub */
-  EVT_CLIENT_MANAGED,   /* Client was added to the managed client list */
-  EVT_CLIENT_UNMANAGED, /* Client was removed from the managed client list */
+  EVT_CLIENT_CREATED   = EVT_CLIENT_LIST_BASE + 0, /* Client was created and registered with hub */
+  EVT_CLIENT_DESTROYED = EVT_CLIENT_LIST_BASE + 1, /* Client was destroyed and unregistered from hub */
+  EVT_CLIENT_MANAGED   = EVT_CLIENT_LIST_BASE + 2, /* Client was added to the managed client list */
+  EVT_CLIENT_UNMANAGED = EVT_CLIENT_LIST_BASE + 3, /* Client was removed from the managed client list */
 };
 
 /*
@@ -131,7 +134,9 @@ void client_list_on_map_request(void* event);
 
 /*
  * Handle XCB_UNMAP_NOTIFY event.
- * Unmanages the window (removes from client list) if managed.
+ * An unmap the WM asked for in client_hide() leaves the client managed; an
+ * unmap the WM did not ask for is a withdrawal: unmanage, WM_STATE=Withdrawn,
+ * EVT_CLIENT_UNMANAGED.
  */
 void client_list_on_unmap_notify(void* event);
 
@@ -153,5 +158,15 @@ uint32_t client_list_managed_count(void);
  * Check if a window is managed.
  */
 bool client_list_is_managed(xcb_window_t window);
+
+/*
+ * Take the size hints replies that have arrived and re-tile the monitors whose
+ * clients they change.
+ *
+ * A property reply is not an event, so nothing dispatches it: the event loop
+ * calls this once per iteration, after it has drained the events. A client is
+ * laid out before its hints are known, and this is what corrects that layout.
+ */
+void client_list_poll_size_hints(void);
 
 #endif /* _COMPONENT_CLIENT_LIST_H_ */

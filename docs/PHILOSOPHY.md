@@ -20,7 +20,7 @@ a promise the code does not keep is a defect list, not marketing.
 | Promise | What it means for the person using the WM | Status 2026-11-01 |
 |---------|-------------------------------------------|-------------------|
 | **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | kept for new windows: mapped, tiled, and placed on `MapRequest` |
-| **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop key handling | not kept: the launcher blocks the loop, and the loop busy-waits (4.7) |
+| **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop key handling | not kept: the launcher blocks the loop |
 | **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | not kept: no key grabs exist (4.5) |
 | **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: the unit suite covers the model, `make test-x` covers the X seam and still fails there |
 | **The WM can explain itself** | current state and recent transitions can be dumped and read | not kept: `LOG_DEBUG` only, no state dump or event trace |
@@ -106,8 +106,9 @@ later as an event.
     reply is needed
   - one `xcb_flush()` per loop iteration, not one per call
   - the main loop blocks on `poll()` or `xcb_wait_for_event()`, never spins
-  - child processes (launcher, terminal) are `fork` + `exec` and are reaped on
-    `SIGCHLD`; the WM does not `waitpid()` inside a handler
+  - child processes (launcher, terminal) are `fork` + `exec`. A `SIGCHLD`
+    handler, when one is installed, may only call async-signal-safe functions
+    and `waitpid(WNOHANG)` — not `LOG_*` and not `signal()` to reinstall itself
 - **For the user:** a stuck application, a slow dmenu, or a hotplug storm cannot
   stop the WM from handling keys. This is the difference between "my window
   manager froze" and "that app froze".
@@ -118,10 +119,9 @@ later as an event.
 **Checked by** `make check-async` (`scripts/check-async.sh`), which fails on
 blocking calls unless the line carries `allow-blocking: <reason>`.
 
-**Current debt:** 17 synchronous `_reply()` calls (6 `wm-xcb.c`, 5
-`monitor-manager.c`, 4 `wm-xcb-ewmh.c`, 2 `wm-kbd-mouse.c`), and two worse cases:
-`handle_xcb_events()` spins at 100% of a core, and `launcher_run_dmenu()` blocks
-the loop on `read()` and `waitpid()` while dmenu is open.
+**Current debt:** the synchronous `_reply()` calls listed in
+`tests/quality/async-baseline.txt`, and `launcher_run_dmenu()`, which blocks the
+loop on `read()` and `waitpid()` while dmenu is open.
 
 ### 2.4 Behaviour arrives as a registration, not as an edit
 
@@ -165,7 +165,7 @@ Short enough to check in review.
 | One flush per loop iteration | 2.3 | review |
 | Every request has a failure event | 2.2 | review: a request with only a success path is incomplete |
 | New behaviour is a registration, not an edit (see §2.4 test) | 2.4 | review |
-| Event ids come from the shared registry, never a fresh local enum | avoids the collisions already in the tree | `bd show wm-4f6.8` |
+| Event ids come from the shared registry, never a fresh local enum | two components that share a value receive each other's events | `src/event-types.h`, `tests/unit/test-event-types.c` |
 | `make test` green, `scripts/xephyr-test.sh` no worse than before | promise 4 | CI (planned) |
 | No AI attribution in commits, comments, or files | project rule | review |
 

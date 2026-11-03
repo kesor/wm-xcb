@@ -78,6 +78,7 @@
               xvfb-run
               xprop
               xrandr
+              xset # the seam suite reads the NumLock state from it
               xdotool
               xterm
               dmenu
@@ -88,6 +89,8 @@
               # Quality gates: .beads/hooks/* call 'lefthook run <hook>'.
               # See docs/QUALITY.md.
               lefthook
+              actionlint # scripts/check-workflow.sh parses .github/workflows/
+              shellcheck # scripts/check-shellcheck.sh; its baseline is pinned to this version
             ];
           };
         };

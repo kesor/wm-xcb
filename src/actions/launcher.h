@@ -38,6 +38,11 @@ void launcher_init(void);
 void launcher_shutdown(void);
 
 /*
+ * Check if the module is initialized (for the startup check)
+ */
+bool launcher_is_initialized(void);
+
+/*
  * Action callback for launching applications via dmenu.
  * Forks dmenu, reads selection, executes command.
  *
