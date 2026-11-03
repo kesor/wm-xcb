@@ -239,14 +239,17 @@ test_monitor_manager_with_monitors(void)
 }
 
 /*
- * A CRTC change event carries the new geometry, so the monitor follows it
- * without asking the server.
+ * A CRTC change event carries the new geometry, so the synchronous fallback
+ * applies it without asking the server.
  *
- * There is no X connection in this test, which is the point: a read of the
- * CRTC's geometry is the only other thing that could set these fields.
+ * This covers the fallback branch only: there is no X connection here, so the
+ * async pass cannot start (monitor_manager_pass_begin() returns false when dpy
+ * is NULL). The test asserts that, so it cannot read as coverage of the pass.
+ * What the pass does with a reply already in flight is covered by the seam
+ * suite, not here.
  */
 void
-test_monitor_manager_crtc_change_uses_the_event_geometry(void)
+test_monitor_manager_crtc_change_uses_the_event_geometry_sync_fallback(void)
 {
   LOG_CLEAN("== Testing a CRTC change event sets the monitor geometry");
 
@@ -296,11 +299,14 @@ test_monitor_manager_crtc_change_uses_the_event_geometry(void)
 }
 
 /*
- * A disconnected output is unmanaged on the spot: destroying a monitor needs no
- * answer from the server.
+ * A disconnected output is unmanaged on the spot in the synchronous fallback:
+ * destroying a monitor needs no answer from the server.
+ *
+ * The async pass cannot start without a connection, and this test says so
+ * instead of implying the pass was exercised.
  */
 void
-test_monitor_manager_disconnect_destroys_the_monitor(void)
+test_monitor_manager_disconnect_destroys_the_monitor_sync_fallback(void)
 {
   LOG_CLEAN("== Testing a disconnected output loses its monitor");
 
@@ -321,6 +327,8 @@ test_monitor_manager_disconnect_destroys_the_monitor(void)
 
   monitor_manager_handle_randr_notify(&event);
 
+  /* The pass never starts without an X connection; this test is the fallback. */
+  assert_or_abort(!monitor_manager_pass_running_for_tests());
   assert_or_abort(monitor_get_by_output(7) == NULL);
   assert_or_abort(monitor_list_get_first() == NULL);
 
@@ -337,6 +345,6 @@ TEST_GROUP(MonitorManager, {
   test_monitor_manager_no_requests();
   test_monitor_manager_accepts_monitor_target();
   test_monitor_manager_with_monitors();
-  test_monitor_manager_crtc_change_uses_the_event_geometry();
-  test_monitor_manager_disconnect_destroys_the_monitor();
+  test_monitor_manager_crtc_change_uses_the_event_geometry_sync_fallback();
+  test_monitor_manager_disconnect_destroys_the_monitor_sync_fallback();
 });

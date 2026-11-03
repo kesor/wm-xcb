@@ -48,6 +48,18 @@ built in, because the binary links the store paths of that shell's libraries.
 
 ---
 
+### A test that early-returns is not coverage
+
+A unit test whose subject gives up for lack of an X connection asserts on a
+fallback branch, not on the behaviour the bead was about. Two monitor-manager
+tests did this and read as coverage of the async RandR pass for a whole cycle;
+the defect the pass carried survived a green suite.
+
+When the subject cannot run in a unit test, say which branch the test covers in
+its name (`..._sync_fallback`), assert that the other branch did not start (a
+`*_for_tests()` getter under `WM_HUB_TESTING` is the usual way), and cover the
+real path in `tests/x/`.
+
 ## 2. Unit tests
 
 ```bash

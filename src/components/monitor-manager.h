@@ -61,4 +61,13 @@ void monitor_manager_handle_randr_notify(void* event);
  */
 HubComponent* monitor_manager_get_component(void);
 
+#ifdef WM_HUB_TESTING
+/*
+ * True while the async RandR pass is waiting on a reply. A unit test has no X
+ * connection, so the pass cannot start there; asserting this tells a test which
+ * branch it actually entered instead of letting it read a fallback as coverage.
+ */
+bool monitor_manager_pass_running_for_tests(void);
+#endif
+
 #endif /* _MONITOR_MANAGER_H_ */
