@@ -33,11 +33,4 @@ xdotool key Num_Lock 2>/dev/null
 
 check_eq "MOD+2 hides its window while Num_Lock is on" "0" "$hidden"
 
-# Leave the monitor on tag 1: the tests that follow put a new client on tag 1
-# and press MOD+2 themselves, which changes nothing if this test left tag 2
-# showing. The window does not come back here because the unmap this tag change
-# caused also unmanaged the client, which is a separate defect.
-xdotool key super+1 2>/dev/null
-sleep 0.2
-
 finish

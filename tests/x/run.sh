@@ -32,7 +32,11 @@
 #
 # Each test file is tests/x/test-*.sh. It gets DISPLAY, WM_PID, WM_LOG and
 # ROOT_DIR in its environment, sources tests/x/lib.sh, and exits 0 only if all
-# of its assertions passed.
+# of its assertions passed. One Xephyr serves the whole run, but every file gets
+# a WM of its own: a tag switch, a moved client or a changed focus outlives the
+# file that made it, and the file after it would fail on state it never set.
+# What lives in the server rather than in the WM - the lock modifiers, a RandR
+# mode - is still shared, and a test that changes it puts it back.
 #
 # Exit status: 0 if every test passed, 1 otherwise.
 #
@@ -94,7 +98,7 @@ done
 # shellcheck source=../../scripts/lib/private-display.sh
 . "$ROOT_DIR/scripts/lib/private-display.sh"
 
-for cmd in Xephyr xdotool xprop xset; do
+for cmd in Xephyr xdotool xprop xset xwininfo; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "run.sh: missing '$cmd'. Start the dev shell: direnv allow" >&2
     exit 1
@@ -170,10 +174,10 @@ WM_PID=""
 
 cleanup() {
   if [ "$KEEP" -eq 1 ]; then
-    echo "run.sh: keeping session on $DISPLAY (wm pid $WM_PID, parent $WM_PARENT_DISPLAY)"
+    echo "run.sh: keeping session on $DISPLAY (wm pid ${WM_PID:-none}, parent $WM_PARENT_DISPLAY)"
     return
   fi
-  [ -n "$WM_PID" ] && kill "$WM_PID" 2>/dev/null
+  [ -n "$WM_PID" ] && stop_wm
   [ -n "$XEPHYR_PID" ] && kill "$XEPHYR_PID" 2>/dev/null
   wait 2>/dev/null
 }
@@ -193,15 +197,39 @@ xdotool getdisplaygeometry >/dev/null 2>&1 || {
   exit 1
 }
 
-"$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
-WM_PID=$!
-sleep 1
-kill -0 "$WM_PID" 2>/dev/null || {
-  echo "run.sh: WM exited during startup:" >&2
-  cat "$WM_LOG" >&2
-  exit 1
+# The WM says nothing when it is ready; the root window does. setup_xcb()
+# selects SubstructureRedirect on it, and the key grabs are in place before the
+# loop reads the first event, so a test that starts here talks to a WM that
+# answers keys. The margin after the mask covers the init between the two, which
+# is a handful of requests: the WM cannot be observed between them, so a fixed
+# wait is the only way to be behind both.
+start_wm() {
+  stop_wm
+  : >"$WM_LOG"
+  "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+  WM_PID=$!
+  export WM_PID
+  local waited=0
+  while [ "$waited" -lt 4000 ]; do
+    kill -0 "$WM_PID" 2>/dev/null || return 1
+    if xwininfo -root -events 2>/dev/null | grep -q SubstructureRedirect; then
+      sleep 0.2
+      return 0
+    fi
+    sleep 0.02
+    waited=$((waited + 20))
+  done
+  return 1
 }
-export WM_PID
+
+stop_wm() {
+  [ -n "$WM_PID" ] || return 0
+  # SIGKILL, not SIGTERM: a test that fails between kill -STOP and kill -CONT
+  # leaves the WM stopped, and a stopped process keeps SIGTERM pending.
+  kill -KILL "$WM_PID" 2>/dev/null
+  wait "$WM_PID" 2>/dev/null
+  WM_PID=""
+}
 
 TESTS=()
 for f in "$ROOT_DIR"/tests/x/test-*.sh; do
@@ -242,6 +270,11 @@ FAILED_FILES=()
 
 for f in "${TESTS[@]}"; do
   name=$(basename "$f")
+  if ! start_wm; then
+    echo "run.sh: the WM did not come up for $name:" >&2
+    cat "$WM_LOG" >&2
+    exit 1
+  fi
   printf '\n%s\n' "$name"
   out=$(bash "$f" 2>&1)
   rc=$?
@@ -275,12 +308,15 @@ for f in "${TESTS[@]}"; do
       tail -n 25 "$WM_LOG" | sed 's/^/        /'
     fi
   fi
-  # A test that killed the WM stops the run: every later test would report the
-  # same failure.
+  # A test that killed the WM loses the log the next file truncates, so the log
+  # of the WM that died is kept under its own name. It does not stop the run:
+  # the next file starts on a WM of its own.
   if ! kill -0 "$WM_PID" 2>/dev/null; then
-    echo "  WM died during $name; stopping the run"
+    crashed_log="$LOG_DIR/wm-crashed-$name.log"
+    cp "$WM_LOG" "$crashed_log" 2>/dev/null
+    echo "  the WM died during $name; its log is $crashed_log"
     TOTAL_NEW=$((TOTAL_NEW + 1))
-    break
+    FAILED_FILES+=("$name")
   fi
 done
 
