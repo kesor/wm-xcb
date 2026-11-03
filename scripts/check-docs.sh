@@ -21,8 +21,7 @@
 # issues may cite lines and counts freely, because they are snapshots with a
 # date on them.
 #
-# Not scanned: README.md, a legacy concatenation scheduled for replacement, and
-# docs/archive/ (frozen history).
+# Not scanned: docs/archive/ (frozen history) and vendor/.
 #
 # Exit status: 0 when the documents are clean, 1 otherwise.
 
@@ -52,7 +51,6 @@ else
       git ls-files '*.md'
       echo 'AGENTS.md'
     } | sort -u |
-      grep -v '^README\.md$' |
       grep -v '^docs/archive/' |
       grep -v '^vendor/'
   )
