@@ -86,7 +86,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 |------|---------|----------------|
 | build | `make -j$(nproc)` | the tree compiles |
 | flake | `scripts/check-flake.sh` | the dev shell in `flake.nix` evaluates for this system, so a syntax error, a moved attribute or a package that no longer exists fails here and not at the next `direnv allow` |
-| unit | `make test` | the unit suite across hub, state machines, targets, components |
+| unit | `scripts/check-unit.sh` | the unit suite across hub, state machines, targets, components. The gate captures the run and prints its log only when it fails: a passing suite is one line per assertion and lefthook prints the verdict and the duration as its own summary, so attaching the log to every commit spends the reader's attention on a step that passed. A run whose summary line is missing, or whose summary counts a failure, fails the gate whatever make exited with |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
@@ -266,6 +266,7 @@ scripts/check-shellcheck.sh # the shell lint, against its baseline
 make test-x                 # the same suite, spelled out; starts a private Xvfb
 scripts/check-sanitize.sh   # the unit suite under the sanitizers, against the leak baseline
 scripts/check-sanitize-x.sh # the WM in a nested server under the sanitizers
+scripts/check-unit.sh       # the unit suite as the commit gate runs it: one line on a pass, the log on a failure
 scripts/check-workflow.sh   # every .github/workflows/ file parses
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 scripts/check-harness-variant.sh  # the harnesses run the variant they report

@@ -61,6 +61,10 @@ Components are tested
 without an X server by calling their handlers with fabricated events and
 inspecting hub events; that is the pattern to copy for new components.
 
+The commit and push gates run the same suite through `scripts/check-unit.sh`,
+which keeps the log to itself and prints it only when the run fails. Run
+`make test` by hand when you want the log of a passing run.
+
 Two extra targets:
 
 ```bash

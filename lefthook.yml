@@ -64,8 +64,8 @@ pre-commit:
       fail_text: "The tree does not build."
 
     unit:
-      run: make test
-      fail_text: "make test failed."
+      run: ./scripts/check-unit.sh
+      fail_text: "make test failed: the suite's own output is above."
 
     async:
       run: ./scripts/check-async.sh
@@ -127,8 +127,8 @@ pre-push:
       fail_text: "New blocking call in the event loop."
 
     unit:
-      run: make test
-      fail_text: "make test failed."
+      run: ./scripts/check-unit.sh
+      fail_text: "make test failed: the suite's own output is above."
 
     # The only check that looks at the running WM. It used to run only when the
     # author or the reviewer chose to, so a branch that broke mapping, tiling,
