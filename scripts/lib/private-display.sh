@@ -104,3 +104,35 @@ wm_parent_display() {
   exec xvfb-run -a -s "-screen 0 ${WM_PARENT_SCREEN:-1280x800x24}" \
     env WM_PRIVATE_PARENT_DISPLAY=1 "${BASH:-bash}" "$0" "$@"
 }
+
+# wm_display_free <n>
+#   True when display :<n> can be used: nothing is listening on its socket and
+#   no live lock is held. A lock file with no socket next to it is a server that
+#   died without cleaning up - a crashed Xvfb, a machine that lost power - and it
+#   used to take that display out of the pool for every later run: one eighth of
+#   the pool, silently, until someone deleted the file by hand.
+#
+#   The lock is removed only when the socket is absent and the lock is older than
+#   WM_STALE_LOCK_SECONDS (default 30), which is longer than the gap between an X
+#   server creating its lock and creating its socket. The removal is reported, so
+#   a person reading a run's log knows a stale lock was cleared rather than
+#   wondering why a display number changed.
+wm_display_free() {
+  local n=$1 socket="/tmp/.X11-unix/X$1" lock="/tmp/.X$1-lock" age now mtime
+  [ -e "$socket" ] && return 1
+  if [ ! -e "$lock" ]; then
+    return 0
+  fi
+  age=${WM_STALE_LOCK_SECONDS:-30}
+  now=$(date +%s)
+  mtime=$(date -r "$lock" +%s 2>/dev/null || echo "$now")
+  if [ $((now - mtime)) -lt "$age" ]; then
+    # A server may be between creating its lock and its socket.
+    return 1
+  fi
+  if rm -f "$lock" 2>/dev/null; then
+    echo "display :$n had a $((now - mtime))s-old lock and no socket; cleared the stale lock" >&2
+    return 0
+  fi
+  return 1
+}

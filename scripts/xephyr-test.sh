@@ -121,11 +121,12 @@ wm_build_variant "$WM_LOG" || exit 1
 pick_display() {
   local n
   for n in 2 3 4 5 6 7 8 9; do
-    if [ -e "/tmp/.X11-unix/X$n" ] || [ -e "/tmp/.X$n-lock" ]; then
-      continue
+    # wm_display_free clears a lock whose server is gone and says so, instead of
+    # skipping that display for every run from then on.
+    if wm_display_free "$n"; then
+      echo "$n"
+      return 0
     fi
-    echo "$n"
-    return 0
   done
   echo ""
 }
@@ -154,7 +155,14 @@ XEPHYR_PID=""
 
 cleanup() {
   if [ "$KEEP" -eq 1 ]; then
-    echo "xephyr-test: keeping session on $TEST_DISPLAY (wm pid $WM_PID)"
+    echo "xephyr-test: keeping the nested session on $TEST_DISPLAY (wm pid $WM_PID)"
+    if [ "${WM_PARENT_DISPLAY_KIND:-private}" = "private" ]; then
+      # The parent Xvfb is started by xvfb-run, which kills it when this process
+      # exits, so the nested server dies with it. Saying "keeping session" without
+      # that was a promise the next command disproved.
+      echo "xephyr-test: the parent display $WM_PARENT_DISPLAY is a private Xvfb this run started, and it goes away with the run." >&2
+      echo "xephyr-test: to look at a kept session, use the session's display: WM_USE_SESSION_DISPLAY=1 scripts/xephyr-test.sh --keep" >&2
+    fi
     return
   fi
   [ -n "$XCLIENT_PID" ] && kill "$XCLIENT_PID" 2>/dev/null

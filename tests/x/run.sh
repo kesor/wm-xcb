@@ -156,9 +156,21 @@ export WM_SEAM_DMENU_STARTED="$LOG_DIR/dmenu-started"
 # before Xephyr starts because that line is what a reader looks for next.
 wm_build_variant "$WM_LOG" || exit 1
 
+# The variant is chosen; nothing below reads DEBUG again, and a shell that
+# exports it turns every xdotool call into a 375-line keymap dump on stderr
+# (libxdo prints it whenever DEBUG is set to any value). That dump drowned the
+# assertions and, at a drag test's call count, overflowed the output this script
+# reads back with "Argument list too long". The tests that start their own
+# server still need the variant, so it is passed under a name libxdo ignores.
+WM_SEAM_DEBUG=${DEBUG:-0}
+export WM_SEAM_DEBUG
+unset DEBUG SANITIZE
+
 DISPLAY_NUM=""
 for n in 2 3 4 5 6 7 8 9; do
-  if [ ! -e "/tmp/.X11-unix/X$n" ] && [ ! -e "/tmp/.X$n-lock" ]; then
+  # A lock with no socket is a server that died without cleaning up. Treating it
+  # as "in use" removed the display from the pool for every later run.
+  if wm_display_free "$n"; then
     DISPLAY_NUM=$n
     break
   fi
