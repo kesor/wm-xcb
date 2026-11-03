@@ -12,7 +12,7 @@
  *  30 - 39  focus        focus state transitions
  *  40 - 49  tiling       layout changes
  *  50 - 59  connection   monitor connect and disconnect
- *  60 - 63  reserved
+ *  60 - 63  launcher     launcher failure: no selection, or no dmenu
  */
 
 #ifndef _EVENT_TYPES_H_
@@ -38,11 +38,16 @@
 #define EVT_CONNECTION_BASE   50
 #define EVT_CONNECTION_LIMIT  60
 
+#define EVT_LAUNCHER_BASE     60
+#define EVT_LAUNCHER_LIMIT    64
+
 _Static_assert(EVT_CLIENT_LIST_LIMIT <= EVT_FULLSCREEN_BASE, "client-list range overlaps fullscreen");
 _Static_assert(EVT_FULLSCREEN_LIMIT <= EVT_TAG_MANAGER_BASE, "fullscreen range overlaps tag-manager");
 _Static_assert(EVT_TAG_MANAGER_LIMIT <= EVT_FOCUS_BASE, "tag-manager range overlaps focus");
 _Static_assert(EVT_FOCUS_LIMIT <= EVT_TILING_BASE, "focus range overlaps tiling");
 _Static_assert(EVT_TILING_LIMIT <= EVT_CONNECTION_BASE, "tiling range overlaps connection");
 _Static_assert(EVT_CONNECTION_LIMIT <= HUB_MAX_EVENT_TYPES, "connection range exceeds the event bus");
+_Static_assert(EVT_CONNECTION_LIMIT <= EVT_LAUNCHER_BASE, "connection range overlaps launcher");
+_Static_assert(EVT_LAUNCHER_LIMIT <= HUB_MAX_EVENT_TYPES, "launcher range exceeds the event bus");
 
 #endif /* _EVENT_TYPES_H_ */

@@ -94,6 +94,7 @@ TEST_SRC = \
 	tests/unit/test-wm-monitor.c \
 	tests/unit/test-wm-tag.c \
 	tests/unit/test-wm-signals.c \
+	tests/unit/test-wm-loop-fds.c \
 	tests/unit/test-target-client.c \
 	tests/unit/test-client-list-component.c \
 	tests/unit/test-tiling-component.c \

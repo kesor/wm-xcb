@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "src/actions/launcher.h"
 #include "src/components/client-list.h"
 #include "src/components/connection-sm.h"
 #include "src/components/focus.h"
@@ -45,6 +46,7 @@ static const KnownEventType known_events[] = {
   KNOWN(EVT_LAYOUT_CHANGED, EVT_TILING_BASE, EVT_TILING_LIMIT),
   KNOWN(EVT_MONITOR_DISCONNECTED, EVT_CONNECTION_BASE, EVT_CONNECTION_LIMIT),
   KNOWN(EVT_MONITOR_CONNECTED, EVT_CONNECTION_BASE, EVT_CONNECTION_LIMIT),
+  KNOWN(EVT_LAUNCHER_FAILED, EVT_LAUNCHER_BASE, EVT_LAUNCHER_LIMIT),
 };
 
 #define KNOWN_EVENT_COUNT (sizeof(known_events) / sizeof(known_events[0]))

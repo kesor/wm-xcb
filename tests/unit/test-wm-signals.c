@@ -12,9 +12,13 @@
  * - a second setup_signals() keeps the pipe the handlers already write to
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
+#include <unistd.h>
+
+#include <sys/wait.h>
 
 #include "test-registry.h"
 #include "test-wm.h"
@@ -23,6 +27,7 @@
 
 static void (*previous_sigint)(int);
 static void (*previous_sigterm)(int);
+static void (*previous_sigchld)(int);
 
 static int
 is_readable(int fd, int timeout_ms)
@@ -41,6 +46,8 @@ remember_signal_dispositions(void)
   signal(SIGINT, previous_sigint);
   previous_sigterm = signal(SIGTERM, SIG_DFL);
   signal(SIGTERM, previous_sigterm);
+  previous_sigchld = signal(SIGCHLD, SIG_DFL);
+  signal(SIGCHLD, previous_sigchld);
 }
 
 static void
@@ -48,6 +55,7 @@ restore_signal_dispositions(void)
 {
   signal(SIGINT, previous_sigint);
   signal(SIGTERM, previous_sigterm);
+  signal(SIGCHLD, previous_sigchld);
 }
 
 void
@@ -117,10 +125,46 @@ test_a_second_setup_keeps_the_same_pipe(void)
   running = was_running;
 }
 
+/*
+ * A forked child is reaped by the handler, not by the code that spawned it:
+ * that is what lets the launcher and the terminal return before their child
+ * exits. Nothing in the WM calls waitpid() for a child it started.
+ */
+void
+test_sigchld_reaps_a_child_without_a_wait(void)
+{
+  LOG_CLEAN("  test_sigchld_reaps_a_child_without_a_wait...");
+
+  setup_signals();
+
+  pid_t pid = fork();
+  assert_or_abort(pid >= 0);
+
+  if (pid == 0)
+    _exit(0);
+
+  /* The handler runs on delivery; kill(2) says ESRCH once the child has been
+     collected and is no longer a zombie. */
+  bool reaped = false;
+  for (int waited = 0; waited < 2000; waited += 10) {
+    if (kill(pid, 0) != 0 && errno == ESRCH) {
+      reaped = true;
+      break;
+    }
+    usleep(10000);
+  }
+
+  assert(reaped);
+  errno = 0;
+  assert(waitpid(pid, NULL, WNOHANG) == -1);
+  assert(errno == ECHILD);
+}
+
 TEST_GROUP(SignalWakeup, {
   remember_signal_dispositions();
   test_setup_signals_creates_a_nonblocking_wakeup_fd();
   test_sigterm_sets_running_and_wakes_the_loop();
   test_a_second_setup_keeps_the_same_pipe();
+  test_sigchld_reaps_a_child_without_a_wait();
   restore_signal_dispositions();
 });

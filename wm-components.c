@@ -111,6 +111,11 @@ wm_components_shutdown(void)
   client_list_component_shutdown();
   focus_component_shutdown();
   fullscreen_component_shutdown();
+  /* Action modules go before the registry: the launcher also drops the pipe
+   * it registered with the loop and closes it, which would otherwise happen
+   * after the loop has forgotten every descriptor. */
+  launcher_shutdown();
+  terminal_shutdown();
   keybinding_shutdown();
   /* pertag shutdown happens after monitor_manager because monitors unregister first */
   hub_shutdown();

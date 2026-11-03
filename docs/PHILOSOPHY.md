@@ -20,7 +20,7 @@ a promise the code does not keep is a defect list, not marketing.
 | Promise | What it means for the person using the WM | Status 2026-11-01 |
 |---------|-------------------------------------------|-------------------|
 | **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | kept for new windows: mapped, tiled, and placed on `MapRequest` |
-| **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop key handling | not kept: the launcher blocks the loop |
+| **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop the loop from running | partly kept: the loop keeps running while dmenu is open, though dmenu itself holds the keyboard grab so keys reach it and not the WM; the synchronous X replies still stop the loop (2.3) |
 | **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | not kept: no key grabs exist (4.5) |
 | **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: the unit suite covers the model, `make test-x` covers the X seam and still fails there |
 | **The WM can explain itself** | current state and recent transitions can be dumped and read | not kept: `LOG_DEBUG` only, no state dump or event trace |
@@ -120,8 +120,15 @@ later as an event.
 blocking calls unless the line carries `allow-blocking: <reason>`.
 
 **Current debt:** the synchronous `_reply()` calls listed in
-`tests/quality/async-baseline.txt`, and `launcher_run_dmenu()`, which blocks the
-loop on `read()` and `waitpid()` while dmenu is open.
+`tests/quality/async-baseline.txt`.
+
+The launcher is not on that list any more. It forks a shell whose last stage is
+`dmenu`, with `dmenu_path` feeding it, and registers the read end of that
+pipeline's stdout with the loop as an event source. The promise holds while the
+pipe exists: the only read of it happens in the loop's descriptor callback, when
+`poll(2)` reports it, and a prompt that closes with nothing written emits a
+failure event. A child is reaped by the `SIGCHLD` handler, never by the code
+that started it.
 
 ### 2.4 Behaviour arrives as a registration, not as an edit
 
