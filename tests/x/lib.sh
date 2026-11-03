@@ -15,6 +15,13 @@
 
 : "${ROOT_DIR:?run the seam tests through tests/x/run.sh}"
 
+# libxdo prints its whole keymap to stderr whenever the DEBUG variable is set to
+# any value, and run.sh is started with DEBUG=<variant> for the build it picks.
+# That trace is 375 lines per xdotool call, which drowns the assertions and, at
+# the call counts a drag test needs, overflows the output run.sh reads back.
+# run.sh has already chosen the variant by the time a test sources this file.
+unset DEBUG
+
 XCLIENT="$ROOT_DIR/tools/xclient"
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -181,6 +188,27 @@ overlap_pairs() {
 # focused_window - the window the X server currently has as input focus.
 focused_window() {
   xdotool getwindowfocus 2>/dev/null
+}
+
+# wait_focus <window-id> [timeout_ms] - returns 0 once the X input focus is that
+# window. The WM answers an enter event asynchronously, so a test that reads the
+# focus right after moving the pointer races the WM.
+wait_focus() {
+  local want=$1 timeout=${2:-1000} waited=0 got
+  while [ "$waited" -lt "$timeout" ]; do
+    got=$(focused_window)
+    [ -n "$got" ] && [ "$((got))" = "$((want))" ] && return 0
+    sleep 0.02
+    waited=$((waited + 20))
+  done
+  return 1
+}
+
+# last_client_pid - the process id behind the most recent spawn_client call.
+# spawn_client appends one pid per call, and a call with count 1 owns exactly
+# one window, so this is the client of the last window it printed.
+last_client_pid() {
+  tail -n 1 "$TMPDIR_SEAM/client-pids.$$" 2>/dev/null
 }
 
 # press <key> - send a key to the nested display through xdotool.
