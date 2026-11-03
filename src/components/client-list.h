@@ -10,7 +10,8 @@
  * - XCB_DESTROY_NOTIFY - destroy Client, unregister from hub
  * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, select pointer
  *   enter/leave so the focus component sees them, map the window
- * - XCB_UNMAP_NOTIFY - unmanage Client
+ * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
+ *   itself to hide the client of a tag that is no longer shown
  *
  * Events Emitted:
  * - EVT_CLIENT_CREATED - emitted after client creation

@@ -209,6 +209,12 @@ and an override-redirect window on a bare display, starts the WM afterwards, and
 asserts that the two are tiled and carry `WM_STATE=Normal` while the
 override-redirect window keeps its geometry and gets no `WM_STATE`.
 
+`test-51-burst-tag-switch.sh` uses the suite's WM but stops it with `SIGSTOP`
+while it sends `super+2` and `super+1`, so both key presses are queued and the
+WM dispatches them in one drain. That is the ordering where a hide and a later
+show both run before the `UnmapNotify` the hide causes is read. The test resumes
+the WM on every exit path.
+
 ---
 
 ## 3b. Static checks

@@ -173,7 +173,7 @@ void monitor_manager_randr_handler(void* event) {
 | `XCB_CREATE_NOTIFY` | client-list | Create client target |
 | `XCB_DESTROY_NOTIFY` | client-list | Destroy client target |
 | `XCB_MAP_REQUEST` | client-list | Manage client |
-| `XCB_UNMAP_NOTIFY` | client-list | Unmanage client |
+| `XCB_UNMAP_NOTIFY` | client-list | Unmanage client, unless the WM asked for the unmap itself |
 | `XCB_CONFIGURE_REQUEST` | floating, tiling | May `hub_send_request()` |
 | `XCB_EXPOSE` | bar | `hub_emit(EVT_BAR_DRAW)` |
 | `XCB_RANDR_NOTIFY` | monitor-manager | `sm_raw_write()` to ConnectionSM |

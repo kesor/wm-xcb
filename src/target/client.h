@@ -136,6 +136,11 @@ typedef struct Client {
   bool                  mapped;     /* is currently mapped */
   enum xcb_stack_mode_t stack_mode; /* X11 stack mode */
 
+  /* Unmaps the WM asked the server for whose UnmapNotify has not been read
+   * yet. A hide and a later show can both run before the loop reads the
+   * notify, so the notify cannot be classified from the state it finds. */
+  uint32_t pending_unmaps;
+
   /* Adopted state machines - dynamically allocated on demand */
   struct {
     StateMachine** machines; /* array of SM pointers */
@@ -398,6 +403,12 @@ bool client_is_managed(const Client* c);
  */
 void client_set_mapped(Client* c, bool mapped);
 bool client_is_mapped(const Client* c);
+
+/*
+ * Spend one unmap the WM recorded in client_hide(). Returns true when this
+ * UnmapNotify answers a hide the WM asked for, which is not a withdrawal.
+ */
+bool client_take_pending_unmap(Client* c);
 
 /*
  * Stack mode

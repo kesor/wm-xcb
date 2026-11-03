@@ -53,6 +53,8 @@ client_properties_init(Client* c)
   c->mapped       = false;
   c->stack_mode   = XCB_STACK_MODE_ABOVE;
 
+  c->pending_unmaps = 0;
+
   /* No hints until the window says otherwise: a client that sets none is
    * unconstrained, not zero-sized. */
   memset(&c->size_hints, 0, sizeof(c->size_hints));
@@ -937,6 +939,19 @@ client_is_mapped(const Client* c)
 }
 
 /*
+ * Spend one unmap the WM recorded in client_hide().
+ */
+bool
+client_take_pending_unmap(Client* c)
+{
+  if (c == NULL || c->pending_unmaps == 0)
+    return false;
+
+  c->pending_unmaps--;
+  return true;
+}
+
+/*
  * Set stack mode.
  */
 void
@@ -1075,10 +1090,22 @@ client_set_wm_state(xcb_window_t wnd, enum ClientWMState state)
 
 /*
  * Hide a client window (unmap it).
+ *
+ * The UnmapNotify that comes back cannot be told from a withdrawal by the
+ * state it finds: a tag change can hide a window and show it again before the
+ * loop reads the notify, so `mapped` is true by then. Record the request here,
+ * where the WM makes it, and let the client-list handler spend it.
  */
 xcb_void_cookie_t
 client_hide(xcb_window_t wnd)
 {
+  Client* c = client_get_by_window(wnd);
+
+  /* A window the server already has unmapped produces no notify, so only a
+   * hide of a window the WM believes is on screen owes one. */
+  if (c != NULL && client_is_mapped(c))
+    c->pending_unmaps++;
+
   if (dpy == NULL)
     return (xcb_void_cookie_t) { 0 };
   return xcb_unmap_window(dpy, wnd);

@@ -367,15 +367,16 @@ client_list_on_map_request(void* event)
  * Handle XCB_UNMAP_NOTIFY event.
  *
  * Not every unmap is the client taking its window away. The WM unmaps windows
- * itself to hide the clients of a tag that is no longer shown, and the tag
- * manager clears the client's `mapped` flag as it sends that unmap. So an
- * unmap of a window the WM does not believe is on screen is the WM's own, and
- * the client stays managed: it comes back when its tag is shown again. Only an
- * unmap of a window the WM has on screen is a withdrawal.
+ * itself to hide the clients of a tag that is no longer shown, and client_hide()
+ * records each of those requests on the client. The notify that answers one is
+ * spent against the record and the client stays managed: showing the tag again
+ * maps it back. An unmap the WM did not ask for is a withdrawal.
  *
- * The flag is the whole test, which puts a requirement on every path that
- * unmaps a client: it has to clear `mapped` when it does, or the next tag
- * switch forgets the client. tiling only ever shows windows.
+ * The record cannot be replaced by reading `mapped`, the flag the visibility
+ * code keeps: a batch of tag actions runs both a hide and a later show before
+ * the loop reads the notifies, so `mapped` is true for an unmap the WM caused.
+ * The count still remembers that one notify is owed, and the show does not
+ * touch it.
  */
 void
 client_list_on_unmap_notify(void* event)
@@ -397,7 +398,7 @@ client_list_on_unmap_notify(void* event)
     return;
   }
 
-  if (!client_is_mapped(c)) {
+  if (client_take_pending_unmap(c)) {
     LOG_DEBUG("Window %u was unmapped by the WM, client stays managed", e->window);
     return;
   }

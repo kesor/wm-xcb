@@ -120,8 +120,9 @@ Short version, and the parts that stay true until they are fixed:
   up, and a unit test runs that startup and asks each of those modules whether
   it is up. An unmap the WM causes itself, hiding the clients of a tag that is
   no longer shown, leaves the client managed, so showing the tag again maps it
-  back; an unmap of a window the WM has on screen is the client withdrawing:
-  it is unmanaged, `WM_STATE` goes to `Withdrawn`, and
+  back even when a later tag action has already shown the window again by the
+  time the unmap is read; an unmap the WM did not ask for is the client
+  withdrawing: it is unmanaged, `WM_STATE` goes to `Withdrawn`, and
   `EVT_CLIENT_UNMANAGED` is emitted. The event loop blocks in `poll(2)` on the
   X connection plus a signal wakeup pipe, so an idle WM costs no CPU, and
   SIGTERM ends it.
