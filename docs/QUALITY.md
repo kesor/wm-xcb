@@ -235,7 +235,10 @@ left behind says a defect is still there when it is not.
 1. Write the check as a script under `scripts/` that exits non-zero on failure
    and prints `file:line` or the failing thing. No network, no model.
 2. Add it to the right layer in `lefthook.yml` with a `fail_text` that says what
-   to do about it.
+   to do about it, then prove it fires: `lefthook run pre-commit --command
+   <name> --force`. Without `--force`, a command with a `glob` is skipped when
+   no staged file matches, and lefthook answers the skipped job with `no job
+   matching <name> found`, which reads as a gate that is not wired at all.
 3. A hook gate needs no workflow edit. The `gates` job runs `lefthook run
    pre-push --force`, so the command from step 2 runs in CI. Pasting that
    command into `.github/workflows/quality.yml` as well is a second
