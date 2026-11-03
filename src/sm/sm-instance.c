@@ -196,6 +196,11 @@ sm_create(void* owner, SMTemplate* template, EventEmitter emit, void* emit_userd
             sm->name, sm->current_state);
 
   sm_debug_machine_created(sm);
+
+  /* The state a machine starts in is where it has been all along; without this
+     a dump of a fresh machine says it is in a state it never entered. */
+  sm_debug_note_enter(sm, sm->current_state);
+
   return sm;
 }
 

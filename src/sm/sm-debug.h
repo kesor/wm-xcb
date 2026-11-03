@@ -25,9 +25,9 @@ void sm_debug_machine_created(StateMachine* sm);
 void sm_debug_machine_destroyed(StateMachine* sm);
 
 /*
- * Count one entrance into `state`. A state that is not in the template's state
- * list is not counted; it was reached by a raw write the template does not
- * declare.
+ * Count one entrance into `state`: every applied change, plus the state a
+ * machine is created in. A state that is not in the template's state list is
+ * not counted; it was reached by a raw write the template does not declare.
  */
 void sm_debug_note_enter(StateMachine* sm, uint32_t state);
 

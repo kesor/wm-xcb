@@ -137,7 +137,8 @@ test_dump_reports_owner_state_counts_and_trace(void)
   assert_header_matches_live_count(text);
   assert(strstr(text, "client 4242") != NULL);
   assert(strstr(text, "dump-sm: state BUSY") != NULL);
-  assert(strstr(text, "entered: IDLE=0 BUSY=1") != NULL);
+  /* The state it starts in counts once, then the change into BUSY. */
+  assert(strstr(text, "entered: IDLE=1 BUSY=1") != NULL);
   assert(strstr(text, "transition IDLE -> BUSY") != NULL);
   assert(strstr(text, "guard passed") != NULL);
   assert(strstr(text, "event 44") != NULL);
