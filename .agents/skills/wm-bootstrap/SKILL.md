@@ -143,18 +143,19 @@ task. `bd edit` opens an editor and blocks an agent — never use it.
 
 ## Spawning workers (optional)
 
-A local harness (`worker.sh`, not part of this repository) runs one worker per git
+A local harness (`worker.py`, not part of this repository) runs one worker per git
 worktree inside a tmux window with a `pi` agent. `auto <bead-id> [--merge]`
 starts a run, waits, reviews it on a different model family, and notifies;
 `inbox` shows what is in flight with the verdict; `review` runs the review
-alone. `worker.sh --help` is the flag list; this file does not repeat it, because
-a copy here rots while the real one changes.
+alone. `worker.py help` is the command list; this file does not repeat it,
+because a copy here rots while the real one changes.
 
 It lives beside the main checkout in a directory named `ai-workers-for-wm/`, so
 from a worktree created under `.worktrees/<bead>/` it is
-`../../../ai-workers-for-wm/`. It is not on `PATH` and not in this tree.
+`../../../ai-workers-for-wm/`. It is not on `PATH` and not in this tree: run it
+as `./worker.py <command>` from that directory.
 
-`worker.sh`, `README.md`, `HANDOFF.md` and `PROCESS.md` in that directory are
+`worker.py`, `README.md`, `HANDOFF.md` and `PROCESS.md` in that directory are
 safe to read: the flags, the defaults, the worktree layout and the rules for the
 session that dispatches are all written there. They are the harness's own
 project, so a worker reads them and does not edit them, and this repository never
@@ -167,9 +168,9 @@ Two things it cannot decide for you:
 
 - **One bead per worker, run in parallel.** Small batches review better: a
   single bead is a ten-minute review, five beads was an eighteen-minute review
-  at 70% of the reviewer's context. `worker.sh auto <bead>` as many times as
+  at 70% of the reviewer's context. `worker.py auto <bead>` as many times as
   there are disjoint beads, staggered a minute or two apart.
-- **Overlapping files decide what "disjoint" means.** `worker.sh overlap <id>
+- **Overlapping files decide what "disjoint" means.** `worker.py overlap <id>
   <id> ...` reads each bead's description and comments for file paths and says
   which are shared. Nothing shared: run them in parallel. Shared: run them in
   order, or give one worker several ids in one call — the second merge stops on

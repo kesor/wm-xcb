@@ -1,6 +1,6 @@
 ---
 name: wm-review
-description: Review a worker's branch on a beads issue and leave a verdict. Use when asked to review work you did not write, when worker.sh review runs you, or before merging a work/<bead> branch. Covers what to check, how deep, the verdict format, and the two allowed outcomes.
+description: Review a worker's branch on a beads issue and leave a verdict. Use when asked to review work you did not write, when worker.py review runs you, or before merging a work/<bead> branch. Covers what to check, how deep, the verdict format, and the two allowed outcomes.
 ---
 
 # Reviewing a worker's branch
@@ -91,7 +91,7 @@ commit or in a comment.
 
 ## The verdict
 
-`worker.sh review` runs you with `bd comment` available; write the verdict
+`worker.py review` runs you with `bd comment` available; write the verdict
 yourself at the end of your turn. The first line is the verdict and the sha it
 covers, because a reader who stops there has to know where they stand:
 
@@ -122,6 +122,6 @@ Then the findings, worst first, then what you checked and what you did not.
 
 Your commit is a normal commit: the pre-push gates run on it, and the human merge
 is still the human's. Do not merge, push, rebase, amend, or close or reopen a
-bead. If the author has to act on a finding, `worker.sh resume <bead>` starts
+bead. If the author has to act on a finding, `worker.py resume <bead>` starts
 them again with `bd comments` in front of them, which is the only reliable way
 findings reach the model that wrote the branch.
