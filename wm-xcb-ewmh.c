@@ -17,6 +17,7 @@ setup_ewmh()
   ewmh = malloc(sizeof(xcb_ewmh_connection_t));
   memset(ewmh, 0, sizeof(xcb_ewmh_connection_t));
   xcb_intern_atom_cookie_t* cookie = xcb_ewmh_init_atoms(dpy, ewmh);
+  /* allow-blocking: startup, the event loop has not started yet */
   if (!xcb_ewmh_init_atoms_replies(ewmh, cookie, &error)) {
     /* replies frees the per-screen lists on failure and leaves the pointers
        dangling. destruct_ewmh wipes again; a second free is a double-free. */
