@@ -144,6 +144,16 @@ cat >"$FAKE_BIN/dmenu_path" <<'FAKE_DMENU_PATH'
 :
 FAKE_DMENU_PATH
 chmod +x "$FAKE_BIN/dmenu_path"
+# dwm's dmenu_run is the usual thing for a launcher to exec, so both shapes have
+# to reach the fake. A launcher that runs the script and finds no dmenu_run
+# exits before it can block, and a responsiveness test then reports "the
+# launcher did not start" - a different defect, from which nothing can be
+# concluded about the loop.
+cat >"$FAKE_BIN/dmenu_run" <<'FAKE_DMENU_RUN'
+#!/bin/sh
+exec dmenu "$@"
+FAKE_DMENU_RUN
+chmod +x "$FAKE_BIN/dmenu_run"
 export PATH="$FAKE_BIN:$PATH"
 # Where the fake dmenu records that it started, so a test can tell an open
 # prompt from a key that never reached the launcher.
