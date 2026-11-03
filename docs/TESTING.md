@@ -127,6 +127,16 @@ running it would print a count from the tree that produced it. Run the suite
 through `make test`, or name the variant binary directly when you want to put
 it under `valgrind`.
 
+The suite installs the WM's own signal handlers and raises `SIGTERM` (and
+`SIGUSR1`, for the state dump) against itself, so a debugger stops there first
+and reports a signal that is not a crash. Pass them through:
+
+```bash
+gdb -batch -ex 'handle SIGTERM nostop noprint pass' \
+          -ex 'handle SIGUSR1 nostop noprint pass' \
+          -ex run -ex bt build/debug/test
+```
+
 The copies `./wm` gets are replaced by writing a temporary file and renaming it
 over `./wm`, so a `make` while a WM started from `./wm` is still running exits 0
 instead of failing on a busy file. The running WM keeps the binary it started
