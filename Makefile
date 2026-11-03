@@ -31,7 +31,7 @@ LDFLAGS_STATIC =
 LDFLAGS = $(LDFLAGS_STATIC) $(PKG_LDFLAGS) -pthread -lc
 
 ifeq ($(strip $(DEBUG)),1)
-	CFLAGS += -g3 -pedantic -Wall -O0 -DDEBUG
+	CFLAGS += -g3 -pedantic -Wall -Og -DDEBUG
 	LDFLAGS += -g
 else
 	CFLAGS += -Os

@@ -140,9 +140,11 @@ pre-push:
       run: ./scripts/check-seam.sh
       fail_text: "A new seam failure: something X should see is not there. Run 'make test-x TEST_X_ARGS=--verbose', and baseline a known failure deliberately or fix it."
 
+    # A passing run printed 215 lines: a gcc link line, a format warning and 113
+    # assertion lines. The gate prints the summary now, and the log on failure.
     standalone:
-      run: make test-standalone && make test-sm-standalone
-      fail_text: "A standalone test target failed to link or run."
+      run: ./scripts/check-standalone.sh
+      fail_text: "A standalone test target failed to link or run; its output is above."
 
     sanitize:
       run: ./scripts/check-sanitize.sh
@@ -157,8 +159,8 @@ pre-push:
       # The suite goes through check-unit.sh rather than `make test >/dev/null`:
       # a failing assertion in the debug build is what this gate is for, and the
       # redirect kept make's "Error 1" line and dropped the assertion with it.
-      run: make clean >/dev/null && make DEBUG=1 >/dev/null && DEBUG=1 ./scripts/check-unit.sh && make -j$(nproc)
-      fail_text: "The -pedantic debug build or its tests failed."
+      run: ./scripts/check-debug-build.sh
+      fail_text: "The -pedantic debug build or its tests failed; its output is above."
 
     build-variants:
       run: ./scripts/check-build-variants.sh
