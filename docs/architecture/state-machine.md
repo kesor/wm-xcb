@@ -198,9 +198,14 @@ StateMachine* sm_create(void* owner, SMTemplate* template,
 ```c
 // Used by listeners when reality changes
 void sm_raw_write(StateMachine* sm, uint32_t new_state) {
-    // No guards - reality is authoritative
+    uint32_t old_state = sm->current_state;
+
+    // No guard - reality is authoritative. The row from the old state to the
+    // new one names the event; a pair the table does not declare emits
+    // nothing.
     sm->current_state = new_state;
-    event_emit(sm->template->get_transition_event(sm, new_state));
+    const SMTransition* row = sm_template_find_transition(sm->template, old_state, new_state);
+    sm_emit_event(sm, old_state, new_state, row ? row->emit_event : 0);
 }
 ```
 
@@ -208,7 +213,7 @@ void sm_raw_write(StateMachine* sm, uint32_t new_state) {
 ```c
 bool sm_transition(StateMachine* sm, uint32_t target_state) {
     // Find transition from current_state → target_state
-    Transition* t = sm_find_transition(sm, sm->current_state, target_state);
+    const SMTransition* t = sm_template_find_transition(sm->template, sm->current_state, target_state);
     if (!t) return false;  // no valid transition
     
     // Run guards (if any)
@@ -231,8 +236,8 @@ bool sm_transition(StateMachine* sm, uint32_t target_state) {
     sm_run_hooks(sm, HOOK_POST_ACTION);
     
     // Emit event
-    event_emit(t->emit_on_transition, sm->owner->id, sm->data);
-    
+    sm_emit_event(sm, old_state, target_state, t->emit_event);
+
     return true;
 }
 ```
