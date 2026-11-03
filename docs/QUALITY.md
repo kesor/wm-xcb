@@ -19,14 +19,29 @@ model.*
 
 ## Layers
 
-| Layer | When | Time | Runs |
-|-------|------|------|------|
-| `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, workflow, beads export, formatting, build, unit tests, async rule |
-| `commit-msg` | every commit | instant | message rules (no AI attribution) |
-| `pre-push` | every push | ~80 s | the above plus the flake evaluation, the shell lint, the seam suite, the sanitize gate, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
-| CI `gates` | every push and PR | ~2 min | `lefthook run pre-push --force --no-auto-install` with the beads job excluded |
-| CI `seam` | every push and PR | ~1 min | `make test-x` on the private Xvfb the run starts, required: known failures are baselined |
-| CI `sanitize-x` | every push and PR | ~1 min | `scripts/check-sanitize-x.sh`: the WM in a nested server under ASan and UBSan |
+`scripts/gate-list.sh` prints which gates each hook runs, read out of
+`lefthook.yml`. Ask it instead of trusting a copy: this table used to list the
+gates by hand, and it drifted twice - a header comment claiming a pre-push set
+missing four of the gates, and a skill table still saying `make test` a commit
+after the hook switched to `scripts/check-unit.sh`. A copy in prose is a claim
+nothing checks.
+
+```bash
+scripts/gate-list.sh            # every hook and its gates
+scripts/gate-list.sh pre-push   # one hook
+```
+
+| Layer | When | Runs |
+|-------|------|------|
+| `pre-commit` | every commit | `scripts/gate-list.sh pre-commit` |
+| `commit-msg` | every commit | `scripts/gate-list.sh commit-msg` |
+| `pre-push` | every push | `scripts/gate-list.sh pre-push` |
+| CI `gates` | every push and PR | `lefthook run pre-push --force --no-auto-install` with the beads job excluded |
+| CI `seam` | every push and PR | `scripts/check-seam.sh`: known failures are baselined, a new one fails |
+| CI `sanitize-x` | every push and PR | `scripts/check-sanitize-x.sh`: the WM in a nested server under ASan and UBSan |
+
+Runtimes are not in this table. The hook prints its own summary with a duration
+per gate, and a number written here is stale the next time a gate gets slower.
 
 No CI job is advisory any more. The seam job could only become required once
 `tests/x/run.sh` could tell a known failure from a new one; the baseline in
