@@ -116,7 +116,11 @@ Short version, and the parts that stay true until they are fixed:
   that adopts a monitor registers after the monitor manager. The components
   `main` starts register the actions they own. A unit test inits
   every owner and fails if a name in `config.wm.def.h` is not registered after
-  that. `main` exits non-zero when a module on its startup check does not come
+  that. Once the last component is up, startup checks every wired binding
+  against the action registry and logs one error line per binding whose action
+  nobody registered, naming the chord and the action; a binding that resolves
+  is not reported, and the window manager still starts. `main` exits non-zero
+  when a module on its startup check does not come
   up, and a unit test runs that startup and asks each of those modules whether
   it is up. An unmap the WM causes itself, hiding the clients of a tag that is
   no longer shown, leaves the client managed, so showing the tag again maps it

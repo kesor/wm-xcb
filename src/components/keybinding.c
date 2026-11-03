@@ -18,6 +18,7 @@
  */
 
 #include <inttypes.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -294,6 +295,108 @@ uint32_t
 keybinding_get_count(void)
 {
   return keybinding_binding_get_count();
+}
+
+/*
+ * Append a piece to the chord name. Silently stops at the end of the buffer,
+ * so a modifier mask this code has no name for cannot write past it.
+ */
+static void
+chord_append(char* out, size_t out_size, size_t* used, const char* text)
+{
+  int written;
+
+  if (*used >= out_size)
+    return;
+
+  written = snprintf(out + *used, out_size - *used, "%s", text);
+  if (written > 0)
+    *used += (size_t) written;
+  if (*used >= out_size)
+    *used = out_size - 1;
+}
+
+/*
+ * Name a binding the way the configuration writes it: the modifiers, then the
+ * X keycode. The keycode is what the compiled wiring stores, and it is the part
+ * of the line the user has to find and fix.
+ */
+static void
+keybinding_chord_name(const KeyBinding* binding, char* out, size_t out_size)
+{
+  static const struct {
+    uint32_t    mask;
+    const char* name;
+  } modifier_names[] = {
+    { XCB_MOD_MASK_4,       "Mod"     },
+    { XCB_MOD_MASK_SHIFT,   "Shift"   },
+    { XCB_MOD_MASK_CONTROL, "Control" },
+    { XCB_MOD_MASK_1,       "Mod1"    },
+    { XCB_MOD_MASK_2,       "Mod2"    },
+    { XCB_MOD_MASK_3,       "Mod3"    },
+    { XCB_MOD_MASK_5,       "Mod5"    },
+    { XCB_MOD_MASK_LOCK,    "Lock"    },
+  };
+
+  size_t   used  = 0;
+  uint32_t named = 0;
+  char     piece[32];
+
+  out[0] = '\0';
+
+  for (size_t i = 0; i < sizeof(modifier_names) / sizeof(modifier_names[0]); i++) {
+    if ((binding->modifiers & modifier_names[i].mask) == 0)
+      continue;
+
+    chord_append(out, out_size, &used, modifier_names[i].name);
+    chord_append(out, out_size, &used, "+");
+    named |= modifier_names[i].mask;
+  }
+
+  uint32_t rest = binding->modifiers & ~named;
+  if (rest != 0) {
+    (void) snprintf(piece, sizeof piece, "0x%" PRIx32 "+", rest);
+    chord_append(out, out_size, &used, piece);
+  }
+
+  (void) snprintf(piece, sizeof piece, "keycode %u", binding->keycode);
+  chord_append(out, out_size, &used, piece);
+}
+
+/*
+ * Check every wired binding against the action registry and report the ones
+ * that name an action nobody registered. The bindings are wired before the
+ * components that own their actions start, so this runs at startup after every
+ * component is up; a missing action leaves that key doing nothing, which is
+ * worth one line and is not a reason to refuse to start.
+ *
+ * Returns the number of bindings that name a missing action.
+ */
+uint32_t
+keybinding_validate_bindings(void)
+{
+  const KeyBinding* const* bindings   = keybinding_binding_get_all();
+  uint32_t                 unresolved = 0;
+
+  for (uint32_t i = 0; bindings != NULL && bindings[i] != NULL; i++) {
+    const char* action = bindings[i]->action;
+
+    if (action != NULL && action_exists(action))
+      continue;
+
+    char chord[128];
+
+    keybinding_chord_name(bindings[i], chord, sizeof chord);
+    LOG_ERROR("keybinding: %s is bound to action '%s', which no component registered; "
+              "the key does nothing",
+              chord, action != NULL ? action : "(none)");
+    unresolved++;
+  }
+
+  LOG_DEBUG("Validated %" PRIu32 " wired binding(s): %" PRIu32 " unresolved",
+            keybinding_binding_get_count(), unresolved);
+
+  return unresolved;
 }
 
 /*
