@@ -51,7 +51,13 @@ run_gate() {
   gate_env=(STUB_LOG="$log" STUB_STATUS="$status" STUB_ARGS="$args")
   if [ -n "${GATE_DEBUG:-}" ]; then gate_env+=(DEBUG="$GATE_DEBUG"); fi
   if [ -n "${GATE_SANITIZE:-}" ]; then gate_env+=(SANITIZE="$GATE_SANITIZE"); fi
-  env "${gate_env[@]}" PATH="$DIR/bin:$PATH" \
+  # `make SANITIZE=1 test-x` exports SANITIZE into every test. lib.sh unsets
+  # DEBUG, because libxdo dumps its keymap when that name is set, and leaves
+  # SANITIZE. An inherited 1 makes the stub answer release-sanitize, and the
+  # release and debug pass-line assertions fail for a variant the case did not
+  # ask for. -u drops both; a value this case set is applied after and is the
+  # one the gate reads.
+  env -u DEBUG -u SANITIZE "${gate_env[@]}" PATH="$DIR/bin:$PATH" \
     "$ROOT_DIR/scripts/check-unit.sh" >"$DIR/$name.out" 2>&1
   echo $?
 }
@@ -103,5 +109,18 @@ check_eq "the sanitize gate passes" 0 "$(run_gate sanitize 0 "${PASSING_LOG[@]}"
 GATE_SANITIZE=
 check_eq "its pass line names the sanitize variant" 1 \
   "$(grep -c 'variant=release-sanitize (DEBUG=0 SANITIZE=1)' "$DIR/sanitize.out")"
+check_eq "the suite is built with the SANITIZE the gate was given" 1 \
+  "$(grep -cE '^test .*SANITIZE=1' "$DIR/sanitize.args")"
+
+# The -u above has to hold when the caller exported SANITIZE, which is what
+# `make SANITIZE=1 test-x` does. export, not a shell assignment: run_gate
+# hands the environment to env(1), which does not see an unexported variable,
+# so a plain assignment would pass even with the -u deleted.
+export SANITIZE=1
+check_eq "an inherited SANITIZE still passes the release run" 0 \
+  "$(run_gate inherited 0 "${PASSING_LOG[@]}")"
+unset SANITIZE
+check_eq "an inherited SANITIZE does not relabel the release pass" 1 \
+  "$(grep -c 'variant=release (DEBUG=0 SANITIZE=0)' "$DIR/inherited.out")"
 
 finish
