@@ -427,6 +427,26 @@ const char* sm_get_state_name(StateMachine* sm, uint32_t state);
 
 ---
 
+## The pre-hub state machine in `wm-states.c`
+
+`wm-states.c` predates this framework and is still linked into the WM. It keeps
+one global `struct Context` for the whole display. `dispatch_event()` in
+`wm-xcb.c` calls `handle_state_event()` after the handler registry for every
+event that is not an X error. A key or button event is matched against
+`transitions[]` in `config.def.h`, and the function of the current state is
+called.
+
+No row matches. `window_target_type` is set only from `EnterNotify`, and that
+event returns before the table is consulted, so a button or key event has
+`WndTypeNone` and every row requires a client or the root. The `Shift+Button1`
+and `Alt+Button1` rows therefore do not change state. The actions are stubs
+either way: `state_window_move()` and `state_window_resize()` log and return.
+Pointer move and resize are not implemented. Behaviour belongs in a component's
+state machine, not in that table; the table stays until the component that owns
+pointer input exists.
+
+---
+
 ## Testing Strategy
 
 1. **Unit tests for sm_transition**: Valid/invalid transitions

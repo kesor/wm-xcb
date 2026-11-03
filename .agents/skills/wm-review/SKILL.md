@@ -45,7 +45,7 @@ run; if it says "docs updated", read the doc.
 
 | The diff touches | Read it like |
 |---|---|
-| `src/xcb/`, `wm-xcb.c`, `src/components/client-list.c`, anything mapping or configuring windows | seam — the unit tests cannot see it, so the seam tests and a live run are the evidence. Distrust a green unit suite here |
+| `src/xcb/`, `wm-xcb.c` (at the checkout root, not under `src/`), `src/components/client-list.c`, anything mapping or configuring windows | seam — the unit tests cannot see it, so the seam tests and a live run are the evidence. Distrust a green unit suite here |
 | event loop, hub, state machines, `src/target/` | rules — the four commitments in `docs/PHILOSOPHY.md`. A state write outside a machine, a component calling another component, or anything blocking is a P1 |
 | a new component or a new event/request | contracts — who owns the state, what refuses a transition, which event fires, what happens when the request fails |
 | docs, scripts, `Makefile`, `.github/` | mechanics — does the command in the doc actually run; does the doc's description of its output match what it prints; does a count or a line number appear; does the new gate execute in CI |

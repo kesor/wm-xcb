@@ -38,6 +38,7 @@ static bool initialized = false;
 static void monitor_manager_executor(struct HubRequest* req);
 static void monitor_manager_xcb_handler(void* event);
 static bool monitor_manager_pass_begin(void);
+
 static void monitor_manager_pass_abort(void);
 static void monitor_manager_pass_poll(void* userdata);
 static void monitor_manager_apply_crtc_geometry(xcb_randr_crtc_t crtc, int16_t x, int16_t y, uint16_t width, uint16_t height);
@@ -295,6 +296,19 @@ static struct {
   bool                                    polling; /* registered with the loop */
 } randr_pass;
 
+#ifdef WM_HUB_TESTING
+/*
+ * Whether the async RandR pass is running. A unit test has no X connection, so
+ * this is the only way a test can tell "entered the pass" from "early-returned
+ * and asserted on the synchronous fallback". Two tests claimed the first while
+ * doing the second, which is how a real defect survived a green suite.
+ */
+bool
+monitor_manager_pass_running_for_tests(void)
+{
+  return randr_pass.pass != MONITOR_PASS_NONE;
+}
+#endif
 static void
 monitor_manager_pass_remove_poll(void)
 {

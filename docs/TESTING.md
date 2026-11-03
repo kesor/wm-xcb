@@ -46,7 +46,38 @@ evaluates the shell without entering it, which is what catches a broken
 Rule of thumb: anything you run against the WM needs the same shell the WM was
 built in, because the binary links the store paths of that shell's libraries.
 
+### Container image
+
+The `Dockerfile` builds the WM in a Nix builder and runs it under `Xvfb` with
+`x11vnc`, so there is a display on a machine with no X server of its own. Three
+make targets drive it:
+
+```bash
+make container-build   # docker build -t wm .
+make container-run     # detached, publishes port 5900
+make container-clean   # removes the image
+```
+
+The entry point, `start.sh`, is written by `flake.nix`: it starts `Xvfb :99`, an
+`xterm`, the WM, and `x11vnc` on that display. Connect a VNC client to
+`localhost:5900`. The image sets no VNC password, so `docker logs` carries
+x11vnc's warning about that. The image holds the WM built from the tree at
+image-build time, so a source change needs `make container-build` again; the
+image is not how a test run should pick up an edit.
+
 ---
+
+### A test that early-returns is not coverage
+
+A unit test whose subject gives up for lack of an X connection asserts on a
+fallback branch, not on the behaviour the bead was about. Two monitor-manager
+tests did this and read as coverage of the async RandR pass for a whole cycle;
+the defect the pass carried survived a green suite.
+
+When the subject cannot run in a unit test, say which branch the test covers in
+its name (`..._sync_fallback`), assert that the other branch did not start (a
+`*_for_tests()` getter under `WM_HUB_TESTING` is the usual way), and cover the
+real path in `tests/x/`.
 
 ## 2. Unit tests
 
@@ -83,7 +114,7 @@ make test-standalone       # hub registry and event bus only
 make DEBUG=1
 ```
 
-Adds `-g3 -O0 -Wall -pedantic -DDEBUG`, which turns `LOG_DEBUG()` into real
+Adds `-g3 -Og -Wall -pedantic -DDEBUG`, which turns `LOG_DEBUG()` into real
 output. This is the build to use when you need to see what the WM decided.
 `-pedantic` rejects GNU-only constructs; a zero-length array initializer in
 `tiling.c` used to break this build and was fixed on 2026-11-01. If the debug
@@ -481,7 +512,7 @@ scripts/perf-test.sh [--windows N] [--display :N] [--keep]
 It starts the same way as `xephyr-test.sh`: it builds the WM variant named by
 `DEBUG` and `SANITIZE`, prints the line that names the variant, the binary and
 the log, and runs that binary. The baseline below was measured on the release
-build; a debug build is `-O0` and its numbers are not comparable with it, which
+build; a debug build is `-Og` and its numbers are not comparable with it, which
 is why the variant is in the output. It then prints these numbers:
 
 | Number | How it is measured | Why it matters |
