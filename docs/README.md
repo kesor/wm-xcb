@@ -124,8 +124,11 @@ Short version, and the parts that stay true until they are fixed:
   time the unmap is read; an unmap the WM did not ask for is the client
   withdrawing: it is unmanaged, `WM_STATE` goes to `Withdrawn`, and
   `EVT_CLIENT_UNMANAGED` is emitted. The event loop blocks in `poll(2)` on the
-  X connection plus a signal wakeup pipe, so an idle WM costs no CPU, and
-  SIGTERM ends it.
+  X connection, a signal wakeup pipe and the pipes modules register with it, so
+  an idle WM costs no CPU, and SIGTERM ends it. `MOD+p` forks dmenu and
+  registers the read end of its pipe as one of those sources: the selection is
+  read when it arrives, so the keys keep working while the prompt is open, and a
+  cancelled prompt emits a failure event instead of blocking.
 - **Does not work:** it sets no EWMH root properties. Visible tags are stored
   twice: a tag view change updates the tag-view state machine, and a new client
   still copies its tags from `Monitor.tagset`, which no runtime path writes, so

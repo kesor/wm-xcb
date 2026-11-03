@@ -23,6 +23,9 @@
 #   time to tile  wall clock from spawning N windows until all N are viewable
 #                 and non-overlapping, or TIMEOUT after 5 s
 #   RSS           WM resident memory after the burst
+#   keys          how long MOD+2 takes to hide the tag-1 windows while dmenu is
+#                 open; more than KEY_BUDGET_MS means the launcher blocks the
+#                 loop, and fails
 #   SIGTERM       how long the WM takes to exit after SIGTERM
 #
 # What is not measured, and how to get it later: per-event service time and X
@@ -30,7 +33,8 @@
 #
 # Exit status: 0 if a measurement ran to completion, 1 if the WM exited, the
 #             windows never reached a tiled state (reported as TIMEOUT), idle
-#             CPU went over the budget, or SIGTERM did not stop the WM.
+#             CPU went over the budget, a key went unanswered while dmenu was
+#             open, or SIGTERM did not stop the WM.
 
 set -uo pipefail
 
@@ -45,6 +49,7 @@ TILE_TIMEOUT_MS=5000
 IDLE_BUDGET_MS=20
 IDLE_WINDOW_MS=2000
 TERM_TIMEOUT_MS=2000
+KEY_BUDGET_MS=500
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -77,6 +82,21 @@ LOG_DIR="${TMPDIR:-/tmp}/wm-perf-test"
 mkdir -p "$LOG_DIR"
 WM_LOG="$LOG_DIR/wm.log"
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
+
+# MOD+p runs dmenu_run. The real one needs fonts a headless nested server does
+# not reliably provide; this one writes nothing and stays open, which is what
+# the WM sees while a user looks at the prompt.
+FAKE_BIN="$LOG_DIR/bin"
+mkdir -p "$FAKE_BIN"
+cat >"$FAKE_BIN/dmenu_run" <<FAKE_DMENU
+#!/bin/sh
+: >"$LOG_DIR/dmenu-started"
+sleep 5
+FAKE_DMENU
+chmod +x "$FAKE_BIN/dmenu_run"
+rm -f "$LOG_DIR/dmenu-started"
+PATH="$FAKE_BIN:$PATH"
+export PATH
 
 # shellcheck source=lib/wm-variant.sh
 . "$ROOT_DIR/scripts/lib/wm-variant.sh"
@@ -231,6 +251,44 @@ if [ "$tiled" -ne 1 ]; then
   echo "RESULT: INCOMPLETE - the WM does not map or tile windows, so the tiling number is a timeout"
   verdict=1
 fi
+
+# --- keys while dmenu is open ---------------------------------------------
+# The promise: the WM never freezes while an application is slow. dmenu is open
+# and writing nothing, so a launcher that waits for it never returns to the loop
+# and the tag switch arrives late.
+DISPLAY="$TEST_DISPLAY" xdotool key --clearmodifiers super+p
+dmenu_up=0
+for _ in $(seq 1 100); do
+  if [ -e "$LOG_DIR/dmenu-started" ]; then
+    dmenu_up=1
+    break
+  fi
+  sleep 0.02
+done
+keys_start=$(now_ms)
+keys_answered=0
+while [ $(( $(now_ms) - keys_start )) -lt "$KEY_BUDGET_MS" ]; do
+  if [ "$(viewable_count)" -eq 0 ]; then
+    keys_answered=1
+    break
+  fi
+  DISPLAY="$TEST_DISPLAY" xdotool key --clearmodifiers super+2
+  sleep 0.01
+done
+keys_ms=$(( $(now_ms) - keys_start ))
+if [ "$dmenu_up" -ne 1 ]; then
+  echo "keys while dmenu is open: MOD+p did not start dmenu, so this line would measure an idle WM"
+  verdict=1
+elif [ "$keys_answered" -eq 1 ]; then
+  echo "keys while dmenu is open: MOD+2 reached the WM in ${keys_ms} ms (budget ${KEY_BUDGET_MS} ms)"
+else
+  echo "keys while dmenu is open: MOD+2 did not reach the WM within ${KEY_BUDGET_MS} ms"
+  verdict=1
+fi
+
+# Leave the tag as it was, so the stages after this one measure the same tree.
+DISPLAY="$TEST_DISPLAY" xdotool key --clearmodifiers super+1
+sleep 0.2
 
 # --- SIGTERM --------------------------------------------------------------
 # A loop that blocks stops when the signal arrives, because the handler writes

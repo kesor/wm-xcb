@@ -2,14 +2,15 @@
  * launcher.h - Application launcher action using dmenu
  *
  * This module provides the "app.launch" action that invokes dmenu
- * for application launching. It forks a dmenu process and executes
- * the user's selection.
+ * for application launching. It forks a dmenu process and, when the event loop
+ * reports the selection, executes it in another process.
  *
  * Design:
  * - Action: "app.launch" (no target required)
- * - Forks dmenu, waits for selection
- * - Executes selected command via fork+exec
- * - Uses XCB to grab keyboard during dmenu run
+ * - Forks dmenu, returns without waiting for the selection
+ * - Reads the selection from a pipe registered with the event loop
+ * - Executes the selected command via fork+exec
+ * - No XCB keyboard grab: dmenu grabs the keyboard itself
  */
 
 #ifndef _WM_LAUNCHER_H_
@@ -19,11 +20,23 @@
 #include <stdint.h>
 
 #include "action-registry.h"
+#include "src/event-types.h"
 
 /*
  * Maximum command length for dmenu output
  */
 #define LAUNCHER_MAX_CMD_LENGTH 256
+
+/*
+ * Launcher events on the hub.
+ *
+ * EVT_LAUNCHER_FAILED: dmenu closed without a selection, or the launcher could
+ * not start at all. Fired on the loop, never from the action that asked for the
+ * launch, because the answer arrives later.
+ */
+enum LauncherEvents {
+  EVT_LAUNCHER_FAILED = EVT_LAUNCHER_BASE + 0,
+};
 
 /*
  * Initialize the launcher module.
@@ -33,7 +46,7 @@ void launcher_init(void);
 
 /*
  * Shutdown the launcher module.
- * Unregisters the action.
+ * Unregisters the action and stops watching an open dmenu.
  */
 void launcher_shutdown(void);
 
@@ -43,19 +56,25 @@ void launcher_shutdown(void);
 bool launcher_is_initialized(void);
 
 /*
+ * Whether a dmenu is open and its selection is still awaited.
+ */
+bool launcher_is_running(void);
+
+/*
  * Action callback for launching applications via dmenu.
- * Forks dmenu, reads selection, executes command.
+ * Starts dmenu and returns; the command runs when the selection arrives.
  *
  * @param inv  Action invocation (target not used for this action)
- * @return     true on successful launch, false on failure
+ * @return     true when dmenu was started, false when it could not be
  */
 bool launcher_action_launch(ActionInvocation* inv);
 
 /*
- * Run dmenu and execute the selected command.
- * This is a synchronous operation - it blocks until dmenu exits.
+ * Start dmenu and execute the selected command when it arrives.
+ * Returns once dmenu is running, not when it exits: the pipe is registered with
+ * the event loop, which reads it.
  *
- * @return  true if a command was executed, false otherwise
+ * @return  true when dmenu was started, false otherwise
  */
 bool launcher_run_dmenu(void);
 
@@ -64,13 +83,12 @@ bool launcher_run_dmenu(void);
  * Can be overridden via config if needed.
  */
 typedef struct LauncherDmenuConfig {
-  const char* prompt;        /* Prompt text (e.g., "Run: ") */
-  const char* font;          /* Font to use */
-  const char* color;         /* Normal color */
-  const char* sel_color;     /* Selected color */
-  int         x_offset;      /* X position offset */
-  int         y_offset;      /* Y position offset */
-  bool        grab_keyboard; /* Grab keyboard during dmenu run */
+  const char* prompt;    /* Prompt text (e.g., "Run: ") */
+  const char* font;      /* Font to use */
+  const char* color;     /* Normal color */
+  const char* sel_color; /* Selected color */
+  int         x_offset;  /* X position offset */
+  int         y_offset;  /* Y position offset */
 } LauncherDmenuConfig;
 
 /*

@@ -25,7 +25,8 @@ XCB (X C Bindings) is the X server communication layer. This document explains h
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       Event Loop                                    │
-│   poll(2) on the X fd + the signal wakeup pipe, then drain:         │
+│   poll(2) on the X fd, the signal wakeup pipe, and any descriptor   │
+│   a module registered; then drain:                                  │
 │   xcb_poll_for_event() → xcb_generic_event_t*                       │
 └─────────────────────────────────────────────────────────────────────┘
                               │
@@ -213,11 +214,19 @@ void xcb_handler_shutdown(void);
 ### Event Loop Integration
 
 The loop blocks, it does not spin. `wm_xcb_wait_for_events()` waits in `poll(2)`
-on the X connection's file descriptor and on the read end of the signal wakeup
-pipe; `handle_xcb_events()` then dispatches everything that arrived and flushes
-once. A connection that has already failed ends the loop: `poll(2)` on that
-socket returns at once, which is the busy-wait again. With no wakeup pipe, the
-wait uses a 250 ms timeout so a signal is still noticed.
+on the X connection's file descriptor, on the read end of the signal wakeup
+pipe, and on every descriptor a module registered with
+`wm_loop_add_fd_handler()`; `handle_xcb_events()` then dispatches everything
+that arrived, runs those descriptors' handlers, and flushes once. A connection
+that has already failed ends the loop: `poll(2)` on that socket returns at once,
+which is the busy-wait again. With no wakeup pipe, the wait uses a 250 ms
+timeout so a signal is still noticed.
+
+An event source is how a module waits on a child without waiting. The launcher
+forks dmenu, registers the read end of the pipe, and returns; the handler runs
+when `poll(2)` says there is something to read, reads until `EAGAIN` or the end
+of file, and removes itself. A handler that leaves its descriptor readable makes
+the loop spin, so it has to drain it.
 
 `poll(2)` reports the socket, not libxcb's own queue. libxcb reads ahead during
 a reply wait (the property and atom queries at startup) and during `xcb_flush()`,
@@ -229,10 +238,13 @@ asking libxcb for more.
 static xcb_generic_event_t* queued_event = NULL;
 
 void wm_xcb_wait_for_events(void) {
-    struct pollfd fds[2] = {
+    size_t watched = fd_entry_count;
+    struct pollfd fds[2 + watched] = {
         { .fd = xcb_get_file_descriptor(dpy), .events = POLLIN },
         { .fd = signals_wakeup_fd(),          .events = POLLIN },
     };
+    for (size_t i = 0; i < watched; i++)
+        fds[2 + i] = (struct pollfd){ .fd = fd_entries[i].fd, .events = POLLIN };
 
     if (xcb_connection_has_error(dpy) != 0) {
         running = 0;
@@ -248,7 +260,7 @@ void wm_xcb_wait_for_events(void) {
        lands before this call would leave the WM asleep and unstoppable. The
        handler writes a byte to the second fd instead. */
     int timeout_ms = fds[1].fd < 0 ? 250 : -1;
-    poll(fds, 2, timeout_ms);
+    poll(fds, 2 + watched, timeout_ms);
     signals_drain_wakeups();
 }
 
@@ -275,6 +287,11 @@ void handle_xcb_events(void) {
        reports "not yet" instead of waiting, which is what lets the loop stay a
        loop. */
     client_list_poll_size_hints();
+
+    /* The descriptors the wait covered besides X: a child's pipe that became
+       readable. The handler reads what is there and starts work; it does not
+       wait, which is why the launcher's read is here and not in the action. */
+    wm_loop_dispatch_fd_handlers();
 
     xcb_flush(dpy);
 }

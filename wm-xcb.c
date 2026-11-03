@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <xcb/errors.h>
 #include <xcb/xcb.h>
 #include <xcb/xinput.h>
@@ -19,6 +20,17 @@
 
 xcb_connection_t* dpy;
 xcb_window_t      root;
+
+void
+wm_xcb_close_connection_in_child(void)
+{
+  if (dpy == NULL)
+    return;
+
+  int fd = xcb_get_file_descriptor(dpy);
+  if (fd >= 0)
+    close(fd);
+}
 
 void
 error_details(xcb_generic_error_t* error)
@@ -144,6 +156,112 @@ setup_xcb()
    the socket, not that queue, so it would block with the event still queued. */
 static xcb_generic_event_t* queued_event = NULL;
 
+/*
+ * Descriptors the loop waits on besides the X connection, and the callbacks it
+ * runs when they are readable. A module that waits on a child process registers
+ * its pipe here instead of reading the pipe in its own action callback, which
+ * would stop the loop until the child answered.
+ */
+typedef struct WmLoopFdEntry {
+  int             fd;
+  WmLoopFdHandler handler;
+  void*           userdata;
+} WmLoopFdEntry;
+
+static WmLoopFdEntry* fd_entries     = NULL;
+static size_t         fd_entry_count = 0;
+static size_t         fd_entry_cap   = 0;
+
+bool
+wm_loop_add_fd_handler(int fd, WmLoopFdHandler handler, void* userdata)
+{
+  if (fd < 0 || handler == NULL) {
+    LOG_ERROR("cannot watch descriptor %d: no descriptor or no handler", fd);
+    return false;
+  }
+
+  for (size_t i = 0; i < fd_entry_count; i++) {
+    if (fd_entries[i].fd == fd) {
+      LOG_ERROR("descriptor %d is already watched by the loop", fd);
+      return false;
+    }
+  }
+
+  if (fd_entry_count == fd_entry_cap) {
+    size_t         cap   = fd_entry_cap == 0 ? 4 : fd_entry_cap * 2;
+    WmLoopFdEntry* grown = realloc(fd_entries, cap * sizeof *grown);
+    if (grown == NULL) {
+      LOG_ERROR("cannot grow the loop's descriptor table: %s", strerror(errno));
+      return false;
+    }
+    fd_entries   = grown;
+    fd_entry_cap = cap;
+  }
+
+  fd_entries[fd_entry_count].fd       = fd;
+  fd_entries[fd_entry_count].handler  = handler;
+  fd_entries[fd_entry_count].userdata = userdata;
+  fd_entry_count++;
+  return true;
+}
+
+void
+wm_loop_remove_fd_handler(int fd)
+{
+  for (size_t i = 0; i < fd_entry_count; i++) {
+    if (fd_entries[i].fd != fd)
+      continue;
+
+    /* Order does not matter in this table: the loop looks an entry up by its
+       descriptor, never by its position. */
+    fd_entries[i] = fd_entries[fd_entry_count - 1];
+    fd_entry_count--;
+    return;
+  }
+}
+
+int
+wm_loop_dispatch_fd_handlers(void)
+{
+  size_t count = fd_entry_count;
+  if (count == 0)
+    return 0;
+
+  /* Snapshot the descriptors before calling anything: a handler that is done
+     with its descriptor removes it, and the table moves under this loop. */
+  int* fds = malloc(count * sizeof *fds);
+  if (fds == NULL) {
+    LOG_ERROR("cannot dispatch the loop's descriptors: %s", strerror(errno));
+    return 0;
+  }
+  for (size_t i = 0; i < count; i++)
+    fds[i] = fd_entries[i].fd;
+
+  int dispatched = 0;
+  for (size_t i = 0; i < count; i++) {
+    struct pollfd pfd = { .fd = fds[i], .events = POLLIN, .revents = 0 };
+    if (poll(&pfd, 1, 0) <= 0)
+      continue;
+    /* POLLHUP is how a pipe whose writer has gone looks: the handler reads the
+       end of file and removes itself. POLLNVAL is a descriptor that is already
+       closed, and there is nothing to call for it. */
+    if ((pfd.revents & (POLLIN | POLLHUP | POLLERR)) == 0)
+      continue;
+
+    /* Look the entry up again: an earlier handler may have removed it. */
+    for (size_t j = 0; j < fd_entry_count; j++) {
+      if (fd_entries[j].fd != fds[i])
+        continue;
+      fd_entries[j].handler(fd_entries[j].fd, fd_entries[j].userdata);
+      dispatched++;
+      break;
+    }
+  }
+
+  free(fds);
+  return dispatched;
+}
+
 void
 destruct_xcb()
 {
@@ -155,6 +273,11 @@ destruct_xcb()
 
   free(queued_event);
   queued_event = NULL;
+
+  free(fd_entries);
+  fd_entries     = NULL;
+  fd_entry_count = 0;
+  fd_entry_cap   = 0;
 
   xcb_disconnect(dpy);
 }
@@ -264,8 +387,11 @@ wm_xcb_adopt_existing_windows(void)
 void
 wm_xcb_wait_for_events()
 {
-  struct pollfd fds[2];
-  int           timeout_ms = -1;
+  int timeout_ms = -1;
+  /* The X connection and the signal wakeup pipe keep the first two slots;
+     everything registered with wm_loop_add_fd_handler() follows them. */
+  size_t        watched = fd_entry_count;
+  struct pollfd fds[2 + watched];
 
   /* poll(2) on a connection that has already failed returns at once for ever,
      which is the busy loop again: there is nothing left to wait for. */
@@ -295,13 +421,19 @@ wm_xcb_wait_for_events()
   fds[1].events  = POLLIN;
   fds[1].revents = 0;
 
+  for (size_t i = 0; i < watched; i++) {
+    fds[2 + i].fd      = fd_entries[i].fd;
+    fds[2 + i].events  = POLLIN;
+    fds[2 + i].revents = 0;
+  }
+
   if (fds[1].fd < 0) {
     /* No wakeup pipe: a signal cannot interrupt the wait, so a timeout is the
        only way SIGTERM is ever noticed. */
     timeout_ms = 250;
   }
 
-  if (poll(fds, 2, timeout_ms) < 0 && errno != EINTR)
+  if (poll(fds, 2 + watched, timeout_ms) < 0 && errno != EINTR)
     LOG_ERROR("poll on the X connection failed: %s", strerror(errno));
 
   signals_drain_wakeups();
@@ -347,6 +479,11 @@ handle_xcb_events()
    * somebody asks for it. Client size hints arrive that way, and a window
    * laid out before they were known has to be laid out again. */
   client_list_poll_size_hints();
+
+  /* The other descriptors the wait covered. A handler reads what is there and
+     starts work; it never waits, which is why this is here and not in the
+     action that registered it. */
+  wm_loop_dispatch_fd_handlers();
 
   /* Handlers queue requests and change the window tree; one flush per
    * iteration sends them without waiting on a reply (PHILOSOPHY 2.3). */

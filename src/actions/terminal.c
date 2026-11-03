@@ -20,11 +20,11 @@
 #include <unistd.h>
 
 #include <sys/types.h>
-#include <sys/wait.h>
 
 #include "action-registry.h"
 #include "terminal.h"
 #include "wm-log.h"
+#include "wm-xcb.h"
 
 /*
  * Action definition for terminal.spawn
@@ -142,18 +142,10 @@ terminal_init(void)
   }
 
   /*
-   * Note: We intentionally do NOT install a SIGCHLD handler.
-   *
-   * Rationale: The launcher module (launcher.c) needs to wait for its forked
-   * dmenu child using waitpid(pid, ...). A process-wide SIGCHLD handler that
-   * reaps all children (waitpid(-1, ...)) would steal children from the
-   * launcher, causing waitpid to fail with ECHILD.
-   *
-   * Terminal children are reaped using WNOHANG after spawn() returns.
-   * For long-running terminal processes, they will eventually become zombies,
-   * but since terminals are typically long-lived, this is acceptable.
-   * Alternatively, the window manager process could be configured to ignore
-   * SIGCHLD signals from child processes using prctl(PR_SET_PDEATHSIG).
+   * Children are reaped by the SIGCHLD handler that setup_signals() installs,
+   * so this module does not wait for its own child. A terminal is typically
+   * long-lived anyway, and waiting for it is exactly what the event loop must
+   * not do.
    */
 
   initialized = true;
@@ -210,10 +202,8 @@ terminal_action_spawn(ActionInvocation* inv)
  * Uses fork()+exec() to avoid affecting the window manager.
  * Uses shell to parse command, supporting arguments and flags.
  *
- * Note: This is a fire-and-forget operation. The child process is not
- * explicitly reaped here - the kernel will deliver SIGCHLD when it exits.
- * For long-running terminal emulators, this is not a problem as they
- * typically outlive the window manager session.
+ * Fire-and-forget: the SIGCHLD handler reaps the child when it exits, so this
+ * returns without waiting for it, however long the terminal lives.
  */
 bool
 terminal_spawn(void)
@@ -227,6 +217,10 @@ terminal_spawn(void)
 
   if (pid == 0) {
     /* Child process - execute terminal */
+
+    /* A terminal that keeps a copy of the X socket open leaves the server
+       believing the WM is still connected after it has exited. */
+    wm_xcb_close_connection_in_child();
 
     /*
      * Use setsid to create a new session and detach from controlling tty.
@@ -255,19 +249,6 @@ terminal_spawn(void)
     _exit(1);
   }
 
-  /* Parent process - try to reap immediately */
-  /* Use WNOHANG to avoid blocking - child may still be running */
-  int   status;
-  pid_t reaped = waitpid(pid, &status, WNOHANG);
-
-  if (reaped > 0) {
-    /* Child exited immediately (likely exec failed) */
-    LOG_DEBUG("Terminal child exited immediately: pid=%d status=%d",
-              (int) pid, WIFEXITED(status) ? WEXITSTATUS(status) : -1);
-  } else {
-    /* Child is still running (normal case) */
-    LOG_DEBUG("Terminal spawned: pid=%d cmd=%s", (int) pid, terminal_get_default());
-  }
-
+  LOG_DEBUG("Terminal spawned: pid=%d cmd=%s", (int) pid, terminal_get_default());
   return true;
 }

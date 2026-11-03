@@ -6,27 +6,27 @@
  *
  * Design:
  * - Action: "app.launch" with ACTION_TARGET_NONE (no target needed)
- * - Forks dmenu, waits for selection
- * - Executes selected command via fork+exec
- * - No XCB keyboard grab (dmenu handles its own grabbing)
+ * - Forks dmenu, then returns: the selection is read by the event loop
+ * - Executes the selected command via fork+exec
+ * - No XCB keyboard grab: dmenu grabs the keyboard itself
  *
  * Security note: Command execution is intentional - user explicitly selects
  * the command via dmenu, so this is not a security issue.
  */
 
 #include <errno.h>
-#include <signal.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include <sys/types.h>
-#include <sys/wait.h>
 
 #include <xcb/xcb.h>
 
 #include "launcher.h"
+#include "wm-hub.h"
 #include "wm-log.h"
 #include "wm-xcb.h"
 
@@ -47,13 +47,12 @@ static Action launcher_action = {
  * Dmenu configuration
  */
 static LauncherDmenuConfig dmenu_config = {
-  .prompt        = "Run: ",
-  .font          = "-misc-fixed-medium-r-normal--13-120-75-75-C-70-iso10646-1",
-  .color         = "#bbbbbb",
-  .sel_color     = "#005577",
-  .x_offset      = 0,
-  .y_offset      = 0,
-  .grab_keyboard = true,
+  .prompt    = "Run: ",
+  .font      = "-misc-fixed-medium-r-normal--13-120-75-75-C-70-iso10646-1",
+  .color     = "#bbbbbb",
+  .sel_color = "#005577",
+  .x_offset  = 0,
+  .y_offset  = 0,
 };
 
 /*
@@ -62,10 +61,25 @@ static LauncherDmenuConfig dmenu_config = {
 static bool initialized = false;
 
 /*
- * Default dmenu path
+ * Default dmenu command
  */
-#define DMENU_PATH "dmenu_path"
-#define DMENU_RUN  "dmenu_run"
+#define DMENU_RUN "dmenu_run"
+
+/*
+ * The dmenu that is open, if any.
+ *
+ * One at a time: a second MOD+p while the prompt is up is a no-op, because two
+ * prompts would fight over the keyboard. The buffer is fixed so the pipe can be
+ * read from the event loop without allocating on that path.
+ */
+static struct {
+  bool   active;
+  int    fd;
+  size_t length;
+  char   command[LAUNCHER_MAX_CMD_LENGTH];
+} selection = { .active = false, .fd = -1, .length = 0, .command = { 0 } };
+
+static void launcher_pipe_readable(int fd, void* userdata);
 
 /*
  * Initialize the launcher module.
@@ -105,8 +119,17 @@ launcher_is_initialized(void)
 }
 
 /*
+ * Whether a dmenu is open and its pipe is being watched by the event loop.
+ */
+bool
+launcher_is_running(void)
+{
+  return selection.active;
+}
+
+/*
  * Shutdown the launcher module.
- * Unregisters the action.
+ * Unregisters the action and stops watching an open dmenu.
  */
 void
 launcher_shutdown(void)
@@ -116,6 +139,17 @@ launcher_shutdown(void)
   }
 
   LOG_DEBUG("Shutting down launcher module");
+
+  if (selection.active) {
+    /* Closing the read end is what tells a dmenu nobody is listening any more:
+       it gets EPIPE on its next write and exits. Its own reaping is the SIGCHLD
+       handler's job. */
+    wm_loop_remove_fd_handler(selection.fd);
+    close(selection.fd);
+    selection.active = false;
+    selection.fd     = -1;
+    selection.length = 0;
+  }
 
   /* Unregister the action */
   action_unregister("app.launch");
@@ -146,13 +180,11 @@ launcher_set_dmenu_config(LauncherDmenuConfig config)
 /*
  * Action callback for launching applications via dmenu.
  *
- * This function:
- * 1. Forks a child process
- * 2. Child runs dmenu to get user selection
- * 3. Parent waits for child and executes selection if non-empty
+ * Starts dmenu and returns. The selection arrives through the event loop, so
+ * the WM keeps handling keys while the prompt is open.
  *
  * @param inv  Action invocation (target not used for this action)
- * @return     true on successful launch, false on failure or no selection
+ * @return     true when dmenu was started, false when it could not be
  */
 bool
 launcher_action_launch(ActionInvocation* inv)
@@ -160,6 +192,10 @@ launcher_action_launch(ActionInvocation* inv)
   (void) inv;
 
   if (!launcher_run_dmenu()) {
+    /* No subscriber needs to know why: the action's return value carries the
+       failure to the caller, and this event is for the components that show
+       the user that the request was not honoured. */
+    hub_emit(EVT_LAUNCHER_FAILED, TARGET_ID_NONE, NULL);
     return false;
   }
 
@@ -167,14 +203,121 @@ launcher_action_launch(ActionInvocation* inv)
 }
 
 /*
- * Run dmenu and execute the selected command.
- * This is a synchronous operation - it blocks until dmenu exits.
+ * Runs the selected command in its own process.
+ * Does not wait for it: the SIGCHLD handler reaps it when it exits.
+ */
+static bool
+launcher_spawn_command(const char* command)
+{
+  pid_t pid = fork();
+
+  if (pid < 0) {
+    LOG_ERROR("Failed to fork for command execution: %s", strerror(errno));
+    return false;
+  }
+
+  if (pid == 0) {
+    wm_xcb_close_connection_in_child();
+
+    /*
+     * Try direct execution first (for simple commands like "firefox"). The
+     * fallback through sh -c covers a pipeline or a built-in that execlp
+     * cannot find. The command was chosen by the user from the list dmenu
+     * showed.
+     */
+    execlp(command, command, (char*) NULL);
+    execlp("sh", "sh", "-c", command, (char*) NULL);
+
+    LOG_DEBUG("Child: failed to execute '%s': %s", command, strerror(errno));
+    _exit(1);
+  }
+
+  LOG_DEBUG("Command started: %s", command);
+  return true;
+}
+
+/*
+ * Stops watching the dmenu pipe and acts on what it wrote.
+ */
+static void
+launcher_finish_selection(void)
+{
+  selection.active = false;
+  wm_loop_remove_fd_handler(selection.fd);
+  close(selection.fd);
+  selection.fd = -1;
+
+  selection.command[selection.length] = '\0';
+
+  /* dmenu writes the selected entry and a newline; a cancelled prompt writes
+     nothing at all and closes the pipe. */
+  size_t len = strlen(selection.command);
+  while (len > 0 && (selection.command[len - 1] == '\n' || selection.command[len - 1] == '\r'))
+    selection.command[--len] = '\0';
+
+  if (len == 0) {
+    LOG_DEBUG("dmenu: no selection or cancelled");
+    hub_emit(EVT_LAUNCHER_FAILED, TARGET_ID_NONE, NULL);
+    return;
+  }
+
+  LOG_DEBUG("dmenu selected: %s", selection.command);
+  launcher_spawn_command(selection.command);
+}
+
+/*
+ * Event loop callback: dmenu has written something, or has closed its end.
  *
- * @return  true if a command was selected and executed, false otherwise
+ * Reads what is available and returns at once. End of file means dmenu is
+ * done: a selection is there, or the user cancelled.
+ */
+static void
+launcher_pipe_readable(int fd, void* userdata)
+{
+  (void) userdata;
+
+  if (!selection.active || fd != selection.fd)
+    return;
+
+  for (;;) {
+    size_t room = sizeof(selection.command) - 1 - selection.length;
+    if (room == 0)
+      break;
+
+    /* allow-blocking: the read end is O_NONBLOCK, so this returns EAGAIN
+       instead of waiting for dmenu to write. */
+    ssize_t nread = read(fd, selection.command + selection.length, room);
+
+    if (nread > 0) {
+      selection.length += (size_t) nread;
+      continue;
+    }
+    if (nread < 0 && errno == EINTR)
+      continue;
+    if (nread < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+      return; /* dmenu is still open and may write more */
+    break;    /* 0: end of file, or an error that leaves nothing to read */
+  }
+
+  launcher_finish_selection();
+}
+
+/*
+ * Start dmenu and return immediately.
+ *
+ * The read end of the pipe is handed to the event loop, so the WM keeps
+ * handling keys and X events until dmenu writes a selection or exits.
+ *
+ * @return  true when dmenu was started, false otherwise
  */
 bool
 launcher_run_dmenu(void)
 {
+  if (selection.active) {
+    LOG_DEBUG("dmenu is already open: ignoring the second launch");
+    return false;
+  }
+
   int pipefd[2];
 
   /* Create pipe for dmenu output */
@@ -205,14 +348,12 @@ launcher_run_dmenu(void)
     }
     close(pipefd[1]);
 
-    /*
-     * Build dmenu arguments
-     * Using dmenu_run style: reads PATH and shows executable names
-     */
+    wm_xcb_close_connection_in_child();
+
     const char* prompt = dmenu_config.prompt ? dmenu_config.prompt : "Run: ";
 
     /* execlp looks for dmenu_run in PATH, which itself uses dmenu_path */
-    execlp("dmenu_run", "dmenu_run", "-p", prompt, (char*) NULL);
+    execlp(DMENU_RUN, DMENU_RUN, "-p", prompt, (char*) NULL);
 
     /* If execlp returns, it failed */
     LOG_ERROR("Child: failed to execute dmenu_run: %s", strerror(errno));
@@ -224,97 +365,33 @@ launcher_run_dmenu(void)
   /* Close write end of pipe */
   close(pipefd[1]);
 
-  /* Read dmenu output */
-  char    cmd[LAUNCHER_MAX_CMD_LENGTH];
-  ssize_t nread = read(pipefd[0], cmd, sizeof(cmd) - 1);
-  close(pipefd[0]);
-
-  /* Wait for dmenu child to exit */
-  int status;
-  waitpid(pid, &status, 0);
-
-  /* Check if dmenu was cancelled (exit code from dmenu is 1 for no selection) */
-  if (nread <= 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-    /* No selection or cancelled */
-    if (nread > 0) {
-      /* Read any remaining data */
-      while (read(pipefd[0], cmd, sizeof(cmd)) > 0)
-        ;
-    }
-    LOG_DEBUG("dmenu: no selection or cancelled");
+  /* The event loop polls this descriptor and must never wait on it. */
+  int flags = fcntl(pipefd[0], F_GETFL, 0);
+  if (flags < 0 || fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK) < 0) {
+    LOG_ERROR("Failed to make the dmenu pipe non-blocking: %s", strerror(errno));
+    close(pipefd[0]);
     return false;
   }
 
-  /* Null-terminate the command */
-  cmd[nread] = '\0';
+  /* A child the WM forks later must not inherit the read end, or it keeps the
+     pipe open after dmenu is gone and the loop never reads the end of file. */
+  flags = fcntl(pipefd[0], F_GETFD, 0);
+  if (flags >= 0)
+    (void) fcntl(pipefd[0], F_SETFD, flags | FD_CLOEXEC);
 
-  /* Remove trailing newline if present */
-  size_t len = strlen(cmd);
-  if (len > 0 && cmd[len - 1] == '\n') {
-    cmd[len - 1] = '\0';
-  }
+  selection.active     = true;
+  selection.fd         = pipefd[0];
+  selection.length     = 0;
+  selection.command[0] = '\0';
 
-  /* Skip empty commands */
-  if (cmd[0] == '\0') {
-    LOG_DEBUG("dmenu: empty selection");
+  if (!wm_loop_add_fd_handler(selection.fd, launcher_pipe_readable, NULL)) {
+    LOG_ERROR("Failed to watch the dmenu pipe: the launcher is not started");
+    selection.active = false;
+    close(selection.fd);
+    selection.fd = -1;
     return false;
   }
 
-  LOG_DEBUG("dmenu selected: %s", cmd);
-
-  /*
-   * Execute the selected command
-   * Use fork+exec to avoid affecting the window manager
-   */
-  pid = fork();
-
-  if (pid < 0) {
-    LOG_ERROR("Failed to fork for command execution: %s", strerror(errno));
-    return false;
-  }
-
-  if (pid == 0) {
-    /* Child - execute the command */
-
-    /*
-     * Use execl with sh -c for proper shell interpretation.
-     * This allows commands with arguments to work correctly.
-     * The command was already selected from dmenu (which shows executable
-     * names only), so we execute it directly without shell interpretation
-     * to avoid security issues with special characters.
-     *
-     * For simple commands like "firefox", execl works directly.
-     * For commands with arguments, users should use the shell explicitly
-     * by prefixing with a shell command.
-     */
-
-    /* Try direct execution first (for simple commands like "firefox") */
-    execlp(cmd, cmd, (char*) NULL);
-
-    /* If execlp fails, try with sh -c (for built-in commands) */
-    execlp("sh", "sh", "-c", cmd, (char*) NULL);
-
-    /* If we get here, both exec attempts failed */
-    _exit(1);
-  }
-
-  /* Parent - wait for the command to start (or fail quickly) */
-  int   cmd_status;
-  pid_t waited = waitpid(pid, &cmd_status, WNOHANG);
-
-  if (waited < 0) {
-    LOG_ERROR("waitpid failed: %s", strerror(errno));
-    return false;
-  }
-
-  if (waited == 0) {
-    /* Command is running in background */
-    LOG_DEBUG("Command started: %s", cmd);
-  } else if (WIFEXITED(cmd_status) && WEXITSTATUS(cmd_status) == 0) {
-    LOG_DEBUG("Command completed immediately: %s", cmd);
-  } else {
-    LOG_DEBUG("Command execution returned: %s (status=%d)", cmd, cmd_status);
-  }
-
+  LOG_DEBUG("dmenu started: pid %d, the selection arrives through the event loop", (int) pid);
   return true;
 }
