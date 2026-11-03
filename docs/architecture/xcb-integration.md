@@ -230,6 +230,15 @@ The line dmenu printed is the selection, and the WM runs it in its own fork. A
 handler that leaves its descriptor readable makes the loop spin, so it has to
 drain it.
 
+A reply is not an event, and it is the other way a module can avoid waiting: it
+sends the request unchecked from its XCB handler, keeps the cookie, and reads
+the answer from a callback registered with `wm_loop_add_poll_handler()`. The loop
+runs those once per iteration, after the dispatch and before the flush, and
+`xcb_poll_for_reply()` returns 0 while the reply has not arrived, so a reply that
+is still in flight leaves the loop free to block in `poll(2)`. Client size hints
+arrive that way. A handler that issues a further request has it flushed in the
+same iteration.
+
 `poll(2)` reports the socket, not libxcb's own queue. libxcb reads ahead during
 a reply wait (the property and atom queries at startup) and during `xcb_flush()`,
 so an event can sit in that queue with nothing left to read on the socket. The

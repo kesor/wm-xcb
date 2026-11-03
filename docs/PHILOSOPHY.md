@@ -105,6 +105,9 @@ later as an event.
   - never call `xcb_*_reply()` from an XCB handler or an action callback;
     use the cookie and process the reply when it arrives, or restructure so no
     reply is needed
+  - a reply is read from a callback registered with
+    `wm_loop_add_poll_handler()`, which runs once per iteration and polls
+    rather than waits
   - one `xcb_flush()` per loop iteration, not one per call
   - the main loop blocks on `poll()` or `xcb_wait_for_event()`, never spins
   - child processes (launcher, terminal) are `fork` + `exec`. A `SIGCHLD`
