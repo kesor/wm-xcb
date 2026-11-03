@@ -37,8 +37,10 @@ else
 	CFLAGS += -Os
 endif
 
-# Address and UB sanitizers: make clean && make SANITIZE=1
-# Useful for the unit tests (valgrind build/release/test) and for a live session.
+# Address and UB sanitizers: make SANITIZE=1
+# Useful for the unit tests and for a live session. No clean is needed; each
+# variant keeps its objects under build/<variant>/, which is what lets the two
+# alternated in one checkout.
 ifeq ($(strip $(SANITIZE)),1)
 	CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer -g
 	LDFLAGS += -fsanitize=address,undefined

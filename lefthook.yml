@@ -9,11 +9,13 @@
 # 'bd hooks run <hook>'. Do not also run 'bd hooks install': it takes over
 # core.hooksPath and these gates stop running. docs/QUALITY.md explains it.
 #
-# Layers, fastest first:
-#   pre-commit  ~5s     paths, docs, test-src, bead-refs, workflow, formatting, build, unit, async, beads
-#   commit-msg  instant  commit message rules
-#   pre-push    ~65s    the above, plus the flake evaluation, the shell lint, the seam suite and the -pedantic debug build
-#   CI                   pre-push --force (beads excluded), plus seam and sanitize-x
+# Layers, fastest first. The gates in each layer are the blocks below, and
+# scripts/gate-list.sh prints them: this header deliberately does not list them,
+# because the list it used to carry was missing four of the pre-push gates.
+#   pre-commit  every commit
+#   commit-msg  every commit
+#   pre-push    every push
+#   CI          pre-push --force (beads excluded), plus seam and sanitize-x
 #
 # Adding a gate: put the command in a script under scripts/ and list it here.
 # The CI gates job runs this file with --force, so a hook gate needs no
