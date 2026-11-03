@@ -4,23 +4,24 @@
  * Handles display detection via RandR.
  * - Registers XCB handler for RANDR_NOTIFY events
  * - Creates/destroys Monitor targets based on output connect/disconnect
- * - Performs initial RandR output discovery on startup
+ * - Reads the geometry with a pass of queries whose replies the loop reads when
+ *   they arrive; only the startup discovery waits
  */
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <xcb/randr.h>
+#include <xcb/xcbext.h>
 
 #include "../target/monitor.h"
 #include "../xcb/xcb-handler.h"
 #include "monitor-manager.h"
 #include "wm-hub.h"
 #include "wm-log.h"
-
-/* External XCB connection - declared in wm-xcb.h */
-extern xcb_connection_t* dpy;
+#include "wm-xcb.h"
 
 /*
  * RandR constants for connection state
@@ -36,16 +37,18 @@ static bool initialized = false;
 /* Forward declarations */
 static void monitor_manager_executor(struct HubRequest* req);
 static void monitor_manager_xcb_handler(void* event);
+static bool monitor_manager_pass_begin(void);
+static void monitor_manager_pass_abort(void);
+static void monitor_manager_pass_poll(void* userdata);
+static void monitor_manager_apply_crtc_geometry(xcb_randr_crtc_t crtc, int16_t x, int16_t y, uint16_t width, uint16_t height);
 
 /* Internal helper functions */
-static void                monitor_manager_discover_outputs(void);
+static void                monitor_manager_discover_outputs_blocking(void);
 static Monitor*            monitor_manager_create_for_output(xcb_randr_output_t output);
 static void                monitor_manager_destroy_for_output(xcb_randr_output_t output);
-static void                monitor_manager_update_output_geometry(xcb_randr_output_t output, xcb_randr_crtc_t crtc);
-static void                monitor_manager_update_crtc_geometry(xcb_randr_crtc_t crtc, xcb_timestamp_t timestamp);
-static bool                monitor_manager_get_output_info(xcb_randr_output_t output, xcb_randr_crtc_t* crtc_out, char** name_out);
-static bool                monitor_manager_get_crtc_info(xcb_randr_crtc_t crtc, int16_t* x, int16_t* y, uint16_t* width, uint16_t* height, xcb_randr_mode_t* mode);
-static xcb_randr_output_t* monitor_manager_get_screen_outputs(xcb_window_t root, int* count);
+static xcb_randr_crtc_t    monitor_manager_apply_output_info(xcb_randr_output_t output, const xcb_randr_get_output_info_reply_t* reply);
+static void                monitor_manager_apply_crtc_info(xcb_randr_output_t output, const xcb_randr_get_crtc_info_reply_t* reply);
+static xcb_randr_output_t* monitor_manager_read_screen_outputs_blocking(xcb_window_t root, int* count);
 
 /*
  * Request types handled by monitor manager (if any)
@@ -126,7 +129,6 @@ monitor_manager_init(void)
    * We select for all notify types we handle: output change, CRTC change,
    * and resource change. Provider/lease events are not selected.
    */
-  extern xcb_window_t root;
   if (dpy != NULL && root != XCB_NONE) {
     uint32_t notify_mask =
         XCB_RANDR_NOTIFY_MASK_CRTC_CHANGE |
@@ -142,7 +144,7 @@ monitor_manager_init(void)
    * This queries the X server for all currently connected outputs
    * and creates Monitor targets for each one.
    */
-  monitor_manager_discover_outputs();
+  monitor_manager_discover_outputs_blocking();
 
   initialized = true;
   LOG_INFO("Monitor manager component initialized");
@@ -158,6 +160,10 @@ monitor_manager_shutdown(void)
 
   /* Unregister XCB handlers */
   xcb_handler_unregister_component(&monitor_manager_component);
+
+  /* A reply still in flight is dropped rather than left for a caller that no
+     longer exists. */
+  monitor_manager_pass_abort();
 
   /* Note: We don't destroy monitors here - that happens via
    * monitor_list_shutdown() which is called by the main wm shutdown.
@@ -191,6 +197,303 @@ monitor_manager_executor(struct HubRequest* req)
 }
 
 /*
+ * What an output-info reply says about an output.
+ *
+ * An output that is connected and has a CRTC is a monitor the WM can place
+ * clients on, and that CRTC's geometry is the next question the pass asks.
+ * Returns the CRTC whose geometry has to be read, or XCB_NONE when there is
+ * nothing to measure.
+ */
+static xcb_randr_crtc_t
+monitor_manager_apply_output_info(xcb_randr_output_t output, const xcb_randr_get_output_info_reply_t* reply)
+{
+  if (reply == NULL)
+    return XCB_NONE;
+
+  if (reply->crtc == XCB_NONE || reply->connection != XCB_RANDR_CONNECTION_CONNECTED)
+    return XCB_NONE;
+
+  if (monitor_get_by_output(output) == NULL)
+    monitor_manager_create_for_output(output);
+
+  Monitor* m = monitor_get_by_output(output);
+  if (m == NULL)
+    return XCB_NONE;
+
+  m->crtc = reply->crtc;
+  return reply->crtc;
+}
+
+/*
+ * Apply a CRTC geometry reply to the monitor of `output`.
+ */
+static void
+monitor_manager_apply_crtc_info(xcb_randr_output_t output, const xcb_randr_get_crtc_info_reply_t* reply)
+{
+  if (reply == NULL)
+    return;
+
+  Monitor* m = monitor_get_by_output(output);
+  if (m == NULL)
+    return;
+
+  monitor_set_geometry(m, reply->x, reply->y, reply->width, reply->height);
+  LOG_DEBUG("Monitor manager: Updated output %u geometry to %ux%u+%d+%d",
+            output, (unsigned int) reply->width, (unsigned int) reply->height,
+            reply->x, reply->y);
+}
+
+/*
+ * Apply the geometry a CRTC change event carries.
+ *
+ * The event holds the new x, y, width and height, so this needs no reply. Which
+ * monitors the CRTC drives was recorded when their output info was read.
+ */
+static void
+monitor_manager_apply_crtc_geometry(xcb_randr_crtc_t crtc, int16_t x, int16_t y, uint16_t width, uint16_t height)
+{
+  for (Monitor* m = monitor_list_get_first(); m != NULL; m = monitor_list_get_next(m)) {
+    if (m->crtc != crtc)
+      continue;
+
+    monitor_set_geometry(m, x, y, width, height);
+    LOG_DEBUG("Monitor manager: CRTC %u is now %ux%u+%d+%d on output %u",
+              crtc, (unsigned int) width, (unsigned int) height, x, y, m->output);
+  }
+}
+
+/*
+ * The RandR pass in flight.
+ *
+ * Finding out what the display looks like costs a chain of queries: the list of
+ * outputs, then one output's info, then the geometry of the CRTC that output
+ * drives. Each answer is a reply, which the loop does not deliver as an event,
+ * so the pass keeps its place here and the loop's poll callback advances it one
+ * step per iteration. A reply that has not arrived leaves the pass where it is;
+ * nothing in the chain waits. A RandR notify that arrives mid-pass drops the
+ * pass and, when the change still needs a read, starts a fresh one: applying the
+ * old reply would recreate a disconnected output or overwrite a CRTC geometry
+ * the event already carried.
+ */
+typedef enum MonitorPass {
+  MONITOR_PASS_NONE = 0,
+  MONITOR_PASS_RESOURCES,   /* waiting for the list of outputs */
+  MONITOR_PASS_OUTPUT_INFO, /* waiting for one output's info */
+  MONITOR_PASS_CRTC_INFO,   /* waiting for the geometry of that output's CRTC */
+} MonitorPass;
+
+static struct {
+  MonitorPass                             pass;
+  xcb_randr_get_screen_resources_cookie_t resources;
+  xcb_randr_get_output_info_cookie_t      output_info;
+  xcb_randr_get_crtc_info_cookie_t        crtc_info;
+  xcb_randr_output_t*                     outputs;
+  int                                     output_count;
+  int                                     output_index;
+  xcb_randr_output_t                      output;
+  xcb_timestamp_t                         timestamp;
+  bool                                    polling; /* registered with the loop */
+} randr_pass;
+
+static void
+monitor_manager_pass_remove_poll(void)
+{
+  if (!randr_pass.polling)
+    return;
+
+  wm_loop_remove_poll_handler(monitor_manager_pass_poll, NULL);
+  randr_pass.polling = false;
+}
+
+static void
+monitor_manager_pass_free_outputs(void)
+{
+  free(randr_pass.outputs);
+  randr_pass.outputs      = NULL;
+  randr_pass.output_count = 0;
+  randr_pass.output_index = 0;
+  randr_pass.pass         = MONITOR_PASS_NONE;
+}
+
+static void
+monitor_manager_pass_issue_output(int index)
+{
+  randr_pass.output_index = index;
+  randr_pass.output       = randr_pass.outputs[index];
+  randr_pass.pass         = MONITOR_PASS_OUTPUT_INFO;
+  randr_pass.output_info  = xcb_randr_get_output_info(dpy, randr_pass.output, randr_pass.timestamp);
+}
+
+/*
+ * End of the pass, or the next output in it.
+ */
+static void
+monitor_manager_pass_finish(void)
+{
+  monitor_manager_pass_free_outputs();
+  monitor_manager_pass_remove_poll();
+}
+
+static void
+monitor_manager_pass_next_output(void)
+{
+  if (randr_pass.output_index + 1 < randr_pass.output_count) {
+    monitor_manager_pass_issue_output(randr_pass.output_index + 1);
+    return;
+  }
+
+  monitor_manager_pass_finish();
+}
+
+/*
+ * Drop the pass in flight. Its reply is never read, so libxcb is told to throw
+ * it away instead of holding it for a caller that is gone.
+ */
+static void
+monitor_manager_pass_abort(void)
+{
+  if (dpy != NULL) {
+    switch (randr_pass.pass) {
+    case MONITOR_PASS_RESOURCES:
+      xcb_discard_reply(dpy, randr_pass.resources.sequence);
+      break;
+    case MONITOR_PASS_OUTPUT_INFO:
+      xcb_discard_reply(dpy, randr_pass.output_info.sequence);
+      break;
+    case MONITOR_PASS_CRTC_INFO:
+      xcb_discard_reply(dpy, randr_pass.crtc_info.sequence);
+      break;
+    case MONITOR_PASS_NONE:
+      break;
+    }
+  }
+
+  monitor_manager_pass_free_outputs();
+  monitor_manager_pass_remove_poll();
+}
+
+/*
+ * Start a pass. One at a time: a pass already in flight is dropped first, so its
+ * reply (which describes the display before this change) is never applied.
+ */
+static bool
+monitor_manager_pass_begin(void)
+{
+  if (dpy == NULL || root == XCB_NONE)
+    return false;
+
+  if (randr_pass.pass != MONITOR_PASS_NONE)
+    monitor_manager_pass_abort();
+
+  if (!randr_pass.polling) {
+    if (!wm_loop_add_poll_handler(monitor_manager_pass_poll, NULL)) {
+      LOG_ERROR("Monitor manager: cannot read RandR, the loop refused the callback");
+      return false;
+    }
+    randr_pass.polling = true;
+  }
+
+  randr_pass.timestamp = XCB_CURRENT_TIME;
+  randr_pass.resources = xcb_randr_get_screen_resources(dpy, root);
+  randr_pass.pass      = MONITOR_PASS_RESOURCES;
+  return true;
+}
+
+/*
+ * The loop's poll callback: read the answer the pass is waiting for, if it has
+ * arrived, and take the next step.
+ */
+static void
+monitor_manager_pass_poll(void* userdata)
+{
+  (void) userdata;
+
+  if (dpy == NULL) {
+    monitor_manager_pass_finish();
+    return;
+  }
+
+  void*                raw_reply = NULL;
+  xcb_generic_error_t* error     = NULL;
+
+  switch (randr_pass.pass) {
+  case MONITOR_PASS_RESOURCES: {
+    /* Not the reply-forcing call: it reports "not yet" instead of waiting, so
+       the loop stays free. */
+    if (!xcb_poll_for_reply(dpy, randr_pass.resources.sequence, &raw_reply, &error))
+      return;
+
+    xcb_randr_get_screen_resources_reply_t* reply = raw_reply;
+    if (reply != NULL && error == NULL) {
+      int length = xcb_randr_get_screen_resources_outputs_length(reply);
+      if (length > 0) {
+        xcb_randr_output_t* listed = xcb_randr_get_screen_resources_outputs(reply);
+        randr_pass.outputs         = malloc((size_t) length * sizeof *randr_pass.outputs);
+        if (randr_pass.outputs != NULL) {
+          memcpy(randr_pass.outputs, listed, (size_t) length * sizeof *randr_pass.outputs);
+          randr_pass.output_count = length;
+        } else {
+          LOG_ERROR("Monitor manager: cannot hold the output list: %s", strerror(errno));
+        }
+      }
+    } else if (error != NULL) {
+      LOG_DEBUG("Monitor manager: the output list could not be read");
+    }
+
+    free(error);
+    free(raw_reply);
+
+    if (randr_pass.output_count == 0) {
+      monitor_manager_pass_finish();
+      return;
+    }
+
+    monitor_manager_pass_issue_output(0);
+    return;
+  }
+
+  case MONITOR_PASS_OUTPUT_INFO: {
+    if (!xcb_poll_for_reply(dpy, randr_pass.output_info.sequence, &raw_reply, &error))
+      return;
+
+    xcb_randr_crtc_t crtc = XCB_NONE;
+    if (raw_reply != NULL && error == NULL)
+      crtc = monitor_manager_apply_output_info(randr_pass.output, raw_reply);
+
+    free(error);
+    free(raw_reply);
+
+    if (crtc == XCB_NONE) {
+      monitor_manager_pass_next_output();
+      return;
+    }
+
+    randr_pass.pass      = MONITOR_PASS_CRTC_INFO;
+    randr_pass.crtc_info = xcb_randr_get_crtc_info(dpy, crtc, randr_pass.timestamp);
+    return;
+  }
+
+  case MONITOR_PASS_CRTC_INFO: {
+    if (!xcb_poll_for_reply(dpy, randr_pass.crtc_info.sequence, &raw_reply, &error))
+      return;
+
+    if (raw_reply != NULL && error == NULL)
+      monitor_manager_apply_crtc_info(randr_pass.output, raw_reply);
+
+    free(error);
+    free(raw_reply);
+
+    monitor_manager_pass_next_output();
+    return;
+  }
+
+  case MONITOR_PASS_NONE:
+    monitor_manager_pass_remove_poll();
+    return;
+  }
+}
+
+/*
  * Handle a RandR notify event.
  * Called when RandR notifies us of output changes.
  */
@@ -213,17 +516,18 @@ monitor_manager_handle_randr_notify(void* event)
               oc->output, oc->crtc, oc->connection);
 
     if (oc->connection == XCB_RANDR_CONNECTION_DISCONNECTED) {
-      /* Output disconnected - destroy monitor */
+      /* The event is enough to unmanage the output. Drop any pass that still
+         holds a connected reply for it, or apply_output_info would create the
+         monitor again. */
       monitor_manager_destroy_for_output(oc->output);
+      if (randr_pass.pass != MONITOR_PASS_NONE)
+        monitor_manager_pass_abort();
     } else if (oc->connection == XCB_RANDR_CONNECTION_CONNECTED) {
-      /* Output connected - create monitor if not exists */
-      if (monitor_get_by_output(oc->output) == NULL) {
+      /* The monitor exists as soon as the event says the output is there; the
+         geometry comes with the pass, one round trip later. */
+      if (monitor_get_by_output(oc->output) == NULL)
         monitor_manager_create_for_output(oc->output);
-      }
-      /* Update geometry from the CRTC */
-      if (oc->crtc != XCB_NONE) {
-        monitor_manager_update_output_geometry(oc->output, oc->crtc);
-      }
+      (void) monitor_manager_pass_begin();
     }
     break;
   }
@@ -234,16 +538,18 @@ monitor_manager_handle_randr_notify(void* event)
     LOG_DEBUG("Monitor manager: CRTC change - crtc=%u, mode=%u, x=%d y=%d %ux%u",
               cc->crtc, cc->mode, cc->x, cc->y, cc->width, cc->height);
 
-    /* Find the output that uses this CRTC and update its geometry */
-    monitor_manager_update_crtc_geometry(cc->crtc, cc->timestamp);
+    /* The event carries the new geometry. Drop a pass whose CRTC reply still
+       holds the old one, or apply_crtc_info would write it back. */
+    monitor_manager_apply_crtc_geometry(cc->crtc, cc->x, cc->y, cc->width, cc->height);
+    if (randr_pass.pass != MONITOR_PASS_NONE)
+      monitor_manager_pass_abort();
     break;
   }
 
   case XCB_RANDR_NOTIFY_RESOURCE_CHANGE: {
     /* Resource change - refresh output list to detect changes */
     LOG_DEBUG("Monitor manager: Resource change notification");
-    /* Re-discover outputs to sync our state */
-    monitor_manager_discover_outputs();
+    (void) monitor_manager_pass_begin();
     break;
   }
 
@@ -263,22 +569,21 @@ monitor_manager_handle_randr_notify(void* event)
 }
 
 /*
- * Discover all currently connected outputs via RandR.
- * Creates Monitor targets for each connected output.
+ * Discover the monitors that are connected when the WM starts.
  *
- * Note: This function requires a valid X connection (dpy != NULL)
- * and root window. In test environments without X, this is a no-op.
+ * This one waits, on purpose: the event loop does not exist yet, and a Monitor
+ * has to be registered before the windows already on the display are adopted,
+ * because that is when the other components attach their state machines to it.
+ * Every later change goes through the pass above, which does not wait.
  */
 static void
-monitor_manager_discover_outputs(void)
+monitor_manager_discover_outputs_blocking(void)
 {
   /* Check for valid X connection - skip discovery in test environment */
   if (dpy == NULL) {
     LOG_DEBUG("Monitor manager: No X connection, skipping output discovery");
     return;
   }
-
-  extern xcb_window_t root;
 
   /* Skip if root window is not set */
   if (root == XCB_NONE) {
@@ -287,7 +592,7 @@ monitor_manager_discover_outputs(void)
   }
 
   int                 output_count = 0;
-  xcb_randr_output_t* outputs      = monitor_manager_get_screen_outputs(root, &output_count);
+  xcb_randr_output_t* outputs      = monitor_manager_read_screen_outputs_blocking(root, &output_count);
 
   if (outputs == NULL || output_count == 0) {
     LOG_DEBUG("Monitor manager: No RandR outputs found");
@@ -299,41 +604,41 @@ monitor_manager_discover_outputs(void)
   for (int i = 0; i < output_count; i++) {
     xcb_randr_output_t output = outputs[i];
 
-    /* Query output info once - get connection state and CRTC */
-    /* allow-blocking: initial output discovery at startup */
-    xcb_randr_get_output_info_cookie_t cookie = xcb_randr_get_output_info(dpy, output, XCB_CURRENT_TIME);
-    xcb_randr_get_output_info_reply_t* reply  = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
-
-    if (reply == NULL) {
+    /* allow-blocking: startup, the event loop has not started yet */
+    xcb_randr_get_output_info_reply_t* reply = xcb_randr_get_output_info_reply(
+        dpy, xcb_randr_get_output_info(dpy, output, XCB_CURRENT_TIME), NULL);
+    if (reply == NULL)
       continue;
-    }
 
-    /* Only create monitor for connected outputs with a valid CRTC */
-    if (reply->crtc != XCB_NONE && reply->connection == XCB_RANDR_CONNECTION_CONNECTED) {
-      /* Only create if monitor doesn't already exist */
-      if (monitor_get_by_output(output) == NULL) {
-        Monitor* m = monitor_manager_create_for_output(output);
-        if (m != NULL) {
-          monitor_manager_update_output_geometry(output, reply->crtc);
-        }
-      }
-    }
-
+    xcb_randr_crtc_t crtc = monitor_manager_apply_output_info(output, reply);
     free(reply);
+
+    if (crtc == XCB_NONE)
+      continue;
+
+    /* allow-blocking: startup, the event loop has not started yet */
+    xcb_randr_get_crtc_info_reply_t* crtc_reply = xcb_randr_get_crtc_info_reply(
+        dpy, xcb_randr_get_crtc_info(dpy, crtc, XCB_CURRENT_TIME), NULL);
+    if (crtc_reply == NULL)
+      continue;
+
+    monitor_manager_apply_crtc_info(output, crtc_reply);
+    free(crtc_reply);
   }
 
   free(outputs);
 }
 
 /*
- * Get list of outputs for the root window.
- * Returns newly allocated array (caller must free) or NULL on error.
+ * Get the outputs of the root window, waiting for the list.
+ * Returns a newly allocated array (caller must free) or NULL on error.
  * Output count is stored in *count.
  *
- * Note: Caller should check dpy != NULL before calling.
+ * Startup only: docs/PHILOSOPHY.md 2.3 has the loop read replies through its
+ * poll callbacks instead.
  */
 static xcb_randr_output_t*
-monitor_manager_get_screen_outputs(xcb_window_t root, int* count)
+monitor_manager_read_screen_outputs_blocking(xcb_window_t root, int* count)
 {
   /* Check for valid X connection */
   if (dpy == NULL) {
@@ -341,9 +646,9 @@ monitor_manager_get_screen_outputs(xcb_window_t root, int* count)
     return NULL;
   }
 
-  xcb_randr_get_screen_resources_cookie_t cookie = xcb_randr_get_screen_resources(dpy, root);
-  /* allow-blocking: startup discovery, no loop yet */
-  xcb_randr_get_screen_resources_reply_t* reply = xcb_randr_get_screen_resources_reply(dpy, cookie, NULL);
+  /* allow-blocking: startup, the event loop has not started yet */
+  xcb_randr_get_screen_resources_reply_t* reply = xcb_randr_get_screen_resources_reply(
+      dpy, xcb_randr_get_screen_resources(dpy, root), NULL);
 
   if (reply == NULL) {
     *count = 0;
@@ -422,158 +727,6 @@ monitor_manager_destroy_for_output(xcb_randr_output_t output)
     hub_unregister_target(m->target.id);
   }
   monitor_destroy(m);
-}
-
-/*
- * Update monitor geometry based on CRTC assignment.
- * Finds the monitor for the given output and updates its geometry.
- */
-static void
-monitor_manager_update_output_geometry(xcb_randr_output_t output, xcb_randr_crtc_t crtc)
-{
-  Monitor* m = monitor_get_by_output(output);
-  if (m == NULL) {
-    return;
-  }
-
-  /* Update the stored CRTC */
-  m->crtc = crtc;
-
-  /* Get CRTC geometry */
-  int16_t          x      = 0;
-  int16_t          y      = 0;
-  uint16_t         width  = 0;
-  uint16_t         height = 0;
-  xcb_randr_mode_t mode   = 0;
-
-  if (monitor_manager_get_crtc_info(crtc, &x, &y, &width, &height, &mode)) {
-    monitor_set_geometry(m, x, y, width, height);
-    LOG_DEBUG("Monitor manager: Updated output %u geometry to %ux%u+%d+%d",
-              output, (unsigned int) width, (unsigned int) height, x, y);
-  }
-}
-
-/*
- * Update monitor geometry for all outputs using a specific CRTC.
- * Called when CRTC configuration changes.
- *
- * Note: Requires valid X connection (dpy != NULL).
- */
-static void
-monitor_manager_update_crtc_geometry(xcb_randr_crtc_t crtc, xcb_timestamp_t timestamp)
-{
-  /* Check for valid X connection */
-  if (dpy == NULL) {
-    return;
-  }
-
-  extern xcb_window_t root;
-
-  /* Find the output that uses this CRTC */
-  int                 output_count = 0;
-  xcb_randr_output_t* outputs      = monitor_manager_get_screen_outputs(root, &output_count);
-
-  if (outputs == NULL) {
-    return;
-  }
-
-  for (int i = 0; i < output_count; i++) {
-    xcb_randr_get_output_info_cookie_t cookie = xcb_randr_get_output_info(dpy, outputs[i], timestamp);
-    xcb_randr_get_output_info_reply_t* reply  = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
-
-    if (reply != NULL && reply->crtc == crtc) {
-      Monitor* m = monitor_get_by_output(outputs[i]);
-      if (m != NULL) {
-        monitor_manager_update_output_geometry(outputs[i], crtc);
-      }
-    }
-
-    free(reply);
-  }
-
-  free(outputs);
-}
-
-/*
- * Get information about a RandR output.
- * Fills crtc_out with the current CRTC and optionally name_out with the output name.
- * Returns true on success, false on failure.
- *
- * Note: Caller should check dpy != NULL before calling.
- */
-static bool
-monitor_manager_get_output_info(xcb_randr_output_t output, xcb_randr_crtc_t* crtc_out, char** name_out)
-{
-  /* Check for valid X connection */
-  if (dpy == NULL) {
-    return false;
-  }
-
-  xcb_randr_get_output_info_cookie_t cookie = xcb_randr_get_output_info(dpy, output, XCB_CURRENT_TIME);
-  xcb_randr_get_output_info_reply_t* reply  = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
-
-  if (reply == NULL) {
-    return false;
-  }
-
-  if (crtc_out != NULL) {
-    *crtc_out = reply->crtc;
-  }
-
-  if (name_out != NULL) {
-    int   name_len = xcb_randr_get_output_info_name_length(reply);
-    char* name     = malloc((size_t) name_len + 1);
-    if (name != NULL) {
-      memcpy(name, xcb_randr_get_output_info_name(reply), (size_t) name_len);
-      name[name_len] = '\0';
-      *name_out      = name;
-    }
-  }
-
-  free(reply);
-  return true;
-}
-
-/*
- * Get information about a RandR CRTC.
- * Fills x, y, width, height, mode with CRTC configuration.
- * Returns true on success, false on failure.
- *
- * Note: Caller should check dpy != NULL and crtc != XCB_NONE before calling.
- */
-static bool
-monitor_manager_get_crtc_info(xcb_randr_crtc_t crtc, int16_t* x, int16_t* y,
-                              uint16_t* width, uint16_t* height, xcb_randr_mode_t* mode)
-{
-  /* Check for valid X connection */
-  if (dpy == NULL) {
-    return false;
-  }
-
-  if (crtc == XCB_NONE) {
-    return false;
-  }
-
-  xcb_randr_get_crtc_info_cookie_t cookie = xcb_randr_get_crtc_info(dpy, crtc, XCB_CURRENT_TIME);
-  xcb_randr_get_crtc_info_reply_t* reply  = xcb_randr_get_crtc_info_reply(dpy, cookie, NULL);
-
-  if (reply == NULL) {
-    return false;
-  }
-
-  if (x != NULL)
-    *x = reply->x;
-  if (y != NULL)
-    *y = reply->y;
-  if (width != NULL)
-    *width = reply->width;
-  if (height != NULL)
-    *height = reply->height;
-  if (mode != NULL)
-    *mode = reply->mode;
-
-  free(reply);
-  return true;
 }
 
 /*

@@ -37,6 +37,38 @@ bool wm_loop_add_fd_handler(int fd, WmLoopFdHandler handler, void* userdata);
 void wm_loop_remove_fd_handler(int fd);
 
 /*
+ * A callback the loop runs once per iteration, after it has dispatched what X
+ * sent and before it flushes what the handlers queued.
+ *
+ * This is where a module reads a reply that has arrived: it issues the request
+ * unchecked from its XCB handler, keeps the cookie, and calls
+ * xcb_poll_for_reply() here. That call reports "not yet" instead of waiting, so
+ * the callback returns and the loop blocks in poll(2) until the server answers.
+ * A callback that issues a further request has it flushed in the same
+ * iteration.
+ */
+typedef void (*WmLoopPollHandler)(void* userdata);
+
+/*
+ * Registers `handler` with the loop. The same callback may be registered more
+ * than once with a different `userdata`, which is how a module polls for more
+ * than one target.
+ * Returns false when `handler` is NULL, already registered with that
+ * `userdata`, or out of memory.
+ */
+bool wm_loop_add_poll_handler(WmLoopPollHandler handler, void* userdata);
+
+/* Stops running `handler`. Does nothing when it is not registered. */
+void wm_loop_remove_poll_handler(WmLoopPollHandler handler, void* userdata);
+
+/*
+ * Runs every registered poll callback once, without waiting. Returns how many
+ * ran. A callback may remove itself, including its own entry; the others are
+ * still called.
+ */
+int wm_loop_dispatch_poll_handlers(void);
+
+/*
  * Runs the handler of every registered descriptor that is readable now,
  * without waiting. Returns how many handlers ran. A handler may remove a
  * descriptor, including its own; the others are still called.

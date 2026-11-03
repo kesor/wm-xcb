@@ -289,6 +289,107 @@ wm_loop_dispatch_fd_handlers(void)
   return dispatched;
 }
 
+/*
+ * Callbacks the loop runs once per iteration, after the events are dispatched
+ * and before the requests are flushed. A reply is not an event, so a module
+ * that sent a cookie reads its answer here: xcb_poll_for_reply() says "not
+ * yet" instead of waiting, and the loop is free to block in poll(2) until the
+ * server answers.
+ */
+typedef struct WmLoopPollEntry {
+  WmLoopPollHandler handler;
+  void*             userdata;
+} WmLoopPollEntry;
+
+static WmLoopPollEntry* poll_entries     = NULL;
+static size_t           poll_entry_count = 0;
+static size_t           poll_entry_cap   = 0;
+
+bool
+wm_loop_add_poll_handler(WmLoopPollHandler handler, void* userdata)
+{
+  if (handler == NULL) {
+    LOG_ERROR("cannot add a poll handler without a callback");
+    return false;
+  }
+
+  for (size_t i = 0; i < poll_entry_count; i++) {
+    if (poll_entries[i].handler == handler && poll_entries[i].userdata == userdata) {
+      LOG_ERROR("this poll handler is already registered with the loop");
+      return false;
+    }
+  }
+
+  if (poll_entry_count == poll_entry_cap) {
+    size_t           cap   = poll_entry_cap == 0 ? 4 : poll_entry_cap * 2;
+    WmLoopPollEntry* grown = realloc(poll_entries, cap * sizeof *grown);
+    if (grown == NULL) {
+      LOG_ERROR("cannot grow the loop's poll table: %s", strerror(errno));
+      return false;
+    }
+    poll_entries   = grown;
+    poll_entry_cap = cap;
+  }
+
+  poll_entries[poll_entry_count].handler  = handler;
+  poll_entries[poll_entry_count].userdata = userdata;
+  poll_entry_count++;
+  return true;
+}
+
+void
+wm_loop_remove_poll_handler(WmLoopPollHandler handler, void* userdata)
+{
+  for (size_t i = 0; i < poll_entry_count; i++) {
+    if (poll_entries[i].handler != handler || poll_entries[i].userdata != userdata)
+      continue;
+
+    /* Order means nothing here: the table is only ever walked whole. */
+    poll_entries[i] = poll_entries[poll_entry_count - 1];
+    poll_entry_count--;
+    return;
+  }
+}
+
+int
+wm_loop_dispatch_poll_handlers(void)
+{
+  size_t count = poll_entry_count;
+  if (count == 0)
+    return 0;
+
+  /* Snapshot the callbacks before calling anything: a handler may register or
+     remove one, and the table moves under this loop. */
+  WmLoopPollEntry* snapshot = malloc(count * sizeof *snapshot);
+  if (snapshot == NULL) {
+    LOG_ERROR("cannot dispatch the loop's poll handlers: %s", strerror(errno));
+    return 0;
+  }
+  for (size_t i = 0; i < count; i++)
+    snapshot[i] = poll_entries[i];
+
+  int dispatched = 0;
+  for (size_t i = 0; i < count; i++) {
+    /* Look the entry up again: an earlier handler may have removed it. */
+    bool still_registered = false;
+    for (size_t j = 0; j < poll_entry_count; j++) {
+      if (poll_entries[j].handler != snapshot[i].handler ||
+          poll_entries[j].userdata != snapshot[i].userdata)
+        continue;
+      still_registered = true;
+      break;
+    }
+    if (!still_registered)
+      continue;
+
+    snapshot[i].handler(snapshot[i].userdata);
+    dispatched++;
+  }
+
+  free(snapshot);
+  return dispatched;
+}
+
 void
 destruct_xcb()
 {
@@ -305,6 +406,11 @@ destruct_xcb()
   fd_entries     = NULL;
   fd_entry_count = 0;
   fd_entry_cap   = 0;
+
+  free(poll_entries);
+  poll_entries     = NULL;
+  poll_entry_count = 0;
+  poll_entry_cap   = 0;
 
   xcb_disconnect(dpy);
 }
@@ -511,6 +617,11 @@ handle_xcb_events()
      starts work; it never waits, which is why this is here and not in the
      action that registered it. */
   wm_loop_dispatch_fd_handlers();
+
+  /* A reply is not an event either: a module that sent a cookie polls for its
+     answer here. The poll reports "not yet" rather than waiting, so the loop
+     stays free and blocks again on the next iteration. */
+  wm_loop_dispatch_poll_handlers();
 
   /* Handlers queue requests and change the window tree; one flush per
    * iteration sends them without waiting on a reply (PHILOSOPHY 2.3). */

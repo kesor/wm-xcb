@@ -10,11 +10,18 @@ extern xcb_ewmh_connection_t* ewmh;
 
 void setup_ewmh();
 void destruct_ewmh();
-void print_atom_name(xcb_atom_t atom);
 
 /*
- * Check if _NET_WM_STATE contains _NET_WM_STATE_FULLSCREEN for a window.
+ * Ask for a window's _NET_WM_STATE list. The caller keeps the cookie and reads
+ * the reply later: a reply read at the call site stops the WM until the server
+ * answers.
  */
-bool ewmh_check_wm_state_fullscreen(xcb_ewmh_connection_t* ewmh, xcb_window_t window);
+xcb_get_property_cookie_t ewmh_request_wm_state(xcb_ewmh_connection_t* ewmh, xcb_window_t window);
+
+/*
+ * Check whether a _NET_WM_STATE reply lists _NET_WM_STATE_FULLSCREEN.
+ * The reply stays the caller's: it is freed after this returns.
+ */
+bool ewmh_wm_state_is_fullscreen(xcb_ewmh_connection_t* ewmh, xcb_get_property_reply_t* reply);
 
 #endif

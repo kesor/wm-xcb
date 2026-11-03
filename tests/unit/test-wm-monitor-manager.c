@@ -238,6 +238,98 @@ test_monitor_manager_with_monitors(void)
   hub_shutdown();
 }
 
+/*
+ * A CRTC change event carries the new geometry, so the monitor follows it
+ * without asking the server.
+ *
+ * There is no X connection in this test, which is the point: a read of the
+ * CRTC's geometry is the only other thing that could set these fields.
+ */
+void
+test_monitor_manager_crtc_change_uses_the_event_geometry(void)
+{
+  LOG_CLEAN("== Testing a CRTC change event sets the monitor geometry");
+
+  hub_init();
+  xcb_handler_init();
+  monitor_list_init();
+  monitor_manager_init();
+
+  Monitor* m = monitor_create(7);
+  assert_or_abort(m != NULL);
+  m->crtc = 42;
+
+  /* A second monitor sits on another CRTC and must not move. */
+  Monitor* other = monitor_create(8);
+  assert_or_abort(other != NULL);
+  other->crtc = 99;
+  monitor_set_geometry(other, 1, 2, 3, 4);
+
+  xcb_randr_notify_event_t event;
+  memset(&event, 0, sizeof event);
+  event.response_type = XCB_RANDR_NOTIFY;
+  event.subCode       = XCB_RANDR_NOTIFY_CRTC_CHANGE;
+  event.u.cc.crtc     = 42;
+  event.u.cc.x        = 100;
+  event.u.cc.y        = 50;
+  event.u.cc.width    = 800;
+  event.u.cc.height   = 600;
+
+  monitor_manager_handle_randr_notify(&event);
+
+  assert_or_abort(m->x == 100);
+  assert_or_abort(m->y == 50);
+  assert_or_abort(m->width == 800);
+  assert_or_abort(m->height == 600);
+
+  assert_or_abort(other->x == 1);
+  assert_or_abort(other->y == 2);
+  assert_or_abort(other->width == 3);
+  assert_or_abort(other->height == 4);
+
+  monitor_destroy(m);
+  monitor_destroy(other);
+  monitor_manager_shutdown();
+  xcb_handler_shutdown();
+  monitor_list_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * A disconnected output is unmanaged on the spot: destroying a monitor needs no
+ * answer from the server.
+ */
+void
+test_monitor_manager_disconnect_destroys_the_monitor(void)
+{
+  LOG_CLEAN("== Testing a disconnected output loses its monitor");
+
+  hub_init();
+  xcb_handler_init();
+  monitor_list_init();
+  monitor_manager_init();
+
+  Monitor* m = monitor_create(7);
+  assert_or_abort(m != NULL);
+
+  xcb_randr_notify_event_t event;
+  memset(&event, 0, sizeof event);
+  event.response_type   = XCB_RANDR_NOTIFY;
+  event.subCode         = XCB_RANDR_NOTIFY_OUTPUT_CHANGE;
+  event.u.oc.output     = 7;
+  event.u.oc.connection = XCB_RANDR_CONNECTION_DISCONNECTED;
+
+  monitor_manager_handle_randr_notify(&event);
+
+  assert_or_abort(monitor_get_by_output(7) == NULL);
+  assert_or_abort(monitor_list_get_first() == NULL);
+
+  monitor_manager_shutdown();
+  xcb_handler_shutdown();
+  monitor_list_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(MonitorManager, {
   test_monitor_manager_component_init_shutdown();
   test_monitor_manager_handler_registration();
@@ -245,4 +337,6 @@ TEST_GROUP(MonitorManager, {
   test_monitor_manager_no_requests();
   test_monitor_manager_accepts_monitor_target();
   test_monitor_manager_with_monitors();
+  test_monitor_manager_crtc_change_uses_the_event_geometry();
+  test_monitor_manager_disconnect_destroys_the_monitor();
 });
