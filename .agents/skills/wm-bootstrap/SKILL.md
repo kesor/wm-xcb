@@ -190,6 +190,11 @@ beads in your final message. This is how the traps below stop being traps.
 
 - **Xephyr has no usable fonts.** `xterm` dies with "cannot load font". Use
   `tools/xclient` (`make tools/xclient`) to create test windows.
+- **A hand-started `Xvfb` takes `-screen 0 WxHxD`, not `-screen WxHxD`.**
+  `Xvfb :7 -screen 800x600x24` prints its usage line and exits, and the reason
+  is in the log, not on stderr. The working form is the one
+  `scripts/lib/private-display.sh` already uses:
+  `xvfb-run -a -s "-screen 0 1280x800x24" <command>`.
 - **`make DEBUG=1` is the only way to read the event log**, and `-pedantic`
   there is what caught a zero-length array. Keep that build green.
 - **`xdotool search --onlyvisible`** is the quickest "did the WM map it" check.

@@ -21,8 +21,6 @@ DRAG_Y=80
 MIN_MOVE=50
 MIN_GROW=50
 
-press super+1
-sleep 0.3
 mapfile -t ids < <(spawn_client 2 300 200 dragging)
 require_visible 2 "both windows are viewable"
 

@@ -18,8 +18,6 @@ restore_mode() {
 }
 trap restore_mode EXIT
 
-press super+1
-sleep 0.3
 mapfile -t ids < <(spawn_client 2 300 200 randr)
 require_visible 2 "both windows are viewable"
 
