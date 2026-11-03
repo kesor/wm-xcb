@@ -119,6 +119,16 @@ static int g_hook_calls[SM_HOOK_MAX];
 static int g_hook_order[SM_HOOK_MAX * 2];
 static int g_hook_order_count;
 
+static int g_data_freed;
+
+static void
+count_data_free(void* data)
+{
+  int* counter = (int*) data;
+  if (counter != NULL)
+    (*counter)++;
+}
+
 static void
 reset_hook_tracking(void)
 {
@@ -792,6 +802,35 @@ test_hooks_removal(void)
   sm_template_destroy(t);
 }
 
+void
+test_sm_owned_data_is_freed_on_destroy(void)
+{
+  LOG_CLEAN("== sm_set_owned_data frees the data on destroy");
+  uint32_t     states[] = { S0, S1 };
+  SMTransition trans[]  = {
+    { S0, S1, NULL, NULL, 10 }
+  };
+  SMTemplate* t = make_tmpl("owned", states, 2, trans, 1, S0);
+
+  int           owner = 0;
+  StateMachine* sm    = make_sm(&owner, t);
+
+  g_data_freed = 0;
+  sm_set_owned_data(sm, &g_data_freed, count_data_free);
+  assert(sm->data == &g_data_freed);
+
+  /* Borrowed data set through sm_set_data is not freed, so it carries no
+   * destructor. */
+  sm_set_data(sm, NULL);
+  assert(sm->data_free == NULL);
+  sm_set_owned_data(sm, &g_data_freed, count_data_free);
+
+  sm_destroy(sm);
+  assert(g_data_freed == 1);
+
+  sm_template_destroy(t);
+}
+
 int
 main(void)
 {
@@ -799,6 +838,7 @@ main(void)
   test_sm_create_destroy();
   test_sm_create_requires_params();
   test_sm_set_emitter();
+  test_sm_owned_data_is_freed_on_destroy();
   test_raw_write();
   test_raw_write_emits_via_hub();
   test_raw_write_with_custom_emitter();
