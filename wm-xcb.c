@@ -21,6 +21,28 @@
 xcb_connection_t* dpy;
 xcb_window_t      root;
 
+/* The display string this WM connected to. A child that opens its own X
+   connection - the launcher's dmenu, the terminal, anything the WM spawns -
+   has to reach the same server, and the environment it inherits is not proof
+   that it will: the WM may have been started through a wrapper that set
+   DISPLAY for one command and left it unset for the rest. */
+static char* connected_display = NULL;
+
+const char*
+wm_xcb_display_name(void)
+{
+  return connected_display;
+}
+
+#ifdef WM_HUB_TESTING
+void
+wm_xcb_set_display_name_for_tests(const char* name)
+{
+  free(connected_display);
+  connected_display = name == NULL ? NULL : strdup(name);
+}
+#endif
+
 void
 wm_xcb_close_connection_in_child(void)
 {
@@ -59,6 +81,11 @@ connect_to_x_display(xcb_connection_t** dpy)
 
   if (displayname == NULL)
     LOG_FATAL("wm: DISPLAY environment variable not set");
+
+  free(connected_display);
+  connected_display = strdup(displayname);
+  if (connected_display == NULL)
+    LOG_FATAL("wm: out of memory while recording the display name");
 
   if (xcb_parse_display(displayname, &hostname, &display_number, &screen_number) == 0)
     LOG_FATAL("wm: failed to parse display name: %s", displayname);

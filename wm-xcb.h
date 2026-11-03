@@ -50,4 +50,19 @@ int wm_loop_dispatch_fd_handlers(void);
  */
 void wm_xcb_close_connection_in_child(void);
 
+/*
+ * The display string the WM connected to. A forked child sets DISPLAY from this
+ * before exec, so a program it starts lands on the WM's own server rather than
+ * on whatever the inherited environment happens to say.
+ */
+const char* wm_xcb_display_name(void);
+
+#ifdef WM_HUB_TESTING
+/*
+ * Pretends the connection was made to `name`. A unit test has no X server, and
+ * the spawned program's DISPLAY is the only thing under test here.
+ */
+void wm_xcb_set_display_name_for_tests(const char* name);
+#endif
+
 #endif
