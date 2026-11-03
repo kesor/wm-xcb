@@ -166,6 +166,8 @@ Short enough to check in review.
 | Every request has a failure event | 2.2 | review: a request with only a success path is incomplete |
 | New behaviour is a registration, not an edit (see §2.4 test) | 2.4 | review |
 | Event ids come from the shared registry, never a fresh local enum | two components that share a value receive each other's events | `src/event-types.h`, `tests/unit/test-event-types.c` |
+| A template declares every state it can be in and every row between them | an undeclared or unreachable state, or a row that emits nothing, is a machine nobody can reason about | `sm_template_validate()`, `tests/unit/test-sm-templates.c` (5.3, 5.6) |
+| Every template ships its diagram, and it matches its table | the header is what a reader opens first; a diagram that drifted sends them to a machine that does not exist | `tests/unit/test-sm-templates.c` (5.10) |
 | `make test` green, `scripts/xephyr-test.sh` no worse than before | promise 4 | CI (planned) |
 | No AI attribution in commits, comments, or files | project rule | review |
 
@@ -230,10 +232,23 @@ this window fullscreen?" by dumping one machine's state and its last transitions
 **What it costs:** the discipline in the ten rules above, and the willingness to
 split a machine rather than add a state.
 
-**Work this implies:** a trace facility (`kill -USR1` dumps every live machine's
-state and last N transitions), a `sm_template` definition format that reads as a
-table, and a test for each machine that walks every declared transition. See the
-beads epic for state machine ergonomics.
+**Where the rules are enforced.** Review is the only check for rules that need
+judgement; the rest are commands that run on every commit, and none of them
+needs a person:
+
+| Rule | Check |
+|------|-------|
+| 3, transitions are declared | `sm_template_validate()` refuses a row that names a state the table does not declare, and a declared state the initial state cannot reach. `sm_template_from_def()` applies it, so a component cannot come up on a broken table |
+| 6, one event per transition | the same validation refuses a row with `emit_event == 0`; `tests/unit/test-sm-templates.c` then drives every declared row of every machine and asserts the event that reaches the hub is the one the row names |
+| 10, every template ships its diagram | `tests/unit/test-sm-templates.c` reads the diagram out of the header and fails when it and the table disagree about a state or a row. Whether a line names the right guard and event is review |
+| the dump below | `kill -USR1 <wm pid>` prints every live machine with its last eight changes, `src/sm/sm-debug.c`; `tests/x/test-15-state-dump.sh` asserts it against a running WM |
+| 1, 2, 4, 5, 7, 8, 9 | review: `.agents/skills/wm-review/SKILL.md` |
+
+**What a dump looks like.** One block per live machine: the target that owns it,
+the state it is in, how often it has entered each state, and the last eight
+changes - raw write or transition, the guard's answer, the event emitted. A
+refused request is in that list, which is what makes "the key did nothing" a
+fact to read instead of a silence.
 
 ---
 

@@ -580,6 +580,8 @@ arrives, and one `poll` that returns is what wakes it.
 |--------|-------|
 | hub, registry, event bus | `make test`, then `make test-standalone` |
 | state machine framework | `make test-sm-standalone` |
+| a state machine template, or a state name | `make test` — `SMTemplates` validates every shipped table, walks every declared row, and compares each header diagram with its table |
+| what a running WM is doing | `kill -USR1 <wm pid>` for a dump of every live machine (see "Asking the WM why" below), then `make test-x` |
 | any component | its `tests/unit/test-*.c` file under `make test`, plus `scripts/xephyr-test.sh` |
 | anything in the manage/map/tile path | `scripts/xephyr-test.sh --windows 2 --verbose` and `--windows 5` |
 | event loop, focus, or key handling | `make check-async`, `scripts/perf-test.sh` for idle CPU, plus a manual session to press keys |
