@@ -46,6 +46,25 @@ evaluates the shell without entering it, which is what catches a broken
 Rule of thumb: anything you run against the WM needs the same shell the WM was
 built in, because the binary links the store paths of that shell's libraries.
 
+### Container image
+
+The `Dockerfile` builds the WM in a Nix builder and runs it under `Xvfb` with
+`x11vnc`, so there is a display on a machine with no X server of its own. Three
+make targets drive it:
+
+```bash
+make container-build   # docker build -t wm .
+make container-run     # detached, publishes port 5900
+make container-clean   # removes the image
+```
+
+The entry point, `start.sh`, is written by `flake.nix`: it starts `Xvfb :99`, an
+`xterm`, the WM, and `x11vnc` on that display. Connect a VNC client to
+`localhost:5900`. The image sets no VNC password, so `docker logs` carries
+x11vnc's warning about that. The image holds the WM built from the tree at
+image-build time, so a source change needs `make container-build` again; the
+image is not how a test run should pick up an edit.
+
 ---
 
 ### A test that early-returns is not coverage

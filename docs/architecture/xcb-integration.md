@@ -179,6 +179,20 @@ void monitor_manager_randr_handler(void* event) {
 | `XCB_EXPOSE` | bar | `hub_emit(EVT_BAR_DRAW)` |
 | `XCB_RANDR_NOTIFY` | monitor-manager | `sm_raw_write()` to ConnectionSM |
 
+## EWMH atoms
+
+`setup_ewmh()` interns the EWMH atom table into one `xcb_ewmh_connection_t`, and
+`destruct_ewmh()` wipes it before freeing it, because `xcb_ewmh_init_atoms()`
+allocates a screen list and one atom per screen inside that struct. The WM writes
+no EWMH root property: `_NET_SUPPORTED`, `_NET_CLIENT_LIST` and
+`_NET_CURRENT_DESKTOP` are open work, so a panel or an external tool sees only
+what it probes for itself.
+
+What the connection is used for today is reading. `ewmh_request_wm_state()` asks
+a client for its `_NET_WM_STATE` and returns the cookie; the caller reads the
+reply from a poll callback, because the `PropertyNotify` that prompted the read
+says the list changed and not what it now holds.
+
 ---
 
 ## XCB Handler Infrastructure
