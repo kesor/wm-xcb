@@ -10,13 +10,6 @@
 # against the fake; what the fake shows is that the WM's loop is free.
 source "$(dirname "$0")/lib.sh"
 
-# Start from a known view. A previous test can leave another tag showing, and
-# switching to the tag that is already visible changes nothing: the assertion
-# below needs MOD+2 to be a change. New clients land on tag 1 either way, which
-# is why the tag-1 window is the one this test uses.
-press super+1
-sleep 0.3
-
 spawn_client 1 400 300 tagged >/dev/null
 wait_viewable 1 2000 >/dev/null
 require_visible 1 "window visible before the launcher"

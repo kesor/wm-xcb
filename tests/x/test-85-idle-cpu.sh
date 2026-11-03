@@ -5,8 +5,11 @@
 # A loop that asks "any events?" and gets "no" a million times a second spends a
 # whole core on nothing. That reads as heat and battery drain long before it
 # reads as a bug, so it is measured here: CPU time from /proc over a wall-clock
-# window in which nothing is happening, with the windows the earlier tests left
-# on screen.
+# window in which nothing is happening, with three windows on screen.
+#
+# The windows are this test's own. run.sh gives each file a WM of its own, so
+# there is nothing left over from an earlier file to measure against, and an
+# empty screen would not cover the layout the WM has to keep.
 #
 # CPU time is Linux-only. Where /proc has no stat for the WM, the test fails
 # rather than passing because it measured nothing.
@@ -19,8 +22,7 @@ source "$(dirname "$0")/lib.sh"
 
 # A spinning loop costs the whole window, so anything near the budget is a
 # defect. The budget is not 0 because /proc counts in clock ticks (10 ms here)
-# and this test starts while the previous test's windows are still being
-# destroyed, which is work the WM is right to do.
+# and the ticks the settle below covers are not this window's.
 IDLE_BUDGET_MS=50
 IDLE_WINDOW_SECONDS=2
 SETTLE_SECONDS=1
@@ -31,6 +33,9 @@ if [ ! -r "/proc/$WM_PID/stat" ]; then
   finish
   exit 1
 fi
+
+spawn_client 3 400 300 idlecpu >/dev/null
+require_visible 3 "three windows are on screen while the idle CPU is measured"
 
 wm_cpu_ms() {
   awk -v hz="$CLK_TCK" '{printf "%d", ($14 + $15) * 1000 / hz}' "/proc/$WM_PID/stat"

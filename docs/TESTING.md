@@ -170,11 +170,30 @@ assertions the unit tests cannot make.
 prefer `make test-x`, which also runs before every push, and keep the old script
 only because several beads issues name it.
 
-`tests/x/run.sh` starts one Xephyr and one WM for the whole run, then runs each
-file as a separate process with `DISPLAY`, `WM_PID`, `WM_LOG` and `ROOT_DIR`
-exported. `tests/x/lib.sh` has the helpers: `spawn_client`, `wait_viewable`,
+`tests/x/run.sh` starts one Xephyr for the whole run, and a WM of its own for
+every test file. It runs each file as a separate process with `DISPLAY`,
+`WM_PID`, `WM_LOG` and `ROOT_DIR` exported, `WM_PID` naming that file's WM.
+The Xephyr is shared and the WM is not, because the state that leaks between
+files is the WM's: a tag view, a client moved to another tag, the input focus,
+the layout. A file that inherits that state fails on something it never did, and
+the failure names the wrong test. `test-94-fresh-wm-per-file.sh` asserts it,
+against the WM's own start time in `/proc`. The server's own state is still
+shared, and that is the part a test has to put back.
+
+`tests/x/lib.sh` has the helpers: `spawn_client`, `wait_viewable`,
 `require_visible`, `rect_of`, `overlap_pairs`, `focused_window`, `press`,
 `root_prop`, and the `check_*` assertions.
+
+Two kinds of state a fresh WM does not reset, because they live in the X server
+rather than in the WM: the lock modifiers (NumLock, CapsLock) and the RandR
+mode. A test that turns one of those on turns it off on every exit path.
+`test-45-key-grab.sh` is the example: it turns NumLock on to prove a grabbed key
+still fires, and turns it off before its assertions are read.
+
+A test that needs a preamble to reach the state it asserts says in its header
+why the preamble is there, so the next reader can tell a setup step from a
+workaround for the state another file left behind. A preamble that outlives its
+reason is the thing to delete.
 
 A failure listed in `tests/quality/seam-baseline.txt` is a **known** failure: it
 is reported and does not fail the run. A failure missing from that file is
