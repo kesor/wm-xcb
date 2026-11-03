@@ -8,4 +8,3 @@
 # 'bd list --parent wm-46k.2'.
 src/components/monitor-manager.c|xcb_randr_get_crtc_info_reply_t* reply = xcb_randr_get_crtc_info_reply(dpy, cookie, NULL);
 src/components/monitor-manager.c|xcb_randr_get_output_info_reply_t* reply = xcb_randr_get_output_info_reply(dpy, cookie, NULL);
-wm-xcb-ewmh.c|xcb_get_property_reply_t* reply = xcb_get_property_reply(dpy, cookie, NULL);

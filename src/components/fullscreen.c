@@ -11,8 +11,10 @@
  * - Guards and actions registered with SM registry
  */
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <xcb/xcbext.h>
 
 #include "fullscreen.h"
 #include "src/actions/action-registry.h"
@@ -52,6 +54,27 @@ static FullscreenComponent fullscreen_component = {
  * Track if static initialization has occurred
  */
 static bool static_init_done = false;
+
+/*
+ * _NET_WM_STATE reads that are in flight.
+ *
+ * A PropertyNotify says the list changed, not what it now holds, so every one
+ * of them costs a query. The answer is a reply, not an event, so the cookie is
+ * kept here and read from the loop's poll callback: reading it in the handler
+ * would stop the WM until the server answered.
+ *
+ * One entry per notification, not one per window: two changes in a row are two
+ * reads, and the later answer must not be applied before the earlier one.
+ */
+typedef struct FullscreenStateRead {
+  xcb_get_property_cookie_t cookie;
+  xcb_window_t              window;
+} FullscreenStateRead;
+
+static FullscreenStateRead* state_reads        = NULL;
+static size_t               state_read_count   = 0;
+static size_t               state_read_cap     = 0;
+static bool                 state_read_polling = false;
 
 static void
 do_static_init(void)
@@ -437,6 +460,136 @@ static Action fullscreen_action = {
 };
 
 /*
+ * Apply a _NET_WM_STATE reply: the state machine follows what the server and
+ * the client agree on, so an external change lands as a raw write.
+ */
+static void
+fullscreen_sync_from_state_reply(xcb_window_t window, xcb_get_property_reply_t* reply)
+{
+  Client* c = client_get_by_window(window);
+  if (c == NULL)
+    return;
+
+  bool is_fullscreen = ewmh_wm_state_is_fullscreen(ewmh, reply);
+
+  /* Get or create the SM (on-demand) */
+  StateMachine* sm = fullscreen_get_sm(c);
+  if (sm == NULL) {
+    LOG_WARN("fullscreen listener: failed to get SM for client window=%u", c->window);
+    return;
+  }
+
+  FullscreenState current = (FullscreenState) sm_get_state(sm);
+
+  /* Sync if different - external change happened */
+  if (is_fullscreen && current == FULLSCREEN_STATE_WINDOWED) {
+    LOG_DEBUG("fullscreen listener: external fullscreen change detected, syncing SM");
+    sm_raw_write(sm, FULLSCREEN_STATE_FULLSCREEN);
+  } else if (!is_fullscreen && current == FULLSCREEN_STATE_FULLSCREEN) {
+    LOG_DEBUG("fullscreen listener: external unfullscreen change detected, syncing SM");
+    sm_raw_write(sm, FULLSCREEN_STATE_WINDOWED);
+  }
+}
+
+/*
+ * The loop's poll callback: read every answer that has arrived and keep the
+ * rest for the next iteration.
+ */
+static void
+fullscreen_state_read_poll(void* userdata)
+{
+  (void) userdata;
+
+  if (dpy == NULL) {
+    state_read_count = 0;
+  }
+
+  for (size_t i = state_read_count; i-- > 0;) {
+    void*                raw_reply = NULL;
+    xcb_generic_error_t* error     = NULL;
+
+    /* Not the reply-forcing call: this one reports "not yet" instead of
+       waiting, so the loop stays free. */
+    if (!xcb_poll_for_reply(dpy, state_reads[i].cookie.sequence, &raw_reply, &error))
+      continue;
+
+    xcb_window_t window = state_reads[i].window;
+
+    /* Order does not matter in this table: the loop walks it whole. */
+    state_reads[i] = state_reads[state_read_count - 1];
+    state_read_count--;
+
+    if (raw_reply != NULL && error == NULL)
+      fullscreen_sync_from_state_reply(window, raw_reply);
+
+    free(error);
+    free(raw_reply);
+  }
+
+  if (state_read_count == 0 && state_read_polling) {
+    wm_loop_remove_poll_handler(fullscreen_state_read_poll, NULL);
+    state_read_polling = false;
+  }
+}
+
+/*
+ * Ask for a window's _NET_WM_STATE and arrange to read the answer.
+ */
+static bool
+fullscreen_state_read_begin(xcb_window_t window)
+{
+  if (dpy == NULL || ewmh == NULL)
+    return false;
+
+  if (!state_read_polling) {
+    if (!wm_loop_add_poll_handler(fullscreen_state_read_poll, NULL)) {
+      LOG_ERROR("fullscreen: cannot read _NET_WM_STATE, the loop refused the callback");
+      return false;
+    }
+    state_read_polling = true;
+  }
+
+  if (state_read_count == state_read_cap) {
+    size_t               cap   = state_read_cap == 0 ? 4 : state_read_cap * 2;
+    FullscreenStateRead* grown = realloc(state_reads, cap * sizeof *grown);
+    if (grown == NULL) {
+      LOG_ERROR("fullscreen: cannot track the _NET_WM_STATE reply: %s", strerror(errno));
+      return false;
+    }
+    state_reads    = grown;
+    state_read_cap = cap;
+  }
+
+  state_reads[state_read_count].cookie = ewmh_request_wm_state(ewmh, window);
+  state_reads[state_read_count].window = window;
+  state_read_count++;
+  return true;
+}
+
+/*
+ * Drop the reads still in flight. Their replies are never read, so libxcb is
+ * told to throw them away instead of holding them for a caller that is gone.
+ */
+static void
+fullscreen_state_read_shutdown(void)
+{
+  if (dpy != NULL) {
+    for (size_t i = 0; i < state_read_count; i++)
+      xcb_discard_reply(dpy, state_reads[i].cookie.sequence);
+  }
+
+  free(state_reads);
+  state_reads      = NULL;
+  state_read_count = 0;
+  state_read_cap   = 0;
+
+  if (state_read_polling) {
+    wm_loop_remove_poll_handler(fullscreen_state_read_poll, NULL);
+    state_read_polling = false;
+  }
+}
+
+/*
  * PropertyNotify handler for _NET_WM_STATE monitoring
  */
 void
@@ -451,32 +604,13 @@ fullscreen_on_property_notify(void* event)
   if (ewmh == NULL || e->atom != ewmh->_NET_WM_STATE)
     return;
 
-  /* Get client for this window */
-  Client* c = client_get_by_window(e->window);
-  if (c == NULL)
+  /* A window the WM does not manage has no state machine to sync, and asking
+     for its list would cost a round trip nobody reads. */
+  if (client_get_by_window(e->window) == NULL)
     return;
 
-  /* Check if _NET_WM_STATE contains _NET_WM_STATE_FULLSCREEN */
-  bool is_fullscreen = ewmh_check_wm_state_fullscreen(ewmh, c->window);
-
-  /* Get or create the SM (on-demand) */
-  StateMachine* sm = fullscreen_get_sm(c);
-  if (sm == NULL) {
-    LOG_WARN("fullscreen listener: failed to get SM for client window=%u", c->window);
-    return;
-  }
-
-  /* Get current SM state */
-  FullscreenState current = (FullscreenState) sm_get_state(sm);
-
-  /* Sync if different - external change happened */
-  if (is_fullscreen && current == FULLSCREEN_STATE_WINDOWED) {
-    LOG_DEBUG("fullscreen listener: external fullscreen change detected, syncing SM");
-    sm_raw_write(sm, FULLSCREEN_STATE_FULLSCREEN);
-  } else if (!is_fullscreen && current == FULLSCREEN_STATE_FULLSCREEN) {
-    LOG_DEBUG("fullscreen listener: external unfullscreen change detected, syncing SM");
-    sm_raw_write(sm, FULLSCREEN_STATE_WINDOWED);
-  }
+  if (!fullscreen_state_read_begin(e->window))
+    LOG_WARN("fullscreen: could not queue a read of window %u's _NET_WM_STATE", e->window);
 }
 
 /*
@@ -575,6 +709,8 @@ fullscreen_component_shutdown(void)
   sm_unregister_action("fs_action_enter_fullscreen");
   sm_unregister_action("fs_action_exit_fullscreen");
   action_unregister(fullscreen_action.name);
+
+  fullscreen_state_read_shutdown();
 
   /* Free cached template after the clients that reference it are gone */
   if (cached_fullscreen_template != NULL) {

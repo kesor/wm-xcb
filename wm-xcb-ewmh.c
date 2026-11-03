@@ -40,52 +40,48 @@ destruct_ewmh()
 }
 
 /*
- * Check if _NET_WM_STATE contains _NET_WM_STATE_FULLSCREEN for a window.
+ * Ask for the window's _NET_WM_STATE list.
  *
- * Uses xcb_get_property directly to get the raw atom list.
+ * The caller keeps the cookie and reads the reply from the loop's poll
+ * callback: `_NET_WM_STATE` arrives as a PropertyNotify, which says the list
+ * changed but not what it now holds, and reading the reply here would stop the
+ * WM until the server answered.
+ */
+xcb_get_property_cookie_t
+ewmh_request_wm_state(xcb_ewmh_connection_t* ewmh, xcb_window_t window)
+{
+  return xcb_get_property_unchecked(
+      dpy, 0, window, ewmh->_NET_WM_STATE, XCB_GET_PROPERTY_TYPE_ANY, 0, 1024);
+}
+
+/*
+ * Check whether a _NET_WM_STATE reply lists _NET_WM_STATE_FULLSCREEN.
+ *
+ * The reply stays the caller's: it is freed after this returns.
  */
 bool
-ewmh_check_wm_state_fullscreen(xcb_ewmh_connection_t* ewmh, xcb_window_t window)
+ewmh_wm_state_is_fullscreen(xcb_ewmh_connection_t* ewmh, xcb_get_property_reply_t* reply)
 {
-  if (ewmh == NULL)
+  if (ewmh == NULL || reply == NULL)
     return false;
 
-  /* Get the _NET_WM_STATE property directly */
-  xcb_get_property_cookie_t cookie = xcb_get_property_unchecked(
-      dpy, 0, window, ewmh->_NET_WM_STATE, XCB_GET_PROPERTY_TYPE_ANY, 0, 1024);
-
-  xcb_get_property_reply_t* reply = xcb_get_property_reply(dpy, cookie, NULL);
-  if (reply == NULL)
+  /* The list is a CARD32 list of atoms; any other format is not one. */
+  if (reply->format != 32)
     return false;
 
-  /* Check format (should be 32 bits for atoms) */
-  if (reply->format != 32) {
-    free(reply);
-    return false;
-  }
-
-  /* Get length in atoms (format * length / 32 = number of atoms) */
   uint32_t length = xcb_get_property_value_length(reply);
-  if (length == 0) {
-    free(reply);
+  if (length < sizeof(xcb_atom_t))
     return false;
-  }
 
   xcb_atom_t* atoms = (xcb_atom_t*) xcb_get_property_value(reply);
-  if (atoms == NULL) {
-    free(reply);
+  if (atoms == NULL)
     return false;
-  }
 
-  /* Check if _NET_WM_STATE_FULLSCREEN is in the list */
   uint32_t count = length / sizeof(xcb_atom_t);
   for (uint32_t i = 0; i < count; i++) {
-    if (atoms[i] == ewmh->_NET_WM_STATE_FULLSCREEN) {
-      free(reply);
+    if (atoms[i] == ewmh->_NET_WM_STATE_FULLSCREEN)
       return true;
-    }
   }
 
-  free(reply);
   return false;
 }
