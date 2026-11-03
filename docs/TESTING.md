@@ -184,7 +184,6 @@ stricter. The remaining known failures, as of the last refresh:
 
 | Test | Known failure, because |
 |------|-------------------------|
-| `test-50-tag-switch-keybinding` | the unmap a tag change causes also unmanages the client, so it never comes back |
 | `test-60-ewmh-root-properties` | no root properties are set |
 
 Write a test so that it cannot pass for the wrong reason: a precondition such as
@@ -209,6 +208,12 @@ and does nothing when either is unset.
 and an override-redirect window on a bare display, starts the WM afterwards, and
 asserts that the two are tiled and carry `WM_STATE=Normal` while the
 override-redirect window keeps its geometry and gets no `WM_STATE`.
+
+`test-51-burst-tag-switch.sh` uses the suite's WM but stops it with `SIGSTOP`
+while it sends `super+2` and `super+1`, so both key presses are queued and the
+WM dispatches them in one drain. That is the ordering where a hide and a later
+show both run before the `UnmapNotify` the hide causes is read. The test resumes
+the WM on every exit path.
 
 ---
 
