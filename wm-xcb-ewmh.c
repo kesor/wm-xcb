@@ -39,21 +39,6 @@ destruct_ewmh()
   ewmh = NULL;
 }
 
-void
-print_atom_name(xcb_atom_t atom)
-{
-  xcb_get_atom_name_cookie_t cookie = xcb_get_atom_name(dpy, atom);
-  xcb_get_atom_name_reply_t* reply  = xcb_get_atom_name_reply(dpy, cookie, NULL);
-  if (reply == NULL) {
-    LOG_ERROR("Failed to get atom name\n");
-    return;
-  }
-
-  LOG_DEBUG("atom name: %s", xcb_get_atom_name_name(reply));
-
-  free(reply);
-}
-
 /*
  * Check if _NET_WM_STATE contains _NET_WM_STATE_FULLSCREEN for a window.
  *

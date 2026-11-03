@@ -10,7 +10,6 @@ extern xcb_ewmh_connection_t* ewmh;
 
 void setup_ewmh();
 void destruct_ewmh();
-void print_atom_name(xcb_atom_t atom);
 
 /*
  * Check if _NET_WM_STATE contains _NET_WM_STATE_FULLSCREEN for a window.
