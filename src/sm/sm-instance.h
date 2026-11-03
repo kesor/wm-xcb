@@ -107,7 +107,9 @@ void sm_set_emitter(StateMachine* sm, EventEmitter emit, void* emit_userdata);
 
 /*
  * Destroy a StateMachine instance.
- * Frees the instance but not the template (caller manages template).
+ * Frees the instance and drops the reference sm_create() took on the
+ * template. The creator's reference is separate: the caller that created
+ * the template still calls sm_template_destroy().
  */
 void sm_destroy(StateMachine* sm);
 

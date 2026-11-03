@@ -51,6 +51,14 @@ trace_guard_deny(StateMachine* sm, void* data)
   return false;
 }
 
+static bool
+trace_action_fail(StateMachine* sm, void* data)
+{
+  (void) sm;
+  (void) data;
+  return false;
+}
+
 static SMTemplate*
 trace_template(const char* name, SMTransition* rows, uint32_t num_rows)
 {
@@ -173,6 +181,50 @@ test_trace_refused_transition(void)
 }
 
 static void
+test_trace_failed_action_names_the_guard_that_ran(void)
+{
+  LOG_CLEAN("== a failed action records the guard that ran, not a guard that did not");
+
+  /* No guard on the row: the refusal is the action, so the guard label is none. */
+  SMTransition rows[] = {
+    { TRACE_OFF, TRACE_ON, NULL, "trace-fail", TRACE_EVT_ON },
+  };
+  SMTemplate*   tmpl  = trace_template("trace-action", rows, 1);
+  int           owner = 0;
+  StateMachine* sm    = sm_create(&owner, tmpl, trace_emitter, NULL);
+  assert_or_abort(sm != NULL);
+
+  assert(sm_transition(sm, TRACE_ON) == false);
+  assert(sm_get_state(sm) == TRACE_OFF);
+
+  SMTraceEntry entry;
+  assert(sm_trace_snapshot(sm, &entry, 1) == 1);
+  assert(entry.via == SM_VIA_TRANSITION);
+  assert(entry.guard == SM_GUARD_NONE);
+  assert(entry.applied == false);
+  assert(entry.emit_event == 0);
+
+  sm_destroy(sm);
+  sm_template_destroy(tmpl);
+
+  /* A guard that passed, then an action that failed. */
+  SMTransition guarded[] = {
+    { TRACE_OFF, TRACE_ON, "trace-allow", "trace-fail", TRACE_EVT_ON },
+  };
+  tmpl = trace_template("trace-action-guarded", guarded, 1);
+  sm   = sm_create(&owner, tmpl, trace_emitter, NULL);
+  assert_or_abort(sm != NULL);
+
+  assert(sm_transition(sm, TRACE_ON) == false);
+  assert(sm_trace_snapshot(sm, &entry, 1) == 1);
+  assert(entry.guard == SM_GUARD_PASSED);
+  assert(entry.applied == false);
+
+  sm_destroy(sm);
+  sm_template_destroy(tmpl);
+}
+
+static void
 test_trace_ring_wraps(void)
 {
   LOG_CLEAN("== trace keeps the newest entries when the ring is full");
@@ -247,10 +299,12 @@ TEST_GROUP(SMTrace, {
   sm_registry_init();
   sm_register_guard("trace-allow", trace_guard_allow);
   sm_register_guard("trace-deny", trace_guard_deny);
+  sm_register_action("trace-fail", trace_action_fail);
 
   test_trace_raw_write();
   test_trace_transition();
   test_trace_refused_transition();
+  test_trace_failed_action_names_the_guard_that_ran();
   test_trace_ring_wraps();
   test_trace_snapshot_capacity();
 

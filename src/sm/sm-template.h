@@ -130,8 +130,9 @@ SMTemplate* sm_template_create(
  * Compile a template from a table definition and check it.
  *
  * Returns NULL on allocation failure, and on a table that fails
- * sm_template_validate(), with the reason logged. A component then fails to
- * come up instead of running a machine whose states do not line up.
+ * sm_template_validate(), with the reason logged. A caller that checks the
+ * result does not install the broken table. Component init does not check,
+ * so the refusal shows up when the component next tries to create a machine.
  */
 SMTemplate* sm_template_from_def(const SMTemplateDef* def);
 

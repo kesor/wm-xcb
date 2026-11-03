@@ -112,11 +112,6 @@ void tag_manager_component_shutdown(void);
 StateMachine* tag_manager_get_view_sm(Monitor* m);
 
 /*
- * Get the TagViewSM for a monitor.
- * Creates the SM on first access (on-demand allocation).
- */
-
-/*
  * Check if a client is visible based on its tags and the monitor's tag view.
  * A client is visible if any of its tags overlap with the monitor's visible tags.
  */

@@ -387,7 +387,7 @@ kill -USR1 $!                 # the dump follows in /tmp/wm.log
 state machines: 3 live
 monitor 555
   tag-view: state TAGGED
-    entered: EMPTY=0 TAGGED=1
+    entered: EMPTY=1 TAGGED=1
     trace (oldest first, 1 of 8 kept):
       transition EMPTY -> TAGGED  guard none, event 20
 monitor 555
@@ -396,7 +396,7 @@ monitor 555
     trace (oldest first, 0 of 8 kept):
 client 4194304
   focus: state FOCUSED
-    entered: UNFOCUSED=0 FOCUSED=1
+    entered: UNFOCUSED=1 FOCUSED=1
     trace (oldest first, 1 of 8 kept):
       transition UNFOCUSED -> FOCUSED  guard passed, event 31
 ```

@@ -227,10 +227,39 @@ test_dump_reports_an_unregistered_owner(void)
   sm_template_destroy(tmpl);
 }
 
+/* The creator dropping its reference must not free the template out from
+   under a live machine. A dump reads the template; that is the path that
+   faulted when shutdown freed the cache first. */
+static void
+test_dump_after_the_creator_drops_the_template(void)
+{
+  LOG_CLEAN("== a live machine keeps its template after the creator drops it");
+
+  sm_register_guard("dump-allow", dump_guard_allow);
+
+  SMTemplate* tmpl = dump_template("kept-alive");
+  assert_or_abort(tmpl != NULL);
+
+  int           owner = 0;
+  StateMachine* sm    = sm_create(&owner, tmpl, dump_emitter, NULL);
+  assert_or_abort(sm != NULL);
+
+  sm_template_destroy(tmpl);
+
+  assert(sm_transition(sm, DUMP_BUSY) == true);
+
+  char text[2048];
+  assert_or_abort(capture_dump(text, sizeof(text)));
+  assert(strstr(text, "kept-alive: state BUSY") != NULL);
+
+  sm_destroy(sm);
+}
+
 TEST_GROUP(SMDebug, {
   sm_registry_init();
 
   test_dump_reports_the_live_count();
+  test_dump_after_the_creator_drops_the_template();
   test_dump_reports_owner_state_counts_and_trace();
   test_dump_lists_only_live_machines();
   test_dump_reports_an_unregistered_owner();

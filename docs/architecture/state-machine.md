@@ -1,7 +1,7 @@
 # State Machine Framework
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-30*
+*Last updated: 2026-11-03*
 
 > **💡 Paradigm Shift:** State machines are the only authority on state mutations. No direct manipulation. No hidden state. Every state change goes through a SM with guards and events.
 
@@ -51,27 +51,8 @@ These are independent SMs. A client can be simultaneously:
 
 ## SM Instance Structure
 
-```c
-typedef struct StateMachine {
-    const char* name;
-    
-    // Current state
-    uint32_t current_state;
-    
-    // Owner
-    Target* owner;  // the client/monitor this SM belongs to
-    
-    // Template reference
-    SMTemplate* template;
-    
-    // Hooks for components (optional)
-    Hook* pre_guards;      // executed before guard
-    Hook* post_actions;    // executed after action
-    
-    // Instance-specific data (from template)
-    void* data;
-} StateMachine;
-```
+The fields are `struct StateMachine` in `src/sm/sm-instance.h`. This document
+does not keep a second copy of that struct.
 
 ### Trace
 
@@ -176,122 +157,56 @@ review of a template change is for (`.agents/skills/wm-review/SKILL.md`).
 
 ## State Machine Operations
 
+The implementation is `src/sm/sm-instance.c`. The notes here are the parts a
+sketch gets wrong; they are not a second copy of the functions.
+
 ### Create
-```c
-StateMachine* sm_create(void* owner, SMTemplate* template,
-                        EventEmitter emit, void* emit_userdata) {
-    StateMachine* sm = malloc(sizeof(StateMachine));
-    sm->name = template->name;
-    sm->owner = owner;
-    sm->template = template;
-    sm->current_state = template->initial_state;
-    sm->data = NULL;
 
-    // Emit callback is required - owner must connect SM to hub
-    sm->emit = emit;
-
-    return sm;
-}
-```
+`sm_create()` sets the state to the template's initial state, retains the
+template, and counts that initial state as entered. `emit` may be NULL. A
+transition then calls `hub_emit` with the row's event and `TARGET_ID_NONE`.
 
 ### Raw Write (for listeners/authoritative events)
-```c
-// Used by listeners when reality changes
-void sm_raw_write(StateMachine* sm, uint32_t new_state) {
-    uint32_t old_state = sm->current_state;
 
-    // No guard - reality is authoritative. The row from the old state to the
-    // new one names the event; a pair the table does not declare emits
-    // nothing.
-    sm->current_state = new_state;
-    const SMTransition* row = sm_template_find_transition(sm->template, old_state, new_state);
-    sm_emit_event(sm, old_state, new_state, row ? row->emit_event : 0);
-}
-```
+`sm_raw_write()` sets the state with no guard. If the table has a row from the
+old state to the new one, that row's event is emitted. A pair the table does
+not declare emits nothing. The trace records a raw write with guard `none`.
 
 ### Transition (for requests)
-```c
-bool sm_transition(StateMachine* sm, uint32_t target_state) {
-    // Find transition from current_state → target_state
-    const SMTransition* t = sm_template_find_transition(sm->template, sm->current_state, target_state);
-    if (!t) return false;  // no valid transition
-    
-    // Run guards (if any)
-    if (t->guard_fn && !sm_run_guard(sm, t->guard_fn)) {
-        return false;  // guard rejected
-    }
-    
-    // Run pre-hooks
-    sm_run_hooks(sm, HOOK_PRE_GUARD);
-    
-    // Execute action
-    if (t->action_fn) {
-        sm_run_action(sm, t->action_fn);
-    }
-    
-    // Update state
-    sm->current_state = target_state;
-    
-    // Run post-hooks
-    sm_run_hooks(sm, HOOK_POST_ACTION);
-    
-    // Emit event
-    sm_emit_event(sm, old_state, target_state, t->emit_event);
 
-    return true;
-}
-```
+`sm_transition()` looks up the row from the current state to the requested
+state.
+
+- No row: the trace records a refusal (`guard none`, not applied) and the call
+  returns false. The state does not change.
+- `SM_HOOK_PRE_GUARD` runs before the guard. A guard that returns false records
+  `guard rejected` and returns false. It does not run the later hook phases.
+- An action that returns false leaves the state unchanged. The trace says the
+  guard passed only when the row named a guard.
+- On success the state changes, the trace records the row's event, and that
+  event is emitted. `SM_HOOK_POST_ACTION` runs after the state change and
+  before the emit.
 
 ### Query Available Transitions
-```c
-// For UI/debugging: what can I request from here?
-uint32_t* sm_get_available_transitions(StateMachine* sm, uint32_t* count) {
-    *count = 0;
-    uint32_t* states = malloc(sizeof(uint32_t) * sm->template->num_transitions);
-    
-    for (uint32_t i = 0; i < sm->template->num_transitions; i++) {
-        if (sm->template->transitions[i].from_state == sm->current_state) {
-            states[(*count)++] = sm->template->transitions[i].to_state;
-        }
-    }
-    
-    return states;  // caller frees
-}
 
-// Check if a specific transition is valid
-bool sm_can_transition(StateMachine* sm, uint32_t target_state) {
-    // Check guard (without running it)
-    // Return whether transition exists and would pass guard
-}
-```
+`sm_get_available_transitions()` returns the target states of rows that leave
+the current state. The caller frees the array. `sm_can_transition()` reports
+whether such a row exists. It does not run the guard.
 
 ---
 
 ## Built-in State Machines
 
-### Client State Machines
+These are the templates the tree ships. A name that is not in this table is
+not a machine yet.
 
-| SM | States | Component |
-|----|--------|-----------|
-| FullscreenSM | WINDOWED ↔ FULLSCREEN | fullscreen |
-| FloatingSM | TILED ↔ FLOATING | floating |
-| UrgencySM | CALM ↔ URGENT | urgency |
-| FocusSM | UNFOCUSED ↔ FOCUSED | focus (managed clients only) |
-
-### Monitor State Machines
-
-| SM | States | Component |
-|----|--------|-----------|
-| ConnectionSM | CONNECTED ↔ DISCONNECTED | connection |
-| ResolutionSM | RES_* (one per mode) | resolution |
-| SelectedSM | SEL_1 ↔ SEL_N (selected monitor) | (system, no component) |
-
-### Global State Machines
-
-| SM | States | Component |
-|----|--------|-----------|
-| TagViewSM | TAGS_* (bitmask of visible tags) | (system) |
-| LayoutSM | LAYOUT_* (current layout per monitor) | (system) |
+| SM | States | Lives on | Component |
+|----|--------|----------|-----------|
+| focus | UNFOCUSED, FOCUSED | Client | focus |
+| fullscreen | WINDOWED, FULLSCREEN | Client | fullscreen |
+| tag-view | EMPTY, TAGGED | Monitor | tag-manager |
+| layout | TILE | Monitor | tiling |
+| connection | DISCONNECTED, CONNECTED | no instance | connection-sm (template only) |
 
 ---
 
@@ -345,60 +260,22 @@ bool fs_guard_can_unfullscreen(StateMachine* sm, void* data) {
 
 ## Hooks (for Plugins)
 
-Plugins can attach hooks to run before/after SM operations:
+`sm_add_hook()` attaches an observer to one `SMHookPhase` (`src/sm/sm-instance.h`).
+Hooks may log or update a cache. A guard is the place that refuses a transition;
+a hook is not a second guard.
 
-```c
-typedef enum HookPhase {
-    HOOK_PRE_GUARD,
-    HOOK_POST_GUARD,
-    HOOK_PRE_ACTION,
-    HOOK_POST_ACTION,
-    HOOK_PRE_EMIT,
-    HOOK_POST_EMIT,
-} HookPhase;
-
-typedef void (*HookFn)(StateMachine* sm, void* userdata);
-
-void sm_add_hook(StateMachine* sm, HookPhase phase, HookFn fn, void* userdata) {
-    // Add to sm->hooks[phase]
-}
-```
-
-**Use cases:**
-- Plugin wants to log all fullscreen transitions
-- Plugin wants to add a custom guard (e.g., "don't fullscreen if video is playing")
-- Plugin wants to trigger UI update on state change
+The phases, in the order `sm_transition()` runs them on a successful change, are
+`SM_HOOK_PRE_GUARD`, `SM_HOOK_POST_GUARD`, `SM_HOOK_PRE_ACTION`,
+`SM_HOOK_POST_ACTION`, `SM_HOOK_PRE_EMIT`, `SM_HOOK_POST_EMIT`.
 
 ---
 
 ## Memory Management
 
-**SM lives on target:**
-```c
-struct Client {
-    // ... properties ...
-    
-    StateMachine* sm_fullscreen;
-    StateMachine* sm_floating;
-    StateMachine* sm_urgency;
-    // ...
-};
-```
-
-**On-demand allocation:**
-
-Targets decide when to allocate SMs. Call `sm_create()` when the SM is first needed (e.g., on first request), not at target creation time. The SM stays allocated for the lifetime of the target.
-
-**Target destruction:**
-```c
-void client_destroy(Client* c) {
-    sm_destroy(c->sm_fullscreen);
-    sm_destroy(c->sm_floating);
-    sm_destroy(c->sm_urgency);
-    // ... free other resources
-    free(c);
-}
-```
+A machine is stored on its target by name (`client_set_sm()`,
+`monitor_set_sm()`), not as a field named after the machine. The component
+creates it on first use and the target frees it in `client_destroy()` or
+`monitor_destroy()`.
 
 ---
 

@@ -340,6 +340,22 @@ has_word(const char* text, const char* word)
   return false;
 }
 
+/* First occurrence of `word` as a whole word at or after `text`, or NULL. */
+static const char*
+word_at(const char* text, const char* word)
+{
+  size_t length = strlen(word);
+
+  for (const char* found = strstr(text, word); found != NULL; found = strstr(found + 1, word)) {
+    bool starts = found == text || !(isalnum((unsigned char) found[-1]) || found[-1] == '_');
+    bool ends   = !(isalnum((unsigned char) found[length]) || found[length] == '_');
+    if (starts && ends)
+      return found;
+  }
+
+  return NULL;
+}
+
 static bool
 line_draws_row(const char* line, size_t length, const char* from, const char* to)
 {
@@ -350,13 +366,18 @@ line_draws_row(const char* line, size_t length, const char* from, const char* to
   memcpy(buffer, line, length);
   buffer[length] = '\0';
 
-  if (!has_word(buffer, from) || !has_word(buffer, to))
+  /* The row is the state it leaves, then an arrow, then the state it enters.
+     A self-loop needs both sides: a line that names the state once is not
+     that row. */
+  const char* from_at = word_at(buffer, from);
+  if (from_at == NULL)
     return false;
 
-  /* Direction matters: the row is the state it leaves, then the state it
-     enters. A diagram that has them the other way is about another row. A row
-     that stays in its state has one position, so the comparison includes it. */
-  return strstr(buffer, from) <= strstr(buffer, to);
+  const char* arrow = strstr(from_at + strlen(from), "->");
+  if (arrow == NULL)
+    return false;
+
+  return word_at(arrow + 2, to) != NULL;
 }
 
 static bool
@@ -375,6 +396,20 @@ diagram_draws_row(const char* block, const char* from, const char* to)
   }
 
   return false;
+}
+
+static void
+test_diagram_self_loop_needs_its_own_line(void)
+{
+  LOG_CLEAN("== a self-loop is not drawn by a line that names the state once");
+
+  const char* other = "  TAGGED -> EMPTY    event EVT_TAG_CHANGED";
+  assert(line_draws_row(other, strlen(other), "TAGGED", "TAGGED") == false);
+  assert(line_draws_row(other, strlen(other), "TAGGED", "EMPTY") == true);
+  assert(line_draws_row(other, strlen(other), "EMPTY", "TAGGED") == false);
+
+  const char* self = "  TAGGED -> TAGGED   event EVT_TAG_CHANGED";
+  assert(line_draws_row(self, strlen(self), "TAGGED", "TAGGED") == true);
 }
 
 static void
@@ -629,6 +664,7 @@ TEST_GROUP(SMTemplates, {
   test_validate_rejects_a_silent_transition();
   test_validate_rejects_an_undeclared_state();
   test_validate_rejects_an_undeclared_initial_state();
+  test_diagram_self_loop_needs_its_own_line();
 
   test_shipped_templates_are_valid();
 

@@ -238,7 +238,7 @@ needs a person:
 
 | Rule | Check |
 |------|-------|
-| 3, transitions are declared | `sm_template_validate()` refuses a row that names a state the table does not declare, and a declared state the initial state cannot reach. `sm_template_from_def()` applies it, so a component cannot come up on a broken table |
+| 3, transitions are declared | `sm_template_validate()` refuses a row that names a state the table does not declare, and a declared state the initial state cannot reach. `sm_template_from_def()` returns NULL for that table. The unit test fails the build; component init does not check the NULL, and the next create then makes no machine |
 | 6, one event per transition | the same validation refuses a row with `emit_event == 0`; `tests/unit/test-sm-templates.c` then drives every declared row of every machine and asserts the event that reaches the hub is the one the row names |
 | 10, every template ships its diagram | `tests/unit/test-sm-templates.c` reads the diagram out of the header and fails when it and the table disagree about a state or a row. Whether a line names the right guard and event is review |
 | the dump below | `kill -USR1 <wm pid>` prints every live machine with its last eight changes, `src/sm/sm-debug.c`; `tests/x/test-15-state-dump.sh` asserts it against a running WM |

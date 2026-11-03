@@ -366,8 +366,11 @@ sm_transition(StateMachine* sm, uint32_t target_state)
   if (t->action_fn != NULL) {
     if (!sm_run_action(sm, t->action_fn, sm->data)) {
       LOG_ERROR("sm_transition: action '%s' failed for %s", t->action_fn, sm->name);
+      /* Same label as the success path: a row with no guard did not pass one. */
       sm_trace_record(sm, sm->current_state, target_state, 0,
-                      SM_VIA_TRANSITION, SM_GUARD_PASSED, false);
+                      SM_VIA_TRANSITION,
+                      t->guard_fn != NULL ? SM_GUARD_PASSED : SM_GUARD_NONE,
+                      false);
       return false;
     }
     LOG_DEBUG("sm_transition: executed action '%s' for %s", t->action_fn, sm->name);
