@@ -7,6 +7,12 @@
 # The press and the motion are sent as separate xdotool commands with a pause
 # between them, so the server delivers a press and then several motion events
 # rather than one jump.
+#
+# The client it drags is tiled, because nothing floats yet and this is the whole
+# of the pointer promise today. dwm's movemouse moves a tiled client the same
+# way and the next layout puts it back, which is what the assertion here reads.
+# A pointer component that moves only floating clients has to change this test
+# to float the client first, not to weaken the assertion.
 source "$(dirname "$0")/lib.sh"
 
 DRAG_X=120
