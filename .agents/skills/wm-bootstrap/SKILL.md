@@ -72,18 +72,13 @@ For testing mechanics, `docs/TESTING.md`. For the gate list, `docs/QUALITY.md`.
 4. **New behaviour is a registration, not an edit.** If a feature must edit a
    file it does not own, that file is missing an extension point; add it first.
 
-| Gate | Command | Enforces |
-|------|---------|----------|
-| build | `make` | it compiles |
-| unit | `scripts/check-unit.sh` | the unit suite in the variant `DEBUG` and `SANITIZE` name; the pass line names it, and the log is printed only when the run fails |
-| seam | `make test-x` | what X sees: mapped, tiled, focused, tags, EWMH; a failure missing from `tests/quality/seam-baseline.txt` fails the run |
-| async | `make check-async` | no new blocking call (baseline in `tests/quality/`) |
-| paths | `scripts/check-paths.sh` | no home directory or personal source tree in a public repo |
-| format | `scripts/format-check.sh` | clang-format clean; `make format` fixes |
-| commit-msg | `scripts/check-commit-msg.sh` | no AI attribution trailers |
-| debug | `make clean && make DEBUG=1 && DEBUG=1 scripts/check-unit.sh` | the `-pedantic` build stays green, and its suite reports the assertion that failed |
+docs/QUALITY.md is the gate list: one row per gate, the command, and what it
+enforces. This file does not repeat it. A second copy drifts, and the copy a
+session reads first is the one that sends it to a command that no longer exists -
+that is how the row here still said `make test` a commit after the hook switched
+to `scripts/check-unit.sh`.
 
-The hooks in `.githooks/` run these; CI runs the same commands.
+
 
 `make test-x` does not fail by design. `tests/x/run.sh` compares the failures it
 saw against `tests/quality/seam-baseline.txt`: an assertion listed there is
