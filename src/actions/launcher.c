@@ -181,10 +181,12 @@ launcher_set_dmenu_config(LauncherDmenuConfig config)
  * Action callback for launching applications via dmenu.
  *
  * Starts dmenu and returns. The selection arrives through the event loop, so
- * the WM keeps handling keys while the prompt is open.
+ * the loop keeps running while the prompt is open. dmenu holds the keyboard
+ * grab for that time, so keys reach it rather than the WM.
  *
  * @param inv  Action invocation (target not used for this action)
- * @return     true when dmenu was started, false when it could not be
+ * @return     true when dmenu was started, false when it could not be started
+ *             or a prompt is already open
  */
 bool
 launcher_action_launch(ActionInvocation* inv)
