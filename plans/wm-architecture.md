@@ -456,7 +456,7 @@ Not in initial scope. See `./docs/extensions/` for specifications.
 
 ### Test Patterns
 
-- Unit tests with assertions (similar to existing `test-wm-window-list.c`)
+- Unit tests with assertions, registered through `TEST_GROUP` in `tests/unit/test-registry.h` and listed in `TEST_SRC` in the `Makefile` (a file missing from that list compiles nowhere)
 - Mock hub/SM for isolation testing
 - Integration tests: request → component → SM → event
 
