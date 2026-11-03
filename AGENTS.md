@@ -141,7 +141,7 @@ One bead per branch is the usual case, named `work/<bead-id>`. Several beads
 share a branch when they touch the same files: the branch is named for the first
 id, and the prompt names them all. How a worker is spawned, and what
 it may run, is `.agents/skills/wm-bootstrap/SKILL.md`, "Spawning workers". That
-harness (`worker.sh`) is not part of this repository.
+harness (`worker.py`) is not part of this repository.
 
 A worker never pushes, merges, or closes its own bead. The commits stay on
 `work/<bead-id>`, and a review decides what happens to them: see
@@ -518,7 +518,7 @@ Worktrees contain agent progress. Before removing or cleaning:
 ### Overlapping Beads
 
 Two beads that touch the same files conflict, whichever branch lands second.
-Run one bead per worker, in parallel, and let `worker.sh overlap <id> <id>`
+Run one bead per worker, in parallel, and let `worker.py overlap <id> <id>`
 decide what parallel means: it reads each bead's description and comments for
 file paths. Nothing shared, run them together; shared, run them in order.
 
