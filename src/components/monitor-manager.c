@@ -4,8 +4,8 @@
  * Handles display detection via RandR.
  * - Registers XCB handler for RANDR_NOTIFY events
  * - Creates/destroys Monitor targets based on output connect/disconnect
- * - Reads the geometry with a pass of unchecked queries whose replies the loop
- *   reads when they arrive; only the startup discovery waits
+ * - Reads the geometry with a pass of queries whose replies the loop reads when
+ *   they arrive; only the startup discovery waits
  */
 
 #include <errno.h>
@@ -270,7 +270,10 @@ monitor_manager_apply_crtc_geometry(xcb_randr_crtc_t crtc, int16_t x, int16_t y,
  * drives. Each answer is a reply, which the loop does not deliver as an event,
  * so the pass keeps its place here and the loop's poll callback advances it one
  * step per iteration. A reply that has not arrived leaves the pass where it is;
- * nothing in the chain waits.
+ * nothing in the chain waits. A RandR notify that arrives mid-pass drops the
+ * pass and, when the change still needs a read, starts a fresh one: applying the
+ * old reply would recreate a disconnected output or overwrite a CRTC geometry
+ * the event already carried.
  */
 typedef enum MonitorPass {
   MONITOR_PASS_NONE = 0,
@@ -289,7 +292,6 @@ static struct {
   int                                     output_index;
   xcb_randr_output_t                      output;
   xcb_timestamp_t                         timestamp;
-  bool                                    again;   /* a change arrived while this pass ran */
   bool                                    polling; /* registered with the loop */
 } randr_pass;
 
@@ -323,23 +325,12 @@ monitor_manager_pass_issue_output(int index)
 }
 
 /*
- * End of the pass, or the next output in it. A change that arrived while the
- * pass ran starts a fresh one: the list it walked is the one from before the
- * change.
+ * End of the pass, or the next output in it.
  */
 static void
 monitor_manager_pass_finish(void)
 {
-  bool again = randr_pass.again;
-
   monitor_manager_pass_free_outputs();
-  randr_pass.again = false;
-
-  if (again) {
-    (void) monitor_manager_pass_begin();
-    return;
-  }
-
   monitor_manager_pass_remove_poll();
 }
 
@@ -352,37 +343,6 @@ monitor_manager_pass_next_output(void)
   }
 
   monitor_manager_pass_finish();
-}
-
-/*
- * Start a pass, or ask the one in flight to run again when it is done.
- *
- * One pass at a time: a second list would be read while the first is still
- * being walked, and the replies of the two would be crossed.
- */
-static bool
-monitor_manager_pass_begin(void)
-{
-  if (dpy == NULL || root == XCB_NONE)
-    return false;
-
-  if (randr_pass.pass != MONITOR_PASS_NONE) {
-    randr_pass.again = true;
-    return true;
-  }
-
-  if (!randr_pass.polling) {
-    if (!wm_loop_add_poll_handler(monitor_manager_pass_poll, NULL)) {
-      LOG_ERROR("Monitor manager: cannot read RandR, the loop refused the callback");
-      return false;
-    }
-    randr_pass.polling = true;
-  }
-
-  randr_pass.timestamp = XCB_CURRENT_TIME;
-  randr_pass.resources = xcb_randr_get_screen_resources(dpy, root);
-  randr_pass.pass      = MONITOR_PASS_RESOURCES;
-  return true;
 }
 
 /*
@@ -408,9 +368,35 @@ monitor_manager_pass_abort(void)
     }
   }
 
-  randr_pass.again = false;
   monitor_manager_pass_free_outputs();
   monitor_manager_pass_remove_poll();
+}
+
+/*
+ * Start a pass. One at a time: a pass already in flight is dropped first, so its
+ * reply (which describes the display before this change) is never applied.
+ */
+static bool
+monitor_manager_pass_begin(void)
+{
+  if (dpy == NULL || root == XCB_NONE)
+    return false;
+
+  if (randr_pass.pass != MONITOR_PASS_NONE)
+    monitor_manager_pass_abort();
+
+  if (!randr_pass.polling) {
+    if (!wm_loop_add_poll_handler(monitor_manager_pass_poll, NULL)) {
+      LOG_ERROR("Monitor manager: cannot read RandR, the loop refused the callback");
+      return false;
+    }
+    randr_pass.polling = true;
+  }
+
+  randr_pass.timestamp = XCB_CURRENT_TIME;
+  randr_pass.resources = xcb_randr_get_screen_resources(dpy, root);
+  randr_pass.pass      = MONITOR_PASS_RESOURCES;
+  return true;
 }
 
 /*
@@ -530,8 +516,12 @@ monitor_manager_handle_randr_notify(void* event)
               oc->output, oc->crtc, oc->connection);
 
     if (oc->connection == XCB_RANDR_CONNECTION_DISCONNECTED) {
-      /* Output disconnected - destroy monitor */
+      /* The event is enough to unmanage the output. Drop any pass that still
+         holds a connected reply for it, or apply_output_info would create the
+         monitor again. */
       monitor_manager_destroy_for_output(oc->output);
+      if (randr_pass.pass != MONITOR_PASS_NONE)
+        monitor_manager_pass_abort();
     } else if (oc->connection == XCB_RANDR_CONNECTION_CONNECTED) {
       /* The monitor exists as soon as the event says the output is there; the
          geometry comes with the pass, one round trip later. */
@@ -548,7 +538,11 @@ monitor_manager_handle_randr_notify(void* event)
     LOG_DEBUG("Monitor manager: CRTC change - crtc=%u, mode=%u, x=%d y=%d %ux%u",
               cc->crtc, cc->mode, cc->x, cc->y, cc->width, cc->height);
 
+    /* The event carries the new geometry. Drop a pass whose CRTC reply still
+       holds the old one, or apply_crtc_info would write it back. */
     monitor_manager_apply_crtc_geometry(cc->crtc, cc->x, cc->y, cc->width, cc->height);
+    if (randr_pass.pass != MONITOR_PASS_NONE)
+      monitor_manager_pass_abort();
     break;
   }
 
