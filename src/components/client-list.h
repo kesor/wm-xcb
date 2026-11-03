@@ -134,7 +134,9 @@ void client_list_on_map_request(void* event);
 
 /*
  * Handle XCB_UNMAP_NOTIFY event.
- * Unmanages the window (removes from client list) if managed.
+ * An unmap the WM asked for in client_hide() leaves the client managed; an
+ * unmap the WM did not ask for is a withdrawal: unmanage, WM_STATE=Withdrawn,
+ * EVT_CLIENT_UNMANAGED.
  */
 void client_list_on_unmap_notify(void* event);
 
