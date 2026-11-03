@@ -40,46 +40,22 @@ guard_connect_allowed(StateMachine* sm, void* data)
 SMTemplate*
 connection_sm_template_create(void)
 {
-  /* Define states */
-  static uint32_t states[] = {
-    CONNECTION_STATE_DISCONNECTED,
-    CONNECTION_STATE_CONNECTED,
+  static const SMStateName states[] = {
+    { CONNECTION_STATE_DISCONNECTED, "DISCONNECTED" },
+    { CONNECTION_STATE_CONNECTED,    "CONNECTED"    },
   };
 
-  /* Define transitions:
-   * CONNECTED → DISCONNECTED (on output disconnect)
-   * DISCONNECTED → CONNECTED (on output reconnect)
-   *
-   * Note: guard_fn is set to NULL since we always allow these transitions.
-   * The SM registry's sm_run_guard() returns true for NULL guards (failsafe).
-   * If guards are needed later, register them with sm_register_guard().
-   */
-  static SMTransition transitions[] = {
-    {
-     .from_state = CONNECTION_STATE_CONNECTED,
-     .to_state   = CONNECTION_STATE_DISCONNECTED,
-     .guard_fn   = NULL,                          /* always allowed */
-        .action_fn  = NULL,
-     .emit_event = EVT_MONITOR_DISCONNECTED,
-     },
-    {
-     .from_state = CONNECTION_STATE_DISCONNECTED,
-     .to_state   = CONNECTION_STATE_CONNECTED,
-     .guard_fn   = NULL, /* always allowed */
-        .action_fn  = NULL,
-     .emit_event = EVT_MONITOR_CONNECTED,
-     },
+  /* No guard: a monitor is connected because RandR said so, and disconnected
+     because the output went away. Either can happen at any time. */
+  static const SMTransition rows[] = {
+    { CONNECTION_STATE_CONNECTED,    CONNECTION_STATE_DISCONNECTED, NULL, NULL, EVT_MONITOR_DISCONNECTED },
+    { CONNECTION_STATE_DISCONNECTED, CONNECTION_STATE_CONNECTED,    NULL, NULL, EVT_MONITOR_CONNECTED    },
   };
 
-  /* Create template */
-  SMTemplate* tmpl = sm_template_create(
-      "connection",
-      states,
-      2, /* num_states */
-      transitions,
-      2, /* num_transitions */
-      CONNECTION_STATE_DISCONNECTED /* initial_state */);
+  static const SMTemplateDef def =
+      SM_TEMPLATE_DEF("connection", CONNECTION_STATE_DISCONNECTED, states, rows);
 
+  SMTemplate* tmpl = sm_template_from_def(&def);
   if (tmpl == NULL) {
     LOG_ERROR("Failed to create connection state machine template");
     return NULL;

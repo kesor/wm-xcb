@@ -99,28 +99,56 @@ shutdown cannot leave a live machine pointing at freed memory.
 
 ## SM Template Structure
 
+A template is two tables and the state the machine starts in. The counts come
+from the tables (`SM_TABLE_COUNT`), so adding a row is one edit and not three.
+
 ```c
-typedef struct SMTemplate {
-    const char* name;
-    
-    // States
-    uint32_t* states;
-    uint32_t num_states;
-    
-    // Transitions: from → to with guard + action
-    Transition {
-        uint32_t from_state;
-        uint32_t to_state;
-        const char* guard_fn;   // name of guard function
-        const char* action_fn;  // name of action function
-        EventType emit_on_transition;
-    }* transitions;
-    uint32_t num_transitions;
-    
-    // Initial state (default)
-    uint32_t initial_state;
-} SMTemplate;
+typedef struct SMStateName { uint32_t value; const char* name; } SMStateName;
+typedef struct SMTransition {
+    uint32_t from_state;
+    uint32_t to_state;
+    const char* guard_fn;   // name of guard function, or NULL
+    const char* action_fn;  // name of action function, or NULL
+    uint32_t emit_event;    // the event subscribers hear about this change
+} SMTransition;
+
+typedef struct SMTemplateDef {
+    const char*         name;
+    uint32_t            initial_state;
+    const SMStateName*  states;
+    uint32_t            num_states;
+    const SMTransition* rows;
+    uint32_t            num_rows;
+} SMTemplateDef;
 ```
+
+A template reads as a table, and the state names are the words its diagram uses:
+
+```c
+static const SMStateName states[] = {
+  { FOCUS_STATE_UNFOCUSED, "UNFOCUSED" },
+  { FOCUS_STATE_FOCUSED,   "FOCUSED"   },
+};
+static const SMTransition rows[] = {
+  { FOCUS_STATE_UNFOCUSED, FOCUS_STATE_FOCUSED, "focus_guard_can_focus", NULL, EVT_CLIENT_FOCUSED   },
+  { FOCUS_STATE_FOCUSED, FOCUS_STATE_UNFOCUSED, "focus_guard_can_unfocus", NULL, EVT_CLIENT_UNFOCUSED },
+};
+static const SMTemplateDef def =
+    SM_TEMPLATE_DEF("focus", FOCUS_STATE_UNFOCUSED, states, rows);
+```
+
+`sm_template_from_def()` compiles that and validates it: the initial state and
+both ends of every row must be declared, every row must emit an event, and every
+declared state must be reachable from the initial state. A table that fails is
+logged and the component does not come up on it. `sm_template_validate()` is the
+check, and `tests/unit/test-sm-templates.c` holds the shipped templates to it.
+
+A machine with one state and no transitions uses `SM_TEMPLATE_DEF_STATES()`: a
+zero-length row table is a GNU extension the `-pedantic` build rejects.
+
+`sm_template_create()` remains the constructor the macros compile to. It does
+not check the table, because the framework's own tests build machines the
+contract forbids on purpose.
 
 ---
 
@@ -128,7 +156,8 @@ typedef struct SMTemplate {
 
 ### Create
 ```c
-StateMachine* sm_create(void* owner, SMTemplate* template, EventEmitter emit) {
+StateMachine* sm_create(void* owner, SMTemplate* template,
+                        EventEmitter emit, void* emit_userdata) {
     StateMachine* sm = malloc(sizeof(StateMachine));
     sm->name = template->name;
     sm->owner = owner;
@@ -241,60 +270,33 @@ bool sm_can_transition(StateMachine* sm, uint32_t target_state) {
 
 ## Example: Fullscreen Component's SM Template
 
+```
+WINDOWED <-> FULLSCREEN
+```
+
 ```c
-// States
-enum {
-    FS_WINDOWED = 0,
-    FS_FULLSCREEN,
+static const SMStateName states[] = {
+  { FULLSCREEN_STATE_WINDOWED,   "WINDOWED"   },
+  { FULLSCREEN_STATE_FULLSCREEN, "FULLSCREEN" },
 };
 
-// Transitions
-static Transition fs_transitions[] = {
-    {
-        .from = FS_WINDOWED,
-        .to = FS_FULLSCREEN,
-        .guard_fn = "fs_guard_can_fullscreen",
-        .action_fn = "fs_action_enter_fullscreen",
-        .emit = EVT_FULLSCREEN_ENTERED,
-    },
-    {
-        .from = FS_FULLSCREEN,
-        .to = FS_WINDOWED,
-        .guard_fn = "fs_guard_can_unfullscreen",
-        .action_fn = "fs_action_exit_fullscreen",
-        .emit = EVT_FULLSCREEN_EXITED,
-    },
+static const SMTransition rows[] = {
+  { FULLSCREEN_STATE_WINDOWED,   FULLSCREEN_STATE_FULLSCREEN, "fs_guard_can_fullscreen",   "fs_action_enter_fullscreen", EVT_FULLSCREEN_ENTERED },
+  { FULLSCREEN_STATE_FULLSCREEN, FULLSCREEN_STATE_WINDOWED,   "fs_guard_can_unfullscreen", "fs_action_exit_fullscreen",  EVT_FULLSCREEN_EXITED  },
 };
 
-// Template
-SMTemplate fullscreen_template = {
-    .name = "client-fullscreen",
-    .states = (uint32_t[]){ FS_WINDOWED, FS_FULLSCREEN },
-    .num_states = 2,
-    .transitions = fs_transitions,
-    .num_transitions = 2,
-    .initial_state = FS_WINDOWED,
-};
+static const SMTemplateDef def =
+    SM_TEMPLATE_DEF("fullscreen", FULLSCREEN_STATE_WINDOWED, states, rows);
 
-// Guard functions
+// Guards decide whether a request is allowed. The X changes are made by the
+// component's executor, not here.
 bool fs_guard_can_fullscreen(StateMachine* sm, void* data) {
-    Client* c = (Client*)sm->owner;
-    // Can always fullscreen a managed client
-    return c->managed;
+  Client* c = (Client*) sm->owner;
+  return c->managed;
 }
 
 bool fs_guard_can_unfullscreen(StateMachine* sm, void* data) {
-    return true;  // Can always unfullscreen
-}
-
-// Action functions (for transitions triggered by requests)
-void fs_action_enter_fullscreen(StateMachine* sm, void* data) {
-    // Actions are handled by executor, not here
-    // This is only for pure SM-side effects if needed
-}
-
-void fs_action_exit_fullscreen(StateMachine* sm, void* data) {
-    // Actions are handled by executor, not here
+  return true;
 }
 ```
 
@@ -385,63 +387,17 @@ If multi-threaded in future:
 
 ## Header: sm.h
 
-```c
-#ifndef SM_H
-#define SM_H
+The declarations are in `src/sm/sm.h` and the files it includes; this document
+does not keep a second copy, because two copies drift and the one in the header
+is the one that compiles.
 
-#include <stdint.h>
-#include <stdbool.h>
-
-// Forward declarations
-typedef struct StateMachine StateMachine;
-typedef struct Target Target;
-typedef struct Event Event;
-
-// State machine instance
-struct StateMachine {
-    const char* name;
-    uint32_t current_state;
-    Target* owner;
-    
-    struct SMTemplate* template;
-    
-    struct Hook* hooks[HOOK_MAX];
-    void* data;
-};
-
-// Operations
-StateMachine* sm_create(Target* owner, struct SMTemplate* tmpl);
-void sm_destroy(StateMachine* sm);
-
-void sm_raw_write(StateMachine* sm, uint32_t new_state);
-bool sm_transition(StateMachine* sm, uint32_t target_state);
-uint32_t sm_get_state(StateMachine* sm);
-
-// Query
-bool sm_can_transition(StateMachine* sm, uint32_t target_state);
-uint32_t* sm_get_available_transitions(StateMachine* sm, uint32_t* count);
-
-// Hooks
-typedef enum HookPhase {
-    HOOK_PRE_GUARD,
-    HOOK_POST_GUARD,
-    HOOK_PRE_ACTION,
-    HOOK_POST_ACTION,
-    HOOK_PRE_EMIT,
-    HOOK_POST_EMIT,
-    HOOK_MAX,
-} HookPhase;
-
-typedef void (*HookFn)(StateMachine* sm, void* userdata);
-void sm_add_hook(StateMachine* sm, HookPhase phase, HookFn fn, void* userdata);
-void sm_remove_hook(StateMachine* sm, HookPhase phase, HookFn fn);
-
-// Template helpers
-struct SMTemplate* sm_get_template(StateMachine* sm);
-const char* sm_get_state_name(StateMachine* sm, uint32_t state);
-
-#endif // SM_H
-```
+| File | Declares |
+|------|----------|
+| `src/sm/sm-instance.h` | `StateMachine`, `sm_create()`, `sm_destroy()`, `sm_raw_write()`, `sm_transition()`, `sm_can_transition()`, `sm_get_available_transitions()`, the hook API, `sm_get_state()`, `sm_get_name()` |
+| `src/sm/sm-template.h` | `SMStateName`, `SMTransition`, `SMTemplateDef`, `SM_TEMPLATE_DEF()`, `sm_template_create()`, `sm_template_from_def()`, `sm_template_validate()`, `sm_template_destroy()` |
+| `src/sm/sm-trace.h` | `SMTraceEntry`, `sm_trace_count()`, `sm_trace_snapshot()` |
+| `src/sm/sm-debug.h` | `sm_debug_dump()` and the live-machine list |
+| `src/sm/sm-registry.h` | registering and looking up guards and actions by name |
 
 ---
 

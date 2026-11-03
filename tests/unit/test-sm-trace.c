@@ -54,7 +54,11 @@ trace_guard_deny(StateMachine* sm, void* data)
 static SMTemplate*
 trace_template(const char* name, SMTransition* rows, uint32_t num_rows)
 {
-  static uint32_t states[] = { TRACE_OFF, TRACE_ON, TRACE_DEAD };
+  static const SMStateName states[] = {
+    { TRACE_OFF,  "OFF"  },
+    { TRACE_ON,   "ON"   },
+    { TRACE_DEAD, "DEAD" },
+  };
   return sm_template_create(name, states, 3, rows, num_rows, TRACE_OFF);
 }
 

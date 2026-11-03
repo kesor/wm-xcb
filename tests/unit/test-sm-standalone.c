@@ -217,10 +217,12 @@ enum { S0 = 0,
 };
 
 static SMTemplate*
-make_tmpl(const char* name, uint32_t* states, int nstates,
-          SMTransition* trans, int ntrans, uint32_t init)
+make_tmpl(const char* name, const SMStateName* states, int nstates,
+          const SMTransition* trans, int ntrans, uint32_t init)
 {
-  return sm_template_create(name, states, nstates, trans, ntrans, init);
+  /* The framework's own constructor, which does not check the table: these
+     tests build machines the contract forbids on purpose. */
+  return sm_template_create(name, states, (uint32_t) nstates, trans, (uint32_t) ntrans, init);
 }
 
 /* Create SM with custom emitter (no hub needed) */
@@ -236,8 +238,11 @@ void
 test_tmpl_create_destroy(void)
 {
   LOG_CLEAN("== SMTemplate create/destroy");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 10 },
     { S1, S0, NULL, NULL, 11 }
   };
@@ -254,8 +259,11 @@ void
 test_sm_create_destroy(void)
 {
   LOG_CLEAN("== StateMachine create/destroy");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 10 }
   };
 
@@ -277,8 +285,11 @@ void
 test_sm_create_requires_params(void)
 {
   LOG_CLEAN("== sm_create requires owner and template");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 10 }
   };
   SMTemplate* t = make_tmpl("test", states, 2, trans, 1, S0);
@@ -297,8 +308,11 @@ void
 test_sm_set_emitter(void)
 {
   LOG_CLEAN("== sm_set_emitter after creation");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 10 },
     { S1, S0, NULL, NULL, 11 }
   };
@@ -321,8 +335,11 @@ void
 test_raw_write(void)
 {
   LOG_CLEAN("== sm_raw_write");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 10 },
     { S1, S0, NULL, NULL, 11 }
   };
@@ -350,8 +367,11 @@ test_raw_write_emits_via_hub(void)
   enum { OFF = 20,
          ON  = 21,
   };
-  uint32_t     states[] = { OFF, ON };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { OFF, "OFF" },
+    { ON,  "ON"  }
+  };
+  SMTransition trans[] = {
     { OFF, ON,  NULL, NULL, OFF },
     { ON,  OFF, NULL, NULL, ON  }
   };
@@ -389,8 +409,11 @@ void
 test_raw_write_with_custom_emitter(void)
 {
   LOG_CLEAN("== sm_raw_write with custom emitter");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 10 },
     { S1, S0, NULL, NULL, 11 }
   };
@@ -411,8 +434,11 @@ void
 test_transition(void)
 {
   LOG_CLEAN("== sm_transition");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 100 },
     { S1, S0, NULL, NULL, 101 }
   };
@@ -438,8 +464,12 @@ void
 test_can_transition(void)
 {
   LOG_CLEAN("== sm_can_transition");
-  uint32_t     states[] = { S0, S1, S2 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" },
+    { S2, "S2" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 0 },
     { S1, S2, NULL, NULL, 0 },
   };
@@ -465,8 +495,11 @@ test_transition_with_guards(void)
   sm_register_guard("deny", guard_deny);
   sm_register_guard("cond", guard_conditional);
 
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, "allow", NULL, 40 },
     { S1, S0, "deny",  NULL, 41 },
   };
@@ -521,8 +554,12 @@ test_transition_with_actions(void)
   sm_register_action("track", action_track);
   sm_register_action("fail", action_fail);
 
-  uint32_t     states[] = { S0, S1, S2 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" },
+    { S2, "S2" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, "track", 30 },
     { S1, S2, NULL, "track", 31 },
     { S0, S2, NULL, "fail",  32 },
@@ -569,8 +606,12 @@ test_complete_flow(void)
   sm_register_guard("can_work", guard_allow);
   sm_register_action("do_work", action_track);
 
-  uint32_t     states[] = { S0, S1, S2 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" },
+    { S2, "S2" }
+  };
+  SMTransition trans[] = {
     { S0, S1, "can_work", "do_work", 35 },
     { S1, S2, NULL,       "do_work", 36 },
   };
@@ -620,8 +661,12 @@ test_invalid_transition_rejected(void)
          OPEN   = 1,
          BROKEN = 2,
   };
-  uint32_t     states[] = { LOCKED, OPEN, BROKEN };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { LOCKED, "LOCKED" },
+    { OPEN,   "OPEN"   },
+    { BROKEN, "BROKEN" }
+  };
+  SMTransition trans[] = {
     { LOCKED, OPEN,   "can_open", NULL, 50 },
     { OPEN,   LOCKED, NULL,       NULL, 51 },
     { OPEN,   BROKEN, NULL,       NULL, 52 },
@@ -651,8 +696,11 @@ void
 test_hooks_basic(void)
 {
   LOG_CLEAN("== sm hooks basic");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 0 }
   };
   SMTemplate* t = make_tmpl("hooks", states, 2, trans, 1, S0);
@@ -680,8 +728,12 @@ test_hooks_all_phases(void)
          WORK = 1,
          DONE = 2,
   };
-  uint32_t     states[] = { IDLE, WORK, DONE };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { IDLE, "IDLE" },
+    { WORK, "WORK" },
+    { DONE, "DONE" }
+  };
+  SMTransition trans[] = {
     { IDLE, WORK, "allow_all", "track", 35 },
     { WORK, DONE, NULL,        "track", 36 },
   };
@@ -737,8 +789,11 @@ void
 test_hooks_userdata(void)
 {
   LOG_CLEAN("== sm hooks userdata");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 0 }
   };
   SMTemplate* t = make_tmpl("ud", states, 2, trans, 1, S0);
@@ -761,8 +816,11 @@ void
 test_hooks_removal(void)
 {
   LOG_CLEAN("== sm hooks removal");
-  uint32_t     states[] = { S0, S1 };
-  SMTransition trans[]  = {
+  SMStateName states[] = {
+    { S0, "S0" },
+    { S1, "S1" }
+  };
+  SMTransition trans[] = {
     { S0, S1, NULL, NULL, 0 }
   };
   SMTemplate* t = make_tmpl("removal", states, 2, trans, 1, S0);

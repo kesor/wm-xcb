@@ -184,49 +184,23 @@ tag_manager_get_test_events(void)
 static SMTemplate*
 tag_view_sm_template_create(void)
 {
-  /* Define states */
-  static uint32_t states[] = {
-    TAG_VIEW_EMPTY,
-    TAG_VIEW_TAGGED,
+  static const SMStateName states[] = {
+    { TAG_VIEW_EMPTY,  "EMPTY"  },
+    { TAG_VIEW_TAGGED, "TAGGED" },
   };
 
-  /* Define transitions:
-   * EMPTY → TAGGED (when at least one tag is selected, emit: EVT_TAG_CHANGED)
-   * TAGGED → EMPTY (when all tags are deselected, emit: EVT_TAG_CHANGED)
-   * TAGGED → TAGGED (when tag selection changes within TAGGED state, emit: EVT_TAG_CHANGED)
-   */
-  static SMTransition transitions[] = {
-    {
-     .from_state = TAG_VIEW_EMPTY,
-     .to_state   = TAG_VIEW_TAGGED,
-     .guard_fn   = NULL,            /* Always allowed */
-        .action_fn  = NULL,
-     .emit_event = EVT_TAG_CHANGED,
-     },
-    {
-     .from_state = TAG_VIEW_TAGGED,
-     .to_state   = TAG_VIEW_EMPTY,
-     .guard_fn   = NULL, /* Allowed - can deselect all tags */
-        .action_fn  = NULL,
-     .emit_event = EVT_TAG_CHANGED,
-     },
-    {
-     .from_state = TAG_VIEW_TAGGED,
-     .to_state   = TAG_VIEW_TAGGED,
-     .guard_fn   = NULL,                             /* Always allowed - tag switching within same state */
-        .action_fn  = NULL,
-     .emit_event = EVT_TAG_CHANGED,
-     },
+  /* No guards and one event for all three rows: the tag mask itself is the
+     payload, and a subscriber reads it from the machine. */
+  static const SMTransition rows[] = {
+    { TAG_VIEW_EMPTY,  TAG_VIEW_TAGGED, NULL, NULL, EVT_TAG_CHANGED },
+    { TAG_VIEW_TAGGED, TAG_VIEW_EMPTY,  NULL, NULL, EVT_TAG_CHANGED },
+    { TAG_VIEW_TAGGED, TAG_VIEW_TAGGED, NULL, NULL, EVT_TAG_CHANGED },
   };
 
-  SMTemplate* tmpl = sm_template_create(
-      TAG_VIEW_SM_NAME,
-      states,
-      2,
-      transitions,
-      3,
-      TAG_VIEW_EMPTY);
+  static const SMTemplateDef def =
+      SM_TEMPLATE_DEF(TAG_VIEW_SM_NAME, TAG_VIEW_EMPTY, states, rows);
 
+  SMTemplate* tmpl = sm_template_from_def(&def);
   if (tmpl == NULL) {
     LOG_ERROR("Failed to create tag-view state machine template");
     return NULL;

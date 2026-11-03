@@ -46,8 +46,11 @@ dump_guard_allow(StateMachine* sm, void* data)
 static SMTemplate*
 dump_template(const char* name)
 {
-  static uint32_t     states[] = { DUMP_IDLE, DUMP_BUSY };
-  static SMTransition rows[]   = {
+  static const SMStateName states[] = {
+    { DUMP_IDLE, "IDLE" },
+    { DUMP_BUSY, "BUSY" },
+  };
+  static SMTransition rows[] = {
     { DUMP_IDLE, DUMP_BUSY, "dump-allow", NULL, DUMP_EVT_START },
     { DUMP_BUSY, DUMP_IDLE, NULL,         NULL, DUMP_EVT_STOP  },
   };
@@ -133,9 +136,9 @@ test_dump_reports_owner_state_counts_and_trace(void)
   assert(sm_debug_live_count() == expected_live);
   assert_header_matches_live_count(text);
   assert(strstr(text, "client 4242") != NULL);
-  assert(strstr(text, "dump-sm: state 1") != NULL);
-  assert(strstr(text, "entered: 0=0 1=1") != NULL);
-  assert(strstr(text, "transition 0 -> 1") != NULL);
+  assert(strstr(text, "dump-sm: state BUSY") != NULL);
+  assert(strstr(text, "entered: IDLE=0 BUSY=1") != NULL);
+  assert(strstr(text, "transition IDLE -> BUSY") != NULL);
   assert(strstr(text, "guard passed") != NULL);
   assert(strstr(text, "event 44") != NULL);
   assert(strstr(text, "refused") != NULL);
@@ -155,8 +158,11 @@ test_dump_lists_only_live_machines(void)
 {
   LOG_CLEAN("== dump lists only the live machines");
 
-  uint32_t     states[] = { DUMP_IDLE, DUMP_BUSY };
-  SMTransition rows[]   = {
+  static const SMStateName states[] = {
+    { DUMP_IDLE, "IDLE" },
+    { DUMP_BUSY, "BUSY" },
+  };
+  SMTransition rows[] = {
     { DUMP_IDLE, DUMP_BUSY, NULL, NULL, DUMP_EVT_START },
   };
   SMTemplate* kept    = sm_template_create("kept-sm", states, 2, rows, 1, DUMP_IDLE);
@@ -195,8 +201,11 @@ test_dump_reports_an_unregistered_owner(void)
 {
   LOG_CLEAN("== dump reports an owner that is not a hub target");
 
-  uint32_t     states[] = { DUMP_IDLE, DUMP_BUSY };
-  SMTransition rows[]   = {
+  static const SMStateName states[] = {
+    { DUMP_IDLE, "IDLE" },
+    { DUMP_BUSY, "BUSY" },
+  };
+  SMTransition rows[] = {
     { DUMP_IDLE, DUMP_BUSY, NULL, NULL, DUMP_EVT_START },
   };
   SMTemplate* tmpl = sm_template_create("ownerless-sm", states, 2, rows, 1, DUMP_IDLE);

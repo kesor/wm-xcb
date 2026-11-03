@@ -234,7 +234,7 @@ sm_can_transition(StateMachine* sm, uint32_t target_state)
   if (sm == NULL || sm->template == NULL)
     return false;
 
-  SMTransition* t = sm_template_find_transition(
+  const SMTransition* t = sm_template_find_transition(
       sm->template, sm->current_state, target_state);
 
   return t != NULL;
@@ -305,7 +305,7 @@ sm_raw_write(StateMachine* sm, uint32_t new_state)
   sm->current_state = new_state;
 
   /* Emit transition event if a valid transition exists */
-  SMTransition* t = sm_template_find_transition(
+  const SMTransition* t = sm_template_find_transition(
       sm->template, old_state, new_state);
   uint32_t emit_event = t ? t->emit_event : 0;
 
@@ -322,7 +322,7 @@ sm_transition(StateMachine* sm, uint32_t target_state)
     return false;
 
   /* Find transition from current state to target state */
-  SMTransition* t = sm_template_find_transition(
+  const SMTransition* t = sm_template_find_transition(
       sm->template, sm->current_state, target_state);
 
   if (t == NULL) {

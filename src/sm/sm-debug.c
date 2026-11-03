@@ -71,7 +71,7 @@ sm_debug_note_enter(StateMachine* sm, uint32_t state)
     return;
 
   for (uint32_t i = 0; i < sm->template->num_states; i++) {
-    if (sm->template->states[i] != state)
+    if (sm->template->states[i].value != state)
       continue;
 
     if (i < SM_STATE_ENTER_MAX)
@@ -125,6 +125,10 @@ describe_owner(void* owner, const char** type_name, TargetID* id)
 static const char*
 state_label(StateMachine* sm, uint32_t state, char* buffer, size_t size)
 {
+  const char* name = sm_template_state_name(sm->template, state);
+  if (name != NULL)
+    return name;
+
   snprintf(buffer, size, "%u", state);
   return buffer;
 }
@@ -163,7 +167,7 @@ dump_counts(FILE* out, StateMachine* sm)
 
   fprintf(out, "    entered:");
   for (uint32_t i = 0; i < states && i < SM_STATE_ENTER_MAX; i++)
-    fprintf(out, " %s=%u", state_label(sm, sm->template->states[i], label, sizeof(label)),
+    fprintf(out, " %s=%u", state_label(sm, sm->template->states[i].value, label, sizeof(label)),
             sm->enter_counts[i]);
 
   if (states > SM_STATE_ENTER_MAX || sm->enter_counts_lost > 0)

@@ -182,17 +182,16 @@ tiling_action_on_layout_change(StateMachine* sm, void* data)
 SMTemplate*
 layout_sm_template_create(void)
 {
-  /* Define single TILE state */
-  static uint32_t states[] = {
-    LAYOUT_STATE_TILE,
+  static const SMStateName states[] = {
+    { LAYOUT_STATE_TILE, "TILE" },
   };
 
-  /* No transitions needed - single state.
-   * NULL rather than an empty array: a zero-length array initializer is a GNU
-   * extension, and the -pedantic debug build rejects it. */
-  SMTemplate* tmpl =
-      sm_template_create("layout", states, 1, NULL, 0, LAYOUT_STATE_TILE);
+  /* One state and no rows: there is no other layout yet. Adding one is a state
+     and the rows in and out of it, not a new machine. */
+  static const SMTemplateDef def =
+      SM_TEMPLATE_DEF_STATES("layout", LAYOUT_STATE_TILE, states);
 
+  SMTemplate* tmpl = sm_template_from_def(&def);
   if (tmpl == NULL) {
     LOG_ERROR("Failed to create layout state machine template");
     return NULL;

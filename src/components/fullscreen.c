@@ -184,21 +184,18 @@ fullscreen_action_exit_fullscreen(StateMachine* sm, void* data)
 
 /*
  * State Machine Template
+ *
+ * WINDOWED <-> FULLSCREEN
  */
 SMTemplate*
 fullscreen_sm_template_create(void)
 {
-  /* Define states */
-  static uint32_t states[] = {
-    FULLSCREEN_STATE_WINDOWED,
-    FULLSCREEN_STATE_FULLSCREEN,
+  static const SMStateName states[] = {
+    { FULLSCREEN_STATE_WINDOWED,   "WINDOWED"   },
+    { FULLSCREEN_STATE_FULLSCREEN, "FULLSCREEN" },
   };
 
-  /* Define transitions:
-   * WINDOWED → FULLSCREEN (guard + action + event)
-   * FULLSCREEN → WINDOWED (guard + action + event)
-   */
-  static SMTransition transitions[] = {
+  static const SMTransition rows[] = {
     {
      .from_state = FULLSCREEN_STATE_WINDOWED,
      .to_state   = FULLSCREEN_STATE_FULLSCREEN,
@@ -215,14 +212,10 @@ fullscreen_sm_template_create(void)
      },
   };
 
-  SMTemplate* tmpl = sm_template_create(
-      "fullscreen",
-      states,
-      2,
-      transitions,
-      2,
-      FULLSCREEN_STATE_WINDOWED);
+  static const SMTemplateDef def =
+      SM_TEMPLATE_DEF("fullscreen", FULLSCREEN_STATE_WINDOWED, states, rows);
 
+  SMTemplate* tmpl = sm_template_from_def(&def);
   if (tmpl == NULL) {
     LOG_ERROR("Failed to create fullscreen state machine template");
     return NULL;

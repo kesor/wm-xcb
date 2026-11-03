@@ -108,7 +108,8 @@ TEST_SRC = \
 	tests/unit/test-wm-xcb-ewmh.c \
 	tests/unit/test-event-types.c \
 	tests/unit/test-sm-trace.c \
-	tests/unit/test-sm-debug.c
+	tests/unit/test-sm-debug.c \
+	tests/unit/test-sm-templates.c
 
 TEST_OBJ = $(TEST_SRC:%.c=$(BUILD_DIR)/%.o)
 

@@ -160,45 +160,38 @@ focus_guard_can_unfocus(StateMachine* sm, void* data)
 
 /*
  * State Machine Template
+ *
+ * UNFOCUSED <-> FOCUSED
  */
 SMTemplate*
 focus_sm_template_create(void)
 {
-  /* Define states */
-  static uint32_t states[] = {
-    FOCUS_STATE_UNFOCUSED,
-    FOCUS_STATE_FOCUSED,
+  static const SMStateName states[] = {
+    { FOCUS_STATE_UNFOCUSED, "UNFOCUSED" },
+    { FOCUS_STATE_FOCUSED,   "FOCUSED"   },
   };
 
-  /* Define transitions:
-   * UNFOCUSED → FOCUSED (on ENTER_NOTIFY, emit: EVT_CLIENT_FOCUSED)
-   * FOCUSED → UNFOCUSED (on LEAVE_NOTIFY, emit: EVT_CLIENT_UNFOCUSED)
-   */
-  static SMTransition transitions[] = {
+  static const SMTransition rows[] = {
     {
      .from_state = FOCUS_STATE_UNFOCUSED,
      .to_state   = FOCUS_STATE_FOCUSED,
      .guard_fn   = "focus_guard_can_focus",
-     .action_fn  = NULL,                  /* X operations handled by listener */
+     .action_fn  = NULL,                  /* the X input focus is set by the listener */
         .emit_event = EVT_CLIENT_FOCUSED,
      },
     {
      .from_state = FOCUS_STATE_FOCUSED,
      .to_state   = FOCUS_STATE_UNFOCUSED,
      .guard_fn   = "focus_guard_can_unfocus",
-     .action_fn  = NULL, /* X operations handled by listener */
-        .emit_event = EVT_CLIENT_UNFOCUSED,
+     .action_fn  = NULL,
+     .emit_event = EVT_CLIENT_UNFOCUSED,
      },
   };
 
-  SMTemplate* tmpl = sm_template_create(
-      "focus",
-      states,
-      2,
-      transitions,
-      2,
-      FOCUS_STATE_UNFOCUSED);
+  static const SMTemplateDef def =
+      SM_TEMPLATE_DEF("focus", FOCUS_STATE_UNFOCUSED, states, rows);
 
+  SMTemplate* tmpl = sm_template_from_def(&def);
   if (tmpl == NULL) {
     LOG_ERROR("Failed to create focus state machine template");
     return NULL;
