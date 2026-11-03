@@ -27,6 +27,11 @@ typedef struct SMHookList   SMHookList;
 typedef void (*EventEmitter)(StateMachine*, uint32_t from_state, uint32_t to_state, void* emit_userdata);
 
 /*
+ * Data destructor, installed with sm_set_owned_data().
+ */
+typedef void (*SMDataFree)(void* data);
+
+/*
  * Hook phases for state machine events
  */
 typedef enum SMHookPhase {
@@ -54,6 +59,7 @@ struct StateMachine {
   void*        owner;              /* owner target (client, monitor, etc.) */
   SMTemplate*  template;           /* reference to the template */
   void*        data;               /* instance-specific data */
+  SMDataFree   data_free;          /* frees `data` on destroy; NULL when borrowed */
   SMHookList*  hooks[SM_HOOK_MAX]; /* hook lists for each phase */
   EventEmitter emit;               /* event emitter function (e.g., hub_emit) */
   void*        emit_userdata;      /* userdata passed to emit function */
@@ -84,7 +90,8 @@ void sm_set_emitter(StateMachine* sm, EventEmitter emit, void* emit_userdata);
 
 /*
  * Destroy a StateMachine instance.
- * Frees the instance but not the template (caller manages template).
+ * Frees the instance and the data it was given with sm_set_owned_data(), but
+ * not the template (caller manages template).
  */
 void sm_destroy(StateMachine* sm);
 
@@ -149,8 +156,19 @@ const char* sm_get_name(StateMachine* sm);
 
 /*
  * Set instance-specific data.
- * This is supported public API for setting sm->data.
+ * This is supported public API for setting sm->data. The data stays owned by
+ * the caller, which must free it before the machine is destroyed.
  */
 void sm_set_data(StateMachine* sm, void* data);
+
+/*
+ * Set instance-specific data that the machine owns.
+ * `free_fn` runs on the data when sm_destroy() is called, whatever destroyed
+ * the machine - the component that stored the data does not have to be
+ * registered any more for the data to be freed. Pass NULL to make the machine
+ * own the data without a way to free it, or use sm_set_data() for data somebody
+ * else frees.
+ */
+void sm_set_owned_data(StateMachine* sm, void* data, SMDataFree free_fn);
 
 #endif /* _SM_INSTANCE_H_ */

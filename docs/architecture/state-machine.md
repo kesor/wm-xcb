@@ -70,6 +70,9 @@ typedef struct StateMachine {
     
     // Instance-specific data (from template)
     void* data;
+
+    // Frees data on sm_destroy; NULL when somebody else owns it
+    void (*data_free)(void*);
 } StateMachine;
 ```
 
@@ -113,6 +116,7 @@ StateMachine* sm_create(void* owner, SMTemplate* template, EventEmitter emit) {
     sm->template = template;
     sm->current_state = template->initial_state;
     sm->data = NULL;
+    sm->data_free = NULL;
 
     // Emit callback is required - owner must connect SM to hub
     sm->emit = emit;

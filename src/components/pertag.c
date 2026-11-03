@@ -182,11 +182,11 @@ pertag_on_unadopt(HubTarget* target)
   if (pt == NULL)
     return;
 
-  /* Clear from monitor's SM storage (this destroys the "SM") */
+  /*
+   * Removing the entry frees what the slot holds - the Pertag this hook was
+   * called for - so the pointer is dead after the call.
+   */
   monitor_set_sm(m, PERTAG_SM_NAME, NULL);
-
-  /* Free Pertag data */
-  free(pt);
 
   LOG_DEBUG("Pertag component unadopted by monitor: %lu", (unsigned long) target->id);
 }

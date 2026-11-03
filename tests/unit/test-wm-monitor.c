@@ -15,6 +15,119 @@
 #include "test-wm.h"
 #include "wm-hub.h"
 
+/* Set by the observer below when a monitor is unregistered. */
+static StateMachine* g_unadopt_seen_machine;
+
+static const char* g_observer_accepts[] = { "monitor", NULL };
+
+static void
+observer_on_unadopt(HubTarget* target)
+{
+  g_unadopt_seen_machine = monitor_get_sm((Monitor*) target, "probe");
+}
+
+static HubComponent g_observer_component = {
+  .name                  = "monitor-unadopt-observer",
+  .accepted_target_names = g_observer_accepts,
+  .on_unadopt            = observer_on_unadopt,
+};
+
+/*
+ * Test: destroying a monitor unadopts its components before it drops the
+ * machines they stored on it.
+ *
+ * The other order left each unadopt hook writing into a table that had just
+ * been cleared, so the hook could not reach the machine it was asked to clean
+ * up. The tag view machine's data is freed through the machine, and it leaked
+ * on every monitor the tests destroyed.
+ */
+void
+test_monitor_destroy_unadopts_before_freeing_machines(void)
+{
+  LOG_CLEAN("== Testing monitor destroy unadopts before dropping the machines");
+
+  hub_init();
+  monitor_list_init();
+
+  g_unadopt_seen_machine = NULL;
+  hub_register_component(&g_observer_component);
+  assert_or_abort(g_observer_component.registered == true);
+
+  Monitor* m = monitor_create(121);
+  assert_or_abort(m != NULL);
+
+  uint32_t     states[] = { 0, 1 };
+  SMTransition trans[]  = {
+    { .from_state = 0, .to_state = 1 },
+  };
+  SMTemplate*   tmpl = sm_template_create("probe", states, 2, trans, 1, 0);
+  StateMachine* sm   = sm_create(m, tmpl, NULL, NULL);
+  assert_or_abort(tmpl != NULL && sm != NULL);
+  assert(monitor_set_sm(m, "probe", sm) == true);
+
+  monitor_destroy(m);
+
+  /* The hook saw the machine, and the monitor freed it afterwards. */
+  assert(g_unadopt_seen_machine == sm);
+
+  monitor_list_shutdown();
+  sm_template_destroy(tmpl);
+  hub_unregister_component(g_observer_component.name);
+  hub_shutdown();
+}
+
+/*
+ * Test: removing the machine stored under a name empties its slot.
+ *
+ * A monitor that kept the emptied slot would start a second entry for the same
+ * name on the next set, and the machine the removal replaced would never be
+ * freed.
+ */
+void
+test_monitor_set_sm_null_removes_entry(void)
+{
+  LOG_CLEAN("== Testing monitor_set_sm removes the machine it replaces");
+
+  hub_init();
+  monitor_list_init();
+
+  Monitor* m = monitor_create(120);
+  assert_or_abort(m != NULL);
+
+  uint32_t     states[] = { 0, 1 };
+  SMTransition trans[]  = {
+    { .from_state = 0, .to_state = 1 },
+  };
+  SMTemplate* tmpl = sm_template_create("probe", states, 2, trans, 1, 0);
+  assert_or_abort(tmpl != NULL);
+
+  StateMachine* first = sm_create(m, tmpl, NULL, NULL);
+  assert_or_abort(first != NULL);
+  assert(monitor_set_sm(m, "probe", first) == true);
+  assert(monitor_get_sm(m, "probe") == first);
+  assert(m->sms.count == 1);
+
+  assert(monitor_set_sm(m, "probe", NULL) == true);
+  assert(monitor_get_sm(m, "probe") == NULL);
+  assert(m->sms.count == 0);
+
+  /* Setting the name again starts from an empty table. */
+  StateMachine* second = sm_create(m, tmpl, NULL, NULL);
+  assert_or_abort(second != NULL);
+  assert(monitor_set_sm(m, "probe", second) == true);
+  assert(monitor_get_sm(m, "probe") == second);
+  assert(m->sms.count == 1);
+
+  /* Removing a name that was never set is not an error. */
+  assert(monitor_set_sm(m, "absent", NULL) == true);
+  assert(m->sms.count == 1);
+
+  monitor_destroy(m);
+  monitor_list_shutdown();
+  sm_template_destroy(tmpl);
+  hub_shutdown();
+}
+
 void
 test_monitor_create_destroy(void)
 {
@@ -429,4 +542,6 @@ TEST_GROUP(Monitor, {
   test_monitor_double_create();
   test_monitor_null_destroy();
   test_monitor_with_hub_integration();
+  test_monitor_set_sm_null_removes_entry();
+  test_monitor_destroy_unadopts_before_freeing_machines();
 });

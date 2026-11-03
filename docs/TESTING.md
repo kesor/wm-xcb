@@ -518,10 +518,10 @@ DISPLAY=:2 ./wm
 both compile and link. `make SANITIZE=1` alone builds only `wm`, so the test
 binary needs `make test SANITIZE=1`. `detect_leaks=1` is on, so a leak makes
 the binary exit non-zero with LeakSanitizer's summary even when every assertion
-passed. The suite leaks today at the allocation sites listed in
-`tests/quality/asan-baseline.txt`, so a raw run of the whole suite is not the
-check: `scripts/check-sanitize.sh` runs the same binary and fails only on a site
-that is not in the baseline. It also drops `suppressions=` and `log_path=` from
+passed. The suite leaves nothing behind at exit, and
+`tests/quality/asan-baseline.txt` is empty: a leak that lands later is new debt,
+not noise. `scripts/check-sanitize.sh` runs the same binary and fails on a site
+the baseline does not list. It also drops `suppressions=` and `log_path=` from
 the sanitizer options, checks the binary it ran for the ASan runtime, and fails
 when the baseline lists sites and the log holds no report, for the reasons the
 nested-server gate below gives.

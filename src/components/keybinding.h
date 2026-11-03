@@ -164,6 +164,16 @@ const KeyBinding* const* keybinding_get_bindings(void);
 uint32_t keybinding_get_count(void);
 
 /*
+ * Check every wired binding against the action registry.
+ * Logs one ERROR for each binding that names an action no component
+ * registered, with the chord and the action name, and returns how many there
+ * were. Called once at startup after the components have registered their
+ * actions: a missing action leaves that key doing nothing and does not stop
+ * the window manager.
+ */
+uint32_t keybinding_validate_bindings(void);
+
+/*
  * Initialize the keybinding component
  * Called by hub during component registration
  */

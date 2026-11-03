@@ -273,8 +273,12 @@ tag_manager_get_view_sm(Monitor* m)
     return NULL;
   }
 
-  /* Store tag mask in SM data */
-  sm->data = tag_mask;
+  /*
+   * The machine owns the mask, so destroying the machine frees it. A monitor
+   * destroyed without this component running its unadopt hook would otherwise
+   * leak the mask.
+   */
+  sm_set_owned_data(sm, tag_mask, free);
 
   /* Store in monitor */
   if (!monitor_set_sm(m, TAG_VIEW_SM_NAME, sm)) {
@@ -747,14 +751,8 @@ tag_manager_on_unadopt(HubTarget* target)
 
   Monitor* m = (Monitor*) target;
 
-  /* Get the SM and free its data */
-  StateMachine* sm = monitor_get_sm(m, TAG_VIEW_SM_NAME);
-  if (sm != NULL && sm->data != NULL) {
-    free(sm->data);
-    sm->data = NULL;
-  }
-
-  /* Clear from monitor */
+  /* Removing the entry destroys the machine, and the machine frees the tag
+   * mask it owns. */
   monitor_set_sm(m, TAG_VIEW_SM_NAME, NULL);
 
   LOG_DEBUG("Tag manager unadopted by monitor: %lu", (unsigned long) target->id);

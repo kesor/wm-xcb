@@ -73,10 +73,32 @@ monitor_sm_find(const Monitor* m, const char* sm_name)
 }
 
 /*
+ * Free whatever occupies the machine slot at `idx` and empty the slot.
+ *
+ * The "pertag" slot holds a Pertag rather than a StateMachine: pertag keeps
+ * its data where a machine goes, so that slot is freed instead of destroyed.
+ */
+static void
+monitor_sm_free_machine(Monitor* m, uint32_t idx)
+{
+  if (m->sms.machines[idx] == NULL)
+    return;
+
+  if (m->sms.names[idx] != NULL && strcmp(m->sms.names[idx], "pertag") == 0) {
+    free(m->sms.machines[idx]);
+  } else {
+    sm_destroy(m->sms.machines[idx]);
+  }
+  m->sms.machines[idx] = NULL;
+}
+
+/*
  * Helper: add or update SM for a name.
  * Takes ownership of `sm` - any previously registered SM for this name
  * will be destroyed (unless it's the same pointer to avoid self-destruction).
  * The sm_name string is copied internally.
+ *
+ * If sm is NULL, removes any existing entry for that name (destroying it).
  *
  * Returns true on success, false on failure (OOM).
  * On failure, the caller should handle cleanup of the passed SM.
@@ -87,19 +109,37 @@ monitor_sm_set_internal(Monitor* m, const char* sm_name, StateMachine* sm)
   int32_t idx = monitor_sm_find(m, sm_name);
 
   if (idx >= 0) {
-    /* Update existing - destroy old SM if different from new one
-     * Only destroy when replacing with a non-NULL SM */
-    if (sm != NULL && m->sms.machines[idx] != NULL && m->sms.machines[idx] != sm) {
-      sm_destroy(m->sms.machines[idx]);
+    /* A NULL machine removes the entry, so the next set of this name starts
+     * from an empty table instead of appending a second entry for it. */
+    if (sm == NULL) {
+      uint32_t slot = (uint32_t) idx;
+      uint32_t last = m->sms.count - 1;
+
+      monitor_sm_free_machine(m, slot);
+      free(m->sms.names[slot]);
+      m->sms.names[slot] = NULL;
+
+      if (slot != last) {
+        m->sms.machines[slot] = m->sms.machines[last];
+        m->sms.names[slot]    = m->sms.names[last];
+      }
+      m->sms.machines[last] = NULL;
+      m->sms.names[last]    = NULL;
+      m->sms.count--;
+      return true;
+    }
+
+    /* Update existing - destroy old SM if different from new one */
+    if (m->sms.machines[idx] != sm) {
+      monitor_sm_free_machine(m, (uint32_t) idx);
     }
     m->sms.machines[idx] = sm;
-    /* Clear name if setting to NULL (data cleanup case) */
-    if (sm == NULL && m->sms.names[idx] != NULL) {
-      free(m->sms.names[idx]);
-      m->sms.names[idx] = NULL;
-    }
     return true;
   }
+
+  /* Removing a name that was never set is not an error. */
+  if (sm == NULL)
+    return true;
 
   /* Add new SM */
   if (m->sms.count >= m->sms.capacity) {
@@ -151,14 +191,8 @@ monitor_sm_storage_free(Monitor* m)
    * StateMachine*.
    */
   for (uint32_t i = 0; i < m->sms.count; i++) {
-    if (m->sms.names[i] != NULL) {
-      if (strcmp(m->sms.names[i], "pertag") == 0) {
-        free(m->sms.machines[i]);
-      } else if (m->sms.machines[i] != NULL) {
-        sm_destroy(m->sms.machines[i]);
-      }
-      free(m->sms.names[i]);
-    }
+    monitor_sm_free_machine(m, i);
+    free(m->sms.names[i]);
   }
   free(m->sms.machines);
   free(m->sms.names);
@@ -180,6 +214,7 @@ monitor_list_init(void)
     Monitor* next = monitor_list->next;
     /* Only free if not registered with hub (orphaned) */
     if (!monitor_list->target.registered) {
+      monitor_sm_storage_free(monitor_list);
       free(monitor_list);
     }
     monitor_list = next;
@@ -295,13 +330,18 @@ monitor_destroy(Monitor* m)
     selected_monitor = monitor_list_get_first();
   }
 
-  /* Free SM storage */
-  monitor_sm_storage_free(m);
-
-  /* Unregister from Hub */
+  /*
+   * Unregister first: the components' unadopt hooks run here, and they reach
+   * the machines this monitor stores - the tag view machine's data is freed
+   * through it. Freeing the storage first left those hooks writing into a
+   * cleared table.
+   */
   if (m->target.registered) {
     hub_unregister_target(m->target.id);
   }
+
+  /* Free SM storage */
+  monitor_sm_storage_free(m);
 
   /* Free monitor */
   free(m);
