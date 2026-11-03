@@ -96,6 +96,14 @@ setup_signals()
   /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
   if (signal(SIGTERM, sigint) == SIG_ERR)
     LOG_FATAL("cannot install SIGTERM event handler");
+
+  /* Every child the WM starts is reaped here. The launcher and the terminal
+     both fork and must not wait for the result, so neither reaps its own child.
+     The launcher learns what dmenu chose from its pipe, not from the exit
+     status, which this handler discards. */
+  /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
+  if (signal(SIGCHLD, sigchld) == SIG_ERR)
+    LOG_FATAL("cannot install SIGCHLD event handler");
 }
 
 int

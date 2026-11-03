@@ -215,6 +215,19 @@ WM dispatches them in one drain. That is the ordering where a hide and a later
 show both run before the `UnmapNotify` the hide causes is read. The test resumes
 the WM on every exit path.
 
+`run.sh` puts a `dmenu` and a `dmenu_path` of its own at the front of `PATH`.
+The fake dmenu records its start in `$WM_SEAM_DMENU_STARTED` and then sleeps,
+writing nothing; the fake list source prints nothing. A real dmenu needs fonts
+the nested server may not have, and a test that presses `MOD+p` wants a child
+that holds the pipe open, not a menu. `test-92-launcher-does-not-block.sh` uses
+it: it waits for the marker so an unstarted launcher cannot make the assertion
+pass on an idle WM, then requires `MOD+2` to hide the tag-1 window within 500 ms.
+`scripts/perf-test.sh` runs the same stage and fails the run when the key goes
+unanswered. The fake does not grab the keyboard; a real dmenu does, so `MOD+2`
+would not reach the WM while a real prompt is up. What the stage measures is
+that the WM's loop still answers, which is the promise; the fake is the only
+dmenu that lets the test see it.
+
 ---
 
 ## 3b. Static checks
@@ -249,9 +262,14 @@ blocking function are ignored, so prose cannot produce a false positive.
 
 The script prints the current counts. Every violation is the debt tracked in
 `bd list --parent wm-46k.2`: the property-handler path through
-`print_atom_name()` and `ewmh_check_wm_state_fullscreen()`, the RandR handler
-path through `monitor_manager_update_crtc_geometry()` and its two helpers, and
-the blocking `read()`/`waitpid()` pair in `launcher_run_dmenu()`.
+`print_atom_name()` and `ewmh_check_wm_state_fullscreen()`, and the RandR
+handler path through `monitor_manager_update_crtc_geometry()` and its two
+helpers.
+
+The launcher's read of dmenu's pipe is waived rather than excused: the read end
+is `O_NONBLOCK`, so it returns `EAGAIN` instead of waiting for dmenu to write,
+and the descriptor is one of the loop's event sources. There is no `waitpid()`
+in the launcher at all: the `SIGCHLD` handler reaps every child.
 
 The check is meant to reach zero by removing the violations, not by adding
 markers. A new marker needs a reason that would satisfy a reviewer: "startup,
@@ -416,16 +434,18 @@ is why the variant is in the output. It then prints these numbers:
 | per window | burst CPU / N | comparable across window counts |
 | time to tile | wall clock until all N windows are viewable, polled every 10 ms, TIMEOUT at 5 s | the number a user feels |
 | RSS | `VmRSS` before/after the burst | leak and growth detection |
+| keys while dmenu is open | wall clock from `MOD+2` until the tag-1 windows are hidden, with a `dmenu` that writes nothing | a launcher that waits for dmenu stops the loop, and over the budget the run fails |
 | SIGTERM | wall clock from SIGTERM until the WM's `/proc` state is gone or `Z` | a loop that blocks must still be stoppable |
 
-Measured 2026-11-02 (1280x800 Xephyr, release build, 5 windows):
+Measured 2026-11-03 (1280x800 Xephyr, release build, 5 windows):
 
 ```
 idle CPU: 0 ms over 2000 ms wall (budget 20 ms)
-time to tile: 12 ms for 5 windows (2.4 ms per window)
+time to tile: 15 ms for 5 windows (3.0 ms per window)
 burst CPU: 0 ms (0.00 ms per window)
-RSS: 2864 kB before, 2864 kB after (0 kB growth)
-SIGTERM: WM exited in 8 ms
+RSS: 2880 kB before, 2880 kB after (0 kB growth)
+keys while dmenu is open: MOD+2 reached the WM in 38 ms (budget 500 ms)
+SIGTERM: WM exited in 9 ms
 ```
 
 Idle CPU is a budget, not a baseline: the loop blocks in `poll(2)`, so anything
