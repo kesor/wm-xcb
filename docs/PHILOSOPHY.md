@@ -123,8 +123,9 @@ later as an event.
 **Checked by** `make check-async` (`scripts/check-async.sh`), which fails on
 blocking calls unless the line carries `allow-blocking: <reason>`.
 
-**Current debt:** the synchronous `_reply()` calls listed in
-`tests/quality/async-baseline.txt`.
+**Current debt:** none. `tests/quality/async-baseline.txt` is empty: every wait
+left in the tree is a startup path carrying `allow-blocking: <reason>`, or the
+non-blocking read of a pipe, and a new violation fails the check.
 
 The launcher is not on that list any more. It forks a shell whose last stage is
 `dmenu`, with `dmenu_path` feeding it, and registers the read end of that

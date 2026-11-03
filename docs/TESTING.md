@@ -310,11 +310,9 @@ startup code that runs before the loop exists, or the non-blocking read of the
 signal wakeup pipe in `signals_drain_wakeups()`. Comments that mention a
 blocking function are ignored, so prose cannot produce a false positive.
 
-The script prints the current counts. Every violation is the debt tracked in
-`bd list --parent wm-46k.2`: the property-handler path through
-`print_atom_name()` and `ewmh_check_wm_state_fullscreen()`, and the RandR
-handler path through `monitor_manager_update_crtc_geometry()` and its two
-helpers.
+The script prints the current counts. There are no violations left: the
+baseline that held them is empty, and every remaining wait is a startup path
+carrying `allow-blocking` with the reason it is safe to wait there.
 
 The launcher's read of dmenu's pipe is waived rather than excused: the read end
 is `O_NONBLOCK`, so it returns `EAGAIN` instead of waiting for dmenu to write,
