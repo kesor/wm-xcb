@@ -36,15 +36,16 @@ project makes about patch conflicts, seen from the user's side instead of the
 maintainer's.
 
 wm is no better today: configuration is compiled into `config.def.h` and
-`config.wm.def.h`, and most of the wired keybindings name actions that do not
-exist, silently. So this is a goal with a status column, not a claim.
+`config.wm.def.h`, and a binding that names an action nobody registered leaves
+a key that does nothing. Startup reports that binding once, with the key and
+the action name, but changing it still means editing the header and rebuilding.
 
 | Goal | Status 2026-11-01 |
 |------|-------------------|
 | No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, and no key is grabbed, so no default binding fires |
 | Change keybindings, rules, and tag names in a text file, no rebuild | not kept: compiled in |
 | Reload that file without restarting | not kept |
-| A wrong line in that file says what is wrong, once, at startup | not kept: a binding to a missing action is silent |
+| A wrong line in that file says what is wrong, once, at startup | not kept: there is no config file yet; a compiled binding to a missing action is reported once at startup, but fixing it needs a rebuild |
 | Every feature a dwm patch provides is a config toggle here | not kept |
 
 **The rule that follows:** a feature a user turns on is a config key, not a

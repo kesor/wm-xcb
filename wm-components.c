@@ -95,6 +95,13 @@ wm_components_init(void)
       return false;
     }
   }
+
+  /* The default bindings are wired inside keybinding_init, before the
+   * components that own most of their actions have registered those actions.
+   * Check the whole table here, once, after every component is up: a binding to
+   * an action nobody registered is a key that does nothing, and the message is
+   * the only place the user can see which one. It does not stop the startup. */
+  (void) keybinding_validate_bindings();
   return true;
 }
 

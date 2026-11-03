@@ -8,7 +8,10 @@
  * - Keybinding action execution (sending hub requests)
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "src/actions/action-registry.h"
 #include "src/actions/keybinding-binding.h"
 #include "src/actions/launcher.h"
@@ -440,6 +443,87 @@ test_keybinding_wired_actions_resolve(void)
   hub_shutdown();
 }
 
+static bool
+test_action_noop(ActionInvocation* inv)
+{
+  (void) inv;
+  return true;
+}
+
+/*
+ * Run the validator with stderr captured, so a test can read what the user
+ * would see at startup rather than trusting that a log call is there.
+ */
+static void
+validate_into(char* log, size_t log_size, uint32_t* unresolved)
+{
+  char path[] = "/tmp/wm-keybinding-validate-XXXXXX";
+  int  log_fd = mkstemp(path);
+  assert_or_abort(log_fd >= 0);
+  (void) unlink(path);
+
+  fflush(stderr);
+  int saved = dup(STDERR_FILENO);
+  assert_or_abort(saved >= 0);
+  assert_or_abort(dup2(log_fd, STDERR_FILENO) == STDERR_FILENO);
+
+  *unresolved = keybinding_validate_bindings();
+  fflush(stderr);
+
+  assert_or_abort(dup2(saved, STDERR_FILENO) == STDERR_FILENO);
+  close(saved);
+
+  assert_or_abort(lseek(log_fd, 0, SEEK_SET) == 0);
+  ssize_t read_bytes = read(log_fd, log, log_size - 1);
+  close(log_fd);
+  assert_or_abort(read_bytes >= 0);
+  log[read_bytes] = '\0';
+}
+
+/*
+ * Test: a binding to an action nobody registered is reported once, with the
+ * chord and the action name, and a binding that resolves is not reported.
+ */
+void
+test_keybinding_validate_bindings(void)
+{
+  LOG_CLEAN("== Testing wired bindings are checked against the action registry");
+
+  static Action known_action = {
+    .name     = "known.action",
+    .callback = test_action_noop,
+  };
+
+  action_registry_init();
+  keybinding_binding_init();
+
+  assert(action_register(&known_action));
+  assert(keybinding_binding_register(XCB_MOD_MASK_4, 41, "known.action"));
+  assert(keybinding_binding_register(
+      XCB_MOD_MASK_4 | XCB_MOD_MASK_SHIFT, 38, "missing.action"));
+
+  uint32_t unresolved = 0;
+  char     log[4096];
+
+  validate_into(log, sizeof log, &unresolved);
+
+  assert(unresolved == 1);
+  assert(strstr(log, "ERROR") != NULL);
+  assert(strstr(log, "Mod+Shift+keycode 38") != NULL);
+  assert(strstr(log, "missing.action") != NULL);
+
+  /* The binding that resolves is not mentioned. */
+  assert(strstr(log, "known.action") == NULL);
+
+  /* One line, not one per key press and not a second summary line. */
+  const char* first_newline = strchr(log, '\n');
+  assert(first_newline != NULL);
+  assert(first_newline != NULL && strchr(first_newline + 1, '\n') == NULL);
+
+  keybinding_binding_shutdown();
+  action_registry_shutdown();
+}
+
 TEST_GROUP(KeybindingComponent, {
   test_keybinding_component_registration();
   test_keybinding_lookup_exact();
@@ -453,4 +537,5 @@ TEST_GROUP(KeybindingComponent, {
   test_keybinding_shutdown_reinit();
   test_keybinding_no_executor();
   test_keybinding_wired_actions_resolve();
+  test_keybinding_validate_bindings();
 });

@@ -60,6 +60,11 @@ test_every_wired_module_starts(void)
     assert(module->is_initialized());
   }
 
+  /* The bindings are wired before their owners register the actions, so the
+   * check only means something after this sequence. Nothing in the compiled
+   * configuration may name an action that is still missing. */
+  assert(keybinding_validate_bindings() == 0);
+
   /* The focus component is the one this list was added for: its ENTER/LEAVE
    * handlers are registered inside focus_component_init(), so a startup that
    * skips it leaves the WM without pointer focus. */
