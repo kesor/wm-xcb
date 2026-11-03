@@ -105,6 +105,9 @@ later as an event.
   - never call `xcb_*_reply()` from an XCB handler or an action callback;
     use the cookie and process the reply when it arrives, or restructure so no
     reply is needed
+  - a reply is read from a callback registered with
+    `wm_loop_add_poll_handler()`, which runs once per iteration and polls
+    rather than waits
   - one `xcb_flush()` per loop iteration, not one per call
   - the main loop blocks on `poll()` or `xcb_wait_for_event()`, never spins
   - child processes (launcher, terminal) are `fork` + `exec`. A `SIGCHLD`
@@ -120,8 +123,9 @@ later as an event.
 **Checked by** `make check-async` (`scripts/check-async.sh`), which fails on
 blocking calls unless the line carries `allow-blocking: <reason>`.
 
-**Current debt:** the synchronous `_reply()` calls listed in
-`tests/quality/async-baseline.txt`.
+**Current debt:** none. `tests/quality/async-baseline.txt` is empty: every wait
+left in the tree is a startup path carrying `allow-blocking: <reason>`, or the
+non-blocking read of a pipe, and a new violation fails the check.
 
 The launcher is not on that list any more. It forks a shell whose last stage is
 `dmenu`, with `dmenu_path` feeding it, and registers the read end of that

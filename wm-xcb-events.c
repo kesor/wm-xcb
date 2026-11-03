@@ -3,7 +3,6 @@
 
 #include "src/target/client.h"
 #include "wm-log.h"
-#include "wm-xcb-ewmh.h"
 #include "wm-xcb.h"
 
 // #define PRINT_EVENT(pFormat,...) LOG_CLEAN("EVENT: "pFormat,##__VA_ARGS__)
@@ -18,7 +17,6 @@ handle_property_notify(xcb_property_notify_event_t* event)
               event->atom,
               event->time,
               event->state);
-  print_atom_name(event->atom);
   return;
 }
 
