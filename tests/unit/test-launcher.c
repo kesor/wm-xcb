@@ -414,6 +414,66 @@ test_launcher_selection_starts_the_command(void)
 }
 
 /*
+ * Test: dmenu runs on the display the WM connected to
+ *
+ * A menu on another display is invisible where the user is looking, and the WM
+ * then waits for a selection that cannot arrive. dmenu opens its own X
+ * connection, so the only thing that decides where it appears is DISPLAY in the
+ * environment the child inherits. Here that environment says one display and
+ * the WM's connection says another; the child must get the WM's.
+ */
+static void
+test_launcher_dmenu_uses_the_wm_display(void)
+{
+  char marker[600];
+  char dmenu[700];
+  char seen[128] = { 0 };
+
+  ASSERT(fake_bin_ready(), "fake bin directory should exist");
+
+  snprintf(marker, sizeof marker, "%s/display-seen", fake_bin);
+  unlink(marker);
+  snprintf(dmenu, sizeof dmenu, "printf '%%s' \"$DISPLAY\" > %s\n", marker);
+  ASSERT(install_fake_dmenu(dmenu), "fake dmenu should record its DISPLAY");
+
+  char*       saved_display = NULL;
+  const char* had_display   = getenv("DISPLAY");
+  if (had_display != NULL)
+    saved_display = strdup(had_display);
+
+  setenv("DISPLAY", ":99", 1);
+  wm_xcb_set_display_name_for_tests(":4242");
+
+  action_registry_init();
+  hub_init();
+  launcher_init();
+
+  ASSERT(launcher_action_launch(NULL), "the action should report that dmenu started");
+  ASSERT(drive_loop_until_launcher_finishes(2000), "the loop should read the selection");
+
+  FILE* log = fopen(marker, "r");
+  ASSERT(log != NULL, "the fake dmenu should have written its DISPLAY");
+  size_t read_bytes = fread(seen, 1, sizeof seen - 1, log);
+  seen[read_bytes]  = '\0';
+  fclose(log);
+
+  ASSERT(strcmp(seen, ":4242") == 0, "dmenu must inherit the WM's display, not the environment's");
+
+  launcher_shutdown();
+  hub_shutdown();
+  action_registry_shutdown();
+  wm_xcb_set_display_name_for_tests(NULL);
+  if (saved_display != NULL) {
+    setenv("DISPLAY", saved_display, 1);
+    free(saved_display);
+  } else {
+    unsetenv("DISPLAY");
+  }
+  restore_real_path();
+  unlink(marker);
+}
+
+/*
  * Test: dmenu that writes nothing reports a failure event
  */
 static void
@@ -457,6 +517,7 @@ run_launcher_tests(void)
   RUN_TEST(test_launcher_returns_before_dmenu_exits);
   RUN_TEST(test_launcher_selection_starts_the_command);
   RUN_TEST(test_launcher_no_selection_emits_failure);
+  RUN_TEST(test_launcher_dmenu_uses_the_wm_display);
 
   free(saved_path);
   saved_path = NULL;

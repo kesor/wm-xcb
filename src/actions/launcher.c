@@ -361,6 +361,16 @@ launcher_run_dmenu(void)
 
     wm_xcb_close_connection_in_child();
 
+    /* dmenu opens its own X connection. Point it at the server this WM
+       connected to, not at whatever DISPLAY the WM inherited: a menu on the
+       wrong display is invisible where the user is looking, and the WM then
+       waits for a selection that can never arrive. */
+    const char* display = wm_xcb_display_name();
+    if (display != NULL && setenv("DISPLAY", display, 1) != 0) {
+      LOG_ERROR("Child: failed to set DISPLAY for dmenu: %s", strerror(errno));
+      _exit(1);
+    }
+
     const char* prompt = dmenu_config.prompt ? dmenu_config.prompt : DMENU_DEFAULT_PROMPT;
 
     /* dmenu_run does not print the choice: it backgrounds

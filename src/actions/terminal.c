@@ -222,6 +222,14 @@ terminal_spawn(void)
        believing the WM is still connected after it has exited. */
     wm_xcb_close_connection_in_child();
 
+    /* The terminal opens its own X connection: give it the server this WM is
+       serving, the same way the launcher does for dmenu. */
+    const char* display = wm_xcb_display_name();
+    if (display != NULL && setenv("DISPLAY", display, 1) != 0) {
+      LOG_ERROR("Child: failed to set DISPLAY for the terminal: %s", strerror(errno));
+      _exit(1);
+    }
+
     /*
      * Use setsid to create a new session and detach from controlling tty.
      * This prevents the terminal from receiving signals from the WM's tty.
