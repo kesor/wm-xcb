@@ -65,6 +65,11 @@ The commit and push gates run the same suite through `scripts/check-unit.sh`,
 which keeps the log to itself and prints it only when the run fails. Run
 `make test` by hand when you want the log of a passing run.
 
+The gate reads `DEBUG` and `SANITIZE` the way `make` does, and the pass line
+names the variant it built. The debug gate runs it as
+`DEBUG=1 scripts/check-unit.sh`, so a failing assertion in the `-pedantic`
+build arrives with the run instead of make's `Error 1` line alone.
+
 Two extra targets:
 
 ```bash

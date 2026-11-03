@@ -6,28 +6,52 @@
 # discover again. This pins the gate's three verdicts without running the suite: a
 # pass is the summary line alone, a failure carries the suite's own output, and a
 # run with no summary line is not a pass however it exited.
+#
+# The debug gate runs the same script with DEBUG=1, so the last assertions pin the
+# other half: the variant make answered with is on the pass line, and the suite is
+# built with the DEBUG and SANITIZE the gate was given.
 source "$(dirname "$0")/lib.sh"
 
 DIR="$TMPDIR_SEAM/unit-gate"
 rm -rf "$DIR"
 mkdir -p "$DIR/bin"
 
-# The gate runs `make test`; this stands in for it so the assertion here is about
-# the gate's verdict, not about the suite.
+# The gate asks make which variant it builds, then runs the suite; this stands in
+# for make so the assertions here are about the gate, not about the suite or the
+# real variant name. The variant answer follows the same rule the Makefile uses.
 cat >"$DIR/bin/make" <<'EOF'
 #!/usr/bin/env bash
-cat "$STUB_LOG"
-exit "$STUB_STATUS"
+printf '%s\n' "$*" >>"$STUB_ARGS"
+case "$*" in
+  *print-variant*)
+    variant=release
+    case "$*" in *DEBUG=1*) variant=debug ;; esac
+    case "$*" in *SANITIZE=1*) variant="$variant-sanitize" ;; esac
+    echo "$variant"
+    ;;
+  *)
+    cat "$STUB_LOG"
+    exit "$STUB_STATUS"
+    ;;
+esac
 EOF
 chmod +x "$DIR/bin/make"
 
 # run_gate <name> <make-status> <log line>... - prints the gate's exit status.
+# GATE_DEBUG and GATE_SANITIZE, when set, are handed to the gate as DEBUG and
+# SANITIZE are on a real run.
 run_gate() {
-  local name=$1 status=$2 log
+  local name=$1 status=$2 log args
+  local -a gate_env
   log="$DIR/$name.log"
+  args="$DIR/$name.args"
   shift 2
   printf '%s\n' "$@" >"$log"
-  STUB_LOG="$log" STUB_STATUS="$status" PATH="$DIR/bin:$PATH" \
+  : >"$args"
+  gate_env=(STUB_LOG="$log" STUB_STATUS="$status" STUB_ARGS="$args")
+  if [ -n "${GATE_DEBUG:-}" ]; then gate_env+=(DEBUG="$GATE_DEBUG"); fi
+  if [ -n "${GATE_SANITIZE:-}" ]; then gate_env+=(SANITIZE="$GATE_SANITIZE"); fi
+  env "${gate_env[@]}" PATH="$DIR/bin:$PATH" \
     "$ROOT_DIR/scripts/check-unit.sh" >"$DIR/$name.out" 2>&1
   echo $?
 }
@@ -60,5 +84,24 @@ check_eq "it says the suite did not reach the end" 1 "$(grep -c 'did not run to 
 check_eq "a summary with failures fails the gate even when make exits 0" 1 \
   "$(run_gate swallowed 0 '  Total: 1 passed, 2 failed')"
 check_eq "it reports the count the summary carries" 1 "$(grep -c 'reported 2 failures' "$DIR/swallowed.out")"
+
+check_eq "a passing run names the build variant make answered with" 1 \
+  "$(grep -c 'variant=release ' "$DIR/pass.out")"
+
+GATE_DEBUG=1
+check_eq "the debug gate passes" 0 "$(run_gate debug 0 "${PASSING_LOG[@]}")"
+GATE_DEBUG=
+check_eq "the debug pass line names the debug variant" 1 \
+  "$(grep -c 'variant=debug (DEBUG=1 SANITIZE=0)' "$DIR/debug.out")"
+check_eq "the suite is built with the DEBUG the gate was given" 1 \
+  "$(grep -cE '^test .*DEBUG=1' "$DIR/debug.args")"
+check_eq "the variant question carries the same DEBUG" 1 \
+  "$(grep -cE 'print-variant .*DEBUG=1' "$DIR/debug.args")"
+
+GATE_SANITIZE=1
+check_eq "the sanitize gate passes" 0 "$(run_gate sanitize 0 "${PASSING_LOG[@]}")"
+GATE_SANITIZE=
+check_eq "its pass line names the sanitize variant" 1 \
+  "$(grep -c 'variant=release-sanitize (DEBUG=0 SANITIZE=1)' "$DIR/sanitize.out")"
 
 finish

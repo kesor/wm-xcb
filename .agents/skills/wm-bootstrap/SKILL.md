@@ -75,13 +75,13 @@ For testing mechanics, `docs/TESTING.md`. For the gate list, `docs/QUALITY.md`.
 | Gate | Command | Enforces |
 |------|---------|----------|
 | build | `make` | it compiles |
-| unit | `scripts/check-unit.sh` | the unit suite; the log is printed only when the run fails |
+| unit | `scripts/check-unit.sh` | the unit suite in the variant `DEBUG` and `SANITIZE` name; the pass line names it, and the log is printed only when the run fails |
 | seam | `make test-x` | what X sees: mapped, tiled, focused, tags, EWMH; a failure missing from `tests/quality/seam-baseline.txt` fails the run |
 | async | `make check-async` | no new blocking call (baseline in `tests/quality/`) |
 | paths | `scripts/check-paths.sh` | no home directory or personal source tree in a public repo |
 | format | `scripts/format-check.sh` | clang-format clean; `make format` fixes |
 | commit-msg | `scripts/check-commit-msg.sh` | no AI attribution trailers |
-| debug | `make clean && make DEBUG=1` | the `-pedantic` build stays green |
+| debug | `make clean && make DEBUG=1 && DEBUG=1 scripts/check-unit.sh` | the `-pedantic` build stays green, and its suite reports the assertion that failed |
 
 The hooks in `.githooks/` run these; CI runs the same commands.
 
