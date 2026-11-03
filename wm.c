@@ -12,6 +12,8 @@
 #include "wm-xcb-ewmh.h"
 #include "wm-xcb.h"
 
+#include "src/sm/sm-debug.h"
+
 #include "wm.h"
 
 int
@@ -45,6 +47,12 @@ main(int argc, char** argv)
   while (running) {
     wm_xcb_wait_for_events();
     handle_xcb_events();
+
+    /* SIGUSR1 asked for a state dump. The handler only set a flag; walking
+       every live state machine is done here, where it cannot interrupt a
+       half-updated list. */
+    if (signals_take_dump_request())
+      sm_debug_dump(stdout);
   }
 
   wm_components_shutdown();

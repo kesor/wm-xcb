@@ -369,6 +369,36 @@ the root instead, and the focus handler then sees a crossing that names the root
 rather than the client. `xprop` reports properties and not masks, and `xdotool`
 has no subcommand for them.
 
+### Asking the WM why
+
+`kill -USR1 <wm pid>` makes the WM print every live state machine to its stdout:
+the owner (`client 4194304`, `monitor 555`), the state it is in, how often it has
+entered each state, and its last eight changes - raw write or transition, what
+the guard answered, and the event that went out. A refused request is in that
+list too, so a key that did nothing leaves a record.
+
+```bash
+DISPLAY=:2 ./wm >/tmp/wm.log 2>&1 &
+kill -USR1 $!                 # the dump follows in /tmp/wm.log
+```
+
+```
+state machines: 3 live
+client 4194304
+  focus: state 1
+    entered: 0=0 1=1
+    trace (oldest first, 1 of 8 kept):
+      raw        0 -> 1  guard none, event 31
+monitor 555
+  tag-view: state 1
+    entered: 0=0 1=1
+    trace (oldest first, 1 of 8 kept):
+      transition 0 -> 1  guard none, event 20
+```
+
+Event numbers are the constants in `src/event-types.h`. `tests/x/test-15-state-dump.sh`
+asserts the dump for the machines a started WM always has.
+
 ### Scripted session
 
 ```bash

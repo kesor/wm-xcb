@@ -26,16 +26,31 @@ sm_template_create(
   tmpl->transitions     = transitions;
   tmpl->num_transitions = num_transitions;
   tmpl->initial_state   = initial_state;
+  tmpl->refs            = 1; /* the creator's reference */
 
   LOG_DEBUG("Created SMTemplate: %s", name);
   return tmpl;
 }
 
 void
-sm_template_destroy(SMTemplate* tmpl)
+sm_template_retain(SMTemplate* tmpl)
 {
   if (tmpl == NULL)
     return;
+  tmpl->refs++;
+}
+
+void
+sm_template_destroy(SMTemplate* tmpl)
+{
+  if (tmpl == NULL || tmpl->refs == 0)
+    return;
+
+  tmpl->refs--;
+  if (tmpl->refs > 0) {
+    LOG_DEBUG("SMTemplate %s still used by %u machine(s)", tmpl->name, tmpl->refs);
+    return;
+  }
 
   LOG_DEBUG("Destroying SMTemplate: %s", tmpl->name);
 

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include "sm-debug.h"
 #include "sm-instance.h"
 #include "sm-registry.h"
 #include "sm-template.h"
@@ -31,6 +32,9 @@ sm_trace_record(StateMachine* sm, uint32_t from_state, uint32_t to_state,
   sm->trace.next = (sm->trace.next + 1) % SM_TRACE_DEPTH;
   if (sm->trace.count < SM_TRACE_DEPTH)
     sm->trace.count++;
+
+  if (applied)
+    sm_debug_note_enter(sm, to_state);
 }
 
 uint32_t
@@ -157,15 +161,19 @@ sm_create(void* owner, SMTemplate* template, EventEmitter emit, void* emit_userd
     return NULL;
   }
 
-  sm->name          = template->name;
-  sm->current_state = template->initial_state;
-  sm->owner         = owner;
-  sm->template      = template;
-  sm->data          = NULL;
-  sm->emit          = emit;
-  sm->emit_userdata = emit_userdata;
-  sm->trace.count   = 0;
-  sm->trace.next    = 0;
+  sm->name              = template->name;
+  sm->current_state     = template->initial_state;
+  sm->owner             = owner;
+  sm->template          = template;
+  sm->data              = NULL;
+  sm->emit              = emit;
+  sm->emit_userdata     = emit_userdata;
+  sm->trace.count       = 0;
+  sm->trace.next        = 0;
+  sm->enter_counts_lost = 0;
+  sm->next_live         = NULL;
+  for (int i = 0; i < SM_STATE_ENTER_MAX; i++)
+    sm->enter_counts[i] = 0;
 
   /* Allocate hook lists for each phase */
   for (int i = 0; i < SM_HOOK_MAX; i++) {
@@ -182,8 +190,12 @@ sm_create(void* owner, SMTemplate* template, EventEmitter emit, void* emit_userd
     }
   }
 
+  sm_template_retain(template);
+
   LOG_DEBUG("Created StateMachine: %s, initial_state=%u",
             sm->name, sm->current_state);
+
+  sm_debug_machine_created(sm);
   return sm;
 }
 
@@ -195,13 +207,17 @@ sm_destroy(StateMachine* sm)
 
   LOG_DEBUG("Destroying StateMachine: %s", sm->name);
 
+  sm_debug_machine_destroyed(sm);
+
   /* Free hook lists */
   for (int i = 0; i < SM_HOOK_MAX; i++) {
     sm_hook_list_destroy(sm->hooks[i]);
     sm->hooks[i] = NULL;
   }
 
+  SMTemplate* template = sm->template;
   free(sm);
+  sm_template_destroy(template);
 }
 
 uint32_t

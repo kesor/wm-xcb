@@ -23,6 +23,7 @@
 
 static void (*previous_sigint)(int);
 static void (*previous_sigterm)(int);
+static void (*previous_sigusr1)(int);
 
 static int
 is_readable(int fd, int timeout_ms)
@@ -41,6 +42,8 @@ remember_signal_dispositions(void)
   signal(SIGINT, previous_sigint);
   previous_sigterm = signal(SIGTERM, SIG_DFL);
   signal(SIGTERM, previous_sigterm);
+  previous_sigusr1 = signal(SIGUSR1, SIG_DFL);
+  signal(SIGUSR1, previous_sigusr1);
 }
 
 static void
@@ -48,6 +51,7 @@ restore_signal_dispositions(void)
 {
   signal(SIGINT, previous_sigint);
   signal(SIGTERM, previous_sigterm);
+  signal(SIGUSR1, previous_sigusr1);
 }
 
 void
@@ -117,10 +121,37 @@ test_a_second_setup_keeps_the_same_pipe(void)
   running = was_running;
 }
 
+void
+test_sigusr1_asks_for_one_state_dump(void)
+{
+  LOG_CLEAN("  test_sigusr1_asks_for_one_state_dump...");
+
+  setup_signals();
+  int fd = signals_wakeup_fd();
+  assert_or_abort(fd >= 0);
+
+  /* Clear a request left by an earlier test before asserting on a new one. */
+  (void) signals_take_dump_request();
+  signals_drain_wakeups();
+
+  assert(raise(SIGUSR1) == 0);
+
+  /* The handler must wake the wait, or the dump waits for the next X event. */
+  assert(is_readable(fd, 100));
+  assert(signals_take_dump_request() == 1);
+  assert(signals_take_dump_request() == 0);
+
+  /* SIGUSR1 asks for a dump; it must not be read as a request to quit. */
+  assert(running != 0);
+
+  signals_drain_wakeups();
+}
+
 TEST_GROUP(SignalWakeup, {
   remember_signal_dispositions();
   test_setup_signals_creates_a_nonblocking_wakeup_fd();
   test_sigterm_sets_running_and_wakes_the_loop();
   test_a_second_setup_keeps_the_same_pipe();
+  test_sigusr1_asks_for_one_state_dump();
   restore_signal_dispositions();
 });

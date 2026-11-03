@@ -20,6 +20,15 @@
  */
 static int wakeup_pipe[2] = { -1, -1 };
 
+/*
+ * Set by the SIGUSR1 handler and taken by the event loop.
+ *
+ * The dump walks every live state machine and writes to stdout: neither is
+ * async-signal-safe, so the handler records the request and wakes the loop,
+ * and the loop makes the dump between two dispatches.
+ */
+static volatile sig_atomic_t dump_requested = 0;
+
 static void
 signal_wakeup(void)
 {
@@ -55,6 +64,13 @@ sigint(int unused)
      not help. LOG_DEBUG and printf take the stdio lock and deadlock the same
      way the code this signal interrupted may. The non-blocking pipe is the
      only safe way to end the wait. */
+  signal_wakeup();
+}
+
+static void
+sigusr1(int unused)
+{
+  dump_requested = 1;
   signal_wakeup();
 }
 
@@ -96,6 +112,22 @@ setup_signals()
   /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
   if (signal(SIGTERM, sigint) == SIG_ERR)
     LOG_FATAL("cannot install SIGTERM event handler");
+
+  /* SIGUSR1 asks for a state dump. Install it here rather than letting the
+     default action stand: the default for SIGUSR1 is to kill the process. */
+  /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
+  if (signal(SIGUSR1, sigusr1) == SIG_ERR)
+    LOG_FATAL("cannot install SIGUSR1 event handler");
+}
+
+int
+signals_take_dump_request(void)
+{
+  if (dump_requested == 0)
+    return 0;
+
+  dump_requested = 0;
+  return 1;
 }
 
 int

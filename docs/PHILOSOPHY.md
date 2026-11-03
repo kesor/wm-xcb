@@ -23,7 +23,7 @@ a promise the code does not keep is a defect list, not marketing.
 | **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop key handling | not kept: the launcher blocks the loop |
 | **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | not kept: no key grabs exist (4.5) |
 | **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: the unit suite covers the model, `make test-x` covers the X seam and still fails there |
-| **The WM can explain itself** | current state and recent transitions can be dumped and read | not kept: `LOG_DEBUG` only, no state dump or event trace |
+| **The WM can explain itself** | current state and recent transitions can be dumped and read | kept: `kill -USR1` prints every live machine with its state, entrance counts and last eight changes (§5) |
 
 Those five are the product. Everything below exists to keep them.
 

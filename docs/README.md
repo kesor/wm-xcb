@@ -125,7 +125,9 @@ Short version, and the parts that stay true until they are fixed:
   withdrawing: it is unmanaged, `WM_STATE` goes to `Withdrawn`, and
   `EVT_CLIENT_UNMANAGED` is emitted. The event loop blocks in `poll(2)` on the
   X connection plus a signal wakeup pipe, so an idle WM costs no CPU, and
-  SIGTERM ends it.
+  SIGTERM ends it. Each state machine keeps its last eight changes, and
+  `kill -USR1` prints every live machine - owner, state, entrance counts, and
+  those changes - so the WM can be asked why a window is in the state it is in.
 - **Does not work:** it sets no EWMH root properties. Visible tags are stored
   twice: a tag view change updates the tag-view state machine, and a new client
   still copies its tags from `Monitor.tagset`, which no runtime path writes, so

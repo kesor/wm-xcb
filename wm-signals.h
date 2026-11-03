@@ -17,4 +17,11 @@ void sigchld(int unused);
 void sigint(int unused);
 void setup_signals();
 
+/*
+ * Returns 1 once for each SIGUSR1 that arrived since the last call, 0
+ * otherwise. The event loop calls it between dispatches and dumps the state
+ * machines when it says yes.
+ */
+int signals_take_dump_request(void);
+
 #endif

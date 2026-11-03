@@ -34,15 +34,24 @@ typedef struct SMTransition {
 struct SMTemplate {
   const char*   name;            /* template name */
   uint32_t*     states;          /* array of state values */
-  uint32_t      num_states;      /* number of states */
+  uint32_t      num_states;      /* number of state values */
   SMTransition* transitions;     /* array of valid transitions */
   uint32_t      num_transitions; /* number of transitions */
   uint32_t      initial_state;   /* default initial state */
+
+  /* References: one held by whoever created the template, one per live machine.
+   * A component that frees its cached template at shutdown still has machines
+   * on its targets, and those machines look their rows up on every transition,
+   * so the struct has to outlive both. */
+  uint32_t refs;
 };
 
 /*
  * Create a new SMTemplate with the given parameters.
  * Returns NULL on allocation failure.
+ *
+ * The creator holds one reference. sm_create() takes another for the machine it
+ * creates, and gives it back in sm_destroy().
  */
 SMTemplate* sm_template_create(
     const char*   name,
@@ -53,11 +62,18 @@ SMTemplate* sm_template_create(
     uint32_t      initial_state);
 
 /*
- * Destroy an SMTemplate.
- * Frees the template struct. Note: the states and transitions arrays
- * are owned by the caller and must be freed separately if needed.
+ * Drop the caller's reference to a template, and free it once no machine uses
+ * it any more.
+ *
+ * The states and transitions arrays are owned by the caller and are not freed.
  */
 void sm_template_destroy(SMTemplate* tmpl);
+
+/*
+ * Take a reference for a machine that is about to use the template.
+ * Not for callers outside the state machine framework.
+ */
+void sm_template_retain(SMTemplate* tmpl);
 
 /*
  * Find a transition from one state to another.

@@ -83,6 +83,18 @@ silence. `src/sm/sm-trace.h` defines the entry; `sm_trace_snapshot()` copies
 the ring oldest first. The ring is a fixed array inside the machine, so
 recording costs no allocation on a path that runs per event.
 
+### Dump
+
+`sm_debug_dump(FILE*)` prints every live machine: the target that owns it, its
+current state, how often it has entered each state, and its trace. The WM calls
+it when SIGUSR1 arrives, from the event loop rather than from the handler, and
+writes to stdout; `tests/unit/test-sm-debug.c` checks the text and
+`tests/x/test-15-state-dump.sh` checks it against a running WM.
+
+A template counts as alive as long as one machine uses it: the creator and every
+machine hold a reference, so a component that drops its cached template at
+shutdown cannot leave a live machine pointing at freed memory.
+
 ---
 
 ## SM Template Structure

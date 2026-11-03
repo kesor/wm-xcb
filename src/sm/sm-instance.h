@@ -47,6 +47,12 @@ typedef enum SMHookPhase {
 typedef void (*SMHookFn)(StateMachine*, void*);
 
 /*
+ * How many states per machine carry an entry count. A template with more
+ * states than this still dumps; the extra states are reported as uncounted.
+ */
+#define SM_STATE_ENTER_MAX 8
+
+/*
  * StateMachine structure
  * Instance of a state machine template.
  */
@@ -66,6 +72,14 @@ struct StateMachine {
     uint32_t     count; /* entries recorded, saturates at SM_TRACE_DEPTH */
     uint32_t     next;  /* slot the next entry is written to */
   } trace;
+
+  /* How often each state was entered, by position in the template's state list.
+   * A dump reads these through sm-debug.c, which is what writes them. */
+  uint32_t enter_counts[SM_STATE_ENTER_MAX];
+  uint32_t enter_counts_lost; /* entries for a state past SM_STATE_ENTER_MAX */
+
+  /* Link in the live-machine list the dump walks. Owned by sm-debug.c. */
+  StateMachine* next_live;
 };
 
 /*
