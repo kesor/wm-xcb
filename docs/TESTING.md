@@ -194,7 +194,10 @@ stricter. The remaining known failures, as of the last refresh:
 
 | Test | Known failure, because |
 |------|-------------------------|
+| `test-53-tag-move-client` | `tag-manager.client-move` toggles the tag bit instead of moving the client, so the client stays on the visible tag (wm-rh6.7) |
+| `test-55-randr-relayout` | an xrandr mode change never reaches the WM: the RandR handler is registered under a reply code, and a monitor geometry change does not ask for a new layout (wm-4f6.19) |
 | `test-60-ewmh-root-properties` | no root properties are set |
+| `test-75-pointer-drag` (two assertions) | there is no pointer component yet, so nothing handles BUTTON_PRESS, MOTION_NOTIFY or BUTTON_RELEASE (wm-rh6.3) |
 
 Write a test so that it cannot pass for the wrong reason: a precondition such as
 "the window is visible before I press the key" uses `require_visible`, which
@@ -204,6 +207,12 @@ pass because it was never there.
 Two files are the exception to "one Xephyr for the whole run" and start their
 own display, because the condition they check cannot be produced once the WM is
 already up: `test-86-queued-event.sh` and `test-88-adopt-existing-windows.sh`.
+
+`test-55-randr-relayout.sh` uses the shared session but changes its screen: it
+switches the nested output to the largest mode narrower than the current one and
+switches back on every exit path, because the tests after it tile into whatever
+screen is left. A mode the server refuses stops the test as a precondition, so
+a failure it reports is about the WM's answer to the change.
 
 `test-86-queued-event.sh` checks what a queued event does. libxcb reads ahead of
 `poll(2)`, so an event can sit in its queue while the socket is no longer
@@ -223,7 +232,10 @@ override-redirect window keeps its geometry and gets no `WM_STATE`.
 while it sends `super+2` and `super+1`, so both key presses are queued and the
 WM dispatches them in one drain. That is the ordering where a hide and a later
 show both run before the `UnmapNotify` the hide causes is read. The test resumes
-the WM on every exit path.
+the WM on every exit path. `test-52-queued-backlog-responsiveness.sh` stops it
+the same way but queues 200 tag toggles and one `super+1`, then measures the wall
+clock from the resume until that `super+1` has brought the window back: the
+answer to a key cannot be stuck behind the backlog.
 
 `run.sh` puts a `dmenu` and a `dmenu_path` of its own at the front of `PATH`.
 The fake dmenu records its start in `$WM_SEAM_DMENU_STARTED` and then sleeps,
