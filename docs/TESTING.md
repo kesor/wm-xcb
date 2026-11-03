@@ -265,18 +265,26 @@ the same way but queues 200 tag toggles and one `super+1`, then measures the wal
 clock from the resume until that `super+1` has brought the window back: the
 answer to a key cannot be stuck behind the backlog.
 
-`run.sh` puts a `dmenu` and a `dmenu_path` of its own at the front of `PATH`.
-The fake dmenu records its start in `$WM_SEAM_DMENU_STARTED` and then sleeps,
-writing nothing; the fake list source prints nothing. A real dmenu needs fonts
-the nested server may not have, and a test that presses `MOD+p` wants a child
-that holds the pipe open, not a menu. `test-92-launcher-does-not-block.sh` uses
-it: it waits for the marker so an unstarted launcher cannot make the assertion
-pass on an idle WM, then requires `MOD+2` to hide the tag-1 window within 500 ms.
-`scripts/perf-test.sh` runs the same stage and fails the run when the key goes
-unanswered. The fake does not grab the keyboard; a real dmenu does, so `MOD+2`
-would not reach the WM while a real prompt is up. What the stage measures is
-that the WM's loop still answers, which is the promise; the fake is the only
-dmenu that lets the test see it.
+`run.sh` puts a `dmenu`, a `dmenu_path` and a `dmenu_run` of its own at the
+front of `PATH`. The fake dmenu records its start in `$WM_SEAM_DMENU_STARTED`
+and then sleeps, writing nothing; the fake list source prints nothing; the fake
+`dmenu_run` execs the fake dmenu, which is what the real script ends up doing. A
+real dmenu needs fonts the nested server may not have, and a test that presses
+`MOD+p` wants a child that holds the pipe open, not a menu.
+`test-92-launcher-does-not-block.sh` uses it: it waits for the marker so an
+unstarted launcher cannot make the assertion pass on an idle WM, then requires
+`MOD+2` to hide the tag-1 window within 500 ms. `dmenu_run` is there because a
+launcher may exec the script rather than dmenu itself, and one that found no
+`dmenu_run` would exit before it could block: the test would then fail at "the
+launcher did not start", which says nothing about the loop. Verified both ways
+on this suite: with the async launcher the key lands in tens of milliseconds;
+with the launcher's blocking read and `waitpid()` put back, the same assertion
+fails with "MOD+2 did not reach the WM within 500 ms".
+`scripts/perf-test.sh` runs the same stage, with the same three names on `PATH`,
+and fails the run when the key goes unanswered. The fake does not grab the
+keyboard; a real dmenu does, so `MOD+2` would not reach the WM while a real
+prompt is up. What the stage measures is that the WM's loop still answers, which
+is the promise; the fake is the only dmenu that lets the test see it.
 
 ---
 

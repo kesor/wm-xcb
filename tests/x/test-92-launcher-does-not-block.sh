@@ -18,6 +18,11 @@ now_ms() {
   echo $(($(date +%s%N) / 1000000))
 }
 
+# The fixture has to carry every name a launcher may exec, or a launcher that
+# does block still stops the test below as "dmenu did not start", which is a
+# different defect and says nothing about the loop.
+check_nonempty "the suite fakes dmenu_run as well as dmenu" "$(command -v dmenu_run 2>/dev/null)"
+
 # leave the WM alone until dmenu has really started: a launcher that never ran
 # would make the assertion below pass because the WM was idle, not responsive.
 rm -f "$WM_SEAM_DMENU_STARTED"
