@@ -154,7 +154,10 @@ pre-push:
       # the tree from scratch, which is what catches a missing dependency edge.
       # No trailing clean is needed any more; each variant has its own object
       # directory, which build-variants checks.
-      run: make clean >/dev/null && make DEBUG=1 >/dev/null && make test >/dev/null && make -j$(nproc)
+      # The suite goes through check-unit.sh rather than `make test >/dev/null`:
+      # a failing assertion in the debug build is what this gate is for, and the
+      # redirect kept make's "Error 1" line and dropped the assertion with it.
+      run: make clean >/dev/null && make DEBUG=1 >/dev/null && DEBUG=1 ./scripts/check-unit.sh && make -j$(nproc)
       fail_text: "The -pedantic debug build or its tests failed."
 
     build-variants:
