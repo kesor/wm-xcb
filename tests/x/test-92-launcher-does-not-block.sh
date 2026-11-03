@@ -18,6 +18,17 @@ now_ms() {
   echo $(($(date +%s%N) / 1000000))
 }
 
+# The fixture has to carry every name a launcher may exec, or a launcher that
+# does block still stops the test below as "dmenu did not start", which is a
+# different defect and says nothing about the loop. command -v alone is not
+# enough: a system dmenu_run (this project's nix shell has one) would satisfy
+# a non-empty check while the suite's fake was missing, and that system script
+# hard-codes absolute paths to the real dmenu, so the start marker never
+# appears. Both names must resolve next to the start-marker directory.
+fake_bin=$(dirname "$WM_SEAM_DMENU_STARTED")/bin
+check_eq "the suite fakes dmenu" "$fake_bin/dmenu" "$(command -v dmenu 2>/dev/null)"
+check_eq "the suite fakes dmenu_run next to dmenu" "$fake_bin/dmenu_run" "$(command -v dmenu_run 2>/dev/null)"
+
 # leave the WM alone until dmenu has really started: a launcher that never ran
 # would make the assertion below pass because the WM was idle, not responsive.
 rm -f "$WM_SEAM_DMENU_STARTED"

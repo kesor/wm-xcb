@@ -99,6 +99,14 @@ cat >"$FAKE_BIN/dmenu_path" <<'FAKE_DMENU_PATH'
 :
 FAKE_DMENU_PATH
 chmod +x "$FAKE_BIN/dmenu_path"
+# A launcher may exec dmenu_run, as dwm's script does, instead of running dmenu
+# itself. Without this name on PATH that launcher exits at once and the keys
+# stage below measures an idle WM, which is the opposite of what it is for.
+cat >"$FAKE_BIN/dmenu_run" <<'FAKE_DMENU_RUN'
+#!/bin/sh
+exec dmenu "$@"
+FAKE_DMENU_RUN
+chmod +x "$FAKE_BIN/dmenu_run"
 rm -f "$LOG_DIR/dmenu-started"
 PATH="$FAKE_BIN:$PATH"
 export PATH
