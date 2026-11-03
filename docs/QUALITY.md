@@ -8,10 +8,10 @@ model.*
 > in one place and called from both. If a check cannot be reduced to a command
 > that gives the same answer twice, it does not belong here.
 >
-> CI calls `lefthook run pre-push --force`. Without `--force` lefthook computes
-> the files a push touched, and a CI checkout has no push range: the branch tip
-> is the commit already checked out, the file list is empty, and lefthook skips
-> every command and reports success. The claim that CI runs the same commands
+> CI calls `lefthook run pre-push --force --no-auto-install`. Without `--force`
+> lefthook computes the files a push touched, and a CI checkout has no push
+> range: the branch tip is the commit already checked out, the file list is
+> empty, and lefthook skips every command and reports success. The claim that CI runs the same commands
 > was false until the flag was there. The job's runtime is the check: tens of
 > seconds means the gates ran.
 
@@ -24,7 +24,7 @@ model.*
 | `pre-commit` | every commit | ~5 s | paths, docs, test-src, bead refs, workflow, beads export, formatting, build, unit tests, async rule |
 | `commit-msg` | every commit | instant | message rules (no AI attribution) |
 | `pre-push` | every push | ~80 s | the above plus the flake evaluation, the shell lint, the seam suite, the sanitize gate, the `-pedantic` debug build, the standalone tests, the build variants, and the harness variants |
-| CI `gates` | every push and PR | ~2 min | `lefthook run pre-push --force` with the beads job excluded |
+| CI `gates` | every push and PR | ~2 min | `lefthook run pre-push --force --no-auto-install` with the beads job excluded |
 | CI `seam` | every push and PR | ~1 min | `make test-x` on the private Xvfb the run starts, required: known failures are baselined |
 | CI `sanitize-x` | every push and PR | ~1 min | `scripts/check-sanitize-x.sh`: the WM in a nested server under ASan and UBSan |
 
@@ -86,7 +86,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 |------|---------|----------------|
 | build | `make -j$(nproc)` | the tree compiles |
 | flake | `scripts/check-flake.sh` | the dev shell in `flake.nix` evaluates for this system, so a syntax error, a moved attribute or a package that no longer exists fails here and not at the next `direnv allow` |
-| unit | `make test` | the unit suite across hub, state machines, targets, components |
+| unit | `scripts/check-unit.sh` | the unit suite across hub, state machines, targets, components. The gate captures the run and prints its log only when it fails: a passing suite is a single summary line and lefthook prints the verdict and the duration as its own summary, so attaching the log to every commit spends the reader's attention on a step that passed. A run whose summary line is missing, or whose summary counts a failure, fails the gate whatever make exited with |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
@@ -235,10 +235,14 @@ left behind says a defect is still there when it is not.
 1. Write the check as a script under `scripts/` that exits non-zero on failure
    and prints `file:line` or the failing thing. No network, no model.
 2. Add it to the right layer in `lefthook.yml` with a `fail_text` that says what
-   to do about it.
+   to do about it, then prove it fires: `lefthook run pre-commit --command
+   <name> --force --no-auto-install`. Without `--force`, a command with a `glob`
+   is skipped when no staged file matches, and lefthook answers the skipped job
+   with `no job matching <name> found`, which reads as a gate that is not wired
+   at all.
 3. A hook gate needs no workflow edit. The `gates` job runs `lefthook run
-   pre-push --force`, so the command from step 2 runs in CI. Pasting that
-   command into `.github/workflows/quality.yml` as well is a second
+   pre-push --force --no-auto-install`, so the command from step 2 runs in CI.
+   Pasting that command into `.github/workflows/quality.yml` as well is a second
    implementation; the unit-suite sanitizer job was that, and it ignored
    `tests/quality/asan-baseline.txt`. The seam and sanitize-x jobs are not that
    kind of copy: seam uploads the logs the hook run does not keep, and
@@ -254,19 +258,24 @@ to leave it out, not to add a heuristic.
 
 ```bash
 make hooks                  # once per clone; points git at .githooks/
-lefthook run pre-push --force   # every gate that runs before a push, changed files or not
-lefthook run pre-commit     # just the commit-time gates
-LEFTHOOK_EXCLUDE=beads lefthook run pre-push --force   # without the beads export
+lefthook run pre-push --force --no-auto-install   # every gate that runs before a push, changed files or not
+lefthook run pre-commit --no-auto-install     # just the commit-time gates
+LEFTHOOK_EXCLUDE=beads lefthook run pre-push --force --no-auto-install   # without the beads export
 scripts/check-seam.sh       # the seam suite as the push gate runs it
 scripts/check-flake.sh      # the dev shell in flake.nix evaluates
 scripts/check-shellcheck.sh # the shell lint, against its baseline
 make test-x                 # the same suite, spelled out; starts a private Xvfb
 scripts/check-sanitize.sh   # the unit suite under the sanitizers, against the leak baseline
 scripts/check-sanitize-x.sh # the WM in a nested server under the sanitizers
+scripts/check-unit.sh       # the unit suite as the commit gate runs it: one line on a pass, the log on a failure
 scripts/check-workflow.sh   # every .github/workflows/ file parses
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
 ```
+
+Pass `--no-auto-install` to a by-hand `lefthook run`: the hook wrapper passes it,
+and without it lefthook treats the committed `core.hooksPath` as a mistake and
+prints a block offering to reset it, which would undo `make hooks`.
 
 ## What is deliberately not a gate
 
