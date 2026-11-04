@@ -132,5 +132,10 @@ When the file does name bindings, they **replace** the compiled ones rather than
 adding to them. That is what makes a key removable: `MOD+2` does nothing in a
 session whose file does not bind it.
 
-A binding that names an action nothing registered is still silent. Startup does
-not check the name against the action registry yet.
+A binding that names an action no component registered is reported once at
+startup, by the same check that reports a compiled binding naming one: the line
+names the chord and the action, not the line of the file it came from.
+
+```
+ERROR: keybinding: Mod+keycode 41 is bound to action 'nope.nothing', which no component registered; the key does nothing
+```
