@@ -120,8 +120,126 @@ test_fullscreen_init_requires_action_registry(void)
   hub_shutdown();
 }
 
+/*
+ * Fake reply source for the queue walk: a bit per cookie sequence says which
+ * reply has arrived, and the value handed back is that sequence, so the test
+ * can name the order the walk applied them in.
+ */
+typedef struct FakeReplies {
+  uint32_t ready_mask;
+  uint32_t applied[4];
+  size_t   applied_count;
+} FakeReplies;
+
+#define REPLY_READY(sequence) (1u << (sequence))
+
+static bool
+fake_read_arrived(void*                     userdata,
+                  xcb_get_property_cookie_t cookie,
+                  xcb_window_t              window,
+                  void**                    reply)
+{
+  FakeReplies* fake = (FakeReplies*) userdata;
+  (void) window;
+
+  if ((fake->ready_mask & REPLY_READY(cookie.sequence)) == 0)
+    return false;
+
+  uint32_t* sequence = malloc(sizeof *sequence);
+  assert_or_abort(sequence != NULL);
+  *sequence = cookie.sequence;
+  *reply    = sequence;
+  return true;
+}
+
+static void
+fake_read_apply(void* userdata, xcb_window_t window, void* reply)
+{
+  FakeReplies* fake = (FakeReplies*) userdata;
+  (void) window;
+
+  assert_or_abort(fake->applied_count < 4);
+  fake->applied[fake->applied_count++] = *(uint32_t*) reply;
+  free(reply);
+}
+
+static xcb_get_property_cookie_t
+fake_cookie(uint32_t sequence)
+{
+  xcb_get_property_cookie_t cookie = { .sequence = sequence };
+  return cookie;
+}
+
+/*
+ * Test: two replies ready in one iteration are applied oldest first. Applying
+ * the newer one first leaves the state machine on the older answer.
+ */
+void
+test_fullscreen_state_read_applies_oldest_first(void)
+{
+  LOG_CLEAN("== Testing _NET_WM_STATE replies apply oldest first");
+
+  fullscreen_state_read_queue_reset_for_tests();
+
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(1), 101));
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(2), 102));
+  assert_or_abort(fullscreen_state_read_queue_count_for_tests() == 2);
+
+  FakeReplies fake = { .ready_mask = REPLY_READY(1) | REPLY_READY(2) };
+  size_t      applied =
+      fullscreen_state_read_drain(fake_read_arrived, fake_read_apply, &fake);
+
+  assert(applied == 2);
+  assert(fake.applied_count == 2);
+  assert(fake.applied[0] == 1);
+  assert(fake.applied[1] == 2);
+  assert(fullscreen_state_read_queue_count_for_tests() == 0);
+
+  fullscreen_state_read_queue_reset_for_tests();
+}
+
+/*
+ * Test: a head whose reply has not arrived stops the walk. The entries behind
+ * it are later, so applying a ready one early is the same defect in a different
+ * shape: it does not wait for the answer before it.
+ */
+void
+test_fullscreen_state_read_stops_at_unarrived_head(void)
+{
+  LOG_CLEAN("== Testing an unarrived _NET_WM_STATE reply stops the walk");
+
+  fullscreen_state_read_queue_reset_for_tests();
+
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(1), 101));
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(2), 102));
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(3), 103));
+
+  FakeReplies fake = { .ready_mask = REPLY_READY(2) | REPLY_READY(3) };
+  size_t      applied =
+      fullscreen_state_read_drain(fake_read_arrived, fake_read_apply, &fake);
+
+  assert(applied == 0);
+  assert(fake.applied_count == 0);
+  assert(fullscreen_state_read_queue_count_for_tests() == 3);
+
+  /* The head arrives: the walk resumes at the oldest and keeps the order. */
+  fake.ready_mask = REPLY_READY(1) | REPLY_READY(2) | REPLY_READY(3);
+  applied         = fullscreen_state_read_drain(fake_read_arrived, fake_read_apply, &fake);
+
+  assert(applied == 3);
+  assert(fake.applied_count == 3);
+  assert(fake.applied[0] == 1);
+  assert(fake.applied[1] == 2);
+  assert(fake.applied[2] == 3);
+  assert(fullscreen_state_read_queue_count_for_tests() == 0);
+
+  fullscreen_state_read_queue_reset_for_tests();
+}
+
 TEST_GROUP(FullscreenComponent, {
   test_fullscreen_action_registered();
   test_fullscreen_toggle_action();
   test_fullscreen_init_requires_action_registry();
+  test_fullscreen_state_read_applies_oldest_first();
+  test_fullscreen_state_read_stops_at_unarrived_head();
 });

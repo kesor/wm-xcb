@@ -27,6 +27,7 @@
 #define _COMPONENT_FULLSCREEN_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <xcb/xcb.h>
 
@@ -166,6 +167,37 @@ void fullscreen_update_x_property(Client* c, bool fullscreen);
  * Called by xcb_handler_dispatch() when a property changes on a client window.
  */
 void fullscreen_on_property_notify(void* event);
+
+/*
+ * The queue of _NET_WM_STATE reads in flight, walked by the loop's poll
+ * callback and by the unit tests.
+ *
+ * `arrived` says whether the head's reply has arrived and, when it has, hands
+ * it over; the walk stops at the first head it refuses. `apply` takes the reply
+ * and owns it. Applying can queue another read, which has to stay behind the
+ * ones still in flight, so the head is dropped before `apply` runs.
+ *
+ * The split exists because a unit test has no server to make a reply arrive,
+ * and the order the walk applies them in is the behaviour worth keeping.
+ */
+typedef bool (*FullscreenStateReadArrived)(void*                     userdata,
+                                           xcb_get_property_cookie_t cookie,
+                                           xcb_window_t              window,
+                                           void**                    reply);
+typedef void (*FullscreenStateReadApply)(void* userdata, xcb_window_t window, void* reply);
+
+/* Returns the number of replies applied. */
+size_t fullscreen_state_read_drain(FullscreenStateReadArrived arrived,
+                                   FullscreenStateReadApply   apply,
+                                   void*                      userdata);
+
+#ifdef WM_HUB_TESTING
+/* Queue one read without an X connection, and inspect or clear the queue. */
+bool   fullscreen_state_read_queue_push_for_tests(xcb_get_property_cookie_t cookie,
+                                                  xcb_window_t              window);
+size_t fullscreen_state_read_queue_count_for_tests(void);
+void   fullscreen_state_read_queue_reset_for_tests(void);
+#endif
 
 /*
  * Guard Functions (for SM transitions)
