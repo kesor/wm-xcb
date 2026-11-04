@@ -88,11 +88,31 @@ measured=$(clang-tidy -p . \
   sort)
 
 if [ -z "$measured" ]; then
-  echo "check-complexity: clang-tidy reported nothing; the check or the database is wrong" >&2
-  exit 1
+  # A header declares no function body, so a commit that touches only headers
+  # measures nothing. Failing it sent workers to --update-baseline with the
+  # wrong cause. The guard is for the other case: a .c that produced no
+  # measurement is a broken compile database, not a pass.
+  if printf '%s\n' "${files[@]}" | grep -qv '\.h$'; then
+    echo "check-complexity: clang-tidy reported nothing; the check or the database is wrong" >&2
+    exit 1
+  fi
+  echo "check-complexity: ${#files[@]} header(s), no function body to measure"
+  exit 0
 fi
 
 if [ "$UPDATE" -eq 1 ]; then
+  # Merge into the baseline; do not rewrite it from the files in hand. The
+  # failure message tells a worker to run this for one staged file, and a
+  # rewrite from that file deleted every entry it did not measure - 28
+  # production entries went, the next push failed on all of them, and a test
+  # entry could never be added because the no-argument form measures only what
+  # `make -s print-src` lists, which excludes tests/. An entry whose function
+  # was measured and is now below the floor is dropped, so a split shows.
+  previous=$(awk '!/^#/ && NF { print $1, $2 }' "$BASELINE" 2>/dev/null)
+  merged=$({
+    printf '%s\n' "$previous"
+    printf '%s\n' "$measured"
+  } | awk -v floor="$FLOOR" '!/^#/ && NF { value[$1] = $2 } END { for (n in value) if (value[n] >= floor) print n, value[n] }' | sort)
   {
     echo "# Cognitive complexity per function, from clang-tidy $TOOL."
     echo "# Written by scripts/check-complexity.sh --update-baseline."
@@ -100,9 +120,9 @@ if [ "$UPDATE" -eq 1 ]; then
     echo "# the gate; a function at or above $FLOOR with no entry fails it too, which"
     echo "# is the moment somebody decides the number is acceptable."
     echo "#"
+    printf '%s\n' "$merged"
   } >"$BASELINE"
-  printf '%s\n' "$measured" | awk -v floor="$FLOOR" '$2 >= floor' >>"$BASELINE"
-  echo "check-complexity: wrote $(awk -v f="$FLOOR" '!/^#/ && $2>=f' "$BASELINE" | wc -l) entries to $BASELINE"
+  echo "check-complexity: wrote $(awk -v f="$FLOOR" '!/^#/ && $2>=f' "$BASELINE" | wc -l) entries to $BASELINE, $(printf '%s\n' "$measured" | awk -v f="$FLOOR" '$2>=f' | wc -l) measured in this run"
   exit 0
 fi
 
