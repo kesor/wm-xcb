@@ -11,11 +11,13 @@ agree with it, and then to leave a record that a later reader can act on.
 This is not a gate. `docs/QUALITY.md` says why: a review that does not answer
 the same way twice cannot block a merge. The gates do that, and they run at the
 merge, after this verdict: `land` rebases, then runs the pre-push set, then
-merges. An approval therefore does not make a tree pass them. A review that
-skips one of the gate commands listed below is followed by that same suite
-refusing the merge, and the loop spends a second cycle on the same diff. A
-review produces one of two things instead: a commit that faces the gates like
-any other, or a bead comment that the author reads when resumed.
+merges. An approval therefore does not make a tree pass them. The commands
+listed below are a subset of that set. Skipping one does not fail the merge. If
+the tree would fail that command, the review did not see the failure, and the
+merge's refusal costs another cycle on the same diff. Running every listed
+command still leaves the rest of the pre-push set for the merge. A review
+produces one of two things instead: a commit that faces the gates like any
+other, or a bead comment that the author reads when resumed.
 
 ## Inputs
 
