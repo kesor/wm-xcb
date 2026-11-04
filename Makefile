@@ -243,6 +243,12 @@ check-async:
 test-x: $(NAME) tools/xclient tools/xcb-ewmh-delay.so
 	DEBUG=$(DEBUG) SANITIZE=$(SANITIZE) ./tests/x/run.sh $(TEST_X_ARGS)
 
+# What the WM does here, in one call: it is the probe tests/x/probe.sh starts,
+# a tool rather than a test, so it needs no baseline and makes no assertion.
+#   make probe PROBE_ARGS="-n 2 -c 'xdotool mousemove 100 100'"
+probe: tools/xclient
+	./tests/x/probe.sh $(PROBE_ARGS)
+
 # Standalone test (no XCB dependencies required)
 # FORCE because the binary is shared by the variants, like wm and test above.
 # Coverage and fuzzing build their own trees under build/; neither is part of
@@ -297,4 +303,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone coverage complexity fuzz check format tidy tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE
+.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone coverage complexity fuzz check format tidy probe tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE

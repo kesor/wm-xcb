@@ -5,9 +5,10 @@
 #
 # Usage: scripts/check-harness-variant.sh [--verbose]
 #
-# scripts/xephyr-test.sh, tests/x/run.sh and scripts/perf-test.sh start the WM
-# themselves, so they build it themselves. A plain `make wm` in such a script
-# builds whatever the Makefile's default is, which is release, so a DEBUG=1 run
+# scripts/xephyr-test.sh, tests/x/run.sh, tests/x/probe.sh and
+# scripts/perf-test.sh start the WM themselves, so they build it themselves. A
+# plain `make wm` in such a script builds whatever the Makefile's default is,
+# which is release, so a DEBUG=1 run
 # got a release binary, an empty log, and the conclusion that the event never
 # happened. Two workers paid for that discovery by hand-rolling a Xephyr session
 # instead. A measurement is the same defect with a number on it: perf-test.sh
@@ -15,8 +16,8 @@
 #
 # So this asks the shared builder, scripts/lib/wm-variant.sh, for each variant
 # and checks four things: the line it prints names the variant, the binary and
-# the log; the binary it names is the one that variant produces; neither
-# harness builds the WM behind its back; and ./wm is left alone. The `wm`
+# the log; the binary it names is the one that variant produces; no harness
+# builds the WM behind its back; and ./wm is left alone. The `wm`
 # target copies onto ./wm, and the builder must not use it: a gate whose last
 # case is SANITIZE=1 would otherwise leave the ASan binary where a manual ./wm
 # starts. A release binary cannot carry the DEBUG log literals (LOG_DEBUG
@@ -65,7 +66,7 @@ pass() {
 TMP_LOG="$(mktemp)"
 trap 'rm -f "$TMP_LOG"' EXIT
 
-HARNESSES=(scripts/xephyr-test.sh tests/x/run.sh scripts/perf-test.sh)
+HARNESSES=(scripts/xephyr-test.sh tests/x/run.sh tests/x/probe.sh scripts/perf-test.sh)
 
 # A harness that calls make itself can build a variant other than the one it
 # was asked for, which is the defect this gate exists for. The builder is the
