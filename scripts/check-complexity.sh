@@ -43,6 +43,13 @@ if ! command -v clang-tidy >/dev/null 2>&1; then
   exit 1
 fi
 
+# The number a function gets depends on the clang-tidy that counted it: a
+# condition two builds of the same check read differently is two points on a
+# function. A gate that fails on a tool difference is a gate nobody trusts, so
+# the version is recorded with the baseline and named when one is missing.
+TOOL=$(clang-tidy --version 2>/dev/null | sed -n 's/^ *LLVM version \(.*\)/\1/p' | head -1)
+TOOL=${TOOL:-unknown}
+
 if [ "${#files[@]}" -eq 0 ]; then
   mapfile -t files < <(make -s print-src | tr ' ' '\n' | grep -v '^wm\.c$' | grep -v '^$')
 fi
@@ -85,7 +92,7 @@ fi
 
 if [ "$UPDATE" -eq 1 ]; then
   {
-    echo "# Cognitive complexity per function, from clang-tidy."
+    echo "# Cognitive complexity per function, from clang-tidy $TOOL."
     echo "# Written by scripts/check-complexity.sh --update-baseline."
     echo "# Functions below $FLOOR are not listed. A function above its number fails"
     echo "# the gate; a function at or above $FLOOR with no entry fails it too, which"
@@ -100,6 +107,11 @@ fi
 if [ ! -f "$BASELINE" ]; then
   echo "check-complexity: $BASELINE is missing; run --update-baseline once and commit it" >&2
   exit 1
+fi
+
+recorded_tool=$(sed -n "s/^# Cognitive complexity per function, from clang-tidy \([^.]*\).*/\1/p" "$BASELINE" | head -1)
+if [ -n "$recorded_tool" ] && [ "$recorded_tool" != "$TOOL" ]; then
+  echo "check-complexity: the baseline was measured with clang-tidy $recorded_tool and this is $TOOL; the numbers can differ by a point or two per function. Regenerate it in this environment if the gate fails on a difference you did not write." >&2
 fi
 
 problems=0
@@ -118,7 +130,7 @@ while read -r name value; do
 done <<<"$measured"
 
 if [ "$problems" -gt 0 ]; then
-  echo "check-complexity: $problems function(s) above the baseline. Split the function along a decision that already exists, or run --update-baseline and say why in the commit." >&2
+  echo "check-complexity: $problems function(s) above the baseline (clang-tidy $TOOL). Split the function along a decision that already exists, or run --update-baseline and say why in the commit." >&2
   exit 1
 fi
 echo "check-complexity: every function at or above $FLOOR is within its baseline entry"

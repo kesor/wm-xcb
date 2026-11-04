@@ -1,4 +1,4 @@
-# Cognitive complexity per function, from clang-tidy.
+# Cognitive complexity per function, from clang-tidy 21.1.8.
 # Written by scripts/check-complexity.sh --update-baseline.
 # Functions below 11 are not listed. A function above its number fails
 # the gate; a function at or above 11 with no entry fails it too, which
