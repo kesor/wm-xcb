@@ -219,7 +219,8 @@ hooks:
 	@echo "hooks: run 'lefthook run pre-push' to execute every gate now"
 
 # print-src is read by scripts/check-async.sh so the static check scans exactly
-# the files the build compiles.
+# the files the build compiles, and by scripts/check-orphan-sources.sh so a
+# tracked source that no target builds is reported.
 print-src:
 	@echo $(SRC)
 

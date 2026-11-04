@@ -46,6 +46,13 @@ pre-commit:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC, so its assertions never run."
 
+    # A .c file that is tracked but missing from SRC compiles nowhere, and
+    # check-async scans the build's list, so a blocking call in it is invisible
+    # to both. That is how wm-kbd-mouse.c kept an xcb_grab_pointer_reply().
+    sources:
+      run: ./scripts/check-orphan-sources.sh
+      fail_text: "A tracked .c file is in no build target, so the compiler and check-async both skip it. Add it to SRC, or delete it."
+
     # A stand-in answers every assertion a test asks it, so the program it names
     # is the one part of a test the suite cannot falsify. The gate resolves that
     # name on PATH, requires a file, and looks there for the line the stand-in
@@ -138,6 +145,10 @@ pre-push:
     test-src:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC."
+
+    sources:
+      run: ./scripts/check-orphan-sources.sh
+      fail_text: "A tracked .c file is in no build target, so the compiler and check-async both skip it."
 
     fakes:
       run: ./scripts/check-fakes.sh
