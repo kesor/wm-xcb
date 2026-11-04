@@ -71,7 +71,10 @@ RULES=(
   'xcb_wait_for_reply\(|synchronous X round trip'
   'xcb_request_check\(|synchronous X round trip'
   'xcb_aux_sync\(|synchronous X round trip'
-  'xcb_key_symbols_alloc\(|hidden X round trip: it asks the server for the keyboard mapping'
+  # alloc only sends GetKeyboardMapping and stores the cookie. The wait is
+  # xcb_get_keyboard_mapping_reply(), and these two names are what call it.
+  'xcb_key_symbols_get_keycode\(|hidden X round trip: waits for the keyboard mapping that xcb_key_symbols_alloc() only requests'
+  'xcb_key_symbols_get_keysym\(|hidden X round trip: waits for the keyboard mapping that xcb_key_symbols_alloc() only requests'
   '\bread\(|blocking read: a callback must not wait for a child process'
   'waitpid\(|blocking wait on a child: reap asynchronously, or pass WNOHANG'
   '\busleep\(|\bsleep\(|nanosleep\(|sleep inside the window manager stalls every client'

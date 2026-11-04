@@ -4,5 +4,4 @@
 # Each line is <file>|<normalized call>. A violation listed here does not
 # fail the check; a violation missing from here does. Remove entries when
 # the call is gone: the script reports stale lines, and the point of the
-# file is that it shrinks. The work that removes them is tracked in
-# 'bd list --parent wm-46k.2'.
+# file is that it shrinks.

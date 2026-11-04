@@ -199,9 +199,10 @@ in `tests/quality/async-baseline.txt`.
 
 The rules also cover blocking names that do not end in `_reply(`: the
 `xcb_*_replies()` family waits once per atom or screen, `xcb_aux_sync()` is a
-round trip, and `xcb_key_symbols_alloc()` asks the server for the keyboard
-mapping. Each of those is waived where it runs before the loop and nowhere
-else.
+round trip, and `xcb_key_symbols_get_keycode()` and
+`xcb_key_symbols_get_keysym()` wait for the keyboard mapping.
+`xcb_key_symbols_alloc()` only sends that request, so it is not a rule.
+Each blocking name is waived where it runs before the loop and nowhere else.
 
 A violation that is in neither fails. That is the point: the file only shrinks.
 Adding an entry is a deliberate act:

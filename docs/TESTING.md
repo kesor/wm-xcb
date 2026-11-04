@@ -334,7 +334,7 @@ compiled cannot produce findings, then flags calls that block:
 |---------|-------------------|
 | `xcb_*_reply()`, `xcb_wait_for_reply()`, `xcb_request_check()`, `xcb_aux_sync()` | synchronous round trip: the loop waits for the server |
 | `xcb_*_replies()` | the plural form of the same wait, once per atom, screen or list; `xcb_ewmh_init_atoms_replies()` is the one in the tree |
-| `xcb_key_symbols_alloc()` | a round trip behind a name that never says `reply`: it asks the server for the keyboard mapping |
+| `xcb_key_symbols_get_keycode()`, `xcb_key_symbols_get_keysym()` | a round trip behind a name that never says `reply`: both call `xcb_get_keyboard_mapping_reply()`. `xcb_key_symbols_alloc()` only sends the request |
 | `read()` | a callback must not wait on a child's pipe |
 | `waitpid()` without `WNOHANG` | blocking wait on a child |
 | `sleep()`, `usleep()`, `nanosleep()` | anything that sleeps stops every client |
