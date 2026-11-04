@@ -74,10 +74,10 @@ void keybinding_fullscreen(void) {
 ```
 
 **Rules:**
-1. Component receives request
-2. Executor tries to fulfill the request (XCB call)
-3. On success: raw write to SM, SM transitions, event emitted
-4. On failure: SM stays in current state, failure event emitted
+1. Component receives the request
+2. Executor calls `sm_transition()` on the target's machine
+3. On success: the row's action did the X work, the machine moved, one event was emitted
+4. On refusal: the machine stays, a failure event is emitted, nothing was written
 
 ---
 
@@ -209,9 +209,9 @@ Keybinding / Plugin
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   Component Executor                                │
 │   Executor receives (Request* req) with concrete target             │
-│   Does XCB call (non-blocking)                                      │
-│   On success: sm_raw_write(target->sm, NEW_STATE)                   │
-│   On failure: emits EVT_REQUEST_FAILED                              │
+│   sm_transition() on the target's machine                           │
+│   On success: the row's action did the X work                       │
+│   On refusal: failure event, state unchanged, nothing written       │
 └─────────────────────────────────────────────────────────────────────┘
          │
          ▼

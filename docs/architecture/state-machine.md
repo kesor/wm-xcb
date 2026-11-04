@@ -269,14 +269,17 @@ bool fs_guard_can_unfullscreen(StateMachine* sm, void* data) {
     return true;  // Can always unfullscreen
 }
 
-// Action functions (for transitions triggered by requests)
-void fs_action_enter_fullscreen(StateMachine* sm, void* data) {
-    // Actions are handled by executor, not here
-    // This is only for pure SM-side effects if needed
+// Action functions (for transitions triggered by requests).
+// A guard that refused never calls these. The executor does not issue the
+// X request itself.
+bool fs_action_enter_fullscreen(StateMachine* sm, void* data) {
+    // Issues the X request the row names.
+    return true;
 }
 
-void fs_action_exit_fullscreen(StateMachine* sm, void* data) {
-    // Actions are handled by executor, not here
+bool fs_action_exit_fullscreen(StateMachine* sm, void* data) {
+    // Removes what the enter action added.
+    return true;
 }
 ```
 
@@ -291,8 +294,8 @@ void fs_action_exit_fullscreen(StateMachine* sm, void* data) {
 
 **Actions:** Side effects that happen during transition
 - Run AFTER guard passes, BEFORE state update
-- Usually empty (executor handles X calls)
-- Can be used for pure in-SM effects (logging, updating other fields)
+- May issue the X request the row names; a refused transition does not reach them
+- Must not change another state machine
 
 ---
 
