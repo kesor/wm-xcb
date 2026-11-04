@@ -48,16 +48,26 @@ output_lines() {
 # at nothing, and the first of those would report the empty result as WM
 # behaviour. The subshell signals the test shell instead, and the trap turns the
 # file into one failing assertion and stops it before that happens.
+#
+# The report has to reach the stdout this file was started with. Callers discard
+# spawn_client's stdout, and the trap can run before that redirect is popped. A
+# FAIL line written then is discarded with it. run.sh judges a file by the FAIL
+# lines it printed, not by its exit status, so a swallowed line is a file the
+# suite reports as passed, and every assertion after the spawn never ran.
+# fd 3 is that stdout.
+exec 3>&1
 SPAWN_FAILURE_FILE="$TMPDIR_SEAM/spawn-failure.$$"
 # shellcheck disable=SC2329 # the trap calls it
 spawn_failure_reported() {
   local line
   [ -s "$SPAWN_FAILURE_FILE" ] || return 0
-  while IFS= read -r line; do
-    fail "$line"
-  done <"$SPAWN_FAILURE_FILE"
-  rm -f "$SPAWN_FAILURE_FILE"
-  finish
+  {
+    while IFS= read -r line; do
+      fail "$line"
+    done <"$SPAWN_FAILURE_FILE"
+    rm -f "$SPAWN_FAILURE_FILE"
+    finish
+  } >&3
   exit 1
 }
 trap spawn_failure_reported USR1

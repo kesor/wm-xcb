@@ -245,12 +245,15 @@ shared, and that is the part a test has to put back.
 `spawn_client` fails the file it is called from when xclient comes back with
 fewer window ids than it was asked for, and the failure's text starts with
 `spawn_client`. The client's ids are read from a file the parent creates before
-the fork, so a shortfall means the client never ran, and every caller's next
-assertion would report that as WM behaviour ("focus is not on either managed
-client"). That assertion therefore never runs: the trap in `lib.sh` reports the
-harness failure, prints the file's own count and exits 1.
-`test-107-spawn-client-report.sh` pins both the report and the ids a
-back-to-back run gets.
+the fork. A shortfall is fewer lines than were asked for after the wait, and
+every caller's next assertion would report that as WM behaviour ("focus is not
+on either managed client"). That assertion therefore never runs: the trap in
+`lib.sh` reports the harness failure, prints the file's own count and exits 1.
+The report is written to the stdout the file was started with, so a caller that
+discards `spawn_client`'s own stdout still shows it. `tests/x/run.sh` judges a
+file by those lines, not by its exit status.
+`test-107-spawn-client-report.sh` pins the report for both call shapes and the
+ids a back-to-back run gets.
 
 Two kinds of state a fresh WM does not reset, because they live in the X server
 rather than in the WM: the lock modifiers (NumLock, CapsLock) and the RandR
