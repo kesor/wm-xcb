@@ -7,7 +7,8 @@
  * Component lifecycle:
  * - on_init(): register PropertyNotify handler, register guards/actions
  * - on_adopt(): create SM instance for client
- * - executor: handle REQ_CLIENT_FULLSCREEN request
+ * - executor: handle REQ_CLIENT_FULLSCREEN by transitioning the client's
+ *   machine; the transition's action issues the _NET_WM_STATE change
  *
  * XCB Events Handled:
  * - XCB_PROPERTY_NOTIFY - listen for _NET_WM_STATE changes
@@ -120,6 +121,9 @@ void fullscreen_component_shutdown(void);
  * Transitions:
  *   WINDOWED → FULLSCREEN (guard: can_fullscreen, action: enter_fullscreen, emit: EVT_FULLSCREEN_ENTERED)
  *   FULLSCREEN → WINDOWED (guard: can_unfullscreen, action: exit_fullscreen, emit: EVT_FULLSCREEN_EXITED)
+ *
+ * The enter and exit actions are what write `_NET_WM_STATE` to the window, so a
+ * transition that a guard refused leaves the property untouched.
  */
 SMTemplate* fullscreen_sm_template_create(void);
 
@@ -219,18 +223,18 @@ bool fullscreen_guard_can_unfullscreen(StateMachine* sm, void* data);
 /*
  * Action Functions (for SM transitions)
  * Registered with the SM registry.
- * Note: These are for SM-side effects only. X operations are in the executor.
+ * Each is the transition's X side effect: it adds or removes
+ * `_NET_WM_STATE_FULLSCREEN` on the machine's owner and returns false when
+ * there is no owner to change it for.
  */
 
 /*
  * Action called when entering fullscreen (via sm_transition).
- * Note: X operations are handled separately in the executor.
  */
 bool fullscreen_action_enter_fullscreen(StateMachine* sm, void* data);
 
 /*
  * Action called when exiting fullscreen (via sm_transition).
- * Note: X operations are handled separately in the executor.
  */
 bool fullscreen_action_exit_fullscreen(StateMachine* sm, void* data);
 

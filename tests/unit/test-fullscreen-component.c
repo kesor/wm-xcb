@@ -120,6 +120,142 @@ test_fullscreen_init_requires_action_registry(void)
   hub_shutdown();
 }
 
+static size_t fullscreen_failures = 0;
+
+static void
+count_fullscreen_failure(struct Event event)
+{
+  (void) event;
+  fullscreen_failures++;
+}
+
+/*
+ * Test: a request is intent, so the guard on the template's WINDOWED →
+ * FULLSCREEN row decides. An unmanaged client has nothing to go fullscreen
+ * into, so the request is refused and the failure is reported instead of the
+ * state moving anyway.
+ */
+void
+test_fullscreen_request_refused_for_unmanaged_client(void)
+{
+  LOG_CLEAN("== Testing a fullscreen request for an unmanaged client");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  client_list_init();
+  action_registry_init();
+  fullscreen_component_init();
+
+  fullscreen_failures = 0;
+  hub_subscribe(EVT_FULLSCREEN_FAILED, count_fullscreen_failure, NULL);
+
+  Client* c = client_create(701);
+  assert_or_abort(c != NULL);
+  assert(c->managed == false);
+
+  hub_send_request(REQ_CLIENT_FULLSCREEN, c->target.id);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+  assert(fullscreen_failures == 1);
+
+  /* The refusal is about the client, not the request: the same request is
+     allowed once there is a managed window behind it. */
+  client_set_managed(c, true);
+  hub_send_request(REQ_CLIENT_FULLSCREEN, c->target.id);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+  assert(fullscreen_failures == 1);
+
+  client_list_shutdown();
+  fullscreen_component_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Counters standing in for the template's actions. Swapping them in by the
+ * names the template carries asks the question a reader of the table asks:
+ * does a request reach the action column of the row it declared?
+ */
+static size_t  fake_enter_calls  = 0;
+static size_t  fake_exit_calls   = 0;
+static Client* fake_action_owner = NULL;
+
+static bool
+fake_enter_fullscreen(StateMachine* sm, void* data)
+{
+  (void) data;
+  fake_enter_calls++;
+  fake_action_owner = (Client*) sm->owner;
+  return true;
+}
+
+static bool
+fake_exit_fullscreen(StateMachine* sm, void* data)
+{
+  (void) data;
+  (void) sm;
+  fake_exit_calls++;
+  return true;
+}
+
+/*
+ * Test: the request path runs the transition the template declares, including
+ * its action. A refusal stops before the action, so counting the action is how
+ * this test tells the guard and the action apart.
+ */
+void
+test_fullscreen_request_runs_the_template_action(void)
+{
+  LOG_CLEAN("== Testing a fullscreen request runs the template action");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  client_list_init();
+  action_registry_init();
+  fullscreen_component_init();
+
+  sm_unregister_action("fs_action_enter_fullscreen");
+  sm_register_action("fs_action_enter_fullscreen", fake_enter_fullscreen);
+  sm_unregister_action("fs_action_exit_fullscreen");
+  sm_register_action("fs_action_exit_fullscreen", fake_exit_fullscreen);
+
+  Client* c = client_create(702);
+  assert_or_abort(c != NULL);
+
+  hub_send_request(REQ_CLIENT_FULLSCREEN, c->target.id);
+  assert(fake_enter_calls == 0);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+
+  client_set_managed(c, true);
+
+  hub_send_request(REQ_CLIENT_FULLSCREEN, c->target.id);
+  assert(fake_enter_calls == 1);
+  assert(fake_action_owner == c);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  hub_send_request(REQ_CLIENT_FULLSCREEN, c->target.id);
+  assert(fake_exit_calls == 1);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+
+  /* Put the component's own actions back: the next test in the group re-inits
+     the registry, and a swap left behind would make that init register a
+     counter instead of the X write. */
+  sm_unregister_action("fs_action_enter_fullscreen");
+  sm_register_action("fs_action_enter_fullscreen", fullscreen_action_enter_fullscreen);
+  sm_unregister_action("fs_action_exit_fullscreen");
+  sm_register_action("fs_action_exit_fullscreen", fullscreen_action_exit_fullscreen);
+
+  client_list_shutdown();
+  fullscreen_component_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
 /*
  * Fake reply source for the queue walk: a bit per cookie sequence says which
  * reply has arrived, and the value handed back is that sequence, so the test
@@ -240,6 +376,8 @@ TEST_GROUP(FullscreenComponent, {
   test_fullscreen_action_registered();
   test_fullscreen_toggle_action();
   test_fullscreen_init_requires_action_registry();
+  test_fullscreen_request_refused_for_unmanaged_client();
+  test_fullscreen_request_runs_the_template_action();
   test_fullscreen_state_read_applies_oldest_first();
   test_fullscreen_state_read_stops_at_unarrived_head();
 });

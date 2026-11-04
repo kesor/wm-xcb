@@ -6,7 +6,8 @@
  *
  * The component provides:
  * - FullscreenSM template: WINDOWED ↔ FULLSCREEN
- * - Executor that handles REQ_CLIENT_FULLSCREEN requests via X
+ * - Executor that handles REQ_CLIENT_FULLSCREEN by transitioning the client's
+ *   machine, whose action issues the X property change
  * - Listener for PROPERTY_NOTIFY to sync external _NET_WM_STATE changes
  * - Guards and actions registered with SM registry
  */
@@ -181,29 +182,38 @@ fullscreen_guard_can_unfullscreen(StateMachine* sm, void* data)
  */
 
 /*
- * Action for entering fullscreen.
- * Note: X operations are handled in the executor, not here.
- * This is for SM-side effects if needed.
+ * Action for entering fullscreen: the transition's own X side effect.
+ *
+ * The write lives here rather than in the executor so that every path into the
+ * machine - a keybinding request today, a direct transition tomorrow - asks the
+ * server for the same thing, and a refused transition asks for nothing. The
+ * request is ADD rather than TOGGLE so that running it twice leaves one
+ * _NET_WM_STATE_FULLSCREEN in the list.
  */
 bool
 fullscreen_action_enter_fullscreen(StateMachine* sm, void* data)
 {
-  (void) sm;
   (void) data;
-  /* X operations handled by executor */
+
+  if (sm == NULL || sm->owner == NULL)
+    return false;
+
+  fullscreen_update_x_property((Client*) sm->owner, true);
   return true;
 }
 
 /*
- * Action for exiting fullscreen.
- * Note: X operations are handled in the executor, not here.
+ * Action for exiting fullscreen: removes the atom the enter action added.
  */
 bool
 fullscreen_action_exit_fullscreen(StateMachine* sm, void* data)
 {
-  (void) sm;
   (void) data;
-  /* X operations handled by executor */
+
+  if (sm == NULL || sm->owner == NULL)
+    return false;
+
+  fullscreen_update_x_property((Client*) sm->owner, false);
   return true;
 }
 
@@ -220,8 +230,8 @@ fullscreen_sm_template_create(void)
   };
 
   /* Define transitions:
-   * WINDOWED → FULLSCREEN (guard + action + event)
-   * FULLSCREEN → WINDOWED (guard + action + event)
+   * WINDOWED → FULLSCREEN (guard + action writes _NET_WM_STATE + event)
+   * FULLSCREEN → WINDOWED (guard + action removes _NET_WM_STATE + event)
    */
   static SMTransition transitions[] = {
     {
@@ -426,11 +436,14 @@ fullscreen_executor(struct HubRequest* req)
                          ? FULLSCREEN_STATE_WINDOWED
                          : FULLSCREEN_STATE_FULLSCREEN;
 
-  /* Perform X operation */
-  fullscreen_update_x_property(c, target == FULLSCREEN_STATE_FULLSCREEN);
-
-  /* Update SM state (raw_write - X operation succeeded) */
-  sm_raw_write(sm, target);
+  /* A keybinding asks for a state, so it goes through the guard and the action
+     the template declares. Refused means nothing was written to the window. */
+  if (!sm_transition(sm, target)) {
+    LOG_DEBUG("fullscreen_executor: transition to state=%u refused for window=%u",
+              target, c->window);
+    hub_emit(EVT_FULLSCREEN_FAILED, req->target, NULL);
+    return;
+  }
 
   LOG_DEBUG("fullscreen_executor: toggled fullscreen for client window=%u to state=%u",
             c->window, target);
