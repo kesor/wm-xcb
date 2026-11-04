@@ -535,15 +535,13 @@ Worktrees contain agent progress. Before removing or cleaning:
 
 ### Overlapping Beads
 
-Two beads that touch the same files conflict at the second merge, whichever
-branch lands second, and the merge stops on a hand resolution that puts an
-unreviewed edit on a branch a reviewer already approved. Which beads overlap,
-and what to do about it, is the "Spawning workers" section of
-`.agents/skills/wm-bootstrap/SKILL.md`. The rule lives there and not here: the
-copy that stood in this file said "nothing shared, run them together", and
-`worker.py overlap` reads only the files a bead names. A bead written before the
-work exists names almost none, so its empty answer is a hint and not a
-decision.
+Two beads that touch the same files conflict at the second merge: the merge
+stops on a hand resolution that puts an unreviewed edit on a branch a reviewer
+already approved. Which beads overlap, and what to do about it, is the
+"Spawning workers" section of `.agents/skills/wm-bootstrap/SKILL.md`. The rule
+lives there and not here: the copy that stood in this file read "nothing
+shared, run them together", and that sentence dispatched three beads in parallel
+whose branches shared four files.
 
 ---
 
