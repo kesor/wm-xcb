@@ -122,12 +122,12 @@ neither refusal is a gate failure. A `review-<slug>` window still open means
 the review is still running: wait for it, then merge. A HEAD that is not the
 sha in the last `Approved at <sha>` verdict, read before that second rebase,
 means that approval does not cover this commit: review again before merging.
-The merge closes the bead, unless the verdict's last line is `Close: no`: the
-close decision is that line, never a sentence in the verdict's body, because a
-merge reads a line and cannot read an argument. The harness's `land` still closes
-every bead the worktree carried, without looking, so a bead closed against
-`Close: no` needs a `bd comment` naming the bead that carries the cause. A worker
-stops at in_progress: see "Definition of done".
+The close decision is the verdict's last line, `Close: no` or `Close: yes`,
+never a sentence in the body, so a later harness change can match a line instead
+of an argument. `land` still closes every bead the worktree carried without
+reading that line, so a bead closed against `Close: no` needs a later `bd
+comment` naming the bead that carries the cause. A worker stops at in_progress:
+see "Definition of done".
 
 Rules: read the acceptance criteria before starting. A parent epic is not a
 task. `bd edit` opens an editor and blocks an agent — never use it.
@@ -248,26 +248,23 @@ beads in your final message. This is how the traps below stop being traps.
   copy back, and `bd setup <tool> --check` reports an incomplete integration
   after `--remove` as well as before the first install, so it cannot tell you
   whether to run the setup or to leave it alone.
-- **A merge can end up on no ref.** The publish step pushes, then resets master
-  onto `origin/master`, so a merge made while that push was in flight is in
-  neither and the reset takes it away. The reset is `git reset --hard
-  origin/<MERGE_REF>` in the harness's `wpy/commands/publish.py`, and it runs
-  whether or not master moved during the wait. That wait is the push, the check
-  run and the merge, so it runs to minutes: the 2026-11-03 publish that
-  discarded a merge recorded 298612ms on its `phase=publish` row. A merge made
-  into that gap is discarded from master. `land` writes `refs/kept/<bead>`
-  before it deletes the branch, and the reset does not move that ref, so a
-  merge that went through `land` is not only an object. When that ref is
-  missing, the commit exists only in the reflog and the next `git gc` removes
-  it. No commit on a `work/<bead>` branch can guard the reset: that file is not
-  in this repository. `HANDOFF.md` section 5 rule 3 says `worker.py` is not
-  edited while a cycle is in flight, and that anything else waits for a
-  boundary; this skill already says a worker reads the harness and does not
-  edit it. A bead asking for that guard is a session-between-runs job, so
-  record the finding and spend no turns looking for an in-tree fix. When a
-  bead is closed as merged and its files are not on master, read
-  `refs/kept/<bead>` first, else `git reflog master` for its
-  `merge work/<bead>` line, pin a reflog sha with
+- **A merge can end up on no ref.** On 2026-11-03 the publish step reset
+  master onto `origin/master` while a merge was in flight, and that merge was
+  on neither ref. The reset is `git reset --hard origin/<MERGE_REF>` in the
+  harness's `wpy/commands/publish.py`. It now refuses when the merge ref is not
+  the sha captured before the first push, and when origin does not carry that
+  tree; both checks run before the reset. The wait that discarded the
+  2026-11-03 merge recorded 298612ms on its `phase=publish` row. `land` writes
+  `refs/kept/<bead>` before it deletes the branch, and the reset does not move
+  that ref, so a merge that went through `land` is not only an object. When
+  that ref is missing, the commit exists only in the reflog and the next
+  `git gc` removes it. No commit on a `work/<bead>` branch can change the
+  reset: that file is not in this repository. `HANDOFF.md` section 5 rule 3
+  says `worker.py` is not edited while a cycle is in flight, and that anything
+  else waits for a boundary; this skill already says a worker reads the
+  harness and does not edit it. When a bead is closed as merged and its files
+  are not on master, read `refs/kept/<bead>` first, else `git reflog master`
+  for its `merge work/<bead>` line, pin a reflog sha with
   `git update-ref refs/local/recovered-<bead> <sha>`, then merge it back and
   say so in the bead.
 - **A bead can ask for work that is not in this tree.** When its text names a
