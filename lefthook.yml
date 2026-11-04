@@ -61,11 +61,17 @@ pre-commit:
       run: ./scripts/format-check.sh {staged_files}
       fail_text: "Formatting: run 'make format' and stage the result."
 
+    # A commit that touches only documentation cannot break the build or the
+    # suite, and both are the two slowest pre-commit gates. The glob is what
+    # makes a doc fix cheap without making the gate skippable: `--force` (what
+    # the merge and CI use) ignores globs and runs everything.
     build:
+      glob: "*.{c,h}|Makefile|*.mk"
       run: make -j$(nproc)
       fail_text: "The tree does not build."
 
     unit:
+      glob: "*.{c,h}|Makefile|*.mk"
       run: ./scripts/check-unit.sh
       fail_text: "make test failed: the suite's own output is above."
 
@@ -147,6 +153,7 @@ pre-push:
     # it runs on, and it fails rather than skipping when that server cannot
     # start.
     seam:
+      glob: "*.{c,h}|tests/x/**|scripts/**|config*.h"
       run: ./scripts/check-seam.sh
       fail_text: "A new seam failure: something X should see is not there. Run 'make test-x TEST_X_ARGS=--verbose', and baseline a known failure deliberately or fix it."
 
@@ -161,18 +168,22 @@ pre-push:
     # a whole cycle twice. Coverage is 7s warm; the fuzzers build once and run
     # 5s each.
     coverage:
+      glob: "*.{c,h}|tests/quality/**|scripts/**"
       run: ./scripts/check-coverage.sh
       fail_text: "Coverage fell below a floor in tests/quality/coverage-baseline.txt, or a file has no floor. Add the floor deliberately, or test what the change added."
 
     fuzz:
+      glob: "*.{c,h}|tests/fuzz/**|scripts/**"
       run: ./scripts/fuzz.sh 5
       fail_text: "A fuzz harness crashed, or would not build. The crashing input is in build/fuzz/."
 
     standalone:
+      glob: "*.{c,h}|Makefile"
       run: ./scripts/check-standalone.sh
       fail_text: "A standalone test target failed to link or run; its output is above."
 
     sanitize:
+      glob: "*.{c,h}|Makefile"
       run: ./scripts/check-sanitize.sh
       fail_text: "A new memory leak: fix it, or run --update-baseline and say why it is deferred."
 

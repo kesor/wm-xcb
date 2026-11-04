@@ -54,8 +54,11 @@ if ! command -v gcov >/dev/null 2>&1; then
 fi
 
 BUILD=build/coverage
-rm -rf "$BUILD"
 mkdir -p "$BUILD"
+# Incremental: the object files are valid until their source changes, and the
+# counters reset by deleting the .gcda. A full rebuild took 7s every time, which
+# is the expensive part of a gate that runs on every push.
+find "$BUILD" -name '*.gcda' -delete 2>/dev/null || true
 
 # The same sources the suite links, with the same flags plus instrumentation.
 SOURCES=$(make -s print-src) || {
@@ -80,26 +83,36 @@ objects=()
 for src in $SOURCES; do
   case $src in wm.c|*/wm.c) continue ;; esac
   obj="$BUILD/${src//\//_}.o"
-  ${CC:-gcc} "${CFLAGS[@]}" -w -c "$src" -o "$obj" || {
-    echo "check-coverage: cannot compile $src" >&2
-    exit 1
-  }
+  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+    ${CC:-gcc} "${CFLAGS[@]}" -w -c "$src" -o "$obj" || {
+      echo "check-coverage: cannot compile $src" >&2
+      exit 1
+    }
+  fi
   objects+=("$obj")
 done
 for src in $TEST_SOURCES; do
   obj="$BUILD/tests_${src//\//_}.o"
-  ${CC:-gcc} "${CFLAGS[@]}" -w -c "$src" -o "$obj" || {
-    echo "check-coverage: cannot compile $src" >&2
-    exit 1
-  }
+  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+    ${CC:-gcc} "${CFLAGS[@]}" -w -c "$src" -o "$obj" || {
+      echo "check-coverage: cannot compile $src" >&2
+      exit 1
+    }
+  fi
   objects+=("$obj")
 done
 
 BIN="$BUILD/test"
-${CC:-gcc} -o "$BIN" "${objects[@]}" "${LDFLAGS[@]}" || {
-  echo "check-coverage: cannot link the suite" >&2
-  exit 1
-}
+relink=0
+for obj in "${objects[@]}"; do
+  [ "$obj" -nt "$BIN" ] && relink=1
+done
+if [ "$relink" = 1 ] || [ ! -x "$BIN" ]; then
+  ${CC:-gcc} -o "$BIN" "${objects[@]}" "${LDFLAGS[@]}" || {
+    echo "check-coverage: cannot link the suite" >&2
+    exit 1
+  }
+fi
 "$BIN" >"$BUILD/run.log" 2>&1
 if ! grep -qE '^[[:space:]]*Total: [0-9]+ passed, 0 failed' "$BUILD/run.log"; then
   echo "check-coverage: the suite did not pass, so its coverage says nothing" >&2

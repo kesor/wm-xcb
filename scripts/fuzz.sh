@@ -72,9 +72,20 @@ for harness in tests/fuzz/fuzz-*.c; do
     [ "$wanted" = 1 ] || continue
   fi
   bin="$OUT/$name"
-  if ! clang "${CFLAGS[@]}" -w "$harness" "${objects[@]}" "${LDFLAGS[@]}" -o "$bin"; then
-    echo "fuzz: cannot link $name" >&2
-    exit 1
+  # Relink only when something the binary is made of is newer. The link with
+  # sanitizers costs about 4s per harness, and a warm run of the gate is
+  # otherwise just the fuzzing seconds.
+  stale=0
+  [ -x "$bin" ] || stale=1
+  [ "$harness" -nt "$bin" ] && stale=1
+  for obj in "${objects[@]}"; do
+    [ "$obj" -nt "$bin" ] && stale=1
+  done
+  if [ "$stale" = 1 ]; then
+    if ! clang "${CFLAGS[@]}" -w "$harness" "${objects[@]}" "${LDFLAGS[@]}" -o "$bin"; then
+      echo "fuzz: cannot link $name" >&2
+      exit 1
+    fi
   fi
   corpus="tests/fuzz/corpus/${name#fuzz-}"
   mkdir -p "$corpus"
