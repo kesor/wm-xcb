@@ -14,7 +14,10 @@
 #
 #   1. Waiver: a comment containing "allow-blocking: <reason>" on the line or the
 #      two lines above it. The reason says why the wait is safe, usually because
-#      it runs at startup before the loop exists.
+#      it runs at startup before the loop exists. A waiver is refused when an
+#      XCB handler can reach the function it sits in: the reason is a claim
+#      about when the code runs, and a handler runs inside the loop.
+#      scripts/lib/async-scan.sh is what reads the call graph.
 #   2. Baseline: tests/quality/async-baseline.txt lists the violations that are
 #      already known and tracked in beads. A hit in the baseline does not fail
 #      the check, so unrelated work is not blocked. A violation that is not in
@@ -31,6 +34,9 @@ set -uo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# shellcheck source=lib/async-scan.sh
+. "$ROOT_DIR/scripts/lib/async-scan.sh"
+
 BASELINE_FILE="$ROOT_DIR/tests/quality/async-baseline.txt"
 VERBOSE=0
 UPDATE=0
@@ -40,7 +46,7 @@ for arg in "$@"; do
     -v | --verbose) VERBOSE=1 ;;
     --update-baseline) UPDATE=1 ;;
     -h | --help)
-      sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+      awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"
       exit 0
       ;;
     *)
@@ -97,8 +103,11 @@ fi
 NEW_VIOLATIONS=0
 KNOWN=0
 WAIVED=0
+REFUSED=0
 declare -A SEEN=()
 declare -a CURRENT=()
+
+async_scan_init "${SOURCES[@]}"
 
 for f in "${SOURCES[@]}"; do
   for rule in "${RULES[@]}"; do
@@ -131,22 +140,31 @@ for f in "${SOURCES[@]}"; do
 
       # A waiver sits on the line or the two above it, and the reason after the
       # marker is what waives: an "allow-blocking:" with nothing after it says
-      # nothing, so it is reported and counted like an unwaived call.
-      start=$((line - 2))
-      [ "$start" -lt 1 ] && start=1
-      context=$(sed -n "${start},${line}p" "$f")
-      if printf '%s' "$context" | grep -qE 'allow-blocking:[[:space:]]*[^[:space:]*]'; then
-        WAIVED=$((WAIVED + 1))
-        if [ "$VERBOSE" -eq 1 ]; then
-          printf '  waived  %s:%s  %s\n' "$f" "$line" \
-            "$(printf '%s' "$context" | grep -o 'allow-blocking:.*' | head -1)"
-        fi
-        continue
-      fi
-      if printf '%s' "$context" | grep -q 'allow-blocking:'; then
-        printf '  WAIVER WITHOUT A REASON  %s:%s\n' "$f" "$line"
-        printf '                 write the reason after allow-blocking:, on that line\n'
-      fi
+      # nothing, so it is reported and counted like an unwaived call. A reason
+      # that the event loop can reach is reported and counted the same way.
+      case "$(async_waiver_verdict "$f" "$line")" in
+        waived)
+          WAIVED=$((WAIVED + 1))
+          if [ "$VERBOSE" -eq 1 ]; then
+            start=$((line - 2))
+            [ "$start" -lt 1 ] && start=1
+            context=$(sed -n "${start},${line}p" "$f")
+            printf '  waived  %s:%s  %s\n' "$f" "$line" \
+              "$(printf '%s' "$context" | grep -o 'allow-blocking:.*' | head -1)"
+          fi
+          continue
+          ;;
+        refused)
+          REFUSED=$((REFUSED + 1))
+          printf '  WAIVER REFUSED  %s:%s  %s is reachable from an XCB handler\n' \
+            "$f" "$line" "$(async_enclosing_function "$f" "$line")"
+          printf '                 the reason claims a wait outside the loop; this call runs inside it\n'
+          ;;
+        unreasoned)
+          printf '  WAIVER WITHOUT A REASON  %s:%s\n' "$f" "$line"
+          printf '                 write the reason after allow-blocking:, on that line\n'
+          ;;
+      esac
 
       key="$f|$(normalize "$text")"
       SEEN["$key"]=1
@@ -197,13 +215,13 @@ done
 
 echo
 if [ "$NEW_VIOLATIONS" -eq 0 ]; then
-  echo "check-async: no new violations (${#SOURCES[@]} files, $KNOWN known, $WAIVED waived)"
+  echo "check-async: no new violations (${#SOURCES[@]} files, $KNOWN known, $WAIVED waived, $REFUSED refused)"
   if [ "$STALE" -gt 0 ]; then
     echo "check-async: $STALE stale baseline entrie(s); run --update-baseline to drop them"
   fi
   exit 0
 fi
-echo "check-async: $NEW_VIOLATIONS new violation(s), $KNOWN known, $WAIVED waived"
+echo "check-async: $NEW_VIOLATIONS new violation(s), $KNOWN known, $WAIVED waived, $REFUSED refused"
 echo "To accept a new one on purpose:"
 echo "  scripts/check-async.sh --update-baseline   (then commit the baseline diff)"
 exit 1
