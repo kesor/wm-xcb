@@ -69,6 +69,14 @@ pre-commit:
       run: ./scripts/check-unit.sh
       fail_text: "make test failed: the suite's own output is above."
 
+    # Shifted left: a function that grows past its recorded complexity is a
+    # missing test waiting to happen, and the worker who wrote it is the one who
+    # can split it. 0.3s, so it runs on every commit.
+    complexity:
+      glob: "*.{c,h}"
+      run: ./scripts/check-complexity.sh {staged_files}
+      fail_text: "A function is above its complexity baseline. Split it along a decision that already exists, or run --update-baseline and say why in the commit."
+
     async:
       run: ./scripts/check-async.sh
       fail_text: "New blocking call in the event loop: nothing in the loop may wait. Move the wait out of the handler, or mark the line with an allow-blocking reason if it runs before the loop starts."
@@ -144,6 +152,22 @@ pre-push:
 
     # A passing run printed 215 lines: a gcc link line, a format warning and 113
     # assertion lines. The gate prints the summary now, and the log on failure.
+    complexity:
+      run: ./scripts/check-complexity.sh
+      fail_text: "A function is above its complexity baseline. Split it along a decision that already exists, or run --update-baseline and say why in the commit."
+
+    # Shifted left from CI. Both used to run only in the CI workflow, so a worker
+    # and a reviewer both saw green on a tree that CI then rejected - which cost
+    # a whole cycle twice. Coverage is 7s warm; the fuzzers build once and run
+    # 5s each.
+    coverage:
+      run: ./scripts/check-coverage.sh
+      fail_text: "Coverage fell below a floor in tests/quality/coverage-baseline.txt, or a file has no floor. Add the floor deliberately, or test what the change added."
+
+    fuzz:
+      run: ./scripts/fuzz.sh 5
+      fail_text: "A fuzz harness crashed, or would not build. The crashing input is in build/fuzz/."
+
     standalone:
       run: ./scripts/check-standalone.sh
       fail_text: "A standalone test target failed to link or run; its output is above."

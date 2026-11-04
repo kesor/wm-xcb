@@ -251,6 +251,9 @@ test-x: $(NAME) tools/xclient tools/xcb-ewmh-delay.so
 coverage: FORCE
 	./scripts/check-coverage.sh
 
+complexity: FORCE
+	./scripts/check-complexity.sh
+
 fuzz: FORCE
 	./scripts/fuzz.sh
 
@@ -294,4 +297,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone coverage fuzz check format tidy tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE
+.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone coverage complexity fuzz check format tidy tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE

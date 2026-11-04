@@ -1,0 +1,28 @@
+# Cognitive complexity per function, from clang-tidy.
+# Written by scripts/check-complexity.sh --update-baseline.
+# Functions below 11 are not listed. A function above its number fails
+# the gate; a function at or above 11 with no entry fails it too, which
+# is the moment somebody decides the number is acceptable.
+#
+client_sm_set_internal 11
+config_file_load 12
+config_wire_file_bindings 11
+focus_on_enter_notify 21
+focus_set_state 14
+handle_state_event 26
+hub_unregister_component 45
+keybinding_numlock_mask 19
+launcher_pipe_readable 11
+launcher_run_dmenu 14
+mod_key_name 14
+monitor_manager_handle_randr_notify 13
+monitor_manager_pass_poll 25
+monitor_sm_set_internal 17
+parse_chord 17
+parse_tags 15
+tag_create 12
+tag_manager_handle_client_tag_toggle 12
+tag_manager_update_visibility 12
+tiling_arrange 27
+tokenize 29
+wm_xcb_adopt_existing_windows 12
