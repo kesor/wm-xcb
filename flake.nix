@@ -13,10 +13,10 @@
         { pkgs, system }:
         let
           # The libxcb headers and man pages ship without the implementation.
-          # Whether xcb_poll_for_reply() waits for the reply, and whether the
-          # serial it compares masks XCB_REQUEST_CHECKED, are answered only in
-          # src/xcb_in.c and src/xcb_out.c. Unpacked here so that answer comes
-          # out of the store instead of a network fetch from gitlab.
+          # Whether xcb_poll_for_reply() waits, and whether a serial comparison
+          # masks XCB_REQUEST_CHECKED, are in the unpacked source, not in the
+          # header. Unpacked here so that answer comes out of the store instead
+          # of a fetch from gitlab. docs/TESTING.md names the files.
           libxcb-source = pkgs.stdenv.mkDerivation {
             pname = "libxcb-source";
             inherit (pkgs.libxcb) version src;
