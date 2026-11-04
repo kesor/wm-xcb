@@ -130,7 +130,11 @@ task. `bd edit` opens an editor and blocks an agent — never use it.
 
 ## Implementing one bead
 
-1. Read `bd show <id>` and the docs it names.
+1. Read `bd show <id>` and the docs it names. Then ask whether the work is
+   here at all: `scripts/bead-scope.sh <id>` reads the title, the description
+   and the comments for a path that only the harness has. Exit 3 means the fix
+   is in the harness; say so in a bd comment and stop. Reading the harness to
+   confirm it is the cost that command exists to remove.
 2. If the change is observable through X, write or extend a `tests/x/test-*.sh`
    first; use `require_visible` for preconditions so a test cannot pass because
    the window was never there.
@@ -260,6 +264,16 @@ beads in your final message. This is how the traps below stop being traps.
   `merge work/<bead>` line, pin a reflog sha with
   `git update-ref refs/local/recovered-<bead> <sha>`, then merge it back and
   say so in the bead.
+- **A bead can ask for work that is not in this tree.** When its text names a
+  file under the harness - `wpy/`, `worker.py`, `worker.sh`, `HANDOFF.md`,
+  `PROCESS.md`, `ai-workers-for-wm/` - no commit on a `work/<bead>` branch can
+  carry the fix, and a worker may not edit the harness at all. Run
+  `scripts/bead-scope.sh <bead-id>`: it reads the title, the description and the
+  comments, names the paths it found outside, and exits 3. Then write one bd
+  comment saying which part of the work is in this tree and which is not, do the
+  part that is here, and stop. The search for the harness file is what costs a
+  session; the command is one call. A description written before the harness
+  moved still names a file it no longer has, and the command says which.
 - **Do not push, and do not rewrite published history,** unless asked.
 
 ## Definition of done
