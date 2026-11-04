@@ -232,95 +232,61 @@ void config_init(void) {
 
 The executor handles requests. It:
 1. Receives a request with a concrete target
-2. Performs X server operations (via XCB)
-3. On success: raw-writes to the target's state machine
-4. On failure: emits an error event
+2. Asks the target's state machine to transition
+3. On success: the row's action performed the X server operation
+4. On refusal or failure: emits an error event, and nothing reached the server
+
+A request from a keybinding is intent, so it goes through `sm_transition()`,
+not `sm_raw_write()`. The guard decides, the action does the X work the row
+names, and a refused transition leaves the server and the machine alone. An
+executor that writes the X property itself and then raw-writes the state skips
+both the guard and the action: the row becomes decoration, and a client the
+guard exists to refuse is changed anyway.
 
 ```c
 void fullscreen_executor(Request* req) {
     // req->type == REQ_CLIENT_FULLSCREEN
     // req->target is concrete client ID
-    
+
     Client* c = (Client*)hub_get_target(req->target);
     if (!c) {
         hub_emit(EVT_ERR_TARGET_NOT_FOUND, req->target, NULL);
         return;
     }
-    
+
     // Get or create the SM (on-demand allocation)
     StateMachine* sm = client_get_sm(c, "fullscreen");
-    
+
     // Determine target state based on current state
     uint32_t target_state = (sm_get_state(sm) == FS_FULLSCREEN)
         ? FS_WINDOWED
         : FS_FULLSCREEN;
-    
-    // Perform X operation (non-blocking)
-    if (target_state == FS_FULLSCREEN) {
-        xcb_void_cookie_t ck = xcb_ewmh_request_change_wm_state(
-            ewmh,
-            c->window,
-            EWMH_WM_STATE_ADD,
-            ewmh->_NET_WM_STATE_FULLSCREEN,
-            XCB_ATOM_NONE,
-            0
-        );
-        // Will handle reply/error later...
-        sm_raw_write(sm, FS_FULLSCREEN);
-    } else {
-        xcb_ewmh_request_change_wm_state(...);
-        sm_raw_write(sm, FS_WINDOWED);
+
+    // The guard on the row runs first. When it passes, the row's action issues
+    // the _NET_WM_STATE change and the machine moves; when it refuses, nothing
+    // is written to the window.
+    if (!sm_transition(sm, target_state)) {
+        hub_emit(EVT_FULLSCREEN_FAILED, req->target, NULL);
     }
 }
 ```
+
+The listener still uses `sm_raw_write()`: an X property change the WM did not
+ask for is reality, and reality is authoritative.
 
 ### Executor and XCB Error Handling
 
-XCB operations are non-blocking. The executor should:
-1. Send the request with a cookie
-2. Store the correlation ID
-3. Return immediately
+XCB operations are non-blocking. The fullscreen request returns a void cookie,
+so there is no reply to store. The executor asks the machine to transition and
+returns. The row's action sends the request. A refused transition emits
+`EVT_FULLSCREEN_FAILED` and sends nothing, because the action did not run.
 
-A separate XCB reply handler will:
-1. Check the cookie for success/failure
-2. If success: sm_raw_write() to the SM
-3. If failure: emit EVT_REQUEST_FAILED
-
-```c
-void fullscreen_executor(Request* req) {
-    Client* c = hub_get_target(req->target);
-    StateMachine* sm = client_get_sm(c, "fullscreen");
-    uint32_t target_state = (sm_get_state(sm) == FS_FULLSCREEN) ? FS_WINDOWED : FS_FULLSCREEN;
-    
-    // Store pending request for later reply handling
-    pending_request_t* pr = malloc(sizeof(pending_request_t));
-    pr->correlation_id = req->correlation_id;
-    pr->client_id = req->target;
-    pr->target_state = target_state;
-    pending_requests_add(pr);
-    
-    // Send XCB request
-    if (target_state == FS_FULLSCREEN) {
-        xcb_ewmh_request_change_wm_state(ewmh, c->window, EWMH_WM_STATE_ADD, ...);
-    } else {
-        xcb_ewmh_request_change_wm_state(ewmh, c->window, EWMH_WM_STATE_TOGGLE, ...);
-    }
-}
-
-// Called when XCB reply comes back
-void on_ewmh_reply(xcb_generic_reply_t* reply, void* data) {
-    pending_request_t* pr = data;
-    StateMachine* sm = client_get_sm(hub_get_target(pr->client_id), "fullscreen");
-    
-    if (reply) {
-        sm_raw_write(sm, pr->target_state);
-    } else {
-        hub_emit(EVT_REQUEST_FAILED, pr->client_id, "fullscreen failed");
-    }
-    
-    pending_requests_remove(pr);
-}
-```
+A request whose outcome arrives only in a reply is not this request. Sending it
+before the guard has run changes the server for a client the guard would
+refuse. That request transitions when the reply arrives. A refusal emits the
+failure event and does not raw-write the state the server rejected. The action
+on that path does not send the request again: the reply is the outcome of the
+send, not a second send.
 
 ---
 
