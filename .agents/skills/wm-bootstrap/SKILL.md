@@ -116,12 +116,14 @@ bd update <id> --claim           # or: --status=in_progress
 ```
 
 The cycle rebases onto the merge ref before the review, so the reviewer reads
-the commits that will land. The merge then refuses two states: a `review-<slug>`
-window still open, and a branch whose HEAD is not the sha in the last
-`Approved at <sha>` verdict. Both refusals mean the branch moved while it was
-being read, not that a gate is wrong; wait for the review's last commit, then
-merge. The merge closes the bead and syncs the tracker through
-`refs/dolt/data`. A worker stops at in_progress: see "Definition of done".
+that rebase's result. Merge rebases again, and that second rebase is a no-op
+unless the merge ref has moved since. The merge then refuses two states, and
+neither refusal is a gate failure. A `review-<slug>` window still open means
+the review is still running: wait for it, then merge. A HEAD that is not the
+sha in the last `Approved at <sha>` verdict, read before that second rebase,
+means that approval does not cover this commit: review again before merging.
+The merge closes the bead. A worker stops at in_progress: see "Definition of
+done".
 
 Rules: read the acceptance criteria before starting. A parent epic is not a
 task. `bd edit` opens an editor and blocks an agent — never use it.
