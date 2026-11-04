@@ -576,24 +576,28 @@ fullscreen_state_read_poll(void* userdata)
   }
 }
 
-/*
- * Append one read to the queue. The queue grows by doubling and never shrinks
- * until shutdown: its length is bounded by the notifications one iteration can
- * deliver.
- */
+static bool
+fullscreen_state_read_queue_ensure(void)
+{
+  if (state_read_count < state_read_cap)
+    return true;
+
+  size_t               cap   = state_read_cap == 0 ? 4 : state_read_cap * 2;
+  FullscreenStateRead* grown = realloc(state_reads, cap * sizeof *grown);
+  if (grown == NULL) {
+    LOG_ERROR("fullscreen: cannot track the _NET_WM_STATE reply: %s", strerror(errno));
+    return false;
+  }
+  state_reads    = grown;
+  state_read_cap = cap;
+  return true;
+}
+
 static bool
 fullscreen_state_read_queue_add(xcb_get_property_cookie_t cookie, xcb_window_t window)
 {
-  if (state_read_count == state_read_cap) {
-    size_t               cap   = state_read_cap == 0 ? 4 : state_read_cap * 2;
-    FullscreenStateRead* grown = realloc(state_reads, cap * sizeof *grown);
-    if (grown == NULL) {
-      LOG_ERROR("fullscreen: cannot track the _NET_WM_STATE reply: %s", strerror(errno));
-      return false;
-    }
-    state_reads    = grown;
-    state_read_cap = cap;
-  }
+  if (!fullscreen_state_read_queue_ensure())
+    return false;
 
   state_reads[state_read_count].cookie = cookie;
   state_reads[state_read_count].window = window;
@@ -637,6 +641,12 @@ fullscreen_state_read_begin(xcb_window_t window)
     }
     state_read_polling = true;
   }
+
+  /* Reserve the slot before the request. A request passed as an argument is
+     sent first, and a failed realloc then drops the cookie, so the reply is
+     never discarded. */
+  if (!fullscreen_state_read_queue_ensure())
+    return false;
 
   return fullscreen_state_read_queue_add(ewmh_request_wm_state(ewmh, window), window);
 }
