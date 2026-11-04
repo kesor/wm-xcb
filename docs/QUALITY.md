@@ -113,6 +113,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
 | fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, cites a line of that program on its third, is named after that program, and names one that is installed on `PATH` outside the fake directory. The check resolves that name to a path, requires a regular file, and looks for the cited line in it. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
+| bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
@@ -290,6 +291,30 @@ git diff tests/quality/shellcheck-baseline.txt    # read it before committing
 A stale entry is not an error, so improving the tree is not punished. An entry
 left behind says a defect is still there when it is not.
 
+## The bead-description baseline
+
+`scripts/check-bead-descriptions.sh` fails when an issue in the tracker has no
+description, or one made only of whitespace, and
+`tests/quality/bead-description-baseline.txt` records the issues that may stay
+without one. The list is empty and is meant to stay that way: every issue had a
+description when the gate landed, so an empty one from now on is a description
+that was lost or never written.
+
+The command it watches is `bd update <id> --description "$(...)"`. When the
+substitution produces nothing, `bd` writes the empty string, prints "Updated
+issue" and exits 0: the description is gone and nothing in the output says so.
+`AGENTS.md` names `bd update <id> --stdin` as the rewrite path, and `bd` refuses
+an empty body there, but a body of whitespace still gets through and the inline
+flag never had the guard at all. So the gate catches the result at the next
+commit and names the bead. `bd history <id> --events` keeps the text each
+update replaced, under `Old:`, so a wipe is recoverable.
+
+The check reads the tracker, and a machine without that database - a CI runner,
+a fresh clone - skips it. The verdict lives in
+`scripts/lib/bead-description-report.sh`, and
+`tests/x/test-103-bead-description-report.sh` feeds it recorded issue lists, so
+the shapes it has to catch are pinned with no tracker involved.
+
 ## Adding a gate
 
 1. Write the check as a script under `scripts/` that exits non-zero on failure
@@ -333,6 +358,7 @@ scripts/check-workflow.sh   # every .github/workflows/ file parses
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
 scripts/check-fakes.sh      # every stand-in names an installed program and cites a line of it
+scripts/check-bead-descriptions.sh   # every bead description is still there
 ```
 
 Pass `--no-auto-install` to a by-hand `lefthook run`: the hook wrapper passes it,

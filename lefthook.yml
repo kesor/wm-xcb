@@ -63,6 +63,14 @@ pre-commit:
       run: ./scripts/check-bead-refs.sh
       fail_text: "Code cites a beads issue id. Say the reason, constraint or workaround in place."
 
+    # A description can be erased with a success message: the inline flag writes
+    # an empty value, prints "Updated issue" and exits 0. Nothing else in the
+    # tree looks at that field, so this does, at the commit that follows the
+    # wipe. The tracker is a local database, so a machine without one skips.
+    bead-descriptions:
+      run: ./scripts/check-bead-descriptions.sh
+      fail_text: "A beads issue has no description: one was wiped by an empty --description, or never written. The text before a wipe is in 'bd history <id> --events', and 'bd update <id> --stdin' is the write path that refuses an empty body."
+
     docs:
       glob: "*.md"
       run: ./scripts/check-docs.sh
@@ -138,6 +146,10 @@ pre-push:
     bead-refs:
       run: ./scripts/check-bead-refs.sh
       fail_text: "Code cites a beads issue id."
+
+    bead-descriptions:
+      run: ./scripts/check-bead-descriptions.sh
+      fail_text: "A beads issue has no description: one was wiped by an empty --description, or never written."
 
     docs:
       run: ./scripts/check-docs.sh
