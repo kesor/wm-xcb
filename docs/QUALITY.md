@@ -206,10 +206,14 @@ in `tests/quality/async-baseline.txt`.
   file's line structure kept. A call name in prose is not a call, whichever line
   of a `/* ... */` block it starts.
 
-`tests/x/test-101-async-rules.sh` runs the gate over probe files and checks
-every rule and every exception above, so a rule that matches nothing, or one
-that matches a call libxcb documents as non-blocking, fails the suite rather
-than sitting in the list.
+`tests/x/test-101-async-rules.sh` runs the gate over probe files. Each blocking
+call in the probe must be reported once, and a comment, a string,
+`xcb_poll_for_reply()`, `xcb_poll_for_reply64()`, `xcb_discard_reply()` and
+`waitpid()` with `WNOHANG` must not. A reasoned `allow-blocking:` is counted
+as waived. The probe names those calls; it does not read the rule array, so a
+rule added later is unchecked until the probe gains a line for it. An
+`allow-blocking:` with no reason, and a waiver the event loop can reach, are
+pinned by `tests/x/test-100-async-scan.sh`.
 
 The rules also cover blocking names that do not end in `_reply(`: the
 `xcb_*_replies()` family waits once per atom or screen, `xcb_aux_sync()` is a

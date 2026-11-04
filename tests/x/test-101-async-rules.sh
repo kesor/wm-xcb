@@ -33,8 +33,8 @@ probe(void)
   usleep(10);
   sleep(1);
   nanosleep(&ts, NULL);
-  /* a call after a block comment that closes on the same line */
-  waitpid(-1, &other, 0);
+  /* a block comment that closes here */ waitpid(-1, &other, 0);
+  waitpid(-1, &hidden, 0); /* WNOHANG */
 }
 EOF
 
@@ -97,26 +97,27 @@ for call in \
   'usleep(10);' \
   'sleep(1);' \
   'nanosleep(&ts, NULL);' \
-  'waitpid(-1, &other, 0);'; do
+  'waitpid(-1, &other, 0);' \
+  'waitpid(-1, &hidden, 0); /* WNOHANG */'; do
   EXPECTED+=("$(line_of "$call" "$BLOCKING")")
 done
 
 run_gate "$BLOCKING" >/dev/null
 check_eq "a tree with blocking calls fails the gate" 1 "$GATE_STATUS"
 
-mapfile -t REPORTED < <(
-  awk -v f="$BLOCKING" '
-    $1 == "NEW" && $2 == "VIOLATION" && index($3, f ":") == 1 {
-      line = $3
-      sub(/^.*:/, "", line)
-      print line
-    }
-  ' "$DIR/gate.log" | sort -n -u
-)
+awk -v f="$BLOCKING" '
+  $1 == "NEW" && $2 == "VIOLATION" && index($3, f ":") == 1 {
+    line = $3
+    sub(/^.*:/, "", line)
+    print line
+  }
+' "$DIR/gate.log" >"$DIR/reported-lines.txt"
+mapfile -t REPORTED < <(sort -n -u "$DIR/reported-lines.txt")
 check_eq "every call the rule list names is reported" \
   "$(printf '%s' "${EXPECTED[*]}")" "$(printf '%s' "${REPORTED[*]}")"
+# sort -u would hide a line two rules both reported. The count is the raw hits.
 check_eq "and no line is reported twice by two rules" \
-  "${#EXPECTED[@]}" "${#REPORTED[@]}"
+  "${#EXPECTED[@]}" "$(grep -c . "$DIR/reported-lines.txt" || true)"
 
 check_eq "a call after a comment that closes on the same line is reported" 1 \
   "$(grep -cE "NEW VIOLATION  .*:$(line_of 'waitpid(-1, &other, 0);' "$BLOCKING") " "$DIR/gate.log")"
