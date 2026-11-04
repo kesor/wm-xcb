@@ -46,6 +46,14 @@ pre-commit:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC, so its assertions never run."
 
+    # A stand-in answers every assertion a test asks it, so the program it names
+    # is the one part of a test the suite cannot falsify. That one is checked
+    # against PATH here. Instant, and it needs no X server.
+    fakes:
+      glob: "tests/fakes/**|scripts/check-fakes.sh"
+      run: ./scripts/check-fakes.sh
+      fail_text: "A stand-in does not name a program that is installed. Its second line says '# models: <program>, <what that program does>', the file is named after the program, and the program is on PATH."
+
     bead-refs:
       glob: "*.{c,h,sh,yml,yaml}"
       run: ./scripts/check-bead-refs.sh
@@ -118,6 +126,10 @@ pre-push:
     test-src:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC."
+
+    fakes:
+      run: ./scripts/check-fakes.sh
+      fail_text: "A stand-in names a program that is not installed, or is not named after the one it names."
 
     bead-refs:
       run: ./scripts/check-bead-refs.sh

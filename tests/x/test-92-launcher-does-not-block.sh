@@ -18,30 +18,48 @@ now_ms() {
   echo $(($(date +%s%N) / 1000000))
 }
 
-# The fixture has to carry every name a launcher may exec, or a launcher that
+# The fixture has to carry every program the launcher execs, or a launcher that
 # does block still stops the test below as "dmenu did not start", which is a
-# different defect and says nothing about the loop. command -v alone is not
-# enough: a system dmenu_run (this project's nix shell has one) would satisfy
-# a non-empty check while the suite's fake was missing, and that system script
-# hard-codes absolute paths to the real dmenu, so the start marker never
-# appears. Both names must resolve next to the start-marker directory.
-fake_bin=$(dirname "$WM_SEAM_DMENU_STARTED")/bin
-check_eq "the suite fakes dmenu" "$fake_bin/dmenu" "$(command -v dmenu 2>/dev/null)"
-check_eq "the suite fakes dmenu_run next to dmenu" "$fake_bin/dmenu_run" "$(command -v dmenu_run 2>/dev/null)"
+# different defect and says nothing about the loop. Both names must resolve next
+# to the fakes, not to a system dmenu_path or dmenu: those hard-code absolute
+# paths and need a display, so the start markers would never appear.
+check_eq "the suite stands in for dmenu" "$WM_FAKE_BIN/dmenu" "$(command -v dmenu 2>/dev/null)"
+check_eq "the suite stands in for dmenu_path" "$WM_FAKE_BIN/dmenu_path" "$(command -v dmenu_path 2>/dev/null)"
 
 # leave the WM alone until dmenu has really started: a launcher that never ran
 # would make the assertion below pass because the WM was idle, not responsive.
-rm -f "$WM_SEAM_DMENU_STARTED"
+rm -f "$WM_FAKE_STARTED_DIR/dmenu" "$WM_FAKE_STARTED_DIR/dmenu_path"
 press super+p
 for _ in $(seq 1 100); do
-  [ -e "$WM_SEAM_DMENU_STARTED" ] && break
+  [ -e "$WM_FAKE_STARTED_DIR/dmenu" ] && break
   sleep 0.02
 done
-if [ ! -e "$WM_SEAM_DMENU_STARTED" ]; then
+if [ ! -e "$WM_FAKE_STARTED_DIR/dmenu" ]; then
   fail "MOD+p did not start dmenu, so nothing is holding the loop (STATUS 4.5)"
   finish
   exit 1
 fi
+# The other stage of the launcher's pipeline is what tells a fake of the wrong
+# program from a missing one: a launcher that execs some other program fails here
+# and at the marker above, and one that execs dmenu but not dmenu_path fails
+# only here.
+if [ -e "$WM_FAKE_STARTED_DIR/dmenu_path" ]; then
+  pass "dmenu_path ran and fed the prompt, so both stages the launcher execs are stood in for"
+else
+  fail "dmenu ran but dmenu_path did not: the launcher execs a list source the suite does not stand in for"
+fi
+
+# And the set has to be exactly what the launcher reaches. A stand-in nobody
+# execs shadows a program nothing starts, which is how a dmenu_run fake made the
+# launcher read as covered while it ran a script that never wrote the pipe.
+unreached=""
+for stand_in in "$WM_FAKE_BIN"/*; do
+  [ -f "$stand_in" ] || continue
+  name=$(basename "$stand_in")
+  [ -e "$WM_FAKE_STARTED_DIR/$name" ] || unreached="${unreached:+$unreached }$name"
+done
+check_eq "every stand-in on PATH was reached by the launcher" "" "$unreached"
+
 pass "dmenu is open and its pipe is still waiting for a selection"
 
 # The press is repeated inside the budget so a lost synthetic key event cannot

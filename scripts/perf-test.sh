@@ -83,32 +83,17 @@ mkdir -p "$LOG_DIR"
 WM_LOG="$LOG_DIR/wm.log"
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
 
-# MOD+p runs `dmenu_path | dmenu`. The real dmenu needs fonts a headless nested
-# server does not reliably provide; this one writes nothing and stays open,
-# which is what the WM sees while a user looks at the prompt.
-FAKE_BIN="$LOG_DIR/bin"
-mkdir -p "$FAKE_BIN"
-cat >"$FAKE_BIN/dmenu" <<FAKE_DMENU
-#!/bin/sh
-: >"$LOG_DIR/dmenu-started"
-sleep 5
-FAKE_DMENU
-chmod +x "$FAKE_BIN/dmenu"
-cat >"$FAKE_BIN/dmenu_path" <<'FAKE_DMENU_PATH'
-#!/bin/sh
-:
-FAKE_DMENU_PATH
-chmod +x "$FAKE_BIN/dmenu_path"
-# A launcher may exec dmenu_run, as dwm's script does, instead of running dmenu
-# itself. Without this name on PATH that launcher exits at once and the keys
-# stage below measures an idle WM, which is the opposite of what it is for.
-cat >"$FAKE_BIN/dmenu_run" <<'FAKE_DMENU_RUN'
-#!/bin/sh
-exec dmenu "$@"
-FAKE_DMENU_RUN
-chmod +x "$FAKE_BIN/dmenu_run"
-rm -f "$LOG_DIR/dmenu-started"
-PATH="$FAKE_BIN:$PATH"
+# MOD+p runs `dmenu_path | dmenu`. The stand-ins live in tests/fakes, shared
+# with the seam suite, and each says in its second line which program it models.
+# The fake dmenu writes nothing and stays open, which is what the WM sees while
+# a user looks at the prompt. WM_FAKE_STARTED_DIR is where the fakes record that
+# they ran.
+WM_FAKE_BIN="$ROOT_DIR/tests/fakes"
+WM_FAKE_STARTED_DIR="$LOG_DIR/fake-started"
+rm -rf "$WM_FAKE_STARTED_DIR"
+mkdir -p "$WM_FAKE_STARTED_DIR"
+export WM_FAKE_BIN WM_FAKE_STARTED_DIR
+PATH="$WM_FAKE_BIN:$PATH"
 export PATH
 
 # shellcheck source=lib/wm-variant.sh
@@ -274,7 +259,7 @@ fi
 DISPLAY="$TEST_DISPLAY" xdotool key --clearmodifiers super+p
 dmenu_up=0
 for _ in $(seq 1 100); do
-  if [ -e "$LOG_DIR/dmenu-started" ]; then
+  if [ -e "$WM_FAKE_STARTED_DIR/dmenu" ]; then
     dmenu_up=1
     break
   fi

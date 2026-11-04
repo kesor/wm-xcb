@@ -1,0 +1,3 @@
+#!/bin/sh
+# models: dmenu_path, which writes the list of runnable commands to stdout. This one writes nothing: which commands a test offers is not part of what it asserts, and an empty list is a prompt with nothing to choose from.
+: >"${WM_FAKE_STARTED_DIR:?set WM_FAKE_STARTED_DIR to a directory the run can write}/dmenu_path"

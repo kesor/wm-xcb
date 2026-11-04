@@ -105,6 +105,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
+| fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, is named after that program, and names one that is installed on `PATH` outside the fake directory. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
@@ -325,6 +326,7 @@ DEBUG=1 scripts/check-unit.sh   # the same suite in the debug build
 scripts/check-workflow.sh   # every .github/workflows/ file parses
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
+scripts/check-fakes.sh      # every stand-in names a program that is installed
 ```
 
 Pass `--no-auto-install` to a by-hand `lefthook run`: the hook wrapper passes it,

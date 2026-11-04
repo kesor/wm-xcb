@@ -127,37 +127,20 @@ XEPHYR_LOG="$LOG_DIR/xephyr.log"
 printf '%s\n' "$WM_PARENT_DISPLAY_LINE" >"$LOG_DIR/parent-display.txt"
 
 # A real dmenu needs fonts and a keyboard grab that a headless nested server does
-# not reliably provide. The suite replaces it with a child that writes nothing
-# and stays open for longer than any test runs: that is what the WM sees while a
-# user looks at the prompt, and it is the only dmenu a test should meet. The WM
-# runs `dmenu_path | dmenu`, so both names have to resolve here.
-FAKE_BIN="$LOG_DIR/bin"
-mkdir -p "$FAKE_BIN"
-cat >"$FAKE_BIN/dmenu" <<FAKE_DMENU
-#!/bin/sh
-: >"$LOG_DIR/dmenu-started"
-sleep 5
-FAKE_DMENU
-chmod +x "$FAKE_BIN/dmenu"
-cat >"$FAKE_BIN/dmenu_path" <<'FAKE_DMENU_PATH'
-#!/bin/sh
-:
-FAKE_DMENU_PATH
-chmod +x "$FAKE_BIN/dmenu_path"
-# dwm's dmenu_run is the usual thing for a launcher to exec, so both shapes have
-# to reach the fake. A launcher that runs the script and finds no dmenu_run
-# exits before it can block, and a responsiveness test then reports "the
-# launcher did not start" - a different defect, from which nothing can be
-# concluded about the loop.
-cat >"$FAKE_BIN/dmenu_run" <<'FAKE_DMENU_RUN'
-#!/bin/sh
-exec dmenu "$@"
-FAKE_DMENU_RUN
-chmod +x "$FAKE_BIN/dmenu_run"
-export PATH="$FAKE_BIN:$PATH"
-# Where the fake dmenu records that it started, so a test can tell an open
-# prompt from a key that never reached the launcher.
-export WM_SEAM_DMENU_STARTED="$LOG_DIR/dmenu-started"
+# not reliably provide, so the suite puts stand-ins for the programs the launcher
+# execs at the front of PATH. They live in tests/fakes, one file per program, and
+# each says in its second line which program it models: a stand-in whose name
+# nobody can compare with the program on PATH is how three fakes came to model a
+# program the WM does not exec. The set is the two stages of
+# `dmenu_path | dmenu`, which is the whole exec line; a stage the launcher adds
+# later needs a file here, and the launcher is expected to fail without it.
+export WM_FAKE_BIN="$ROOT_DIR/tests/fakes"
+export PATH="$WM_FAKE_BIN:$PATH"
+# Where the fakes record that they ran, so a test can tell an open prompt from a
+# key that never reached the launcher.
+export WM_FAKE_STARTED_DIR="$LOG_DIR/fake-started"
+rm -rf "$WM_FAKE_STARTED_DIR"
+mkdir -p "$WM_FAKE_STARTED_DIR"
 
 # Build first, and say which build it is. These scripts start the WM
 # themselves, and nothing else rebuilds it, so a stale binary reports the

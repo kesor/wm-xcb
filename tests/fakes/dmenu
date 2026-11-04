@@ -1,0 +1,4 @@
+#!/bin/sh
+# models: dmenu, which reads the command list on stdin and writes the chosen line on stdout, then exits. This one writes nothing and stays open: that is a prompt nobody has answered yet.
+: >"${WM_FAKE_STARTED_DIR:?set WM_FAKE_STARTED_DIR to a directory the run can write}/dmenu"
+sleep 5
