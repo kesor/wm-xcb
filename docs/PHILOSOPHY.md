@@ -123,7 +123,8 @@ later as an event.
   executor).
 
 **Checked by** `make check-async` (`scripts/check-async.sh`), which fails on
-blocking calls unless the line carries `allow-blocking: <reason>`.
+blocking calls unless the line carries `allow-blocking: <reason>`, and refuses
+that reason inside a function an XCB handler can reach.
 
 **Current debt:** none. `tests/quality/async-baseline.txt` is empty: every wait
 left in the tree is a startup path carrying `allow-blocking: <reason>`, or the

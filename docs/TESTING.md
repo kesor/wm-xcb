@@ -371,6 +371,18 @@ marker's own line: an `allow-blocking:` with nothing after it is reported as a
 waiver without a reason and counts as a violation. Comments that mention a
 blocking function are ignored, so prose cannot produce a false positive.
 
+The marker is refused when an XCB handler can reach the function it sits in.
+The reason is always a claim about when the code runs, and code a handler
+reaches runs inside the loop. `scripts/lib/async-scan.sh` reads that from the
+sources: the handlers named in an `xcb_handler_register()` call, plus everything
+they reach through a call written in the tree. A comment that mentions a
+function name inside another function body counts as a call, so the reading
+errs toward refusing; a callback invoked through a struct field is not
+followed. The refusal prints the function's name and the call is then judged as
+a violation, so the fix is either to stop the handler reaching the wait or to
+baseline it. `tests/x/test-100-async-scan.sh` pins the decision on small
+sources, including a handler in one file reaching a helper in another.
+
 The script prints the current counts. There are no violations left: the
 baseline that held them is empty, and every remaining wait carries
 `allow-blocking` with a reason. That reason is a startup path, where the loop

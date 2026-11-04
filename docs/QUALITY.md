@@ -188,7 +188,11 @@ in `tests/quality/async-baseline.txt`.
 - **Waiver** — a comment `allow-blocking: <reason>` on the line or the two above
   it. For code that cannot block: startup paths before the loop runs. The reason
   is required on that same line; an `allow-blocking:` with nothing after it is
-  printed as a waiver without a reason and fails like a violation.
+  printed as a waiver without a reason and fails like a violation. A waiver is
+  also refused when an XCB handler can reach the function it sits in: the reason
+  is a claim about when the code runs, and a handler runs inside the loop. The
+  refusal is printed as `WAIVER REFUSED` with the function's name, and the call
+  is judged as a violation.
 - **Baseline** — the calls that are known and tracked in beads. The script
   prints how many there are, and the file is empty today: the async audit that
   filled it is done and the waits that remain are startup paths with a waiver.
@@ -203,6 +207,16 @@ round trip, and `xcb_key_symbols_get_keycode()` and
 `xcb_key_symbols_get_keysym()` wait for the keyboard mapping.
 `xcb_key_symbols_alloc()` only sends that request, so it is not a rule.
 Each blocking name is waived where it runs before the loop and nowhere else.
+
+What "where it runs" means is read off the sources, in
+`scripts/lib/async-scan.sh`: the handlers named in an `xcb_handler_register()`
+call, plus everything those reach through a call written in the tree. A name
+mentioned in a comment inside another function body counts as a call from it,
+so the analysis errs toward refusing a waiver. A callback stored in a struct
+field and called through that field is not followed, because the source does
+not say when it runs; `xcb_handler_register()` is how the tree hands a function
+to the loop, and it is the one that is followed.
+`tests/x/test-100-async-scan.sh` pins the decision on small sources.
 
 A violation that is in neither fails. That is the point: the file only shrinks.
 Adding an entry is a deliberate act:
