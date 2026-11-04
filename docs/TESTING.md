@@ -270,10 +270,11 @@ Write a test so that it cannot pass for the wrong reason: a precondition such as
 stops the test, not `check_eq`, which would let a later "the window is gone now"
 pass because it was never there.
 
-Three files are the exception to "one Xephyr for the whole run" and start their
-own display, because the condition they check cannot be produced once the WM is
-already up: `test-86-queued-event.sh`, `test-88-adopt-existing-windows.sh`, and
-`test-54-config-file-binding.sh`.
+These files start their own display, because the condition they check cannot
+be produced once the WM is already up: `test-86-queued-event.sh`,
+`test-88-adopt-existing-windows.sh`, and `test-54-config-file-binding.sh`.
+`test-102-probe-shape.sh` starts one too, by running `tests/x/probe.sh`, so the
+probe does not take the display the suite is using.
 
 `run.sh` points `WM_CONFIG` at a path that does not exist, so the suite always
 meets the compiled bindings whatever the developer running it has in
@@ -517,29 +518,45 @@ display: that fallback is what this replaced.
 
 ```bash
 tests/x/probe.sh -n 2 -c 'xdotool mousemove 100 100'
-make probe PROBE_ARGS="-n 3"          # the same thing, from the Makefile
+make probe PROBE_ARGS="-n 3"
 ```
+
+`make probe` runs the same script. `PROBE_ARGS` is passed through as its
+arguments.
 
 This answers "what does the WM do here?" in one call: it starts a private
-Xvfb, draws a Xephyr into it, starts the WM the way `tests/x/run.sh` does, maps
-`-n` windows, runs one command with `-c`, and prints the state a seam assertion
-reads.
+Xvfb, draws a Xephyr into it, builds the WM through `scripts/lib/wm-variant.sh`,
+maps `-n` windows, runs one command with `-c`, and prints the state a seam
+assertion reads. Unless `WM_CONFIG` is already set, it points that variable at
+a path that does not exist, the same way `tests/x/run.sh` does, and the header
+names the path in force.
+
+A standalone run prints one line before this block, from the parent-display
+helper, saying it is starting a private Xvfb. The display number, the window
+ids, the pid and the log body vary. The lines, in that order, and the columns
+do not. The log header contains the `-l` value.
 
 ```
+probe.sh: parent display = :99 (private Xvfb), session display = :0
+probe.sh: variant=release (DEBUG=0 SANITIZE=0), binary=..., log=...
 probe: display=:2 config=/tmp/nix-shell.../wm-probe/no-config-file
 --- command: xdotool mousemove 100 100 ---
 command: exit 0
 --- state ---
 screen: 1280 800
 window          x     y     w     h  border  viewable  focus  tags  title
-0x00400000    640     0   638   798       1       yes     no     -  probe-1
-0x00400001      0     0   638   798       1       yes    yes     -  probe-2
+0x00400000    640     0   638   798       1      yes     no     -  probe-1
+0x00400001      0     0   638   798       1      yes    yes     -  probe-2
 viewable: 2 of 2
 --- root properties ---
+_NET_SUPPORTING_WM_CHECK: not set
 _NET_CLIENT_LIST: not set
+_NET_CURRENT_DESKTOP: not set
+_NET_NUMBER_OF_DESKTOPS: not set
+_NET_DESKTOP_NAMES: not set
 --- wm ---
 wm: running (pid 1234)
---- wm log (last <N> lines) ---
+--- wm log (last N lines) ---
 ```
 
 `-n`, `-W`, `-H` size and count the windows, `-w MS` is the settle wait after
@@ -561,10 +578,13 @@ focus question needs a move out and back, in that order, inside one `-c`:
 tests/x/probe.sh -n 2 -c 'xdotool mousemove 300 400; sleep 0.3; xdotool mousemove 900 400'
 ```
 
-The exit status is the command's when one was given, and 0 otherwise. It is 1
-when the WM died before or during the run, and `wm: dead (exit N)` plus the log
-tail says so. That is what makes `-c` usable as an assertion in a loop: the
-answer is the shell's `$?`, not a line to grep.
+The exit status is the command's when one was given and the WM is still
+running, and 0 when no command was given. It is 1 when the WM died after it
+took the root window: the state section ends with `wm: dead (exit N)` and the
+log tail follows. It is also 1 when the WM never became ready, and that path
+prints the reason and the log tail on stderr and does not print the table.
+That is what makes `-c` usable as an assertion: the answer is the shell's
+`$?`, not a line to grep.
 
 It is a tool and not a test. `tests/x/run.sh` discovers `tests/x/test-*.sh`, so
 this file never runs as part of the suite; `tests/x/test-102-probe-shape.sh`

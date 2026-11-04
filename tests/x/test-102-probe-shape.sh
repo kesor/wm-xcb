@@ -15,7 +15,8 @@ OUT="$TMPDIR_SEAM/probe.out"
 # a variant the assertions below do not name. The probe starts its own nested
 # server and waits 200 ms twice; two minutes is a stuck run, not a slow one.
 timeout 120 env -u SANITIZE DEBUG=0 \
-  "$ROOT_DIR/tests/x/probe.sh" -n 2 -w 200 -c 'xdotool getdisplaygeometry' -l 40 \
+  "$ROOT_DIR/tests/x/probe.sh" -n 2 -w 200 -l 40 \
+  -c 'printenv DISPLAY; xdotool getdisplaygeometry' \
   >"$OUT" 2>&1
 rc=$?
 printf '  probe output in %s\n' "$OUT"
@@ -53,11 +54,19 @@ check_eq "the header names every column" 1 \
 check_eq "every row carries a tags value" 0 \
   "$(sed -n '/^--- state ---$/,/^viewable: /p' "$OUT" | awk '$1 ~ /^0x/ && $9 == ""' | grep -c .)"
 
-check_eq "the command ran against the probe's display" 1 \
+check_eq "the command printed the screen size" 1 \
   "$(grep -c '^1280 800$' "$OUT")"
+# Both servers in this run are 1280x800, so the line above passes when the
+# command talked to the suite's display. The line the command printed is the
+# display it had.
+if [ -n "$PROBE_DISPLAY" ] && [ "$(grep -cx "$PROBE_DISPLAY" "$OUT")" = 1 ]; then
+  pass "the command saw the display the probe started ($PROBE_DISPLAY)"
+else
+  fail "the command saw the display the probe started: expected one $PROBE_DISPLAY line"
+fi
 check_eq "it reports the command's exit status" 1 "$(grep -c '^command: exit 0$' "$OUT")"
 
-check_eq "it names the root properties the WM does not set" 5 \
+check_eq "it prints one line per root property" 5 \
   "$(sed -n '/^--- root properties ---$/,/^--- wm ---$/p' "$OUT" | grep -cE '^_NET_[A-Z_]+: ')"
 check_eq "it reports the WM alive" 1 "$(grep -c '^wm: running (pid [0-9]*)$' "$OUT")"
 check_eq "it prints the WM log" 1 "$(grep -c '^--- wm log (last 40 lines) ---$' "$OUT")"

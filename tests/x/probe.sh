@@ -31,26 +31,33 @@
 # nobody has written a test for yet, so it reports rather than asserts: the exit
 # status says whether the run itself worked, not whether the WM is correct.
 #
-# Output shape, one line each and always in this order. The command section is
-# there only when -c was given, and the WM log is whatever the WM wrote.
+# Output shape, one line each and always in this order. A standalone run prints
+# one line before it, from the parent-display helper, saying it is starting a
+# private Xvfb; a run that already has one does not. The command section is
+# there only when -c was given, and the WM log is whatever the WM wrote. The
+# log header contains the -l value.
 #
-#   probe.sh: parent display = :99 (private Xvfb), ...
+#   probe.sh: parent display = :99 (private Xvfb), session display = :0
 #   probe.sh: variant=release (DEBUG=0 SANITIZE=0), binary=..., log=...
-#   probe: display=:2 config=<path|none>
+#   probe: display=:2 config=<path>
 #   --- command: xdotool getdisplaygeometry ---
 #   1280 800
 #   command: exit 0
 #   --- state ---
 #   screen: 1280 800
 #   window          x     y     w     h  border  viewable  focus  tags  title
-#   0x00400000    640     0   638   798       1       yes     no     -  probe-1
-#   0x00400001      0     0   638   798       1       yes    yes     -  probe-2
+#   0x00400000    640     0   638   798       1      yes     no     -  probe-1
+#   0x00400001      0     0   638   798       1      yes    yes     -  probe-2
 #   viewable: 2 of 2
 #   --- root properties ---
+#   _NET_SUPPORTING_WM_CHECK: not set
 #   _NET_CLIENT_LIST: not set
+#   _NET_CURRENT_DESKTOP: not set
+#   _NET_NUMBER_OF_DESKTOPS: not set
+#   _NET_DESKTOP_NAMES: not set
 #   --- wm ---
 #   wm: running (pid 1234)
-#   --- wm log (last 20 lines) ---
+#   --- wm log (last N lines) ---
 #
 # viewable and focus come from the X server. tags is the client's
 # _NET_WM_DESKTOP, and prints '-' when the WM sets no such property, which is
