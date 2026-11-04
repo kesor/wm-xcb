@@ -32,6 +32,8 @@ wm-log.c 78.5
 wm-signals.c 79.5
 wm-components.c 80.3
 tests/unit/test-terminal.c 82.0
+config-file.c 84.0
+tests/unit/test-config-file.c 88.1
 tests/unit/test-wm-monitor-manager.c 88.5
 tests/unit/test-event-types.c 88.8
 wm-hub.c 89.2

@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "tag.h"
 #include "wm-hub.h"
 #include "wm-log.h"
@@ -171,10 +172,12 @@ tag_list_init(void)
   }
   tag_list = NULL;
 
-  /* Create 9 default tags (indices 0-8) */
+  /* Create 9 default tags (indices 0-8). A name from the config file's tags
+   * line belongs to the tag at that position; the rest keep the number the
+   * user types. */
   LOG_DEBUG("Initializing default tags (0-8)");
   for (int i = 0; i < TAG_NUM_TAGS; i++) {
-    Tag* t = tag_create(i, NULL);
+    Tag* t = tag_create(i, config_get_tag_name(i));
     if (t == NULL) {
       LOG_ERROR("Failed to create default tag %d", i);
       /* Continue creating remaining tags */

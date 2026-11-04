@@ -219,6 +219,13 @@ xdotool getdisplaygeometry >/dev/null 2>&1 || {
   exit 1
 }
 
+# The WM reads a config file at startup, and this suite asserts what the
+# compiled one does: the keys its tests press are compiled-in bindings. A
+# developer's own file would change what the suite sees depending on whose
+# machine ran it, so every WM this harness starts gets a path that does not
+# exist. test-54 starts its own WM to check what a file does.
+export WM_CONFIG="$LOG_DIR/no-config-file"
+
 # The WM says nothing when it is ready; the root window does. setup_xcb()
 # selects SubstructureRedirect on it, and the key grabs are in place before the
 # loop reads the first event, so a test that starts here talks to a WM that

@@ -270,9 +270,20 @@ Write a test so that it cannot pass for the wrong reason: a precondition such as
 stops the test, not `check_eq`, which would let a later "the window is gone now"
 pass because it was never there.
 
-Two files are the exception to "one Xephyr for the whole run" and start their
+Three files are the exception to "one Xephyr for the whole run" and start their
 own display, because the condition they check cannot be produced once the WM is
-already up: `test-86-queued-event.sh` and `test-88-adopt-existing-windows.sh`.
+already up: `test-86-queued-event.sh`, `test-88-adopt-existing-windows.sh`, and
+`test-54-config-file-binding.sh`.
+
+`run.sh` points `WM_CONFIG` at a path that does not exist, so the suite always
+meets the compiled bindings whatever the developer running it has in
+`~/.config/wm/config`. `test-54-config-file-binding.sh` is the one that wants a
+file: it starts a bare Xvfb, writes a file that binds `MOD+F5` and `MOD+F6` (keys
+the compiled configuration does not have) and holds one line the parser must
+reject, and starts the WM with it. It asserts the file's keys change the view,
+that a compiled key (`MOD+2`) no longer does, and that the WM log reports the
+rejected line once by line number. Then it restarts the WM with no file and
+asserts `MOD+2` works again, which is the fallback.
 
 `test-55-randr-relayout.sh` uses the shared session but changes its screen: it
 switches the nested output to the largest mode narrower than the current one and

@@ -195,7 +195,10 @@ if ! wait_for_display; then
   exit 1
 fi
 
-DISPLAY="$TEST_DISPLAY" "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+# This harness does not press keys, but it starts the same WM the seam suite
+# does. A config file in the developer's home must not decide which bindings
+# or float rules that WM loaded. The path is one that does not exist.
+WM_CONFIG="$LOG_DIR/no-config-file" DISPLAY="$TEST_DISPLAY" "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
 WM_PID=$!
 sleep 1
 

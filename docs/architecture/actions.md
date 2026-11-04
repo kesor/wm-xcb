@@ -593,7 +593,7 @@ void config_pointer_init(void) {
 | `src/actions/action-registry.c/h` | Action registration, lookup, and invocation |
 | `src/actions/keybinding-binding.c/h` | Runtime binding storage and lookup |
 | `src/components/keybinding.c` | Key event handling with action invocation |
-| `config.def.h` | Wiring configuration (future) |
+| `config.def.h` | Compiled configuration and its accessors |
 
 ---
 
@@ -620,9 +620,12 @@ void config_pointer_init(void) {
 - Update `config.def.h` to use action names
 
 ### Phase 3: Runtime Config
-- Add JSON/YAML config file support
-- Replace compile-time `config.def.h` with runtime config
-- Add `action_unregister()` for hot-reload
+- A text config file read at startup, with the compiled wiring as the fallback:
+  done for `bind` lines. `float` and `tags` lines are parsed and not applied yet.
+  See `docs/configuration.md`
+- Gaps, borders and per-application tag rules are still compiled in
+- Reloading without a restart needs `action_unregister()` for a keybinding hot
+  reload; not written
 
 ---
 

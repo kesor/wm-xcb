@@ -60,6 +60,7 @@ BUILD_DIR = build/$(BUILD_VARIANT)
 
 # Root-level source files
 ROOT_SRC = \
+	config-file.c \
 	config.c \
 	wm-log.c \
 	wm-signals.c \
@@ -105,6 +106,7 @@ TEST_SRC = \
 	tests/unit/test-wm-components.c \
 	tests/unit/test-fullscreen-component.c \
 	tests/unit/test-wm-keybinding.c \
+	tests/unit/test-config-file.c \
 	tests/unit/test-wm-monitor-manager.c \
 	tests/unit/test-launcher.c \
 	tests/unit/test-terminal.c \
