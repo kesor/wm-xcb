@@ -42,9 +42,9 @@ _async_analyze() {
   awk '
     FNR == 1 { cur = ""; cand = ""; inreg = 0; regtext = "" }
 
-    # The handler is the third argument, so the last name before the closing
-    # paren, however the call is wrapped. A registration inside the definition
-    # of xcb_handler_register itself is skipped by requiring a function body.
+    # The handler is the last name before the closing paren of the call, however
+    # the call is wrapped. The definition of xcb_handler_register is at column
+    # 0, so it is not inside a function and is not read as a registration.
     function flush_registration(text, t, parts, n, i) {
       t = text
       sub(/^[^(]*\(/, "", t)
@@ -52,6 +52,15 @@ _async_analyze() {
       n = split(t, parts, /[^A-Za-z0-9_]+/)
       for (i = n; i >= 1; i--)
         if (parts[i] != "") { handlers[parts[i]] = 1; return }
+    }
+
+    # clang-format leaves a comment on the closing line (`); /* ... */` or
+    # `); // ...`, with spaces before it). A parenthesis in that comment would
+    # be the last name if it stayed in the text the flush reads.
+    function without_trailing_comment(s) {
+      sub(/[ \t]*\/\/.*/, "", s)
+      sub(/[ \t]*\/\*.*/, "", s)
+      return s
     }
 
     {
@@ -62,8 +71,11 @@ _async_analyze() {
         regtext = ""
       }
       if (inreg) {
-        regtext = regtext " " line
-        if (line ~ /\);[ \t]*$/) { flush_registration(regtext); inreg = 0 }
+        regtext = regtext " " without_trailing_comment(line)
+        if (line ~ /\);[ \t]*(\/\/.*|\/\*.*)?$/) {
+          flush_registration(regtext)
+          inreg = 0
+        }
       }
 
       if (cur != "") {

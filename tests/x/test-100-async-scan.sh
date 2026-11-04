@@ -39,6 +39,30 @@ register_handlers(void)
 }
 
 static void
+on_expose(void* event)
+{
+  reply_helper();
+}
+
+static void
+on_no_exposure(void* event)
+{
+  reply_helper();
+}
+
+void
+register_expose(void)
+{
+  /* clang-format keeps a trailing comment on the closing line, spaces and all,
+     and the comment may itself contain parentheses. */
+  xcb_handler_register(
+      XCB_EXPOSE,
+      &component,
+      on_expose); /* expose (the event) */
+  xcb_handler_register(XCB_NO_EXPOSURE, &component, on_no_exposure); // no exposure (copy)
+}
+
+static void
 startup_only(void)
 {
   /* allow-blocking: startup, before the loop runs */
@@ -86,6 +110,12 @@ BARE_CALL=$(line_of 'xcb_get_screen_resources_reply' "$LOOP")
 
 async_loop_callable on_map_request
 check_eq "a handler named in a wrapped registration is callable" 0 "$?"
+
+async_loop_callable on_expose
+check_eq "a wrapped registration with a trailing block comment names the handler" 0 "$?"
+
+async_loop_callable on_no_exposure
+check_eq "a one-line registration with a trailing line comment names the handler" 0 "$?"
 
 async_loop_callable on_key_press
 check_eq "a handler named in a one-line registration is callable" 0 "$?"
@@ -137,12 +167,12 @@ check_eq "the gate fails a refused waiver" 1 "$STATUS"
 check_eq "it names the line and the function to the reader" 1 \
   "$(grep -c "WAIVER REFUSED  $LOOP:$HELPER_CALL  reply_helper is reachable from an XCB handler" "$OUT")"
 check_eq "the refused call is judged as a violation" 1 \
-  "$(grep -c "  NEW VIOLATION  $LOOP:$HELPER_CALL" "$OUT")"
+  "$(grep -c "  NEW VIOLATION  $LOOP:$HELPER_CALL  " "$OUT")"
 check_eq "the count separates the three outcomes" 1 \
   "$(grep -cE '^check-async: 3 new violation\(s\), [0-9]+ known, 1 waived, 1 refused$' "$OUT")"
 check_eq "the startup-only reason is not counted as a violation" 0 \
-  "$(grep -c "  NEW VIOLATION  $LOOP:$STARTUP_CALL" "$OUT")"
+  "$(grep -c "  NEW VIOLATION  $LOOP:$STARTUP_CALL  " "$OUT")"
 check_eq "a marker with nothing after it is reported" 1 \
-  "$(grep -c "WAIVER WITHOUT A REASON  $LOOP:$BARE_CALL" "$OUT")"
+  "$(grep -cE "WAIVER WITHOUT A REASON  $LOOP:$BARE_CALL([^0-9]|$)" "$OUT")"
 
 finish
