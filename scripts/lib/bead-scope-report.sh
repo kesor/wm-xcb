@@ -81,8 +81,9 @@ bead_scope_resolve() {
 }
 
 # bead_scope_outside <bead-json> <comments-json> <repo-files> <harness-files>
-#   One line per file the bead names that only the harness has, as
-#   `<path>TAB<what it is>`. Nothing when the bead's work is in this worktree.
+#   One line per token the bead names that only the harness has, as
+#   `<path>TAB<what it is>`, with the path resolved so a reader can open it.
+#   Nothing when the bead's work is in this worktree.
 bead_scope_outside() {
   local bead=$1 comments=$2 repo=$3 harness=$4
   local text tok base name what hit
@@ -115,7 +116,7 @@ bead_scope_outside() {
   rm -f "$text"
 }
 
-# bead_scope_verify <bead-json> <comments-json> <repo-files> <harness-files> <label>
+# bead_scope_verify <bead-json> <comments-json> <repo-files> <harness-files>
 #   0 when the bead asks for work this worktree can carry, 3 when its work is in
 #   the harness, naming what it found.
 bead_scope_verify() {
