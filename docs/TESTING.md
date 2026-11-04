@@ -669,8 +669,9 @@ has no subcommand for them.
 `xmodmap -pm` prints the modifier table: for each of Shift, Lock, Control and
 Mod1 through Mod5, the keycodes that carry it. A keybinding masked with a
 modifier whose bit no keycode carries never matches, so the keysym looks dead
-while the binding is correct. `xdotool key` under `DEBUG=1` prints the same
-information inside a 375-line keymap dump.
+while the binding is correct. `xdotool key` under `DEBUG=1` prints a keymap
+dump: the modifier mask each keysym level requires, not the keycode that sets
+the bit.
 
 ### Scripted session
 
