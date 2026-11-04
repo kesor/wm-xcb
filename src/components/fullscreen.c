@@ -76,6 +76,8 @@ static size_t               state_read_count   = 0;
 static size_t               state_read_cap     = 0;
 static bool                 state_read_polling = false;
 
+static void fullscreen_state_read_shutdown(void);
+
 static void
 do_static_init(void)
 {
@@ -492,51 +494,132 @@ fullscreen_sync_from_state_reply(xcb_window_t window, xcb_get_property_reply_t* 
 }
 
 /*
- * The loop's poll callback: apply the answers that have arrived, in the order
- * the notifications were queued, and keep the rest for the next iteration.
+ * Apply the answers that have arrived, in the order the notifications were
+ * queued, and keep the rest for the next iteration.
  *
  * A later answer must not be applied before an earlier one. Both are ready by
  * the time this runs when the two notifications arrived in one batch, and
  * applying the newer one first leaves the state machine on the older reply. A
  * reply that has not arrived stops the walk: the ones after it are later.
  */
-static void
-fullscreen_state_read_poll(void* userdata)
+size_t
+fullscreen_state_read_drain(FullscreenStateReadArrived arrived,
+                            FullscreenStateReadApply   apply,
+                            void*                      userdata)
 {
-  (void) userdata;
-
-  if (dpy == NULL) {
-    state_read_count = 0;
-  }
+  size_t applied = 0;
 
   while (state_read_count > 0) {
-    void*                raw_reply = NULL;
-    xcb_generic_error_t* error     = NULL;
+    FullscreenStateRead head  = state_reads[0];
+    void*               reply = NULL;
 
-    /* Not the reply-forcing call: this one reports "not yet" instead of
-       waiting, so the loop stays free. */
-    if (!xcb_poll_for_reply(dpy, state_reads[0].cookie.sequence, &raw_reply, &error))
+    if (!arrived(userdata, head.cookie, head.window, &reply))
       break;
-
-    xcb_window_t window = state_reads[0].window;
 
     /* Drop this entry before applying. Applying can queue another read, and
        that entry has to stay behind the ones still in flight. */
     state_read_count--;
     memmove(state_reads, state_reads + 1, state_read_count * sizeof *state_reads);
 
-    if (raw_reply != NULL && error == NULL)
-      fullscreen_sync_from_state_reply(window, raw_reply);
-
-    free(error);
-    free(raw_reply);
+    apply(userdata, head.window, reply);
+    applied++;
   }
+
+  return applied;
+}
+
+/*
+ * The loop's reply source: xcb_poll_for_reply() reports "not yet" instead of
+ * waiting, so the loop stays free.
+ */
+static bool
+fullscreen_state_read_arrived_from_x(void*                     userdata,
+                                     xcb_get_property_cookie_t cookie,
+                                     xcb_window_t              window,
+                                     void**                    reply)
+{
+  (void) userdata;
+  (void) window;
+
+  xcb_generic_error_t* error = NULL;
+  if (!xcb_poll_for_reply(dpy, cookie.sequence, reply, &error))
+    return false;
+
+  free(error);
+  return true;
+}
+
+static void
+fullscreen_state_read_apply_from_x(void* userdata, xcb_window_t window, void* reply)
+{
+  (void) userdata;
+
+  if (reply != NULL)
+    fullscreen_sync_from_state_reply(window, reply);
+
+  free(reply);
+}
+
+static void
+fullscreen_state_read_poll(void* userdata)
+{
+  if (dpy == NULL) {
+    state_read_count = 0;
+  }
+
+  fullscreen_state_read_drain(
+      fullscreen_state_read_arrived_from_x, fullscreen_state_read_apply_from_x, NULL);
 
   if (state_read_count == 0 && state_read_polling) {
     wm_loop_remove_poll_handler(fullscreen_state_read_poll, NULL);
     state_read_polling = false;
   }
 }
+
+/*
+ * Append one read to the queue. The queue grows by doubling and never shrinks
+ * until shutdown: its length is bounded by the notifications one iteration can
+ * deliver.
+ */
+static bool
+fullscreen_state_read_queue_add(xcb_get_property_cookie_t cookie, xcb_window_t window)
+{
+  if (state_read_count == state_read_cap) {
+    size_t               cap   = state_read_cap == 0 ? 4 : state_read_cap * 2;
+    FullscreenStateRead* grown = realloc(state_reads, cap * sizeof *grown);
+    if (grown == NULL) {
+      LOG_ERROR("fullscreen: cannot track the _NET_WM_STATE reply: %s", strerror(errno));
+      return false;
+    }
+    state_reads    = grown;
+    state_read_cap = cap;
+  }
+
+  state_reads[state_read_count].cookie = cookie;
+  state_reads[state_read_count].window = window;
+  state_read_count++;
+  return true;
+}
+
+#ifdef WM_HUB_TESTING
+bool
+fullscreen_state_read_queue_push_for_tests(xcb_get_property_cookie_t cookie, xcb_window_t window)
+{
+  return fullscreen_state_read_queue_add(cookie, window);
+}
+
+size_t
+fullscreen_state_read_queue_count_for_tests(void)
+{
+  return state_read_count;
+}
+
+void
+fullscreen_state_read_queue_reset_for_tests(void)
+{
+  fullscreen_state_read_shutdown();
+}
+#endif
 
 /*
  * Ask for a window's _NET_WM_STATE and arrange to read the answer.
@@ -555,21 +638,7 @@ fullscreen_state_read_begin(xcb_window_t window)
     state_read_polling = true;
   }
 
-  if (state_read_count == state_read_cap) {
-    size_t               cap   = state_read_cap == 0 ? 4 : state_read_cap * 2;
-    FullscreenStateRead* grown = realloc(state_reads, cap * sizeof *grown);
-    if (grown == NULL) {
-      LOG_ERROR("fullscreen: cannot track the _NET_WM_STATE reply: %s", strerror(errno));
-      return false;
-    }
-    state_reads    = grown;
-    state_read_cap = cap;
-  }
-
-  state_reads[state_read_count].cookie = ewmh_request_wm_state(ewmh, window);
-  state_reads[state_read_count].window = window;
-  state_read_count++;
-  return true;
+  return fullscreen_state_read_queue_add(ewmh_request_wm_state(ewmh, window), window);
 }
 
 /*

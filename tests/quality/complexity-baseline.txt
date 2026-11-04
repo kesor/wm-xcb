@@ -24,6 +24,11 @@ run_launcher_tests 12
 tag_create 12
 tag_manager_handle_client_tag_toggle 12
 tag_manager_update_visibility 12
+test_fullscreen_action_registered 27
+test_fullscreen_init_requires_action_registry 12
+test_fullscreen_state_read_applies_oldest_first 29
+test_fullscreen_state_read_stops_at_unarrived_head 45
+test_fullscreen_toggle_action 27
 test_launcher_action_callback 17
 test_launcher_action_exists 29
 test_launcher_dmenu_config 11

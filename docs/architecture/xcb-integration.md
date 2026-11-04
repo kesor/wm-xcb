@@ -255,6 +255,14 @@ a client's `_NET_WM_STATE`, and the RandR output list and CRTC geometry arrive
 that way. A handler that issues a further request has it flushed in the same
 iteration.
 
+Two notifications can queue two reads before either answer arrives, so the
+answers are applied in the order the notifications came, and the walk stops at
+the first answer that has not arrived: the entries behind it are later, and
+applying one of them first would leave the state machine on the older answer.
+The fullscreen component keeps that queue, and `fullscreen_state_read_drain()`
+takes the reply source as a callback so a unit test drives the walk with two
+replies and no server.
+
 `poll(2)` reports the socket, not libxcb's own queue. libxcb reads ahead during
 a reply wait (the property and atom queries at startup) and during `xcb_flush()`,
 so an event can sit in that queue with nothing left to read on the socket. The
