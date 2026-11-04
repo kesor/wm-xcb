@@ -84,7 +84,8 @@ WM_LOG="$LOG_DIR/wm.log"
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
 
 # MOD+p runs `dmenu_path | dmenu`. The stand-ins live in tests/fakes, shared
-# with the seam suite, and each says in its second line which program it models.
+# with the seam suite, and each names on its second line the program it models
+# and on its third a line of that program.
 # The fake dmenu writes nothing and stays open, which is what the WM sees while
 # a user looks at the prompt. WM_FAKE_STARTED_DIR is where the fakes record that
 # they ran.

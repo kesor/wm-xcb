@@ -317,23 +317,25 @@ answer to a key cannot be stuck behind the backlog.
 `run.sh` puts `tests/fakes/` at the front of `PATH`. The fake `dmenu` records
 its start in `$WM_FAKE_STARTED_DIR` and then sleeps, writing nothing, which is a
 prompt nobody has answered yet; the fake `dmenu_path` records its start and
-prints nothing. A real dmenu needs fonts the nested server may not have, and a
-test that presses `MOD+p` wants a child that holds the pipe open, not a menu.
-`test-92-launcher-does-not-block.sh` uses them: it waits for the dmenu marker so
-an unstarted launcher cannot make the assertion pass on an idle WM, then
-requires `MOD+2` to hide the tag-1 window within 500 ms. It also requires the
-`dmenu_path` marker. A missing marker fails the test; the message does not name
-whatever else the launcher exec'd. The test also requires every file in
+prints nothing. A test that presses `MOD+p` wants a child that holds the pipe
+open and leaves the keyboard alone: a real dmenu grabs the keyboard for as long
+as it is open, so `MOD+2` would go to the prompt and never reach the WM.
+`test-87-dmenu-prints-the-selection.sh` runs the installed dmenu for the part a
+stand-in cannot answer for, what it writes on stdout.
+`test-92-launcher-does-not-block.sh` uses the fakes: it waits for the dmenu
+marker so an unstarted launcher cannot make the assertion pass on an idle WM,
+then requires `MOD+2` to hide the tag-1 window within 500 ms. It also requires
+the `dmenu_path` marker. A missing marker fails the test; the message does not
+name whatever else the launcher exec'd. The test also requires every file in
 `tests/fakes/` to have left a marker, so a stand-in the launcher did not exec
 fails by that stand-in's name. Verified both ways on this
 suite: with the async launcher the key lands in tens of milliseconds; with the
 launcher's blocking read and `waitpid()` put back, the same assertion fails with
 "MOD+2 did not reach the WM within 500 ms". `scripts/perf-test.sh` runs the same
 stage with the same directory on `PATH`, and fails the run when the key goes
-unanswered. The fake does not grab the keyboard; a real dmenu does, so `MOD+2`
-would not reach the WM while a real prompt is up. What the stage measures is
-that the WM's loop still answers, which is the promise; the fake is the only
-dmenu that lets the test see it.
+unanswered. What the stage measures is that the WM's loop still answers, which
+is the promise; a stand-in that does not grab the keyboard is what lets the
+test see it.
 
 ---
 
@@ -352,22 +354,39 @@ stops a repeat.
   `# models: <program>, <what the real program does and what this one does
   instead>`. The word after the colon is the program, and it is also the file
   name, because PATH shadowing finds a program by its file name.
-- **The named program is installed.** `scripts/check-fakes.sh` resolves it with
-  every fake directory removed from `PATH`; a stand-in for a name nobody has is
-  a fake of an idea.
+- **It cites a line of that program**, on the next line: `# from <program>:
+  <a line of the installed file, verbatim>`. The line is one the installed
+  file has, and a line that is not there fails the gate: the claim is checked
+  against the program, not against the stand-in's own description. The citation
+  proves the stand-in was written against that file; what the program does with
+  a selection is checked by the case that runs it, below.
+- **The named program is installed, and the cited line is in it.**
+  `scripts/check-fakes.sh` resolves the name with every fake directory removed
+  from `PATH`, requires the result to be a regular file (a directory answers to
+  a name and has no contents), and looks for the cited line in it. The path is
+  resolved by the check rather than written into the stand-in: a Nix store path
+  is a property of the machine that built the shell, and the check prints the
+  path it found. An upgrade that changes the cited line fails the gate, which is
+  the moment to read the program again rather than keep modelling the version
+  before it.
 - **A stand-in records that it ran**, writing
   `$WM_FAKE_STARTED_DIR/<its name>` as its first act.
   `test-92-launcher-does-not-block.sh` requires every file in `tests/fakes/` to
   have left one, so a stand-in for a program nothing execs fails as unreached
   instead of shadowing a name in silence.
-- **Where the real program can run, one case runs it.** A real dmenu needs a
-  display and fonts the nested server does not reliably provide, so no case can
-  run that one. `dmenu_path` needs neither, and
-  `tests/unit/test-launcher.c` runs the installed one and asserts the prompt
-  received a list from it.
+- **Where the real program can run, one case runs it.** `dmenu_path` needs no
+  display: `tests/unit/test-launcher.c` runs the installed one and asserts the
+  prompt received a list; the case fails rather than skipping when the program
+  is not on `PATH`. The installed `dmenu` draws with Xft, which the nested
+  server does provide (it is `xterm`'s bitmap fonts that are missing), so
+  `tests/x/test-87-dmenu-prints-the-selection.sh` runs it on the suite's server:
+  a three-line list on stdin, a key press through the grab, and the assertion
+  that stdout holds the chosen line and the program exited 0. Not through the
+  WM, because a real prompt keeps the keyboard for as long as it is open;
+  `test-92` measures the loop with the stand-in.
 
-`scripts/check-fakes.sh` checks the first two, and the seam test checks the
-third. The fourth is a judgement each stand-in has to answer for: a fake of a
+`scripts/check-fakes.sh` checks the first three, and the seam test checks the
+fourth. The fifth is a judgement each stand-in has to answer for: a fake of a
 program no case ever runs stands in for an idea of it.
 
 The stand-ins for the harnesses live in `tests/fakes/`, one file per program, and
@@ -376,7 +395,8 @@ of `PATH`. One directory is what stops the two harnesses' fakes drifting apart,
 and a program the code starts exec'ing arrives as a file in the diff. A unit test
 that needs a different body per case writes its own fake and states what it
 models the same way; `test_launcher_fake_names_the_program_it_models` reads that
-line back and resolves the name behind the fake.
+claim back, resolves the program behind the fake, and looks for the cited line
+in the file it resolves to.
 
 ---
 

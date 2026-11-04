@@ -1,30 +1,40 @@
 #!/usr/bin/env bash
 #
-# check-fakes.sh - every stand-in for an outside program says which program it
-# models, and that program is installed.
+# check-fakes.sh - every stand-in for an outside program names that program,
+# cites a line of it, and that program is installed.
 #
 # Usage: scripts/check-fakes.sh [-v|--verbose]
 #
-# tests/fakes holds one executable per program the harnesses replace, and its
-# second line is `# models: <program>, <what the real program does and what this
-# one does instead>`. Nothing inside a test can check that claim: the stand-in
-# answers every assertion the test asks it. Three fakes in this tree modelled
+# tests/fakes holds one executable per program the harnesses replace. Its second
+# line is `# models: <program>, <what the real program does and what this one
+# does instead>` and its third is `# from <program>: <a line of the installed
+# program>`. Nothing inside a test can check that claim: the stand-in answers
+# every assertion the test asks it. Three fakes in this tree modelled
 # `dmenu_run`, which backgrounds its pipeline and exits, while the launcher ran
 # it and waited for a selection that never came; 1065 unit results and 148 seam
 # results were green on the wrong program.
 #
 # So the claim is checked here instead, by the one thing the fakes cannot fake:
-# the rest of PATH.
+# the installed program.
 #
 #   - The file is named after the program it stands in for, because the name is
 #     how PATH shadowing finds it. A `dmenu` file claiming to model `dmenu_run`
 #     shadows one program and describes another.
-#   - The claimed program resolves on PATH with every fake directory removed. A
-#     stand-in for a name nobody installed is a fake of an idea, and a name that
-#     resolves only to the fake proves nothing.
+#   - The claimed program resolves on PATH with every fake directory removed, and
+#     it is a regular file. A stand-in for a name nobody installed is a fake of
+#     an idea, and a name that resolves only to the fake proves nothing.
+#   - The cited line occurs in the file that name resolves to. This is what opens
+#     the program: a stand-in cannot describe the program it names without having
+#     read it, and an upgrade that changes that line fails the gate instead of
+#     leaving the stand-in modelling the version before it.
+#
+# The path is resolved here rather than written into the stand-in because a Nix
+# store path is a property of the machine that built the shell, not of the
+# program. The line is the portable half of the citation, and the resolved path
+# is printed under --verbose.
 #
 # Unit tests that need a different body per case write their own fake; the
-# models line is the same shape there, and the case that reads it back lives in
+# citation is the same shape there, and the case that reads it back lives in
 # tests/unit/test-launcher.c.
 #
 # Exit status: 0 when every stand-in passes, 1 otherwise.
@@ -109,6 +119,20 @@ for fake in "$FAKE_DIR"/*; do
     continue
   fi
 
+  citation=$(sed -n 3p "$fake")
+  case "$citation" in
+    "# from $program: "*) ;;
+    *)
+      report "$fake" "line 3 is not '# from $program: <a line of the installed program>': cite the line of the real program this stands in for, read from the file that name resolves to"
+      continue
+      ;;
+  esac
+  cited=${citation#"# from $program: "}
+  if [ -z "$cited" ]; then
+    report "$fake" "line 3 names '$program' and then nothing: quote a line of the installed program"
+    continue
+  fi
+
   # Resolved with the fakes off PATH: command -v answers with the first match,
   # which is what the harness would exec without the stand-in.
   resolved=$(PATH="$REAL_PATH" command -v "$program" 2>/dev/null)
@@ -117,7 +141,18 @@ for fake in "$FAKE_DIR"/*; do
     continue
   fi
 
-  [ "$VERBOSE" -eq 1 ] && printf '  ok    %s -> %s\n' "$name" "$resolved"
+  if [ ! -f "$resolved" ]; then
+    report "$fake" "models '$program', which resolves to $resolved, and that is not a regular file"
+    continue
+  fi
+
+  # -a: dmenu is a binary, and the usage line is a plain string in it.
+  if ! grep -aqF -- "$cited" "$resolved"; then
+    report "$fake" "cites '$cited', which is not in $resolved: the stand-in describes a line the installed program does not have, so it was written against a different program or a different version"
+    continue
+  fi
+
+  [ "$VERBOSE" -eq 1 ] && printf '  ok    %s -> %s (cites: %s)\n' "$name" "$resolved" "$cited"
 done
 
 if [ "$CHECKED" -eq 0 ]; then
@@ -126,7 +161,7 @@ if [ "$CHECKED" -eq 0 ]; then
 fi
 
 if [ "$FOUND" -eq 0 ]; then
-  echo "check-fakes: $CHECKED stand-in(s) name a program that is installed, and nothing else"
+  echo "check-fakes: $CHECKED stand-in(s) name an installed program and cite a line of it, and nothing else"
   exit 0
 fi
 

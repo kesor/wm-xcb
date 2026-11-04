@@ -126,14 +126,17 @@ export TMPDIR_SEAM="$LOG_DIR"
 XEPHYR_LOG="$LOG_DIR/xephyr.log"
 printf '%s\n' "$WM_PARENT_DISPLAY_LINE" >"$LOG_DIR/parent-display.txt"
 
-# A real dmenu needs fonts and a keyboard grab that a headless nested server does
-# not reliably provide, so the suite puts stand-ins for the programs the launcher
-# execs at the front of PATH. They live in tests/fakes, one file per program, and
-# each says in its second line which program it models: a stand-in whose name
-# nobody can compare with the program on PATH is how three fakes came to model a
-# program the WM does not exec. The set is the two stages of
-# `dmenu_path | dmenu`, which is the whole exec line; a stage the launcher adds
-# later needs a file here, and the launcher is expected to fail without it.
+# A real dmenu grabs the keyboard for as long as it is open, so a test that
+# presses MOD+p and then a key wants a child that holds the pipe open and lets
+# the key through: the suite puts stand-ins for the programs the launcher execs
+# at the front of PATH. They live in tests/fakes, one file per program, and each
+# says on its second line which program it models and on its third a line of
+# that program: a stand-in whose name nobody can compare with the program on PATH
+# is how three fakes came to model a program the WM does not exec. The set is
+# the two stages of `dmenu_path | dmenu`, which is the whole exec line; a stage
+# the launcher adds later needs a file here, and the launcher is expected to
+# fail without it. test-87 runs the installed dmenu for what a stand-in cannot
+# answer for, the line it writes on stdout.
 export WM_FAKE_BIN="$ROOT_DIR/tests/fakes"
 export PATH="$WM_FAKE_BIN:$PATH"
 # Where the fakes record that they ran, so a test can tell an open prompt from a
