@@ -448,6 +448,12 @@ reports is the line to open. Without it a `/* ... */` block that began a
 continuation line with `waitpid(` was reported as a blocking wait, and the
 workaround was to reword the sentence.
 
+`scripts/check-orphan-sources.sh` asks the same build for its source list and
+compares it with the tracked `.c` files outside `tests/` and `tools/`, which
+have targets of their own. A file that is tracked but missing from `SRC`
+compiles nowhere, and the async check cannot see a blocking call in it: that is
+how `wm-kbd-mouse.c` kept an `xcb_grab_pointer_reply()` with every gate green.
+
 `tests/x/test-101-async-rules.sh` pins every rule and every exception above on
 probe files: one blocking call per line must be reported, and a `//` comment, a
 string literal, a block comment and a `poll_for_reply` call must not.

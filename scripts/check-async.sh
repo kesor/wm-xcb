@@ -57,7 +57,7 @@ for arg in "$@"; do
 done
 
 # Compile the source list exactly as the build does, so a file that is not
-# built does not produce findings (wm-kbd-mouse.c is dead but still on disk).
+# built does not produce findings.
 mapfile -t SOURCES < <(make -s print-src 2>/dev/null | tr ' ' '\n' | grep -E '\.c$')
 if [ "${#SOURCES[@]}" -eq 0 ]; then
   echo "check-async: could not read the source list from 'make -s print-src'" >&2
