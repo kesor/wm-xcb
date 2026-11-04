@@ -210,3 +210,81 @@ async_waiver_verdict() {
   fi
   printf 'none'
 }
+
+# async_strip_comments <file> - the file with comment text and string contents
+# blanked, one output line per input line so a reported line number is the line
+# the reader opens.
+#
+# scripts/check-async.sh runs the rules over this instead of the source text.
+# The per-line comment filter it replaced only hid a line that *began* with a
+# comment marker, so a /* ... */ block whose continuation line started with
+# waitpid( was reported as a blocking wait and the author had to reword the
+# sentence to get past the gate. A call name inside a string literal fooled it
+# the same way. Quote characters and tabs are kept so a printed line still
+# lines up with the source.
+async_strip_comments() {
+  awk '
+    BEGIN { quotechar = sprintf("%c", 39) }
+    {
+      line = $0
+      out = ""
+      i = 1
+      n = length(line)
+      # A // comment ending in a backslash runs on into the next line.
+      if (in_line_comment) {
+        in_line_comment = (line ~ /\\$/)
+        print ""
+        next
+      }
+      while (i <= n) {
+        c = substr(line, i, 1)
+        if (in_block) {
+          if (c == "*" && substr(line, i + 1, 1) == "/") {
+            in_block = 0
+            out = out "  "
+            i += 2
+          } else {
+            out = out (c == "\t" ? "\t" : " ")
+            i++
+          }
+          continue
+        }
+        if (in_quote != "") {
+          if (c == "\\") {
+            out = out "  "
+            i += 2
+            continue
+          }
+          if (c == in_quote) {
+            in_quote = ""
+            out = out c
+            i++
+            continue
+          }
+          out = out (c == "\t" ? "\t" : " ")
+          i++
+          continue
+        }
+        if (c == "/" && substr(line, i + 1, 1) == "*") {
+          in_block = 1
+          out = out "  "
+          i += 2
+          continue
+        }
+        if (c == "/" && substr(line, i + 1, 1) == "/") {
+          in_line_comment = (line ~ /\\$/)
+          break
+        }
+        if (c == "\"" || c == quotechar) {
+          in_quote = c
+          out = out c
+          i++
+          continue
+        }
+        out = out c
+        i++
+      }
+      print out
+    }
+  ' "$1"
+}
