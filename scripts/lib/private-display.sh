@@ -3,7 +3,8 @@
 # lib/private-display.sh - give a harness a parent display of its own.
 #
 # Sourced by scripts/check-seam.sh, scripts/xephyr-test.sh,
-# scripts/check-sanitize-x.sh and tests/x/run.sh; not executable on its own.
+# scripts/check-sanitize-x.sh, tests/x/run.sh and tests/x/probe.sh; not
+# executable on its own.
 #
 # Each of those draws a nested Xephyr into a parent display. They used to take
 # the session's DISPLAY whenever it was set, and start xvfb-run only when it was

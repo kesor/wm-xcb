@@ -2,8 +2,8 @@
 #
 # lib/wm-variant.sh - build the WM variant a harness asked for, and say which.
 #
-# Sourced by scripts/xephyr-test.sh and tests/x/run.sh; not executable on its
-# own. The caller sets ROOT_DIR, may export DEBUG and SANITIZE with the same
+# Sourced by scripts/xephyr-test.sh, tests/x/run.sh and tests/x/probe.sh; not
+# executable on its own. The caller sets ROOT_DIR, may export DEBUG and SANITIZE with the same
 # meaning as the make targets, and gets back WM_VARIANT_BIN.
 #
 # The Makefile has a default variant, and a harness that runs plain `make` gets
