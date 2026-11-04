@@ -172,11 +172,21 @@ Two things it cannot decide for you:
   at 70% of the reviewer's context. `worker.py auto <bead>` as many times as
   there are disjoint beads, staggered a minute or two apart.
 - **Overlapping files decide what "disjoint" means.** `worker.py overlap <id>
-  <id> ...` reads each bead's description and comments for file paths and says
-  which are shared. Nothing shared: run them in parallel. Shared: run them in
-  order, or give one worker several ids in one call — the second merge stops on
-  a rebase conflict that a person resolves by hand, which puts an unreviewed
-  edit on a branch the reviewer already approved.
+  <id> ...` reads each bead's description and comments for file paths, and, when
+  a worktree exists, the diff on that branch. It prints the intersection. A
+  file it prints is in both sets, which is not proof both branches will edit
+  it. A non-empty answer still means serialise. An empty answer proves nothing,
+  because a bead written before the work exists names almost no path. Two beads
+  also overlap when they are in the same epic. An empty answer is what
+  dispatched three beads in one epic whose branches shared files the tool did
+  not print. They also overlap when both name the same component under
+  `src/components/`, by the component's own name (`tiling`, `client-list`,
+  `focus`, `monitor-manager`, ...) and not by a path. Overlapping means run
+  them in order, or give one worker several ids in one call: the second merge
+  otherwise stops on a rebase conflict that a person resolves by hand, which
+  puts an unreviewed edit on a branch the reviewer already approved. A
+  serialised dispatch costs ten minutes (the harness's `PROCESS.md`, "Stagger,
+  and check the overlap first").
 - **Review.** Workers commit to `work/<bead-id>` and never push, merge, or close
   a bead. Merging is a human decision.
 
