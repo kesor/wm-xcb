@@ -78,6 +78,7 @@
               xvfb-run
               xprop
               xrandr
+              xmodmap # which keycode carries each modifier bit; a keymap dump buries it
               xset # the seam suite reads the NumLock state from it
               xdotool
               xterm

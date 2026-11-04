@@ -33,8 +33,8 @@ nix develop
 
 The shell provides gcc, clang, clang-tools, bear, gdb, the libxcb family, and
 the test tools: `Xephyr` (from `xorg-server`), `xvfb`, `xdotool`, `xprop`,
-`xwininfo`, `xrandr`, `xterm`, `dmenu`, `imagemagick` (`import` for screenshots),
-`valgrind`, and `strace`.
+`xwininfo`, `xrandr`, `xmodmap`, `xterm`, `dmenu`, `imagemagick` (`import` for
+screenshots), `valgrind`, and `strace`.
 
 A tool the harnesses need but the shell lacks is fixed in `flake.nix`, in the
 same commit as the recipe that needs it. Each worktree carries its own copy of
@@ -651,6 +651,7 @@ xwininfo -id <id>                                 # geometry, border width, map 
 xwininfo -id <id> -events                         # the event mask that window selected
 xwininfo -root -tree                              # the window tree under the root
 xrandr                                            # what the WM should see
+xmodmap -pm                                       # which keycode each modifier holds
 import -window root /tmp/shot.png                 # screenshot of the nested screen
 ```
 
@@ -664,6 +665,12 @@ window that does not select `EnterWindow`/`LeaveWindow` sends `ENTER_NOTIFY` to
 the root instead, and the focus handler then sees a crossing that names the root
 rather than the client. `xprop` reports properties and not masks, and `xdotool`
 has no subcommand for them.
+
+`xmodmap -pm` prints the modifier table: for each of Shift, Lock, Control and
+Mod1 through Mod5, the keycodes that carry it. A keybinding masked with a
+modifier whose bit no keycode carries never matches, so the keysym looks dead
+while the binding is correct. `xdotool key` under `DEBUG=1` prints the same
+information inside a 375-line keymap dump.
 
 ### Scripted session
 
