@@ -123,11 +123,12 @@ the review is still running: wait for it, then merge. A HEAD that is not the
 sha in the last `Approved at <sha>` verdict, read before that second rebase,
 means that approval does not cover this commit: review again before merging.
 The close decision is the verdict's last line, `Close: no` or `Close: yes`,
-never a sentence in the body, so a later harness change can match a line instead
-of an argument. `land` still closes every bead the worktree carried without
-reading that line, so a bead closed against `Close: no` needs a later `bd
-comment` naming the bead that carries the cause. A worker stops at in_progress:
-see "Definition of done".
+never a sentence in the body, so the harness can match a line instead of an
+argument. `land` reads it: the merge happens either way, and `Close: no` then
+sets that one bead back to `open` with a comment naming the findings, so
+`bd ready` offers it again; `publish` leaves it open once the pull request
+lands. Every other id the worktree carried still closes, and a missing line
+means close. A worker stops at in_progress: see "Definition of done".
 
 Rules: read the acceptance criteria before starting. A parent epic is not a
 task. `bd edit` opens an editor and blocks an agent — never use it.
