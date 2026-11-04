@@ -182,6 +182,20 @@ fullscreen_guard_can_unfullscreen(StateMachine* sm, void* data)
  */
 
 /*
+ * The X half of both rows. Enter and exit differ only in which way the property
+ * goes, so the shared part is here.
+ */
+static bool
+fullscreen_action_write_state(StateMachine* sm, bool fullscreen)
+{
+  if (sm->owner == NULL)
+    return false;
+
+  fullscreen_update_x_property((Client*) sm->owner, fullscreen);
+  return true;
+}
+
+/*
  * Action for entering fullscreen: the transition's own X side effect.
  *
  * The write lives here rather than in the executor so that every path into the
@@ -194,12 +208,7 @@ bool
 fullscreen_action_enter_fullscreen(StateMachine* sm, void* data)
 {
   (void) data;
-
-  if (sm == NULL || sm->owner == NULL)
-    return false;
-
-  fullscreen_update_x_property((Client*) sm->owner, true);
-  return true;
+  return fullscreen_action_write_state(sm, true);
 }
 
 /*
@@ -209,12 +218,7 @@ bool
 fullscreen_action_exit_fullscreen(StateMachine* sm, void* data)
 {
   (void) data;
-
-  if (sm == NULL || sm->owner == NULL)
-    return false;
-
-  fullscreen_update_x_property((Client*) sm->owner, false);
-  return true;
+  return fullscreen_action_write_state(sm, false);
 }
 
 /*

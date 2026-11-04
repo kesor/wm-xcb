@@ -161,8 +161,9 @@ FullscreenState fullscreen_get_state(Client* c);
 
 /*
  * Update the _NET_WM_STATE X property to reflect fullscreen state.
- * Called by the listener when property changes, or by the executor
- * when fullscreen state changes.
+ * Called by the enter and exit actions, which the transition runs. The listener
+ * does not call it: a change that came from the window is already in the
+ * property.
  */
 void fullscreen_update_x_property(Client* c, bool fullscreen);
 
