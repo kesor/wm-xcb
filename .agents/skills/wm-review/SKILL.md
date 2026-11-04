@@ -55,16 +55,21 @@ run; if it says "docs updated", read the doc.
 
 1. **Acceptance criteria, all of them, as written.** Quote each one and the code
    that satisfies it. A criterion quietly reinterpreted is the most common miss.
-2. **A rule broken.** State machines own state; components do not call each
+2. **A new check can fail, proven by removing what it must catch.** The author's
+   word is not the proof: remove the exact thing the check is for, once per
+   shape it must catch, and watch it fail. For a table walker that is one
+   removal per shape of row: a plain row, a self-loop, a row with a guard, a row
+   with no event. "I mutated something and it failed" is not that.
+3. **A rule broken.** State machines own state; components do not call each
    other; nothing in the event loop blocks; new behaviour arrives as a
    registration. Each has a gate — run them: `make test`, `make check-async`,
    `./scripts/format-check.sh`, `./scripts/check-docs.sh`, and `make test-x`
    when the diff touches windows, keys, focus, or X properties.
-3. **Something left broken or half-done and not mentioned.** A behaviour change
+4. **Something left broken or half-done and not mentioned.** A behaviour change
    without a test, a document that now contradicts the code, a comment
    describing what the code no longer does, a defect the author noticed and only
    put in their final message.
-4. **Style, last.** Only where it hides a defect.
+5. **Style, last.** Only where it hides a defect.
 
 Not worth saying: the diff restated, praise, and anything the gates already
 enforce. If the only finding is formatting, the gates will have caught it.
