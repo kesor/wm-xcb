@@ -322,9 +322,10 @@ test that presses `MOD+p` wants a child that holds the pipe open, not a menu.
 `test-92-launcher-does-not-block.sh` uses them: it waits for the dmenu marker so
 an unstarted launcher cannot make the assertion pass on an idle WM, then
 requires `MOD+2` to hide the tag-1 window within 500 ms. It also requires the
-`dmenu_path` marker, and requires every file in `tests/fakes/` to have left one,
-so a launcher that execs a program the stand-ins do not cover fails by name
-instead of passing as a launcher that never started. Verified both ways on this
+`dmenu_path` marker. A missing marker fails the test; the message does not name
+whatever else the launcher exec'd. The test also requires every file in
+`tests/fakes/` to have left a marker, so a stand-in the launcher did not exec
+fails by that stand-in's name. Verified both ways on this
 suite: with the async launcher the key lands in tens of milliseconds; with the
 launcher's blocking read and `waitpid()` put back, the same assertion fails with
 "MOD+2 did not reach the WM within 500 ms". `scripts/perf-test.sh` runs the same
