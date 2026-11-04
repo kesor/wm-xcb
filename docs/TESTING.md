@@ -67,6 +67,13 @@ image is not how a test run should pick up an edit.
 
 ---
 
+### Coverage and fuzzing
+
+`scripts/check-coverage.sh` says what the unit suite executes, per file and per
+branch; `scripts/fuzz.sh` runs the two libFuzzer harnesses against the X event
+dispatcher and the window-rule matcher. `docs/QUALITY.md` has both, what the
+baseline means, and why a 0% file is the number worth reading.
+
 ### A test that early-returns is not coverage
 
 A unit test whose subject gives up for lack of an X connection asserts on a

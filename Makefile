@@ -243,6 +243,15 @@ test-x: $(NAME) tools/xclient tools/xcb-ewmh-delay.so
 
 # Standalone test (no XCB dependencies required)
 # FORCE because the binary is shared by the variants, like wm and test above.
+# Coverage and fuzzing build their own trees under build/; neither is part of
+# `make` or the hooks, because both take a minute and the docs say when to run
+# them. docs/QUALITY.md has both.
+coverage: FORCE
+	./scripts/check-coverage.sh
+
+fuzz: FORCE
+	./scripts/fuzz.sh
+
 test-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o tests/unit/test-wm-hub-standalone.c FORCE
 	$(CC) $(CFLAGS) -o $@ $(filter-out FORCE,$^)
 	./test-standalone
@@ -283,4 +292,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone check format tidy tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE
+.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone coverage fuzz check format tidy tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE

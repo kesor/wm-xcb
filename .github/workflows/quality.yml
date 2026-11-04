@@ -70,6 +70,38 @@ jobs:
           path: /tmp/wm-seam-tests/
           if-no-files-found: error
 
+  coverage:
+    name: what the unit suite executes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: line and branch coverage against the baseline
+        run: nix develop --command scripts/check-coverage.sh
+      - name: coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: build/coverage/*.gcov.json
+          if-no-files-found: warn
+
+  fuzz:
+    name: libFuzzer, 60s per harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: fuzz the event dispatcher and the rule matcher
+        run: nix develop --command scripts/fuzz.sh 60
+      - name: a crash input, if there is one
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash
+          path: build/fuzz/*crash-*
+          if-no-files-found: ignore
+
   sanitize-x:
     name: the WM in a nested X server under ASan and UBSan
     runs-on: ubuntu-latest
