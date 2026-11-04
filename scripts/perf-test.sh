@@ -88,12 +88,11 @@ XEPHYR_LOG="$LOG_DIR/xephyr.log"
 # The fake dmenu writes nothing and stays open, which is what the WM sees while
 # a user looks at the prompt. WM_FAKE_STARTED_DIR is where the fakes record that
 # they ran.
-WM_FAKE_BIN="$ROOT_DIR/tests/fakes"
 WM_FAKE_STARTED_DIR="$LOG_DIR/fake-started"
 rm -rf "$WM_FAKE_STARTED_DIR"
 mkdir -p "$WM_FAKE_STARTED_DIR"
-export WM_FAKE_BIN WM_FAKE_STARTED_DIR
-PATH="$WM_FAKE_BIN:$PATH"
+export WM_FAKE_STARTED_DIR
+PATH="$ROOT_DIR/tests/fakes:$PATH"
 export PATH
 
 # shellcheck source=lib/wm-variant.sh
