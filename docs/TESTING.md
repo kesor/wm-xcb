@@ -485,12 +485,12 @@ under test runs as the only WM on that second display.
 ### The parent display
 
 Xephyr needs a parent display to draw its window into. `scripts/xephyr-test.sh`,
-`tests/x/run.sh`, `scripts/check-seam.sh` and `scripts/check-sanitize-x.sh` get
-a private Xvfb for it, started by the run itself, whether or not `DISPLAY` is
-set: no Xephyr window appears on the desktop you are working on, and the run
-answers the same on a display with another depth or a wedged server. The rule
-lives in `scripts/lib/private-display.sh`, and each run prints the display it
-used:
+`tests/x/run.sh`, `tests/x/probe.sh`, `scripts/check-seam.sh` and
+`scripts/check-sanitize-x.sh` get a private Xvfb for it, started by the run
+itself, whether or not `DISPLAY` is set: no Xephyr window appears on the desktop
+you are working on, and the run answers the same on a display with another depth
+or a wedged server. The rule lives in `scripts/lib/private-display.sh`, and each
+run prints the display it used:
 
 ```
 run.sh: parent display = :99 (private Xvfb), session display = :0
@@ -512,6 +512,64 @@ WM_USE_SESSION_DISPLAY=1 scripts/xephyr-test.sh --keep --verbose
 `xvfb-run` and `Xvfb` come from the dev shell. Without them the scripts stop
 with a message naming what is missing rather than falling back to the session
 display: that fallback is what this replaced.
+
+### One-shot probe
+
+```bash
+tests/x/probe.sh -n 2 -c 'xdotool mousemove 100 100'
+make probe PROBE_ARGS="-n 3"          # the same thing, from the Makefile
+```
+
+This answers "what does the WM do here?" in one call: it starts a private
+Xvfb, draws a Xephyr into it, starts the WM the way `tests/x/run.sh` does, maps
+`-n` windows, runs one command with `-c`, and prints the state a seam assertion
+reads.
+
+```
+probe: display=:2 config=/tmp/nix-shell.../wm-probe/no-config-file
+--- command: xdotool mousemove 100 100 ---
+command: exit 0
+--- state ---
+screen: 1280 800
+window          x     y     w     h  border  viewable  focus  tags  title
+0x00400000    640     0   638   798       1       yes     no     -  probe-1
+0x00400001      0     0   638   798       1       yes    yes     -  probe-2
+viewable: 2 of 2
+--- root properties ---
+_NET_CLIENT_LIST: not set
+--- wm ---
+wm: running (pid 1234)
+--- wm log (last <N> lines) ---
+```
+
+`-n`, `-W`, `-H` size and count the windows, `-w MS` is the settle wait after
+the windows are mapped and again after `-c`, and `-l LINES` is the size of the
+log tail. `probe.sh -h` has the list. The windows come from `tools/xclient`
+through `tests/x/lib.sh`, so they are the same clients the suite uses.
+
+`viewable` and `focus` are read from the X server, so they say what a user sees
+rather than what the WM intended. `tags` is the client's `_NET_WM_DESKTOP`, and
+prints `-` because the WM publishes no per-client EWMH property yet; the root
+properties section says the same about the root window, and it is there because
+"did it set `_NET_CLIENT_LIST`" is a question the suite asks.
+
+The pointer starts at the centre of the screen, which is inside one of the
+windows. A warp into the window it is already in sends no enter event, so a
+focus question needs a move out and back, in that order, inside one `-c`:
+
+```bash
+tests/x/probe.sh -n 2 -c 'xdotool mousemove 300 400; sleep 0.3; xdotool mousemove 900 400'
+```
+
+The exit status is the command's when one was given, and 0 otherwise. It is 1
+when the WM died before or during the run, and `wm: dead (exit N)` plus the log
+tail says so. That is what makes `-c` usable as an assertion in a loop: the
+answer is the shell's `$?`, not a line to grep.
+
+It is a tool and not a test. `tests/x/run.sh` discovers `tests/x/test-*.sh`, so
+this file never runs as part of the suite; `tests/x/test-102-probe-shape.sh`
+pins the output shape, so a column that stops printing is a failed test rather
+than a probe nobody trusts.
 
 ### Manual session
 
