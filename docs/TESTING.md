@@ -46,6 +46,21 @@ evaluates the shell without entering it, which is what catches a broken
 Rule of thumb: anything you run against the WM needs the same shell the WM was
 built in, because the binary links the store paths of that shell's libraries.
 
+`LIBXCB_SRC` points at libxcb's unpacked source. The header declares
+`xcb_poll_for_reply()` and says nothing about whether it waits, and the dev
+shell has no man page for it. The serial a reply is compared against is
+assigned in `src/xcb_out.c`. `XCB_REQUEST_CHECKED` is defined in
+`src/xcbext.h` and tested in `src/xcb_in.c`, not in `src/xcb_out.c`. The
+comparison is `XCB_SEQUENCE_COMPARE` in `src/xcbint.h`. Read them from
+`$LIBXCB_SRC`. Fetching the same files from gitlab needs the network and
+fails without it.
+
+```bash
+rg -n 'poll_for_reply' "$LIBXCB_SRC/src/xcb_in.c"   # does it block
+rg -n 'XCB_REQUEST_CHECKED' "$LIBXCB_SRC/src/xcbext.h" "$LIBXCB_SRC/src/xcb_in.c"
+rg -n 'XCB_SEQUENCE_COMPARE' "$LIBXCB_SRC/src/xcbint.h"
+```
+
 ### Container image
 
 The `Dockerfile` builds the WM in a Nix builder and runs it under `Xvfb` with

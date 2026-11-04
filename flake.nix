@@ -11,6 +11,20 @@
       systems = [ "x86_64-linux" ];
       perSystem =
         { pkgs, system }:
+        let
+          # The libxcb headers and man pages ship without the implementation.
+          # Whether xcb_poll_for_reply() waits, and whether a serial comparison
+          # masks XCB_REQUEST_CHECKED, are in the unpacked source, not in the
+          # header. Unpacked here so that answer comes out of the store instead
+          # of a fetch from gitlab. docs/TESTING.md names the files.
+          libxcb-source = pkgs.stdenv.mkDerivation {
+            pname = "libxcb-source";
+            inherit (pkgs.libxcb) version src;
+            dontConfigure = true;
+            dontBuild = true;
+            installPhase = "cp -a . $out";
+          };
+        in
         {
           packages."${system}".default = pkgs.stdenv.mkDerivation {
             pname = "wm-xcb";
@@ -53,6 +67,8 @@
           };
 
           devShells."${system}".default = pkgs.mkShell {
+            LIBXCB_SRC = "${libxcb-source}";
+
             buildInputs = with pkgs; [
               bear
               clang
