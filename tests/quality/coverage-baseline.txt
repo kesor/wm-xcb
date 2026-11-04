@@ -1,7 +1,9 @@
-# Line-coverage floors for the unit suite, per source file.
+# Line-coverage floors for the unit suite, per production source file.
 # Written by scripts/check-coverage.sh --update-baseline. A file that
 # drops below its floor fails the gate; a new file must be added here
 # deliberately, which is the moment somebody decides what covers it.
+# Test files under tests/ are printed by the run and carry no floor: a
+# helper's error return is only reachable by breaking the environment.
 # Deleted files are dropped by the next update.
 #
 wm-states.c 0.0
