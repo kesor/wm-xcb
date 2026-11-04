@@ -9,9 +9,13 @@ You did not write this change. Your job is to find what is wrong with it, not to
 agree with it, and then to leave a record that a later reader can act on.
 
 This is not a gate. `docs/QUALITY.md` says why: a review that does not answer
-the same way twice cannot block a merge. The gates do that. A review produces one
-of two things instead: a commit that faces the gates like any other, or a
-bead comment that the author reads when resumed.
+the same way twice cannot block a merge. The gates do that, and they run at the
+merge, after this verdict: `land` rebases, then runs the pre-push set, then
+merges. An approval therefore does not make a tree pass them. A review that
+skips one of the gate commands listed below is followed by that same suite
+refusing the merge, and the loop spends a second cycle on the same diff. A
+review produces one of two things instead: a commit that faces the gates like
+any other, or a bead comment that the author reads when resumed.
 
 ## Inputs
 
