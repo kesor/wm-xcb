@@ -22,10 +22,12 @@
 # and a check that cannot be wrong for a reason nobody can reproduce is not a
 # gate. It is the answer to a question, and the caller decides.
 #
-# Exit status: 0 the work is in this worktree, 3 it is in the harness, 2 the
-# question could not be answered. A broken read is 2 and not 0: an answer that
-# says "workable here" because the tracker could not be reached is worse than no
-# answer, and a caller that only tests for success would take it.
+# Exit status: 0 no token names the harness, 3 the text names a harness path,
+# 2 the question could not be answered. A bead can name a harness file and still
+# ask for a change here; the verdict says to land that part. A broken read is 2
+# and not 0: an answer that says "workable here" because the tracker could not
+# be reached is worse than no answer, and a caller that only tests for success
+# would take it.
 
 set -uo pipefail
 
@@ -48,10 +50,13 @@ if ! need bd || ! need jq; then
   exit 2
 fi
 
-# The harness sits beside the main checkout, so from a worktree under
-# .worktrees/<bead>/ it is three levels up. WORKER_HARNESS overrides it for a
-# checkout somewhere else.
-HARNESS_DIR=${WORKER_HARNESS:-$ROOT_DIR/../../../ai-workers-for-wm}
+# shellcheck source=lib/bead-scope-report.sh
+. "$ROOT_DIR/scripts/lib/bead-scope-report.sh"
+
+# Beside the main checkout, not three levels up from this script. A worktree
+# and the main checkout are different depths, and dispatch runs this from the
+# main checkout before a worktree exists.
+HARNESS_DIR=$(bead_scope_harness_dir "$ROOT_DIR")
 
 IDS=("$@")
 if [ "${#IDS[@]}" -eq 0 ]; then
@@ -72,12 +77,9 @@ trap 'rm -rf "$WORK"' EXIT
 git -C "$ROOT_DIR" ls-files >"$WORK/repo.txt" 2>/dev/null || : >"$WORK/repo.txt"
 if ! git -C "$HARNESS_DIR" ls-files >"$WORK/harness.txt" 2>/dev/null; then
   : >"$WORK/harness.txt"
-  echo "bead-scope: no harness checkout at $HARNESS_DIR, so only the names it is"
-  echo "            known by are checked, not the files it tracks"
+  echo "bead-scope: no harness checkout at $HARNESS_DIR, so only the names it is" >&2
+  echo "            known by are checked, not the files it tracks" >&2
 fi
-
-# shellcheck source=lib/bead-scope-report.sh
-. "$ROOT_DIR/scripts/lib/bead-scope-report.sh"
 
 STATUS=0
 for id in "${IDS[@]}"; do

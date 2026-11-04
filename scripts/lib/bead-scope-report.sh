@@ -8,10 +8,9 @@
 # database or a checkout of the harness.
 #
 # The question is the one a worker asks and cannot answer cheaply: a bead whose
-# text names a file under the harness (`../../../ai-workers-for-wm` beside this
-# checkout) asks for work no commit on a `work/<bead>` branch can carry. Reading
-# the harness to learn that costs a session its turns; asking this costs one
-# command.
+# text names a file under the harness (the checkout beside the main one) asks
+# for work no commit on a `work/<bead>` branch can carry. Reading the harness to
+# learn that costs a session its turns; asking this costs one command.
 #
 # The rule is evidence, not a vocabulary. A token in the bead's text is in the
 # harness when it resolves, at a path boundary, to a file the harness checkout
@@ -21,10 +20,40 @@
 # lists cannot: a name that belongs to the harness and has moved or been
 # deleted, which is how a stale bead description misleads a worker.
 
+# bead_scope_harness_dir <repo-root>
+#   The harness checkout beside the main checkout. Three levels up from a
+#   worktree under .worktrees/<bead> happens to land there; the same three
+#   levels up from the main checkout does not. Dispatch runs this from the main
+#   checkout, before a worktree exists, so the path is computed from the common
+#   git dir rather than from where the script file sits. WORKER_HARNESS
+#   overrides it. The three-up path is the fallback when git cannot name the
+#   common dir, and it is wrong from the main checkout.
+bead_scope_harness_dir() {
+  local root=$1 common main parent
+  if [ -n "${WORKER_HARNESS:-}" ]; then
+    printf '%s\n' "$WORKER_HARNESS"
+    return 0
+  fi
+  common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common=""
+  if [ -z "$common" ]; then
+    printf '%s\n' "$root/../../../ai-workers-for-wm"
+    return 0
+  fi
+  main=$(dirname "$common")
+  parent=$(cd "$main/.." && pwd) || {
+    printf '%s\n' "$root/../../../ai-workers-for-wm"
+    return 0
+  }
+  printf '%s\n' "$parent/ai-workers-for-wm"
+}
+
 # bead_scope_harness_names
 #   The harness paths a bead may name, with what each one is, as
 #   `<name>TAB<what it is>`. Used only when a token matches no file: a
-#   description written before the harness was reorganised still names these.
+#   description written before the harness was reorganised still names these,
+#   and a path whose component is one of them (`wpy/commands/publish.py`, or
+#   `wpy/commands` left after a brace list is split) still names the harness
+#   when the file list cannot resolve it.
 bead_scope_harness_names() {
   cat <<'EOF'
 worker.py	the harness entry point
@@ -81,12 +110,13 @@ bead_scope_resolve() {
 }
 
 # bead_scope_outside <bead-json> <comments-json> <repo-files> <harness-files>
-#   One line per token the bead names that only the harness has, as
-#   `<path>TAB<what it is>`, with the path resolved so a reader can open it.
-#   Nothing when the bead's work is in this worktree.
+#   One line per harness path the bead names, as `<path>TAB<what it is>`.
+#   A token that resolves against the file list is printed as that file. A token
+#   that only matches a known harness name is printed as written. Two tokens that
+#   name the same file are one line. Nothing when no token names the harness.
 bead_scope_outside() {
   local bead=$1 comments=$2 repo=$3 harness=$4
-  local text tok base name what hit
+  local text tok name what hit rest part matched path
 
   text=$(mktemp "${TMPDIR:-/tmp}/bead-scope-text.XXXXXX") || return 1
   bead_scope_text "$bead" "$comments" >"$text"
@@ -97,19 +127,34 @@ bead_scope_outside() {
       # A name both trees carry is this repository's: the question here is what
       # only the harness has.
       [ -n "$(bead_scope_resolve "$tok" "$repo")" ] && continue
-      hit=$(bead_scope_resolve "$tok" "$harness" | head -1)
+      hit=$(bead_scope_resolve "$tok" "$harness")
       if [ -n "$hit" ]; then
-        printf '%s\t%s\n' "$hit" "the harness tracks it"
+        while IFS= read -r path; do
+          [ -n "$path" ] || continue
+          printf '%s\t%s\n' "$path" "the harness tracks it"
+        done <<<"$hit"
         continue
       fi
-      base=${tok##*/}
-      while IFS=$'\t' read -r name what; do
-        [ -n "$name" ] || continue
-        if [ "$base" = "$name" ]; then
-          printf '%s\t%s\n' "$tok" "$what"
+      rest=$tok
+      while [ -n "$rest" ]; do
+        part=${rest%%/*}
+        matched=0
+        while IFS=$'\t' read -r name what; do
+          [ -n "$name" ] || continue
+          if [ "$part" = "$name" ]; then
+            printf '%s\t%s\n' "$tok" "$what"
+            matched=1
+            break
+          fi
+        done < <(bead_scope_harness_names)
+        if [ "$matched" -eq 1 ]; then
           break
         fi
-      done < <(bead_scope_harness_names)
+        case "$rest" in
+          */*) rest=${rest#*/} ;;
+          *) break ;;
+        esac
+      done
     done < <(bead_scope_tokens <"$text")
   } | sort -u
 
@@ -117,8 +162,9 @@ bead_scope_outside() {
 }
 
 # bead_scope_verify <bead-json> <comments-json> <repo-files> <harness-files>
-#   0 when the bead asks for work this worktree can carry, 3 when its work is in
-#   the harness, naming what it found.
+#   0 when no token names the harness, 3 when one does, naming what it found.
+#   A bead can name a harness file and still ask for a change in this tree; the
+#   printed verdict says to land that part.
 bead_scope_verify() {
   local bead=$1 comments=$2 repo=$3 harness=$4
   local id status title found why what

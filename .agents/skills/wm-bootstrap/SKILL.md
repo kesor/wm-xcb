@@ -132,9 +132,11 @@ task. `bd edit` opens an editor and blocks an agent — never use it.
 
 1. Read `bd show <id>` and the docs it names. Then ask whether the work is
    here at all: `scripts/bead-scope.sh <id>` reads the title, the description
-   and the comments for a path that only the harness has. Exit 3 means the fix
-   is in the harness; say so in a bd comment and stop. Reading the harness to
-   confirm it is the cost that command exists to remove.
+   and the comments for a path that only the harness has. Exit 3 means the text
+   names one; the command prints the paths. Say in a bd comment which part is in
+   this tree and which is not, do the part that is here, and stop on the rest.
+   Reading the harness to confirm the paths is the cost that command exists to
+   remove.
 2. If the change is observable through X, write or extend a `tests/x/test-*.sh`
    first; use `require_visible` for preconditions so a test cannot pass because
    the window was never there.
