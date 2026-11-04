@@ -102,9 +102,11 @@ keeps only what the nested-server gate has on its own: the harness line.
 | build | `make -j$(nproc)` | the tree compiles |
 | flake | `scripts/check-flake.sh` | the dev shell in `flake.nix` evaluates for this system, so a syntax error, a moved attribute or a package that no longer exists fails here and not at the next `direnv allow` |
 | unit | `scripts/check-unit.sh` | the unit suite across hub, state machines, targets, components. The gate captures the run and prints its log only when it fails: a passing suite is a single summary line and lefthook prints the verdict and the duration as its own summary, so attaching the log to every commit spends the reader's attention on a step that passed. A run whose summary line is missing, or whose summary counts a failure, fails the gate whatever make exited with. `DEBUG` and `SANITIZE` select the variant, and the pass line names the one make built, so the debug gate's suite cannot pass as release |
+| coverage | `scripts/check-coverage.sh` | no production source file is below its line floor in `tests/quality/coverage-baseline.txt`, and no production source file is missing one. Files under `tests/` are printed and carry no floor: a helper's error return is only reachable by breaking the environment |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
+| fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, cites a line of that program on its third, is named after that program, and names one that is installed on `PATH` outside the fake directory. The check resolves that name to a path, requires a regular file, and looks for the cited line in it. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
@@ -325,6 +327,7 @@ DEBUG=1 scripts/check-unit.sh   # the same suite in the debug build
 scripts/check-workflow.sh   # every .github/workflows/ file parses
 scripts/check-build-variants.sh   # release, sanitize and debug builds in one tree
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
+scripts/check-fakes.sh      # every stand-in names an installed program and cites a line of it
 ```
 
 Pass `--no-auto-install` to a by-hand `lefthook run`: the hook wrapper passes it,
@@ -395,6 +398,16 @@ current run; doing that to turn a red run green is the same as deleting a test,
 so say why in the commit. The floor written is the measured value less 1.5
 points, because the launcher tests fork and exec and their coverage moves by
 about a point between runs of the same tree.
+
+The floors cover the production sources only. A file under `tests/` is printed
+in the table and carries no floor, in the baseline or in the comparison: its
+missed lines are the guards inside the tests' own helpers (a `mkdtemp`, `strdup`
+or `fopen` that failed, a stand-in file the test could not write), and no
+passing test reaches one without breaking its environment. A floor there
+measures how much defensive code a helper carries, and it fails the branch that
+adds tests: adding one helper that removes a directory dropped
+`tests/unit/test-launcher.c` below a floor set when the file was a third of its
+size, and that failed a merge whose unit suite passed.
 
 A file at 0% is the useful number. On the tree this was written against, three
 source files were never executed by any unit test: `wm-states.c`,
