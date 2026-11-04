@@ -123,6 +123,29 @@ Then the findings, worst first, then what you checked and what you did not.
 - If you committed a fix, name both: the sha you read the author's work at, and
   the sha your commit produced.
 
+The last line is the close decision, alone on its line so a merge can match it
+and not have to read a sentence:
+
+```
+Close: no
+```
+
+or
+
+```
+Close: yes
+```
+
+`Close: no` means the branch lands and the bead stays open, and the finding
+above it names the bead that carries the remaining cause. `Close: yes` is the
+usual case: the branch is the whole fix, so the merge closes the bead. A
+sentence in the body is not a decision. On 2026-11-04 a verdict said "Do not
+close this bead on the strength of the branch alone", the merge closed it, and
+the bead that tracked the still-unfixed cause read CLOSED with nothing pointing
+at it. When a merge closes a bead whose verdict says `Close: no`, `bd comment`
+that bead with the bead that carries the cause: the status is not yours to
+change, and the comment is what keeps the pointer.
+
 ## After a fix
 
 Your commit is a normal commit: the pre-push gates run on it, and the human merge

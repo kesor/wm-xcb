@@ -122,8 +122,12 @@ neither refusal is a gate failure. A `review-<slug>` window still open means
 the review is still running: wait for it, then merge. A HEAD that is not the
 sha in the last `Approved at <sha>` verdict, read before that second rebase,
 means that approval does not cover this commit: review again before merging.
-The merge closes the bead. A worker stops at in_progress: see "Definition of
-done".
+The merge closes the bead, unless the verdict's last line is `Close: no`: the
+close decision is that line, never a sentence in the verdict's body, because a
+merge reads a line and cannot read an argument. The harness's `land` still closes
+every bead the worktree carried, without looking, so a bead closed against
+`Close: no` needs a `bd comment` naming the bead that carries the cause. A worker
+stops at in_progress: see "Definition of done".
 
 Rules: read the acceptance criteria before starting. A parent epic is not a
 task. `bd edit` opens an editor and blocks an agent — never use it.
