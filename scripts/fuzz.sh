@@ -27,7 +27,9 @@ if ! command -v clang >/dev/null 2>&1; then
   exit 1
 fi
 
-OUT=build/fuzz
+# Same reason as the coverage cache: `make clean` removes build/, and gates that
+# clean on purpose must not throw away a fuzz build.
+OUT=.cache/fuzz
 mkdir -p "$OUT"
 
 # The WM objects the harnesses link against, read from the Makefile so a new

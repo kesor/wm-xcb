@@ -53,7 +53,11 @@ if ! command -v gcov >/dev/null 2>&1; then
   exit 1
 fi
 
-BUILD=build/coverage
+# A cache of compiled objects, not a build output: `make clean` removes build/, and
+# two gates run it on purpose (build-variants to prove a clean tree builds, and
+# sanitize to rebuild its variant). Keeping the cache under build/ meant those
+# gates turned a 0.45s check into a 7s one.
+BUILD=.cache/coverage
 mkdir -p "$BUILD"
 # Incremental: the object files are valid until their source changes, and the
 # counters reset by deleting the .gcda. A full rebuild took 7s every time, which

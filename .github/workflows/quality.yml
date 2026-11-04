@@ -83,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: build/coverage/*.gcov.json
+          path: .cache/coverage/*.gcov.json
           if-no-files-found: warn
 
   fuzz:
@@ -99,7 +99,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-crash
-          path: build/fuzz/*crash-*
+          path: .cache/fuzz/*crash-*
           if-no-files-found: ignore
 
   sanitize-x:
