@@ -78,6 +78,8 @@ jobs:
       - uses: cachix/install-nix-action@v31
       - name: line and branch coverage against the baseline
         run: nix develop --command scripts/check-coverage.sh
+      - name: "complexity, advisory: the number is not reproducible across environments yet"
+        run: nix develop --command scripts/check-complexity.sh --advisory
       - name: coverage report
         if: always()
         uses: actions/upload-artifact@v4

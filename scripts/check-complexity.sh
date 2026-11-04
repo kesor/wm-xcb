@@ -28,11 +28,13 @@ cd "$ROOT_DIR" || exit 1
 BASELINE="tests/quality/complexity-baseline.txt"
 FLOOR=11
 UPDATE=0
+ADVISORY=0
 files=()
 for arg in "$@"; do
   case $arg in
     --update-baseline) UPDATE=1 ;;
     --floor=*) FLOOR=${arg#--floor=} ;;
+    --advisory) ADVISORY=1 ;;
     -*) echo "check-complexity: unknown argument '$arg'" >&2; exit 1 ;;
     *) files+=("$arg") ;;
   esac
@@ -109,7 +111,7 @@ if [ ! -f "$BASELINE" ]; then
   exit 1
 fi
 
-recorded_tool=$(sed -n "s/^# Cognitive complexity per function, from clang-tidy \([^.]*\).*/\1/p" "$BASELINE" | head -1)
+recorded_tool=$(sed -n "s/.*from clang-tidy \(.*\)\.$/\1/p" "$BASELINE" | head -1)
 if [ -n "$recorded_tool" ] && [ "$recorded_tool" != "$TOOL" ]; then
   echo "check-complexity: the baseline was measured with clang-tidy $recorded_tool and this is $TOOL; the numbers can differ by a point or two per function. Regenerate it in this environment if the gate fails on a difference you did not write." >&2
 fi
@@ -131,6 +133,15 @@ done <<<"$measured"
 
 if [ "$problems" -gt 0 ]; then
   echo "check-complexity: $problems function(s) above the baseline (clang-tidy $TOOL). Split the function along a decision that already exists, or run --update-baseline and say why in the commit." >&2
+  if [ "$ADVISORY" -eq 1 ]; then
+    # The number is a heuristic and it differs between environments: the same
+    # tree and the same clang-tidy reported mod_key_name at 14 here and 38 on a
+    # CI runner, which is not a difference of one condition. Until that is
+    # understood, CI prints this and does not fail on it, while the hook gates
+    # fail on the machine where the baseline was measured.
+    echo "check-complexity: --advisory, so this does not fail the run" >&2
+    exit 0
+  fi
   exit 1
 fi
 echo "check-complexity: every function at or above $FLOOR is within its baseline entry"

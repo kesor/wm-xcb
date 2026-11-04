@@ -352,6 +352,12 @@ deciding the number is acceptable. It writes its own compile database from
 `compile_flags.txt` rather than calling `make compile-commands`, which does a
 full clean build.
 
+In CI the job runs it with `--advisory`, and the reason is in wm-9n0.30: the same
+commit and the same clang-tidy reported `mod_key_name` at 14 on the author's
+machine and 38 on a runner, so the gate cannot fail a merge on the difference
+until that is explained. The hook gates still fail, on the machine where the
+baseline was measured.
+
 **Coverage.** `scripts/check-coverage.sh` builds the unit suite with gcov
 instrumentation, runs it, and prints line and branch coverage per file. A file
 below its recorded floor in `tests/quality/coverage-baseline.txt` fails, and so
