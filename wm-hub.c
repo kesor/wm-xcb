@@ -325,6 +325,44 @@ hub_register_component(HubComponent* comp)
   LOG_DEBUG("Registered component: %s", comp->name);
 }
 
+/*
+ * The component that handles `rt` among those still registered, searched the
+ * way the index is built: the last registration wins.
+ */
+static HubComponent*
+request_handler_among_registered(RequestType rt)
+{
+  for (int32_t i = (int32_t) component_count - 1; i >= 0; i--) {
+    HubComponent* other = components[i];
+    if (other == NULL || other->requests == NULL)
+      continue;
+    for (int k = 0; other->requests[k] != 0; k++) {
+      if (other->requests[k] == rt)
+        return other;
+    }
+  }
+  return NULL;
+}
+
+/*
+ * Drop the request types this component claimed and hand each one to a
+ * component that is still registered. A type this component does not own is
+ * left alone: an earlier registration handles it, and that one is staying.
+ */
+static void
+unregister_component_requests(HubComponent* comp)
+{
+  if (comp->requests == NULL)
+    return;
+
+  for (int i = 0; comp->requests[i] != 0; i++) {
+    RequestType rt = comp->requests[i];
+    if (rt >= MAX_REQUEST_TYPES || component_by_request_type[rt] != comp)
+      continue;
+    component_by_request_type[rt] = request_handler_among_registered(rt);
+  }
+}
+
 void
 hub_unregister_component(const char* name)
 {
@@ -345,49 +383,28 @@ hub_unregister_component(const char* name)
     return;
   }
 
-  /* Remove from main component array FIRST */
+  /* Out of the component array first: the request index is recomputed from
+   * what is left in it. */
   for (uint32_t i = 0; i < component_count; i++) {
-    if (components[i] == comp) {
-      components[i] = components[component_count - 1];
-      component_count--;
-      break;
-    }
+    if (components[i] != comp)
+      continue;
+    component_count--;
+    components[i]               = components[component_count];
+    components[component_count] = NULL;
+    break;
   }
 
-  /* Recompute request type mappings - scan remaining components */
-  if (comp->requests != NULL) {
-    for (int i = 0; comp->requests[i] != 0; i++) {
-      RequestType rt = comp->requests[i];
-      if (rt < MAX_REQUEST_TYPES) {
-        /* Only recompute if this component was the handler */
-        if (component_by_request_type[rt] == comp) {
-          component_by_request_type[rt] = NULL;
-          /* Recompute from remaining components */
-          for (int32_t j = (int32_t) component_count - 1; j >= 0; j--) {
-            HubComponent* other = components[j];
-            if (other != NULL && other->requests != NULL) {
-              for (int k = 0; other->requests[k] != 0; k++) {
-                if (other->requests[k] == rt) {
-                  component_by_request_type[rt] = other;
-                  j                             = -1; /* Signal found, break outer loop */
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  unregister_component_requests(comp);
 
   /* Remove from name index */
   for (uint32_t i = 0; i < name_entry_count; i++) {
-    if (component_by_name[i].comp == comp) {
-      /* Swap with last and decrement */
-      component_by_name[i] = component_by_name[name_entry_count - 1];
-      name_entry_count--;
-      break;
-    }
+    if (component_by_name[i].comp != comp)
+      continue;
+    name_entry_count--;
+    component_by_name[i]                     = component_by_name[name_entry_count];
+    component_by_name[name_entry_count].name = NULL;
+    component_by_name[name_entry_count].comp = NULL;
+    break;
   }
 
   /* Free accepted_targets array if allocated */

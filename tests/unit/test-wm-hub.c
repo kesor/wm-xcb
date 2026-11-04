@@ -228,6 +228,52 @@ test_get_component_by_request_type(void)
   hub_shutdown();
 }
 
+/*
+ * Test: a request type whose only handler leaves is unclaimed again, instead of
+ * still pointing at the component that left.
+ */
+void
+test_unregister_drops_the_last_request_handler(void)
+{
+  LOG_CLEAN("== Testing a request type loses its handler with the component");
+  hub_init();
+
+  hub_register_component(&test_fullscreen);
+  assert(hub_get_component_by_request_type(1) == &test_fullscreen);
+  assert(hub_get_component_by_request_type(2) == &test_fullscreen);
+
+  hub_unregister_component("fullscreen");
+  assert(hub_get_component_by_request_type(1) == NULL);
+  assert(hub_get_component_by_request_type(2) == NULL);
+  assert(hub_get_component_by_name("fullscreen") == NULL);
+  assert(hub_component_count() == 0);
+
+  hub_shutdown();
+}
+
+/*
+ * Test: a request type another component took over stays with that component
+ * when the earlier registration leaves.
+ */
+void
+test_unregister_keeps_a_request_type_another_component_owns(void)
+{
+  LOG_CLEAN("== Testing unregistration leaves a request type to its current owner");
+  hub_init();
+
+  hub_register_component(&test_fullscreen); /* request types 1 and 2 */
+  hub_register_component(&test_focus);      /* request types 1 and 3, and 1 is now focus's */
+
+  hub_unregister_component("fullscreen");
+
+  assert(hub_get_component_by_request_type(1) == &test_focus);
+  assert(hub_get_component_by_request_type(2) == NULL);
+  assert(hub_get_component_by_request_type(3) == &test_focus);
+  assert(hub_component_count() == 1);
+
+  hub_shutdown();
+}
+
 void
 test_register_unregister_target(void)
 {
@@ -1322,6 +1368,8 @@ TEST_GROUP(HubRegistry, {
   test_unregister_null_name();
   test_get_component_by_name();
   test_get_component_by_request_type();
+  test_unregister_drops_the_last_request_handler();
+  test_unregister_keeps_a_request_type_another_component_owns();
   test_register_unregister_target();
   test_register_null_target();
   test_register_target_none_id();
