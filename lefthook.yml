@@ -46,6 +46,18 @@ pre-commit:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC, so its assertions never run."
 
+    # A stand-in answers every assertion a test asks it, so the program it names
+    # is the one part of a test the suite cannot falsify. The gate resolves that
+    # name on PATH, requires a file, and looks there for the line the stand-in
+    # cites. Instant, and it needs no X server.
+    #
+    # The glob is a list on purpose: lefthook 2.1.15 reads a single string as one
+    # pattern, so `a|b` matches nothing and the gate is skipped every time.
+    fakes:
+      glob: ["tests/fakes/*", "scripts/check-fakes.sh"]
+      run: ./scripts/check-fakes.sh
+      fail_text: "A stand-in does not name an installed program and cite a line of it. Its second line says '# models: <program>, <what that program does>', its third says '# from <program>: <a line of the installed file>', the file is named after the program, and the program is on PATH."
+
     bead-refs:
       glob: "*.{c,h,sh,yml,yaml}"
       run: ./scripts/check-bead-refs.sh
@@ -118,6 +130,10 @@ pre-push:
     test-src:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC."
+
+    fakes:
+      run: ./scripts/check-fakes.sh
+      fail_text: "A stand-in names a program that is not installed, cites a line that program does not have, or is not named after the one it names."
 
     bead-refs:
       run: ./scripts/check-bead-refs.sh
