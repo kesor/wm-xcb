@@ -87,6 +87,16 @@ review: <what was wrong>
 
 Then re-run the gates and record the verdict naming the new head.
 
+Your fix is held to the rule the author's fix is: it arrives with a test that
+fails without it. A review commit that fixed the order two `_NET_WM_STATE`
+replies are applied in shipped with no test, and the reviewer had written the gap
+into the verdict before committing anyway. `make test` and `make test-x` passed
+on both the broken walk and the fixed one, so reading the diff was the only thing
+keeping it. When the fixed code cannot be reached by a test - a `static`
+function no seam can see, a branch that needs a server the suite does not start -
+commit it only with a bead that says why it has no test and what would make one
+possible. Naming the gap in the verdict is not a substitute for the bead.
+
 **Record everything else.** Anything needing a design decision, anything you are
 not sure about, anything that would change what the author chose to build. Change
 no code. One comment, findings worst first.
