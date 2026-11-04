@@ -26,9 +26,12 @@
 #
 # The floor written for a file is this run's line coverage less MARGIN, because
 # the suite is not perfectly deterministic: the launcher tests fork and exec, and
-# the child's path is covered or not depending on scheduling. One file moved 0.9
-# points between two runs of the same tree. A margin keeps a real drop visible
-# and scheduling noise out of the gate.
+# the child's path is covered or not depending on scheduling - and on whether the
+# child finished writing its counters before the test binary exited. One file
+# moved 0.9 points between two runs here and 2.6 points on a CI runner. The margin
+# is sized for the runner, not for this machine. The tests that made it necessary
+# are the launcher's, and making them deterministic would let it go back to one
+# point.
 #
 # --update-baseline rewrites the floors from this run. Doing that to make a red
 # run green is the same as deleting a test: say in the commit why the drop is
@@ -42,7 +45,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR" || exit 1
 
 BASELINE="tests/quality/coverage-baseline.txt"
-MARGIN=1.5
+MARGIN=3.0
 UPDATE=0
 SHOW_ZERO=0
 for arg in "$@"; do
