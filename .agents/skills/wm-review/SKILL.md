@@ -152,13 +152,16 @@ carries the remaining cause. `Close: yes` is the usual case: the branch is the
 whole fix, so the merge closes the bead. A missing line means close. A sentence
 in the body is not a decision.
 
-`land` does not read the line yet. It still closes every bead the worktree
-carried. On 2026-11-03 a verdict said "Do not close this bead on the strength of
-the branch alone", the merge closed the bead, and the status read merged. A
-comment at 04:47 UTC, after the 04:44 close, named the bead that still carried
-the cause; the status does not show that comment. When a merge closes a bead
-whose verdict says `Close: no`, a later reader comments on that bead with the
-bead that carries the cause. This review does not change the status.
+`land` reads the line. A `Close: no` still rebases, still runs the pre-push
+gates, still merges the branch, and still removes the worktree and the branch;
+then it sets that one bead back to `open` with a comment pointing at the
+findings, so `bd ready` offers it again. `publish` leaves it open after the pull
+request lands. Every other id the worktree carried still closes, and a missing
+line means close. Before land read the line, on 2026-11-03, a verdict said "Do
+not close this bead on the strength of the branch alone", the merge closed the
+bead, and the status read merged. A comment at 04:47 UTC, after the 04:44 close,
+named the bead that still carried the cause. This review does not change the
+status.
 
 ## After a fix
 
