@@ -29,7 +29,12 @@ nothing checks.
 ```bash
 scripts/gate-list.sh            # every hook and its gates
 scripts/gate-list.sh pre-push   # one hook
+lefthook run pre-push --force   # run them all by hand
 ```
+
+Without `--force` a hook runs only the gates its globs match, and a hand run has
+no staged or pushed files to match, so everything skips and the summary is green.
+`--force` is what the merge and CI use, and it is what to use by hand.
 
 | Layer | When | Runs |
 |-------|------|------|
@@ -422,3 +427,18 @@ dispatcher and the window-rule matcher. Both take their input from a place a
 client controls: a client sends the event fields and it chooses `WM_CLASS` and
 `WM_NAME`. A crash prints its input, and dropping that file into
 `tests/fuzz/corpus/<target>/` makes it a case every later run re-tests.
+
+## Globs are a list, not an alternation
+
+`glob: "*.{c,h}|Makefile"` matches nothing in lefthook 2.1: the string is read as
+one pattern, not a set. Write it as a YAML list:
+
+```yaml
+glob: ["*.{c,h}", "Makefile"]
+```
+
+The first version of the skip-what-cannot-matter globs used `|`, so the build,
+unit, seam, coverage and fuzz gates skipped themselves on every commit and push
+for an afternoon while their summaries read green. `--force` ignores globs, which
+is why the merge and CI never noticed - and why the only thing that caught it was
+a retro reading the gate output.
