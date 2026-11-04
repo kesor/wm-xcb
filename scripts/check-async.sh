@@ -64,7 +64,13 @@ if [ "${#SOURCES[@]}" -eq 0 ]; then
   exit 1
 fi
 
-# pattern|what the reader should do instead
+# pattern|what the reader should do instead. The pattern is everything before
+# the last '|', so it may hold an alternation; a reason may not, and none needs
+# one. Splitting on the first '|' cut the sleep rule down to its first
+# alternative, so sleep() and nanosleep() were never checked.
+#
+# xcb_wait_for_reply() is not a rule of its own: xcb_[a-z_]*_reply() matches it,
+# and a second rule reported the same line twice.
 #
 # xcb_poll_for_event() is deliberately not on this list. Returning NULL instead
 # of waiting is exactly what an event loop does after poll(2) tells it the
@@ -74,7 +80,6 @@ fi
 RULES=(
   'xcb_[a-z_]*_reply\(|synchronous X round trip: use the cookie and handle the reply as an event, or restructure so no reply is needed'
   'xcb_[a-z_]*_replies\(|synchronous X round trip: the plural form waits once per atom, screen or list'
-  'xcb_wait_for_reply\(|synchronous X round trip'
   'xcb_request_check\(|synchronous X round trip'
   'xcb_aux_sync\(|synchronous X round trip'
   # alloc only sends GetKeyboardMapping and stores the cookie. The wait is
@@ -91,6 +96,24 @@ RULES=(
 normalize() {
   printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]][[:space:]]*/ /g; s/[[:space:]]*$//'
 }
+
+# The rules run over a copy of each file with its comments and string contents
+# blanked, so a call named in prose is not a call. The copy keeps the file's line
+# structure, and the waiver check below reads the original: the marker lives in
+# a comment, and the comment is exactly what the copy dropped.
+CODE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/check-async.XXXXXX") || exit 1
+trap 'rm -rf "$CODE_DIR"' EXIT
+declare -A CODE_FILE=()
+for f in "${SOURCES[@]}"; do
+  code="$CODE_DIR/${#CODE_FILE[@]}.c"
+  async_strip_comments "$f" >"$code"
+  # A copy that lost the whole file would be a clean run for the wrong reason.
+  if [ -s "$f" ] && [ ! -s "$code" ]; then
+    echo "check-async: the comment-free copy of $f is empty, so the rules read nothing" >&2
+    exit 1
+  fi
+  CODE_FILE["$f"]=$code
+done
 
 declare -A BASELINE=()
 if [ -f "$BASELINE_FILE" ]; then
@@ -110,19 +133,14 @@ declare -a CURRENT=()
 async_scan_init "${SOURCES[@]}"
 
 for f in "${SOURCES[@]}"; do
+  code=${CODE_FILE["$f"]}
   for rule in "${RULES[@]}"; do
-    pattern="${rule%%|*}"
-    reason="${rule#*|}"
+    pattern="${rule%|*}"
+    reason="${rule##*|}"
     while IFS= read -r hit; do
       [ -n "$hit" ] || continue
       line="${hit%%:*}"
       text="${hit#*:}"
-
-      # A call named in a comment is not a call.
-      stripped="$(printf '%s' "$text" | sed 's/^[[:space:]]*//')"
-      case "$stripped" in
-        \** | //* | '/*'*) continue ;;
-      esac
 
       # waitpid with WNOHANG does not block.
       if [ "$pattern" = 'waitpid\(' ] && printf '%s' "$text" | grep -q 'WNOHANG'; then
@@ -185,7 +203,7 @@ for f in "${SOURCES[@]}"; do
       NEW_VIOLATIONS=$((NEW_VIOLATIONS + 1))
       printf '  NEW VIOLATION  %s:%s  %s\n' "$f" "$line" "$reason"
       printf '                 %s\n' "$(normalize "$text")"
-    done < <(grep -nE "$pattern" "$f" 2>/dev/null)
+    done < <(grep -nE "$pattern" "$code" 2>/dev/null)
   done
 done
 

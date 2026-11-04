@@ -357,6 +357,22 @@ compiled cannot produce findings, then flags calls that block:
 | `waitpid()` without `WNOHANG` | blocking wait on a child |
 | `sleep()`, `usleep()`, `nanosleep()` | anything that sleeps stops every client |
 
+`xcb_poll_for_reply()`, `xcb_poll_for_reply64()` and `xcb_discard_reply()` are
+not violations. Their names end in `_reply` like the calls that wait, and
+libxcb documents all three as returning without waiting; flagging them would
+push the author to waive the very call the rule asks for.
+
+The rules run over a copy of each file with its comments and string contents
+blanked, so a call name in prose is not a call. `scripts/lib/async-scan.sh`
+writes that copy and keeps the file's line structure, so the line a rule
+reports is the line to open. Without it a `/* ... */` block that began a
+continuation line with `waitpid(` was reported as a blocking wait, and the
+workaround was to reword the sentence.
+
+`tests/x/test-101-async-rules.sh` pins every rule and every exception above on
+probe files: one blocking call per line must be reported, and a `//` comment, a
+string literal, a block comment and a `poll_for_reply` call must not.
+
 `xcb_poll_for_event()` is not on the list. It returns NULL instead of waiting,
 which is what the loop does to drain the events libxcb queued after `poll(2)`
 reported the connection readable, and a grep cannot tell that from the spin it
@@ -368,8 +384,7 @@ A call is waived when it, or the two lines above it, carries
 startup code that runs before the loop exists, or the non-blocking read of the
 signal wakeup pipe in `signals_drain_wakeups()`. The reason has to be on the
 marker's own line: an `allow-blocking:` with nothing after it is reported as a
-waiver without a reason and counts as a violation. Comments that mention a
-blocking function are ignored, so prose cannot produce a false positive.
+waiver without a reason and counts as a violation.
 
 The marker is refused when an XCB handler can reach the function it sits in.
 The reason is always a claim about when the code runs, and code a handler

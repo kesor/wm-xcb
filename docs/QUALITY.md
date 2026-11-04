@@ -200,6 +200,16 @@ in `tests/quality/async-baseline.txt`.
   `xcb_discard_reply()`. Their names end in `_reply`, and libxcb documents all
   three as not waiting: the first two return 0 while the reply has not arrived.
   Flagging them would tell the author to waiver the call the rule asks for.
+- **Not read at all** — the text of a comment or a string literal. The rules run
+  over a copy of each file from `async_strip_comments()` in
+  `scripts/lib/async-scan.sh`, with comments and string contents blanked and the
+  file's line structure kept. A call name in prose is not a call, whichever line
+  of a `/* ... */` block it starts.
+
+`tests/x/test-101-async-rules.sh` runs the gate over probe files and checks
+every rule and every exception above, so a rule that matches nothing, or one
+that matches a call libxcb documents as non-blocking, fails the suite rather
+than sitting in the list.
 
 The rules also cover blocking names that do not end in `_reply(`: the
 `xcb_*_replies()` family waits once per atom or screen, `xcb_aux_sync()` is a
