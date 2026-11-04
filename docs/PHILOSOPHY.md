@@ -20,7 +20,7 @@ a promise the code does not keep is a defect list, not marketing.
 | Promise | What it means for the person using the WM | Status 2026-11-01 |
 |---------|-------------------------------------------|-------------------|
 | **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | kept for new windows: mapped, tiled, and placed on `MapRequest` |
-| **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop the loop from running | partly kept: the loop keeps running while dmenu is open, though dmenu itself holds the keyboard grab so keys reach it and not the WM; the synchronous X replies still stop the loop (2.3) |
+| **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop the loop from running | kept (2026-11-04): the loop keeps running while dmenu is open, and no handler or action waits for the server (2.3). While the prompt is up, dmenu holds the keyboard grab itself, so the keys go to it |
 | **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | not kept: no key grabs exist (4.5) |
 | **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: the unit suite covers the model, `make test-x` covers the X seam and still fails there |
 | **The WM can explain itself** | current state and recent transitions can be dumped and read | not kept: `LOG_DEBUG` only, no state dump or event trace |

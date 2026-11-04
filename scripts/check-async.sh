@@ -67,8 +67,14 @@ fi
 # seam suite and the idle CPU number in scripts/perf-test.sh.
 RULES=(
   'xcb_[a-z_]*_reply\(|synchronous X round trip: use the cookie and handle the reply as an event, or restructure so no reply is needed'
+  'xcb_[a-z_]*_replies\(|synchronous X round trip: the plural form waits once per atom, screen or list'
   'xcb_wait_for_reply\(|synchronous X round trip'
   'xcb_request_check\(|synchronous X round trip'
+  'xcb_aux_sync\(|synchronous X round trip'
+  # alloc only sends GetKeyboardMapping and stores the cookie. The wait is
+  # xcb_get_keyboard_mapping_reply(), and these two names are what call it.
+  'xcb_key_symbols_get_keycode\(|hidden X round trip: waits for the keyboard mapping that xcb_key_symbols_alloc() only requests'
+  'xcb_key_symbols_get_keysym\(|hidden X round trip: waits for the keyboard mapping that xcb_key_symbols_alloc() only requests'
   '\bread\(|blocking read: a callback must not wait for a child process'
   'waitpid\(|blocking wait on a child: reap asynchronously, or pass WNOHANG'
   '\busleep\(|\bsleep\(|nanosleep\(|sleep inside the window manager stalls every client'
@@ -123,17 +129,23 @@ for f in "${SOURCES[@]}"; do
         continue
       fi
 
-      # A waiver sits on the line or the two above it, with a reason.
+      # A waiver sits on the line or the two above it, and the reason after the
+      # marker is what waives: an "allow-blocking:" with nothing after it says
+      # nothing, so it is reported and counted like an unwaived call.
       start=$((line - 2))
       [ "$start" -lt 1 ] && start=1
       context=$(sed -n "${start},${line}p" "$f")
-      if printf '%s' "$context" | grep -q 'allow-blocking:'; then
+      if printf '%s' "$context" | grep -qE 'allow-blocking:[[:space:]]*[^[:space:]*]'; then
         WAIVED=$((WAIVED + 1))
         if [ "$VERBOSE" -eq 1 ]; then
           printf '  waived  %s:%s  %s\n' "$f" "$line" \
             "$(printf '%s' "$context" | grep -o 'allow-blocking:.*' | head -1)"
         fi
         continue
+      fi
+      if printf '%s' "$context" | grep -q 'allow-blocking:'; then
+        printf '  WAIVER WITHOUT A REASON  %s:%s\n' "$f" "$line"
+        printf '                 write the reason after allow-blocking:, on that line\n'
       fi
 
       key="$f|$(normalize "$text")"

@@ -186,14 +186,23 @@ otherwise `nix develop --command lefthook`, otherwise a warning.
 in `tests/quality/async-baseline.txt`.
 
 - **Waiver** — a comment `allow-blocking: <reason>` on the line or the two above
-  it. For code that cannot block: startup paths before the loop runs.
+  it. For code that cannot block: startup paths before the loop runs. The reason
+  is required on that same line; an `allow-blocking:` with nothing after it is
+  printed as a waiver without a reason and fails like a violation.
 - **Baseline** — the calls that are known and tracked in beads. The script
-  prints how many there are; the remaining ones are all in
-  `bd list --parent wm-46k.2`.
+  prints how many there are, and the file is empty today: the async audit that
+  filled it is done and the waits that remain are startup paths with a waiver.
 - **Not a violation** — `xcb_poll_for_reply()`, `xcb_poll_for_reply64()` and
   `xcb_discard_reply()`. Their names end in `_reply`, and libxcb documents all
   three as not waiting: the first two return 0 while the reply has not arrived.
   Flagging them would tell the author to waiver the call the rule asks for.
+
+The rules also cover blocking names that do not end in `_reply(`: the
+`xcb_*_replies()` family waits once per atom or screen, `xcb_aux_sync()` is a
+round trip, and `xcb_key_symbols_get_keycode()` and
+`xcb_key_symbols_get_keysym()` wait for the keyboard mapping.
+`xcb_key_symbols_alloc()` only sends that request, so it is not a rule.
+Each blocking name is waived where it runs before the loop and nowhere else.
 
 A violation that is in neither fails. That is the point: the file only shrinks.
 Adding an entry is a deliberate act:
