@@ -332,7 +332,9 @@ compiled cannot produce findings, then flags calls that block:
 
 | Pattern | Why it is flagged |
 |---------|-------------------|
-| `xcb_*_reply()`, `xcb_wait_for_reply()`, `xcb_request_check()` | synchronous round trip: the loop waits for the server |
+| `xcb_*_reply()`, `xcb_wait_for_reply()`, `xcb_request_check()`, `xcb_aux_sync()` | synchronous round trip: the loop waits for the server |
+| `xcb_*_replies()` | the plural form of the same wait, once per atom, screen or list; `xcb_ewmh_init_atoms_replies()` is the one in the tree |
+| `xcb_key_symbols_get_keycode()`, `xcb_key_symbols_get_keysym()` | a round trip behind a name that never says `reply`: both call `xcb_get_keyboard_mapping_reply()`. `xcb_key_symbols_alloc()` only sends the request |
 | `read()` | a callback must not wait on a child's pipe |
 | `waitpid()` without `WNOHANG` | blocking wait on a child |
 | `sleep()`, `usleep()`, `nanosleep()` | anything that sleeps stops every client |
@@ -346,7 +348,9 @@ seam suite, and the idle CPU line of `scripts/perf-test.sh`.
 A call is waived when it, or the two lines above it, carries
 `allow-blocking: <reason>`. The marker is the record of why the wait is safe:
 startup code that runs before the loop exists, or the non-blocking read of the
-signal wakeup pipe in `signals_drain_wakeups()`. Comments that mention a
+signal wakeup pipe in `signals_drain_wakeups()`. The reason has to be on the
+marker's own line: an `allow-blocking:` with nothing after it is reported as a
+waiver without a reason and counts as a violation. Comments that mention a
 blocking function are ignored, so prose cannot produce a false positive.
 
 The script prints the current counts. There are no violations left: the

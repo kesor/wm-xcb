@@ -177,11 +177,12 @@ keybinding_numlock_mask(void)
   if (dpy == NULL)
     return 0;
 
-  /* allow-blocking: startup only, the event loop has not started yet */
+  /* alloc only queues GetKeyboardMapping; get_keycode waits for the reply. */
   xcb_key_symbols_t* symbols = xcb_key_symbols_alloc(dpy);
   if (symbols == NULL)
     return 0;
 
+  /* allow-blocking: startup only, the event loop has not started yet */
   xcb_keycode_t* keycodes = xcb_key_symbols_get_keycode(symbols, XK_Num_Lock);
   xcb_key_symbols_free(symbols);
 
