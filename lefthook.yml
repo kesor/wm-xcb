@@ -159,9 +159,10 @@ pre-push:
 
     # A passing run printed 215 lines: a gcc link line, a format warning and 113
     # assertion lines. The gate prints the summary now, and the log on failure.
-    complexity:
-      run: ./scripts/check-complexity.sh
-      fail_text: "A function is above its complexity baseline. Split it along a decision that already exists, or run --update-baseline and say why in the commit."
+    # Complexity runs in pre-commit, over the changed files, and in CI as an
+    # advisory step - not here. The number it prints is not reproducible across
+    # environments yet (the same function reads 14 here and 38 on a runner), so a
+    # pre-push gate would fail a merge for a difference the author cannot see.
 
     # Shifted left from CI. Both used to run only in the CI workflow, so a worker
     # and a reviewer both saw green on a tree that CI then rejected - which cost
