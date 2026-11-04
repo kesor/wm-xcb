@@ -13,6 +13,7 @@
 | **[QUALITY.md](QUALITY.md)** | The gates: what runs on commit, push, and CI, and how to add one |
 | **[VISION.md](VISION.md)** | Why we built this, the paradigm shift |
 | **[IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md)** | Implementation order and why it is this order (status lives in `bd list --type=epic`) |
+| **[configuration.md](configuration.md)** | The config file: a bind line changes keys without a rebuild |
 
 ---
 
@@ -106,10 +107,14 @@ Short version, and the parts that stay true until they are fixed:
   points the X input focus at the focused window with `xcb_set_input_focus`;
   a newly managed client takes focus, and the newest remaining client takes it
   back when the focused one is unmanaged or destroyed. The
-  keys in `config.wm.def.h` are grabbed on the root window when the keybinding
-  component starts, with the CapsLock and NumLock masks a press can carry, and
-  grabbed again on `MappingNotify`, so a press reaches the component that owns
-  it. The tag-manager and tiling components start before monitor discovery, so
+  keys come from the user's config file when it names a binding this keyboard
+  can use, and from `config.wm.def.h` otherwise, and are grabbed on the root
+  window when the keybinding component starts, with the CapsLock and NumLock
+  masks a press can carry, and grabbed again on `MappingNotify`, so a press
+  reaches the component that owns it. `docs/configuration.md` has the file
+  format; a line the parser cannot read is reported once, with its line
+  number, and the compiled bindings stay in place when the file names none.
+  The tag-manager and tiling components start before monitor discovery, so
   every monitor is adopted with a tag-view and a layout state machine, and
   `tag-manager.view`, `tag-manager.toggle`, and `tag-manager.client-move` are
   in the registry. A unit test runs the startup order and fails if a component

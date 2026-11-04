@@ -325,7 +325,7 @@ Configuration has been decoupled from components:
 
 **Keybinding component decoupling:**
 - `keybinding.c` no longer has hardcoded bindings
-- `keybinding_init()` calls `config_init()` which calls `config_wire_keybindings()`
+- `keybinding_init()` calls `config_init()`, which registers the config file's bindings, or `config_wire_keybindings()` when the file names none that can be used
 - Component only handles KEY_PRESS → action lookup and invocation
 
 **Scope (IMPLEMENTED):**
@@ -341,6 +341,38 @@ Configuration has been decoupled from components:
 
 - See GitHub issue: **#84 Design: Configuration System for Keybindings, Rules, and Properties** — IMPLEMENTED (partial)
 - See GitHub issue: **#92 Decouple config from component details** — IMPLEMENTED
+
+### Decision: A text file read at startup, with the compiled configuration as the fallback
+
+**Decision:** the WM reads one text file at startup (`$WM_CONFIG`, else
+`$XDG_CONFIG_HOME/wm/config`, else `$HOME/.config/wm/config`). It holds `bind`,
+`float`, and `tags` lines. `config-file.c` parses it and touches no X server;
+`config.c` wires what it found into the keybinding table and the accessors other
+modules read. `docs/configuration.md` is the format.
+
+**Rationale:**
+- One parser, no X: the format and its error messages are unit-testable, and a
+  keysym becomes a keycode only in `config.c`, which already knows the server.
+- The compiled configuration stays the fallback, so a machine with no file runs
+  the configuration the unit tests cover and behaves the same as before.
+- A rejected line is reported with its path and line number and skipped, so one
+  typo costs one line rather than every binding.
+- A file with `bind` lines replaces the compiled table instead of adding to it.
+  Additive would make a compiled binding impossible to remove from a running
+  session, which is the first thing a user changes.
+
+**Alternatives considered:**
+- dwm's model (`config.h` and a rebuild): what this exists to replace.
+- A JSON or YAML file: a parser dependency and a syntax whose errors point at
+  byte offsets, for a file that needs three directives.
+- Wiring the file only when it exists, keeping compiled bindings alongside: two
+  sources of truth for one chord, and no way to unbind a key.
+
+**Known limit:** gaps, borders and per-application tag rules are still compiled
+in. A `float` or `tags` line is parsed and kept; the manage path does not ask
+the float rules, and nothing creates the tag list at startup, so neither changes
+what the user sees yet. The reload path that would let an edit take effect
+without a restart is not written yet.
 
 ---
 

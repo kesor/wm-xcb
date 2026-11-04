@@ -21,7 +21,11 @@ cd "$ROOT_DIR" || exit 1
 # shellcheck source=scripts/lib/gate-log.sh
 . scripts/lib/gate-log.sh
 
-gate_log "check-debug-build" make clean || exit 1
+# Only this variant's directory: the point of the clean is a from-scratch debug
+# build, and `make clean` removes every variant - which wiped the coverage and
+# fuzz caches every push, turning two incremental gates (0.5s and 12s) back into
+# full rebuilds (7s and 19s).
+gate_log "check-debug-build" rm -rf build/debug "$(dirname "$0")/../wm" || exit 1
 gate_log "check-debug-build" make DEBUG=1 || exit 1
 gate_log "check-debug-build" env DEBUG=1 ./scripts/check-unit.sh || exit 1
 gate_log "check-debug-build" make -j"$(nproc)" || exit 1

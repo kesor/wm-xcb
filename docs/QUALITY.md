@@ -323,3 +323,61 @@ prints a block offering to reset it, which would undo `make hooks`.
   a bead comment. Never a `lefthook.yml` job.
 - **Coverage percentages.** Not until the seam tests pass, otherwise the number
   measures the wrong thing.
+
+## Coverage and fuzzing
+
+These three run in the hook now, and by hand, and in CI. They used to run only in
+CI, and that is where they cost the most: a worker and a reviewer both saw green
+on a tree that CI then rejected, twice in one night, each time losing a cycle.
+Shifted left, the person who wrote the code is the one who sees the number.
+
+```bash
+scripts/check-complexity.sh            # per-function cognitive complexity (0.3s)
+scripts/check-coverage.sh              # line and branch coverage of the unit suite (7s warm)
+scripts/check-coverage.sh --show-zero  # also list what the suite never executes
+scripts/fuzz.sh 5                      # the fuzzers, short: the hook's version
+scripts/fuzz.sh 60                     # the same, long: by hand or in CI
+```
+
+In the hook: complexity is a `pre-commit` gate on the changed files, and
+complexity, coverage and a 5-second fuzz run are `pre-push` gates. `scripts/fuzz.sh`
+with no argument runs 20 seconds per harness.
+
+**Complexity.** `scripts/check-complexity.sh` runs clang-tidy's
+cognitive-complexity check over every source file and compares the number with
+`tests/quality/complexity-baseline.txt`, which lists `<function> <number>` for
+everything at 11 or above. A function above its number fails, and so does one at
+or above the floor with no entry: a new god-function arrives with somebody
+deciding the number is acceptable. It writes its own compile database from
+`compile_flags.txt` rather than calling `make compile-commands`, which does a
+full clean build.
+
+In CI the job runs it with `--advisory`, and the reason is in wm-9n0.30: the same
+commit and the same clang-tidy reported `mod_key_name` at 14 on the author's
+machine and 38 on a runner, so the gate cannot fail a merge on the difference
+until that is explained. The hook gates still fail, on the machine where the
+baseline was measured.
+
+**Coverage.** `scripts/check-coverage.sh` builds the unit suite with gcov
+instrumentation, runs it, and prints line and branch coverage per file. A file
+below its recorded floor in `tests/quality/coverage-baseline.txt` fails, and so
+does a source file with no floor at all: a new file arrives with somebody
+deciding what covers it. `--update-baseline` rewrites the floors from the
+current run; doing that to turn a red run green is the same as deleting a test,
+so say why in the commit. The floor written is the measured value less 1.5
+points, because the launcher tests fork and exec and their coverage moves by
+about a point between runs of the same tree.
+
+A file at 0% is the useful number. On the tree this was written against, three
+source files were never executed by any unit test: `wm-states.c`,
+`wm-xcb-events.c` (the handlers nobody registers) and
+`src/components/connection-sm.c` (the state machine with no instance). A branch
+percentage in single digits on the monitor manager is the same signal: the code
+is there, and nothing proves it runs.
+
+**Fuzzing.** `scripts/fuzz.sh` builds `tests/fuzz/fuzz-*.c` with clang, ASan and
+UBSan, and runs each for the seconds given. The two harnesses feed the X event
+dispatcher and the window-rule matcher. Both take their input from a place a
+client controls: a client sends the event fields and it chooses `WM_CLASS` and
+`WM_NAME`. A crash prints its input, and dropping that file into
+`tests/fuzz/corpus/<target>/` makes it a case every later run re-tests.

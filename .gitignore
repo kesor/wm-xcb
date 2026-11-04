@@ -12,12 +12,18 @@ test-*
 !tests/unit/test-*.c
 !tests/unit/test-*.h
 !tests/x/test-*.sh
+# A fuzz harness is a test-* shape under another name, and a crash artifact is
+# build output that belongs in build/ (already ignored).
+!tests/fuzz/fuzz-*.c
 test
 pr-body.md
 result
 
 # direnv cache
 .direnv/
+
+# Compiled objects the coverage and fuzz gates keep between runs.
+.cache/
 
 # Test tool binaries (tools/xclient is built from tools/xclient.c)
 tools/xclient

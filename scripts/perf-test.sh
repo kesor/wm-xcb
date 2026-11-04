@@ -198,7 +198,9 @@ if ! DISPLAY="$TEST_DISPLAY" xdotool getdisplaygeometry >/dev/null 2>&1; then
   exit 1
 fi
 
-DISPLAY="$TEST_DISPLAY" "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
+# The stage presses compiled-in bindings, so a config file in the developer's
+# home must not decide what they mean.
+WM_CONFIG="$LOG_DIR/no-config-file" DISPLAY="$TEST_DISPLAY" "$WM_VARIANT_BIN" >"$WM_LOG" 2>&1 &
 WM_PID=$!
 sleep 1
 if ! kill -0 "$WM_PID" 2>/dev/null; then

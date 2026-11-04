@@ -35,17 +35,19 @@ with `patch`, and stepping on the other patches. That is the same criticism this
 project makes about patch conflicts, seen from the user's side instead of the
 maintainer's.
 
-wm is no better today: configuration is compiled into `config.def.h` and
-`config.wm.def.h`, and a binding that names an action nobody registered leaves
-a key that does nothing. Startup reports that binding once, with the key and
-the action name, but changing it still means editing the header and rebuilding.
+wm is no better today: gaps and borders are still compiled into `config.def.h`
+and `config.wm.def.h`. Keybindings, float rules and tag names come from a text
+file (`docs/configuration.md`), and a binding that names an action nobody
+registered is reported once at startup with its key and the action name. The
+float rules and the tag names are read and kept, and nothing consults them yet.
+So this is a goal with a status column, not a claim.
 
-| Goal | Status 2026-11-01 |
+| Goal | Status 2026-11-04 |
 |------|-------------------|
-| No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, and no key is grabbed, so no default binding fires |
-| Change keybindings, rules, and tag names in a text file, no rebuild | not kept: compiled in |
-| Reload that file without restarting | not kept |
-| A wrong line in that file says what is wrong, once, at startup | not kept: there is no config file yet; a compiled binding to a missing action is reported once at startup, but fixing it needs a rebuild |
+| No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, so `MOD+Return` runs nothing on a machine without it |
+| Change keybindings, rules, and tag names in a text file, no rebuild | partly kept: a `bind` line changes which action a key invokes without a rebuild; `float` and `tags` lines are read, but the manage path never asks the float rules and nothing creates the tag list at startup |
+| Reload that file without restarting | not kept: the file is read once, at startup |
+| A wrong line in that file says what is wrong, once, at startup | partly kept: a line the parser cannot read is reported with its path and line number, and a binding to an action nobody registered is reported once with its key and the action name |
 | Every feature a dwm patch provides is a config toggle here | not kept |
 
 **The rule that follows:** a feature a user turns on is a config key, not a
@@ -260,8 +262,8 @@ beads epic for state machine ergonomics.
 - **Runtime plugin loading.** Compile-time components only, for now
   (`plans/wm-architecture.md`, out of scope for v1). The decoupling is about
   replaceability, not `dlopen`.
-- **Config reload without a restart.** Nice, not the point. Config is compiled in
-  today, same as dwm.
+- **Config reload without a restart.** Not yet written. The file is read once, at
+  startup, so an edit needs a restart.
 - **Beating dwm's latency.** The target is "not worse". A WM that freezes is
   worse; see §2.3.
 

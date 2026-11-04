@@ -6,6 +6,7 @@
 #include "wm-running.h"
 #include "wm-signals.h"
 
+#include "config.h"
 #include "wm-components.h"
 #include "wm-hub.h"
 #include "wm-states.h"
@@ -26,9 +27,14 @@ main(int argc, char** argv)
   /* Initialize hub first */
   hub_init();
 
+  /* Before the components: the keybinding component wires its table from
+   * whatever this kept, and a missing file leaves the compiled bindings. */
+  config_load_runtime(NULL);
+
   if (!wm_components_init()) {
     LOG_ERROR("The window manager did not start: a component failed to initialize");
     wm_components_shutdown();
+    config_shutdown();
     destruct_state_machine();
     destruct_ewmh();
     destruct_xcb();
@@ -48,6 +54,10 @@ main(int argc, char** argv)
   }
 
   wm_components_shutdown();
+
+  /* The binding table held pointers into the file, and keybinding_shutdown()
+   * has emptied it. */
+  config_shutdown();
 
   /* Cleanup core systems */
   destruct_state_machine();
