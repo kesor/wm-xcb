@@ -17,9 +17,9 @@ typedef struct KeyBinding KeyBinding;
  * Configuration values are defined in config.def.h and accessed via
  * config_get_*() functions.
  *
- * Keybindings are NOT accessed here - they're registered directly
- * via keybinding_binding_register() in config.wm.def.h, keeping the
- * config system generic and decoupled from the keybinding component.
+ * Keybindings are not read from here. config.c registers a config file's bind
+ * lines, and config.wm.def.h registers the compiled fallback, both through
+ * keybinding_binding_register(). This header stays free of that wiring.
  */
 
 /*

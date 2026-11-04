@@ -13,7 +13,7 @@
 | **[QUALITY.md](QUALITY.md)** | The gates: what runs on commit, push, and CI, and how to add one |
 | **[VISION.md](VISION.md)** | Why we built this, the paradigm shift |
 | **[IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md)** | Implementation order and why it is this order (status lives in `bd list --type=epic`) |
-| **[configuration.md](configuration.md)** | The config file: keybindings, float rules and tag names without a rebuild |
+| **[configuration.md](configuration.md)** | The config file: a bind line changes keys without a rebuild |
 
 ---
 
@@ -107,8 +107,8 @@ Short version, and the parts that stay true until they are fixed:
   points the X input focus at the focused window with `xcb_set_input_focus`;
   a newly managed client takes focus, and the newest remaining client takes it
   back when the focused one is unmanaged or destroyed. The
-  keys are read from the user's config file at startup, and from
-  `config.wm.def.h` where that file says nothing, and are grabbed on the root
+  keys come from the user's config file when it names a binding this keyboard
+  can use, and from `config.wm.def.h` otherwise, and are grabbed on the root
   window when the keybinding component starts, with the CapsLock and NumLock
   masks a press can carry, and grabbed again on `MappingNotify`, so a press
   reaches the component that owns it. `docs/configuration.md` has the file

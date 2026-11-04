@@ -325,7 +325,7 @@ Configuration has been decoupled from components:
 
 **Keybinding component decoupling:**
 - `keybinding.c` no longer has hardcoded bindings
-- `keybinding_init()` calls `config_init()` which calls `config_wire_keybindings()`
+- `keybinding_init()` calls `config_init()`, which registers the config file's bindings, or `config_wire_keybindings()` when the file names none that can be used
 - Component only handles KEY_PRESS → action lookup and invocation
 
 **Scope (IMPLEMENTED):**
@@ -369,8 +369,10 @@ modules read. `docs/configuration.md` is the format.
   sources of truth for one chord, and no way to unbind a key.
 
 **Known limit:** gaps, borders and per-application tag rules are still compiled
-in. The reload path that would let an edit take effect without a restart is not
-written yet.
+in. A `float` or `tags` line is parsed and kept; the manage path does not ask
+the float rules, and nothing creates the tag list at startup, so neither changes
+what the user sees yet. The reload path that would let an edit take effect
+without a restart is not written yet.
 
 ---
 

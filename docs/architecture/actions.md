@@ -621,7 +621,8 @@ void config_pointer_init(void) {
 
 ### Phase 3: Runtime Config
 - A text config file read at startup, with the compiled wiring as the fallback:
-  done for `bind`, `float`, and `tags` lines, see `docs/configuration.md`
+  done for `bind` lines. `float` and `tags` lines are parsed and not applied yet.
+  See `docs/configuration.md`
 - Gaps, borders and per-application tag rules are still compiled in
 - Reloading without a restart needs `action_unregister()` for a keybinding hot
   reload; not written
