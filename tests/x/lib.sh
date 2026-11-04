@@ -94,6 +94,12 @@ spawn_client() {
     extra=("$@")
   fi
   local out="$TMPDIR_SEAM/client-$count-$$-$RANDOM.txt"
+  # Create the file before forking. The child does the redirection, so the read
+  # below could find no file at all: `wc -l <"$out"` then prints an error, the
+  # loop's test is false, and spawn_client returns no ids - which every caller
+  # reports as a statement about the WM ("focus is not on either managed
+  # client"). Reproduced once in 300 on a loaded box.
+  : >"$out"
   "$XCLIENT" -n "$count" -W "$width" -H "$height" -t "$title" -c "$CLASS" -v "${extra[@]}" \
     >"$out" 2>&1 &
   # This function runs inside a command substitution (mapfile, $(...)), so a
@@ -106,6 +112,15 @@ spawn_client() {
     sleep 0.01
     waited=$((waited + 1))
   done
+  local got
+  got=$(wc -l <"$out")
+  if [ "$got" -lt "$count" ]; then
+    # Say what actually happened. A test that fails because it has no clients is
+    # a harness failure, and reporting it as a WM behaviour is what turned this
+    # race into a NEW seam failure.
+    echo "spawn_client: asked $XCLIENT for $count window(s), got $got after ${waited}00ms" >&2
+    echo "spawn_client: this is the harness, not the WM; see $out" >&2
+  fi
   awk '{print $1}' "$out"
 }
 
