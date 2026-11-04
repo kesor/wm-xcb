@@ -30,20 +30,11 @@ fi
 OUT=build/fuzz
 mkdir -p "$OUT"
 
-# The WM objects the harnesses link against. wm.c is the event loop and not
-# needed; the rest is what a dispatch and a rule lookup reach.
-SOURCES=(
-  config.c wm-log.c wm-hub.c wm-states.c wm-components.c wm-running.c wm-signals.c
-  wm-xcb.c wm-xcb-ewmh.c wm-xcb-events.c
-  src/sm/sm-instance.c src/sm/sm-registry.c src/sm/sm-template.c
-  src/xcb/xcb-handler.c
-  src/target/client.c src/target/monitor.c src/target/tag.c
-  src/components/client-list.c src/components/connection-sm.c src/components/focus.c
-  src/components/fullscreen.c src/components/keybinding.c src/components/monitor-manager.c
-  src/components/pertag.c src/components/tag-manager.c src/components/tiling.c
-  src/actions/action-registry.c src/actions/keybinding-binding.c src/actions/launcher.c
-  src/actions/terminal.c
-)
+# The WM objects the harnesses link against, read from the Makefile so a new
+# source file is picked up: the first version hard-coded the list, and the day a
+# bead added config-file.c the fuzz job stopped linking (`undefined reference to
+# config_file_load`) while every other gate passed. wm.c is the event loop.
+mapfile -t SOURCES < <(make -s print-src | tr ' ' '\n' | grep -v '^wm\.c$' | grep -v '^$')
 
 read -r -a PKG_CFLAGS <<<"$(pkg-config --cflags xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms)"
 read -r -a PKG_LIBS <<<"$(pkg-config --libs xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms)"
