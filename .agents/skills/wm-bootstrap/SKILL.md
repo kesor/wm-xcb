@@ -241,11 +241,19 @@ beads in your final message. This is how the traps below stop being traps.
 - **A merge can end up on no ref.** The publish step pushes, then resets master
   onto `origin/master`, so a merge made while that push was in flight is in
   neither and the reset takes it away. The commit then exists only as an object,
-  and the next `git gc` removes it. When a bead is closed as merged and its
-  files are not on master, read `git reflog master` for its
-  `merge work/<bead>` line, pin the sha with
-  `git update-ref refs/local/recovered-<bead> <sha>`, then merge it back and say
-  so in the bead.
+  and the next `git gc` removes it. The reset is `git reset --hard
+  origin/<MERGE_REF>` in the harness's `wpy/commands/publish.py`, and it runs
+  whether or not master moved during the wait. That wait is the push, the check
+  run and the merge, so it runs to minutes: 298612ms in the metrics row for the
+  2026-11-03 publish, 2618289ms for the 2026-11-04 one. A merge made into that
+  gap is discarded. No commit on a `work/<bead>` branch can guard
+  it: that file is not in this repository, and `HANDOFF.md` section 5 rule 3
+  forbids editing the harness while a run is in flight. A bead asking for that
+  guard is a session-between-runs job, so record the finding and spend no turns
+  looking for an in-tree fix. When a bead is closed as merged and its files are
+  not on master, read `git reflog master` for its `merge work/<bead>` line, pin
+  the sha with `git update-ref refs/local/recovered-<bead> <sha>`, then merge it
+  back and say so in the bead.
 - **Do not push, and do not rewrite published history,** unless asked.
 
 ## Definition of done
