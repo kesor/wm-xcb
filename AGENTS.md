@@ -482,6 +482,23 @@ what you tried, what happened
 EOF
 ```
 
+A bead's description goes the same way, and there `--description` is the shape
+that loses text: `bd update <id> --description ""` prints "Updated issue" and
+exits 0, and a `$(...)` that produced nothing is indistinguishable from a
+decision to clear the description. `--stdin` refuses an empty body, so a failed
+read of the text cannot pass for the text:
+
+```bash
+bd update <bead-id> --stdin <<'EOF'
+what changed, and what done means
+EOF
+```
+
+A body of nothing but whitespace still gets through, which is why
+`scripts/check-bead-descriptions.sh` fails the commit when an issue carries no
+description. `bd history <bead-id> --events` keeps the text an update replaced,
+under `Old:`, so a wipe is recoverable.
+
 ## When You're Done
 
 The commit hook runs the gates in `lefthook.yml` for you (beads export, paths,
