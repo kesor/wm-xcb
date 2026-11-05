@@ -56,7 +56,10 @@ Parent epic: `wm-dfg` ("Harness friction"). Verify with
 `bd list --type=epic | grep friction` if the id is not found.
 
 ```bash
-bd search "lefthook PATH"            # is it already reported?
+# is it already reported? `bd search` reads titles only, so grep the open
+# list, one distinctive term at a time. `bd search "lefthook PATH"` returns
+# nothing for a bead titled "lefthook missing from the worker shell".
+bd list --status=open --limit 0 | grep -i -e lefthook -e PATH
 
 bd create --type=chore --priority=1 --parent=wm-dfg --labels=friction \
   --title "friction(seiton): lefthook missing from the worker shell" \
@@ -78,9 +81,12 @@ File, then continue with the workaround. Do not stop to fix harness code unless
 the fix is in a file your issue already touches; if it is, fix it in the same
 commit and link the friction bead in the commit body.
 
-Do not file the same friction twice. Search first (`bd search`), and if the
-existing bead is open, add a comment with the new data instead of creating
-another.
+Do not file the same friction twice. Search first, and not with `bd search`: it
+matches titles only, so it misses a bead whose symptom is in its description.
+Grep the open list for each distinctive term of the finding -
+`bd list --status=open --limit 0 | grep -i -e <term> -e <term>` - and read the
+open `wm-dfg` beads. If an existing bead is open, add a comment with the new
+data instead of creating another.
 
 ## Filing this yourself, from a worker
 
