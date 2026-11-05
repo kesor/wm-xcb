@@ -589,6 +589,32 @@ tiling_arrange(
 }
 
 /*
+ * Tiled placement configures each window with STACK_MODE_ABOVE, which stacks
+ * the clients left in the layout over a floating one. When one of them is
+ * given the monitor, the floating window is covered and still reports the
+ * rectangle it had. Raise floating clients after that placement and before
+ * fullscreen placement, so the floated window stays visible and a fullscreen
+ * client stays above it. Stack mode only: repeating the rectangle would be
+ * the layout placing a window it just left out.
+ */
+static void
+tiling_raise_floating_clients(Monitor* m)
+{
+  if (dpy == NULL || m == NULL)
+    return;
+
+  Client* c = client_list_sentinel()->next;
+  while (c != client_list_sentinel()) {
+    if (c->managed && c->mapped && c->monitor == m && tiling_client_is_floating(c) &&
+        !tiling_client_is_fullscreen(c)) {
+      uint32_t value = XCB_STACK_MODE_ABOVE;
+      xcb_configure_window(dpy, c->window, XCB_CONFIG_WINDOW_STACK_MODE, &value);
+    }
+    c = c->next;
+  }
+}
+
+/*
  * Place every fullscreen client on the monitor over the whole of it, after the
  * tiled clients so it is stacked above them. Called on every pass, not only
  * when the state changed: a re-tile for another client must not shrink it.
@@ -625,6 +651,7 @@ tiling_tile_monitor(Monitor* m)
     /* A monitor with nothing left to tile can still have a fullscreen client
        on it: that client was excluded from the layout, not from the monitor. */
     free(clients);
+    tiling_raise_floating_clients(m);
     tiling_place_fullscreen_clients(m);
     LOG_DEBUG("No clients to tile on monitor");
     return;
@@ -651,6 +678,7 @@ tiling_tile_monitor(Monitor* m)
 
   free(clients);
 
+  tiling_raise_floating_clients(m);
   tiling_place_fullscreen_clients(m);
 
   LOG_DEBUG("Tiled %" PRIu32 " clients (nmaster=%d) on monitor", client_count, actual_nmaster);

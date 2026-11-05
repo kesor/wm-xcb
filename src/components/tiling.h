@@ -32,7 +32,10 @@
  * - A client whose floating state machine says FLOATING is left out of the
  *   layout and keeps the rectangle it has, so its size survives a tag switch
  * - EVT_CLIENT_FLOATED and EVT_CLIENT_TILED re-tile that client's monitor, so
- *   the clients still in the layout get the area it gave up
+ *   the clients still in the layout get the area it gave up. The same pass
+ *   raises the floating client above those windows: their configure uses
+ *   STACK_MODE_ABOVE, and without the raise the window that took the monitor
+ *   covers the one that floated
  *
  * Events Emitted:
  * - EVT_LAYOUT_CHANGED - emitted after layout changes

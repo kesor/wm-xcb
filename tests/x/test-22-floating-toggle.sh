@@ -14,6 +14,29 @@ outer_rect() {
   printf '%s %s %s %s\n' "$x" "$y" "$((w + 2 * border))" "$((h + 2 * border))"
 }
 
+# above <window-id> <other> - yes when <window-id> is stacked above <other>.
+# xwininfo -root -tree prints the root's children top-most first: it walks the
+# XQueryTree list from the last index, and that list is bottom-most first. A
+# geometry check cannot see this. The window left in the layout is given the
+# whole monitor, so a floating window under it is covered and still reports
+# the rectangle it had.
+above() {
+  local want other want_hex other_hex seen
+  want=$1
+  other=$2
+  want_hex=$(printf '0x%x' "$want")
+  other_hex=$(printf '0x%x' "$other")
+  seen=$(xwininfo -root -tree | awk -v w="$want_hex" -v o="$other_hex" '
+    $1 == w { print "want"; exit }
+    $1 == o { print "other"; exit }
+  ')
+  if [ "$seen" = "want" ]; then
+    echo yes
+  else
+    echo no
+  fi
+}
+
 mapfile -t ids < <(spawn_client 2 400 300 floating)
 check_eq "two windows created" "2" "${#ids[@]}"
 
@@ -43,6 +66,8 @@ check_eq "MOD+Shift+space leaves the floating window where it was" "$before" \
   "$(outer_rect "$focused")"
 check_eq "the window left in the layout covers the monitor" "0 0 $sw $sh" \
   "$(outer_rect "$other")"
+check_eq "the floating window is above the window that took the monitor" "yes" \
+  "$(above "$focused" "$other")"
 
 press super+shift+space
 sleep 0.3
@@ -82,5 +107,7 @@ sleep 0.4
 check_eq "MOD+1 shows both windows again" "2" "$(count_viewable)"
 check_eq "the floating window keeps its size across the tag switch" "$back" \
   "$(outer_rect "$focused")"
+check_eq "the floating window is still above the layout after the tag switch" "yes" \
+  "$(above "$focused" "$other")"
 
 finish
