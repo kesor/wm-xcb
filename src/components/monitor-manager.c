@@ -414,6 +414,104 @@ monitor_manager_pass_begin(void)
 }
 
 /*
+ * Copy the output list out of the screen resources reply: the reply is freed
+ * before the list is walked, so the list cannot point into it.
+ */
+static void
+monitor_manager_pass_store_outputs(const xcb_randr_get_screen_resources_reply_t* reply)
+{
+  int length = xcb_randr_get_screen_resources_outputs_length(reply);
+  if (length <= 0)
+    return;
+
+  const xcb_randr_output_t* listed = xcb_randr_get_screen_resources_outputs(reply);
+  randr_pass.outputs               = malloc((size_t) length * sizeof *randr_pass.outputs);
+  if (randr_pass.outputs == NULL) {
+    LOG_ERROR("Monitor manager: cannot hold the output list: %s", strerror(errno));
+    return;
+  }
+
+  memcpy(randr_pass.outputs, listed, (size_t) length * sizeof *randr_pass.outputs);
+  randr_pass.output_count = length;
+}
+
+/*
+ * The output list, or a step further once it is here. A reply that has not
+ * arrived leaves the pass where it is; the loop calls back again.
+ */
+static void
+monitor_manager_pass_poll_outputs(void)
+{
+  void*                raw_reply = NULL;
+  xcb_generic_error_t* error     = NULL;
+
+  /* Not the reply-forcing call: it reports "not yet" instead of waiting, so the
+     loop stays free. */
+  if (!xcb_poll_for_reply(dpy, randr_pass.resources.sequence, &raw_reply, &error))
+    return;
+
+  if (raw_reply != NULL && error == NULL)
+    monitor_manager_pass_store_outputs(raw_reply);
+  else if (error != NULL)
+    LOG_DEBUG("Monitor manager: the output list could not be read");
+
+  free(error);
+  free(raw_reply);
+
+  if (randr_pass.output_count == 0) {
+    monitor_manager_pass_finish();
+    return;
+  }
+
+  monitor_manager_pass_issue_output(0);
+}
+
+/* One output's connection state, and the CRTC it sits on. */
+static void
+monitor_manager_pass_poll_output_info(void)
+{
+  void*                raw_reply = NULL;
+  xcb_generic_error_t* error     = NULL;
+
+  if (!xcb_poll_for_reply(dpy, randr_pass.output_info.sequence, &raw_reply, &error))
+    return;
+
+  xcb_randr_crtc_t crtc = XCB_NONE;
+  if (raw_reply != NULL && error == NULL)
+    crtc = monitor_manager_apply_output_info(randr_pass.output, raw_reply);
+
+  free(error);
+  free(raw_reply);
+
+  if (crtc == XCB_NONE) {
+    monitor_manager_pass_next_output();
+    return;
+  }
+
+  randr_pass.pass      = MONITOR_PASS_CRTC_INFO;
+  randr_pass.crtc_info = xcb_randr_get_crtc_info(dpy, crtc, randr_pass.timestamp);
+}
+
+/* The CRTC's geometry, then the next output. */
+static void
+monitor_manager_pass_poll_crtc_info(void)
+{
+  void*                raw_reply = NULL;
+  xcb_generic_error_t* error     = NULL;
+
+  if (!xcb_poll_for_reply(dpy, randr_pass.crtc_info.sequence, &raw_reply, &error))
+    return;
+
+  if (raw_reply != NULL && error == NULL)
+    monitor_manager_apply_crtc_info(randr_pass.output, raw_reply);
+
+  free(error);
+  free(raw_reply);
+
+  monitor_manager_pass_next_output();
+}
+
+/*
  * The loop's poll callback: read the answer the pass is waiting for, if it has
  * arrived, and take the next step.
  */
@@ -427,80 +525,16 @@ monitor_manager_pass_poll(void* userdata)
     return;
   }
 
-  void*                raw_reply = NULL;
-  xcb_generic_error_t* error     = NULL;
-
   switch (randr_pass.pass) {
-  case MONITOR_PASS_RESOURCES: {
-    /* Not the reply-forcing call: it reports "not yet" instead of waiting, so
-       the loop stays free. */
-    if (!xcb_poll_for_reply(dpy, randr_pass.resources.sequence, &raw_reply, &error))
-      return;
-
-    xcb_randr_get_screen_resources_reply_t* reply = raw_reply;
-    if (reply != NULL && error == NULL) {
-      int length = xcb_randr_get_screen_resources_outputs_length(reply);
-      if (length > 0) {
-        xcb_randr_output_t* listed = xcb_randr_get_screen_resources_outputs(reply);
-        randr_pass.outputs         = malloc((size_t) length * sizeof *randr_pass.outputs);
-        if (randr_pass.outputs != NULL) {
-          memcpy(randr_pass.outputs, listed, (size_t) length * sizeof *randr_pass.outputs);
-          randr_pass.output_count = length;
-        } else {
-          LOG_ERROR("Monitor manager: cannot hold the output list: %s", strerror(errno));
-        }
-      }
-    } else if (error != NULL) {
-      LOG_DEBUG("Monitor manager: the output list could not be read");
-    }
-
-    free(error);
-    free(raw_reply);
-
-    if (randr_pass.output_count == 0) {
-      monitor_manager_pass_finish();
-      return;
-    }
-
-    monitor_manager_pass_issue_output(0);
+  case MONITOR_PASS_RESOURCES:
+    monitor_manager_pass_poll_outputs();
     return;
-  }
-
-  case MONITOR_PASS_OUTPUT_INFO: {
-    if (!xcb_poll_for_reply(dpy, randr_pass.output_info.sequence, &raw_reply, &error))
-      return;
-
-    xcb_randr_crtc_t crtc = XCB_NONE;
-    if (raw_reply != NULL && error == NULL)
-      crtc = monitor_manager_apply_output_info(randr_pass.output, raw_reply);
-
-    free(error);
-    free(raw_reply);
-
-    if (crtc == XCB_NONE) {
-      monitor_manager_pass_next_output();
-      return;
-    }
-
-    randr_pass.pass      = MONITOR_PASS_CRTC_INFO;
-    randr_pass.crtc_info = xcb_randr_get_crtc_info(dpy, crtc, randr_pass.timestamp);
+  case MONITOR_PASS_OUTPUT_INFO:
+    monitor_manager_pass_poll_output_info();
     return;
-  }
-
-  case MONITOR_PASS_CRTC_INFO: {
-    if (!xcb_poll_for_reply(dpy, randr_pass.crtc_info.sequence, &raw_reply, &error))
-      return;
-
-    if (raw_reply != NULL && error == NULL)
-      monitor_manager_apply_crtc_info(randr_pass.output, raw_reply);
-
-    free(error);
-    free(raw_reply);
-
-    monitor_manager_pass_next_output();
+  case MONITOR_PASS_CRTC_INFO:
+    monitor_manager_pass_poll_crtc_info();
     return;
-  }
-
   case MONITOR_PASS_NONE:
     monitor_manager_pass_remove_poll();
     return;

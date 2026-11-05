@@ -512,11 +512,59 @@ test_size_hints_shape_the_layout(void)
   hub_shutdown();
 }
 
+/*
+ * Test: with no master clients the stack has no area of its own, so it shares
+ * the master column instead of being drawn at half width.
+ *
+ * The component's nmaster is 1, so this layout only arrives through a direct
+ * call today; the branch is still the layout's, and a hole in the client array
+ * must not shift the clients after it.
+ */
+void
+test_arrange_without_a_master_column(void)
+{
+  LOG_CLEAN("== Testing a stack with no master clients fills the master column");
+
+  hub_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_init();
+  tiling_component_init();
+
+  Monitor* m      = create_test_monitor();
+  Client*  first  = client_create(2301);
+  Client*  second = client_create(2302);
+  assert_or_abort(first != NULL && second != NULL);
+
+  Client* stack[3] = { first, NULL, second };
+
+  tiling_arrange(m, NULL, 0, stack, 3);
+
+  assert(first->x == m->x);
+  assert(first->y == m->y);
+  assert(outer_width(first) == TEST_MONITOR_WIDTH);
+  assert(outer_height(first) == TEST_MONITOR_HEIGHT / 3);
+  assert(second->y == first->y + (int16_t) (2 * outer_height(first)));
+
+  /* Nothing to arrange without a monitor. */
+  tiling_arrange(NULL, NULL, 0, stack, 3);
+  assert(first->y == m->y);
+
+  tiling_component_shutdown();
+  client_list_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(TilingComponent, {
   test_monitor_tile_action_registered();
   test_monitor_gets_layout_sm_on_adoption();
   test_manage_triggers_tiling();
   test_tiled_clients_touch();
+  test_arrange_without_a_master_column();
   test_size_hints_shape_the_layout();
   test_unmanage_triggers_tiling();
   test_monitor_tile_action_retiles();

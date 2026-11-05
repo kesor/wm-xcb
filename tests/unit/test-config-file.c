@@ -235,6 +235,90 @@ test_config_file_rejects_bad_float_and_tags_lines(void)
   unlink(path);
 }
 
+/*
+ * Test: what separates fields, and what is text inside a quoted one.
+ *
+ * A tab separates as a space does. A '#' outside quotes begins a comment that
+ * ends the line; inside them it is part of the value, so a title with a hash in
+ * it survives.
+ */
+void
+test_config_file_splits_fields(void)
+{
+  LOG_CLEAN("== Testing field separators, quotes and comments");
+
+  char       path[256];
+  const char text[] =
+      "float title=\"cpu # load\" class=htop\n"
+      "float\tinstance=one\ttitle=two\tclass=three\n"
+      "tags dev\tchat\n";
+
+  if (!write_config(path, sizeof path, text)) {
+    assert(0 && "cannot write a temporary config file");
+    return;
+  }
+
+  ConfigFile* cf = config_file_load(path);
+
+  assert(cf != NULL && cf->found);
+  assert(cf->error_count == 0);
+  assert(cf->float_rule_count == 2);
+
+  assert(cf->float_rules[0].title_substring != NULL &&
+         strcmp(cf->float_rules[0].title_substring, "cpu # load") == 0);
+  assert(cf->float_rules[0].class_name != NULL && strcmp(cf->float_rules[0].class_name, "htop") == 0);
+
+  assert(cf->float_rules[1].instance_name != NULL && strcmp(cf->float_rules[1].instance_name, "one") == 0);
+  assert(cf->float_rules[1].title_substring != NULL &&
+         strcmp(cf->float_rules[1].title_substring, "two") == 0);
+  assert(cf->float_rules[1].class_name != NULL && strcmp(cf->float_rules[1].class_name, "three") == 0);
+
+  assert(cf->tags_set == true);
+  assert(cf->tag_names[0] != NULL && strcmp(cf->tag_names[0], "dev") == 0);
+  assert(cf->tag_names[1] != NULL && strcmp(cf->tag_names[1], "chat") == 0);
+  assert(cf->tag_names[2] == NULL);
+
+  config_file_free(cf);
+  unlink(path);
+}
+
+/*
+ * Test: a quote left open and a line with more fields than the parser holds are
+ * both refused, with the line that carries them.
+ */
+void
+test_config_file_rejects_a_broken_field(void)
+{
+  LOG_CLEAN("== Testing an unclosed quote and a line with too many fields");
+
+  char       path[256];
+  const char text[] =
+      "float title=\"unclosed\n"
+      "tags a b c d e f g h i j k\n";
+
+  if (!write_config(path, sizeof path, text)) {
+    assert(0 && "cannot write a temporary config file");
+    return;
+  }
+
+  ConfigFile* cf = config_file_load(path);
+
+  assert(cf != NULL && cf->found);
+  assert(cf->float_rule_count == 0);
+  assert(cf->tags_set == false);
+  assert(cf->error_count == 2);
+
+  if (cf->error_count == 2) {
+    assert(cf->errors[0].line == 1);
+    assert(strstr(cf->errors[0].text, "quoted value is not closed") != NULL);
+    assert(cf->errors[1].line == 2);
+    assert(strstr(cf->errors[1].text, "more than 11 fields") != NULL);
+  }
+
+  config_file_free(cf);
+  unlink(path);
+}
+
 void
 test_config_file_parses_tag_names(void)
 {
@@ -424,6 +508,8 @@ TEST_GROUP(ConfigFile, {
   test_config_file_parses_bindings();
   test_config_file_reports_the_line();
   test_config_file_parses_float_rules();
+  test_config_file_splits_fields();
+  test_config_file_rejects_a_broken_field();
   test_config_file_rejects_bad_float_and_tags_lines();
   test_config_file_parses_tag_names();
   test_config_file_key_names();

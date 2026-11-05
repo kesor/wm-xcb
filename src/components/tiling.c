@@ -487,6 +487,22 @@ tiling_place_client(Client* c, int16_t x, int16_t y, uint16_t w, uint16_t h)
 }
 
 /*
+ * Place a run of clients down one column: each gets the whole width and an
+ * equal share of the height, one below the next.
+ */
+static void
+tiling_arrange_rows(Client** clients, int count, int16_t x, int16_t y, uint16_t w, uint16_t row)
+{
+  for (int i = 0; i < count; i++) {
+    Client* c = clients[i];
+    if (c == NULL)
+      continue;
+
+    tiling_place_client(c, x, (int16_t) (y + ((int32_t) i * (int32_t) row)), w, row);
+  }
+}
+
+/*
  * Arrange clients using the tiled layout algorithm.
  */
 void
@@ -519,43 +535,22 @@ tiling_arrange(
   tiling_stack_geometry(m, nmaster, mfact, &sx, &sy, &sw, &sh);
 
   /* Tile master clients vertically */
-  if (nmaster > 0 && mw > 0) {
-    uint16_t h = mh / (uint16_t) nmaster;
-    for (int i = 0; i < nmaster; i++) {
-      Client* c = master_clients[i];
-      if (c == NULL)
-        continue;
+  if (nmaster > 0 && mw > 0)
+    tiling_arrange_rows(master_clients, nmaster, mx, my, mw, mh / (uint16_t) nmaster);
 
-      tiling_place_client(c, mx, (int16_t) (my + ((int32_t) i * (int32_t) h)), mw, h);
-    }
+  if (nstack <= 0)
+    return;
+
+  /* Tile stack clients beside the master column */
+  if (sw > 0) {
+    tiling_arrange_rows(stack_clients, nstack, sx, sy, sw, sh / (uint16_t) nstack);
+    return;
   }
 
-  /* Tile stack clients */
-  if (nstack > 0) {
-    if (sw > 0) {
-      /* Arrange stack clients vertically */
-      uint16_t h = sh / (uint16_t) nstack;
-      for (int i = 0; i < nstack; i++) {
-        Client* c = stack_clients[i];
-        if (c == NULL)
-          continue;
-
-        tiling_place_client(c, sx, (int16_t) (sy + ((int32_t) i * (int32_t) h)), sw, h);
-      }
-    } else {
-      /* No stack area - tile in master */
-      uint16_t h      = mh / (uint16_t) (nmaster + nstack);
-      uint16_t offset = (uint16_t) nmaster * h;
-      for (int i = 0; i < nstack; i++) {
-        Client* c = stack_clients[i];
-        if (c == NULL)
-          continue;
-
-        tiling_place_client(
-            c, mx, (int16_t) (my + ((int32_t) offset + (int32_t) i * (int32_t) h)), mw, h);
-      }
-    }
-  }
+  /* No stack area: the stack shares the master column, below its clients. */
+  uint16_t row    = mh / (uint16_t) (nmaster + nstack);
+  uint16_t offset = (uint16_t) nmaster * row;
+  tiling_arrange_rows(stack_clients, nstack, mx, (int16_t) (my + (int32_t) offset), mw, row);
 }
 
 /*
