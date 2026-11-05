@@ -50,7 +50,8 @@ tags 1 2 3 4 dev chat
 Binds a key chord to an action from the action registry. The action names are
 the ones a component registers, for example `tag-manager.view`,
 `tag-manager.toggle`, `tag-manager.client-move`, `fullscreen.toggle`,
-`monitor.tile`, `focus.focus-prev`, `app.launch`, `terminal.spawn`. The
+`floating.toggle`, `monitor.tile`, `focus.focus-prev`, `app.launch`,
+`terminal.spawn`. The
 `[argument]` is a number the action receives; the tag actions take the tag
 number, 1-based.
 

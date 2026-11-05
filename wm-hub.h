@@ -18,7 +18,7 @@ typedef uint32_t RequestType;
 typedef uint32_t EventType;
 
 /* Number of slots in the event bus; event values run from 0 to this minus 1. */
-#define HUB_MAX_EVENT_TYPES 64
+#define HUB_MAX_EVENT_TYPES 72
 
 /*
  * Target Type
@@ -53,6 +53,8 @@ typedef uint32_t TargetTypeId;
 enum {
   REQ_CLIENT_FULLSCREEN = 10,
   REQ_MONITOR_TILE      = 20,
+  REQ_CLIENT_FLOAT      = 30,
+  REQ_CLIENT_TILE       = 40,
 };
 
 /*

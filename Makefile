@@ -106,6 +106,7 @@ TEST_SRC = \
 	tests/unit/test-focus-component.c \
 	tests/unit/test-wm-components.c \
 	tests/unit/test-fullscreen-component.c \
+	tests/unit/test-floating-component.c \
 	tests/unit/test-wm-keybinding.c \
 	tests/unit/test-config-file.c \
 	tests/unit/test-wm-monitor-manager.c \

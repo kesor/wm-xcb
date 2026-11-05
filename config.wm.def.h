@@ -109,6 +109,9 @@ config_wire_keybindings(void)
   /* Fullscreen toggle - Mod+f */
   KB(MODKEY, 41, "fullscreen.toggle");
 
+  /* Float the focused client, or tile it again - Mod+Shift+space */
+  KB(MODKEY | XCB_MOD_MASK_SHIFT, 65, "floating.toggle");
+
   /* Tile monitor - Mod+i */
   KB(MODKEY, 31, "monitor.tile");
 
