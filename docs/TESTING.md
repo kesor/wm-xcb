@@ -302,7 +302,6 @@ stricter. The remaining known failures, as of the last refresh:
 |------|-------------------------|
 | `test-53-tag-move-client` | `tag-manager.client-move` toggles the tag bit instead of moving the client, so the client stays on the visible tag (wm-rh6.7) |
 | `test-55-randr-relayout` | an xrandr mode change never reaches the WM: the RandR handler is registered under a reply code, and a monitor geometry change does not ask for a new layout (wm-4f6.19) |
-| `test-60-ewmh-root-properties` | no root properties are set |
 | `test-75-pointer-drag` (two assertions) | there is no pointer component yet, so nothing handles BUTTON_PRESS, MOTION_NOTIFY or BUTTON_RELEASE (wm-rh6.3) |
 
 Write a test so that it cannot pass for the wrong reason: a precondition such as
