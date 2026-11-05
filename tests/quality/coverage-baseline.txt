@@ -13,6 +13,7 @@ wm-xcb.c 30.8
 src/components/pertag.c 33.7
 wm-states.c 36.7
 src/sm/sm-instance.c 41.8
+src/components/ewmh-desktop.c 43.7
 src/components/keybinding.c 47.0
 config.c 47.8
 src/actions/terminal.c 51.4

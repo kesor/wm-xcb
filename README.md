@@ -4,8 +4,9 @@ wm-xcb is an X11 window manager written in C over libxcb, built as a dwm
 alternative: a feature is a component that subscribes to hub events and sends
 requests, and state lives in state machines on targets, so an extension does not
 patch shared code. It is not a daily driver yet. Windows are mapped, tiled and
-focused, keys are grabbed and the pointer is tracked, but it sets no EWMH root
-properties and every new client lands on tag 1 whatever the tag view says;
+focused, keys are grabbed, the pointer is tracked, and a panel or pager finds
+the WM and its desktops through the EWMH root properties, but every new client
+lands on tag 1 whatever the tag view says;
 [docs/README.md#current-state](docs/README.md#current-state) keeps that list,
 and each gap in it is a beads issue.
 

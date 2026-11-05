@@ -97,10 +97,11 @@ Names the tags in order: the first name is tag 1, the second tag 2, up to nine.
 A tag with no name keeps the number the user types. Quoted names may contain
 spaces. A second `tags` line replaces the first and warns about it.
 
-`tag_get_name()` returns the name for a tag that exists. Two things are missing
-before a name is visible: nothing creates the tag list at startup today
-(`tag_list_init()` is called only from the tests), and there is no bar to show a
-name on.
+The names reach a panel through `_NET_DESKTOP_NAMES`: a tag with no name is
+published as the number the user types. `tag_get_name()` still returns a name
+only for a tag that exists, and nothing creates the tag list at startup today
+(`tag_list_init()` is called only from the tests); there is no bar to show a
+name on either.
 
 ## What the file does not decide yet
 

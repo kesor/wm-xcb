@@ -103,7 +103,8 @@ Each extension uses specific events. Here's the coverage:
 
 | Event | Extensions |
 |-------|------------|
-| `EVT_TAG_VIEW_CHANGED` | pertag, ewmh-desktop, urgency, focus-adjacent |
+| `EVT_TAG_VIEW_CHANGED` | pertag, urgency, focus-adjacent |
+| `EVT_TAG_CHANGED` | ewmh-desktop |
 | `EVT_CLIENT_MANAGED` | floatpos, pertag, attach-policy |
 | `EVT_CLIENT_FOCUS_GAIN/LOSE` | urgency, pertag |
 | `EVT_CLIENT_FLOAT_ENABLED/DISABLED` | floatpos, resizecorners |
