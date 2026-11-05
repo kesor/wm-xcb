@@ -278,6 +278,16 @@ scripts/check-sanitize.sh --update-baseline  # accept today's leak sites
 scripts/check-sanitize-x.sh --update-baseline  # accept today's sites under a live WM
 ```
 
+`--update-baseline` merges what the run measured into the file instead of
+rewriting it. An entry whose test file this run did not start is kept as it was,
+so `TEST_X_ARGS="--filter=<name> --update-baseline"` updates the entries of the
+files it ran and leaves the rest of the file alone. The stale-entry report
+follows the same rule: an entry for a file a filtered run never started says
+nothing about the tree, so it is not stale, and the suggestion to drop it is not
+made. `scripts/lib/seam-baseline.sh` holds both decisions, and
+`tests/x/test-109-seam-baseline-filter.sh` pins them. The one entry an update
+drops without measuring it is the one whose test file no longer exists.
+
 Layout: the unit tests live in `tests/unit/`, the seam tests in `tests/x/`, and
 the reviewed baselines in `tests/quality/`. The repository root is the window
 manager itself.
