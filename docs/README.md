@@ -102,12 +102,13 @@ Short version, and the parts that stay true until they are fixed:
   falls inside the area it was given - neighbours touch, and a client alone on
   the monitor fills it - and honouring a client's minimum size from
   `WM_NORMAL_HINTS` at the ICCCM's fixed offsets, and tracking
-  which client the pointer is over: a managed window selects pointer enter and
-  leave, and the focus component raw-writes `FocusSM` from those events and
-  points the X input focus at the focused window with `xcb_set_input_focus`;
-  a newly managed client takes focus, and the newest remaining client takes it
-  back when the focused one is unmanaged or destroyed. The
-  keys come from the user's config file when it names a binding this keyboard
+  which client the pointer is over: a managed window selects pointer enter,
+  leave and property change, so the focus component raw-writes `FocusSM` from
+  the crossings and the fullscreen component syncs a client's `_NET_WM_STATE`;
+  the focus component points the X input focus at the focused window with
+  `xcb_set_input_focus`, a newly managed client takes focus, and the newest
+  remaining client takes it back when the focused one is unmanaged or destroyed.
+  The keys come from the user's config file when it names a binding this keyboard
   can use, and from `config.wm.def.h` otherwise, and are grabbed on the root
   window when the keybinding component starts, with the CapsLock and NumLock
   masks a press can carry, and grabbed again on `MappingNotify`, so a press

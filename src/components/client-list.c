@@ -283,6 +283,25 @@ client_list_on_destroy_notify(void* event)
 }
 
 /*
+ * The event mask a managed window has to select.
+ *
+ * Pointer enter and leave are how the focus component learns which client the
+ * pointer is over. Without that selection X walks up to the root, which does
+ * select them, and the event then carries the root window as `event`, so the
+ * focus handler cannot resolve a client from it.
+ *
+ * Property change is how the fullscreen component learns that a client, or
+ * another program acting for it, changed _NET_WM_STATE: a window sends no
+ * PropertyNotify unless someone selected it, and an event mask belongs to one
+ * window, so there is no other place to ask for it.
+ */
+uint32_t
+client_list_managed_event_mask(void)
+{
+  return XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW | XCB_EVENT_MASK_PROPERTY_CHANGE;
+}
+
+/*
  * Put a window the WM has taken over on screen: give it the border, tell other
  * clients it is managed through WM_STATE, and map it.
  *
@@ -306,14 +325,8 @@ client_list_map_client(Client* c)
 
   xcb_configure_window(dpy, c->window, XCB_CONFIG_WINDOW_BORDER_WIDTH, &border);
 
-  /* Pointer enter and leave are how the focus component learns which client
-   * the pointer is over. Without this selection X walks up to the root, which
-   * does select them, and the event then carries the root window as `event`,
-   * so the focus handler cannot resolve a client from it. An event mask is
-   * per client, so overwriting it leaves the application's own selection
-   * intact. */
-  uint32_t pointer_mask = XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
-  xcb_change_window_attributes(dpy, c->window, XCB_CW_EVENT_MASK, &pointer_mask);
+  uint32_t event_mask = client_list_managed_event_mask();
+  xcb_change_window_attributes(dpy, c->window, XCB_CW_EVENT_MASK, &event_mask);
 
   if (!client_set_wm_state(c->window, CLIENT_WM_STATE_NORMAL))
     LOG_WARN("WM_STATE atom missing, window %u stays unmarked in X", c->window);

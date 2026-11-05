@@ -298,6 +298,27 @@ test_map_request_manages_client(void)
 }
 
 /*
+ * The event mask a managed window selects.
+ *
+ * A window sends no PropertyNotify unless someone selected PropertyChange on
+ * it, so a missing bit is a handler that never runs - and xwininfo reports the
+ * union of every client's selection, which is why a seam test cannot see this
+ * without a client that asks for nothing. The bits are pinned here so that an
+ * edit to the mask fails in the unit suite as well.
+ */
+void
+test_managed_event_mask_covers_the_readers(void)
+{
+  LOG_CLEAN("== Testing the event mask a managed window selects");
+
+  uint32_t mask = client_list_managed_event_mask();
+
+  assert((mask & XCB_EVENT_MASK_ENTER_WINDOW) != 0);
+  assert((mask & XCB_EVENT_MASK_LEAVE_WINDOW) != 0);
+  assert((mask & XCB_EVENT_MASK_PROPERTY_CHANGE) != 0);
+}
+
+/*
  * Test MAP_REQUEST sets the border width in the model
  *
  * The unit suite runs without an X connection, so client_list_map_client()
@@ -864,6 +885,7 @@ TEST_GROUP(ClientListComponent, {
   test_create_notify_skips_override_redirect();
   test_destroy_notify_destroys_client();
   test_map_request_manages_client();
+  test_managed_event_mask_covers_the_readers();
   test_map_request_sets_border_width();
   test_map_request_creates_client_if_not_exists();
   test_unmap_notify_unmanages_client();
