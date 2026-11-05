@@ -13,6 +13,7 @@
 #include "src/actions/keybinding-binding.h"
 #include "src/components/client-list.h"
 #include "src/components/focus.h"
+#include "src/components/fullscreen.h"
 #include "src/components/keybinding.h"
 #include "src/components/tag-manager.h"
 #include "src/components/tiling.h"
@@ -559,6 +560,113 @@ test_arrange_without_a_master_column(void)
   hub_shutdown();
 }
 
+/*
+ * Test: a fullscreen client covers its monitor instead of taking a tiled slot,
+ * and the clients left behind tile the monitor without it. The state is the
+ * client's, so the change reaches tiling as an event and not as a call.
+ */
+void
+test_fullscreen_client_covers_the_monitor(void)
+{
+  LOG_CLEAN("== Testing a fullscreen client covers the monitor");
+
+  hub_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_component_init();
+  fullscreen_component_init();
+  tiling_component_init();
+
+  Monitor* m = create_test_monitor();
+  map_test_window(1500);
+  map_test_window(1501);
+
+  /* The list holds the newest client first, and that is the master. */
+  Client* fullscreen = client_get_by_window(1501);
+  Client* other      = client_get_by_window(1500);
+  assert_or_abort(fullscreen != NULL && other != NULL);
+  assert(outer_width(fullscreen) == TEST_MASTER_WIDTH);
+
+  fullscreen_set_state(fullscreen, FULLSCREEN_STATE_FULLSCREEN);
+
+  assert(fullscreen->x == m->x);
+  assert(fullscreen->y == m->y);
+  assert(outer_width(fullscreen) == TEST_MONITOR_WIDTH);
+  assert(outer_height(fullscreen) == TEST_MONITOR_HEIGHT);
+
+  /* The client that is still tiled has the monitor to itself. */
+  assert(outer_width(other) == TEST_MONITOR_WIDTH);
+
+  /* A tile request for somebody else leaves the fullscreen window alone. */
+  client_set_geometry(fullscreen, 7, 9, 123, 45);
+  hub_send_request(REQ_MONITOR_TILE, m->target.id);
+  assert(outer_width(fullscreen) == TEST_MONITOR_WIDTH);
+  assert(outer_height(fullscreen) == TEST_MONITOR_HEIGHT);
+
+  fullscreen_set_state(fullscreen, FULLSCREEN_STATE_WINDOWED);
+
+  assert(outer_width(fullscreen) == TEST_MASTER_WIDTH);
+  assert(outer_width(other) == TEST_MASTER_WIDTH);
+
+  tiling_component_shutdown();
+  client_list_component_shutdown();
+  fullscreen_component_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Test: a monitor whose only visible client is fullscreen has nothing left to
+ * tile, and the fullscreen client is still placed. Skipping the client's own
+ * placement on that path would leave the window where it was before the key.
+ */
+void
+test_fullscreen_client_alone_on_the_monitor(void)
+{
+  LOG_CLEAN("== Testing a lone fullscreen client is still placed");
+
+  hub_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_component_init();
+  fullscreen_component_init();
+  tiling_component_init();
+
+  Monitor* m = create_test_monitor();
+  map_test_window(1600);
+  map_test_window(1601);
+
+  Client* fullscreen = client_get_by_window(1600);
+  assert_or_abort(fullscreen != NULL);
+
+  fullscreen_set_state(fullscreen, FULLSCREEN_STATE_FULLSCREEN);
+
+  /* The window on top goes away, leaving the fullscreen one alone. */
+  unmap_test_window(1601);
+
+  /* Something moved the window after that; the next tile has to put it back
+   * over the monitor even though the layout has no client to arrange. */
+  client_set_geometry(fullscreen, 7, 9, 123, 45);
+  hub_send_request(REQ_MONITOR_TILE, m->target.id);
+
+  assert(fullscreen->x == m->x);
+  assert(fullscreen->y == m->y);
+  assert(outer_width(fullscreen) == TEST_MONITOR_WIDTH);
+  assert(outer_height(fullscreen) == TEST_MONITOR_HEIGHT);
+
+  tiling_component_shutdown();
+  client_list_component_shutdown();
+  fullscreen_component_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(TilingComponent, {
   test_monitor_tile_action_registered();
   test_monitor_gets_layout_sm_on_adoption();
@@ -571,4 +679,6 @@ TEST_GROUP(TilingComponent, {
   test_monitor_tile_keybinding();
   test_tag_view_change_triggers_tiling();
   test_client_tag_move_triggers_tiling();
+  test_fullscreen_client_covers_the_monitor();
+  test_fullscreen_client_alone_on_the_monitor();
 });

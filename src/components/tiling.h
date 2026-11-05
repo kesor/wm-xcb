@@ -21,6 +21,13 @@
  * - Each client is placed in an area minus its border, so the window plus its
  *   border covers the area and neighbours touch
  *
+ * Fullscreen clients:
+ * - A client whose fullscreen state machine says FULLSCREEN is left out of the
+ *   layout and covers its monitor on its own, so a tiled slot cannot undo the
+ *   geometry it was given
+ * - EVT_FULLSCREEN_ENTERED and EVT_FULLSCREEN_EXITED re-tile that client's
+ *   monitor: this component is the one that writes window geometry
+ *
  * Events Emitted:
  * - EVT_LAYOUT_CHANGED - emitted after layout changes
  */

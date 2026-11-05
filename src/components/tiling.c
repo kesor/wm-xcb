@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "src/actions/action-registry.h"
+#include "src/components/fullscreen.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -393,6 +394,19 @@ tiling_get_nmaster(Monitor* m)
 }
 
 /*
+ * A fullscreen client covers the monitor on its own and is not part of the
+ * tiled layout: a tiled slot would undo the geometry it was given. The state
+ * lives on the client, so this reads the client's machine instead of calling
+ * the component that owns it.
+ */
+static bool
+tiling_client_is_fullscreen(Client* c)
+{
+  StateMachine* sm = client_get_sm(c, FULLSCREEN_COMPONENT_NAME);
+  return sm != NULL && sm_get_state(sm) == FULLSCREEN_STATE_FULLSCREEN;
+}
+
+/*
  * Count managed clients visible on a monitor.
  */
 static uint32_t
@@ -402,7 +416,7 @@ tiling_count_visible_clients(Monitor* m)
   Client*  c     = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->mapped && c->monitor == m) {
+    if (c->managed && c->mapped && c->monitor == m && !tiling_client_is_fullscreen(c)) {
       count++;
     }
     c = c->next;
@@ -436,7 +450,7 @@ tiling_collect_clients(Monitor* m, uint32_t* count)
   Client*  c   = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->mapped && c->monitor == m) {
+    if (c->managed && c->mapped && c->monitor == m && !tiling_client_is_fullscreen(c)) {
       if (idx < capacity) {
         clients[idx++] = c;
       } else {
@@ -554,6 +568,23 @@ tiling_arrange(
 }
 
 /*
+ * Place every fullscreen client on the monitor over the whole of it, after the
+ * tiled clients so it is stacked above them. Called on every pass, not only
+ * when the state changed: a re-tile for another client must not shrink it.
+ */
+static void
+tiling_place_fullscreen_clients(Monitor* m)
+{
+  Client* c = client_list_sentinel()->next;
+
+  while (c != client_list_sentinel()) {
+    if (c->managed && c->mapped && c->monitor == m && tiling_client_is_fullscreen(c))
+      tiling_place_client(c, m->x, m->y, m->width, m->height);
+    c = c->next;
+  }
+}
+
+/*
  * Tile all clients on a monitor according to current layout.
  */
 void
@@ -567,10 +598,13 @@ tiling_tile_monitor(Monitor* m)
   int nmaster = tiling_get_nmaster(m);
 
   /* Collect clients */
-  uint32_t client_count;
-  Client** clients = tiling_collect_clients(m, &client_count);
+  uint32_t client_count = 0;
+  Client** clients      = tiling_collect_clients(m, &client_count);
   if (clients == NULL || client_count == 0) {
+    /* A monitor with nothing left to tile can still have a fullscreen client
+       on it: that client was excluded from the layout, not from the monitor. */
     free(clients);
+    tiling_place_fullscreen_clients(m);
     LOG_DEBUG("No clients to tile on monitor");
     return;
   }
@@ -595,6 +629,8 @@ tiling_tile_monitor(Monitor* m)
   }
 
   free(clients);
+
+  tiling_place_fullscreen_clients(m);
 
   LOG_DEBUG("Tiled %" PRIu32 " clients (nmaster=%d) on monitor", client_count, actual_nmaster);
 }
@@ -687,6 +723,21 @@ tiling_executor(struct HubRequest* req)
 }
 
 /*
+ * A fullscreen client is placed by this component, so this is where the state
+ * changing has to be heard: enter and exit both change the geometry the monitor
+ * should have, and a request is how this component is asked for one.
+ */
+static void
+tiling_on_fullscreen_change(struct Event event)
+{
+  Client* c = client_get_by_window((xcb_window_t) event.target);
+  if (c == NULL || c->monitor == NULL)
+    return;
+
+  hub_send_request(REQ_MONITOR_TILE, c->monitor->target.id);
+}
+
+/*
  * Component initialization
  */
 bool
@@ -736,6 +787,9 @@ tiling_component_init(void)
     LOG_WARN("Failed to register monitor.tile action");
   }
 
+  hub_subscribe(EVT_FULLSCREEN_ENTERED, tiling_on_fullscreen_change, NULL);
+  hub_subscribe(EVT_FULLSCREEN_EXITED, tiling_on_fullscreen_change, NULL);
+
   tiling_component.initialized = true;
   LOG_DEBUG("Tiling component initialized successfully");
 
@@ -753,6 +807,9 @@ tiling_component_shutdown(void)
   }
 
   LOG_DEBUG("Shutting down tiling component");
+
+  hub_unsubscribe(EVT_FULLSCREEN_ENTERED, tiling_on_fullscreen_change);
+  hub_unsubscribe(EVT_FULLSCREEN_EXITED, tiling_on_fullscreen_change);
 
   action_unregister("monitor.tile");
 

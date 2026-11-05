@@ -100,7 +100,12 @@ Short version, and the parts that stay true until they are fixed:
   monitor with that monitor's visible tags, tiling that monitor's visible
   clients when a window is managed or unmanaged so that each client's border
   falls inside the area it was given - neighbours touch, and a client alone on
-  the monitor fills it - and honouring a client's minimum size from
+  the monitor fills it - and `MOD+f` makes the focused client fullscreen as
+  both the user and the client can see it: its window covers the monitor with
+  its border inside it, `_NET_WM_STATE` on the window lists
+  `_NET_WM_STATE_FULLSCREEN`, another window on that monitor is tiled as if the
+  fullscreen one were not there, and the same key puts the window back into the
+  layout and removes the atom; honouring a client's minimum size from
   `WM_NORMAL_HINTS` at the ICCCM's fixed offsets, and tracking
   which client the pointer is over: a managed window selects pointer enter,
   leave and property change, so the focus component raw-writes `FocusSM` from
