@@ -16,7 +16,14 @@
 #
 # A function above its recorded number fails, and a function at or above the
 # floor with no entry fails, so a new one cannot arrive unnoticed. --update
-# rewrites the baseline; say in the commit why a number went up.
+# merges the measured numbers into the baseline; say in the commit why a number
+# went up.
+#
+# A file under tests/ is not measured. clang-tidy charges each ASSERT's if/else
+# as a decision, so a test body's number is its assertion count, and the remedy
+# this gate offers - split along a decision - would mean deleting assertions.
+# Coverage floors cover production sources only for the same reason: a number
+# nobody can act on teaches people to edit the baseline by hand instead.
 #
 # Exit status: 0 when every function is within its entry, 1 otherwise.
 
@@ -54,6 +61,24 @@ TOOL=${TOOL:-unknown}
 
 if [ "${#files[@]}" -eq 0 ]; then
   mapfile -t files < <(make -s print-src | tr ' ' '\n' | grep -v '^wm\.c$' | grep -v '^$')
+fi
+
+skipped_tests=0
+kept=()
+for f in "${files[@]}"; do
+  case ${f#./} in
+    tests/*) skipped_tests=$((skipped_tests + 1)) ;;
+    *) kept+=("$f") ;;
+  esac
+done
+files=()
+if [ "${#kept[@]}" -gt 0 ]; then
+  files=("${kept[@]}")
+fi
+
+if [ "${#files[@]}" -eq 0 ]; then
+  echo "check-complexity: $skipped_tests test source(s), nothing for this gate to measure"
+  exit 0
 fi
 
 # clang-tidy wants a compile database. `make compile-commands` uses bear, which
@@ -102,12 +127,11 @@ fi
 
 if [ "$UPDATE" -eq 1 ]; then
   # Merge into the baseline; do not rewrite it from the files in hand. The
-  # failure message tells a worker to run this for one staged file, and a
-  # rewrite from that file deleted every entry it did not measure - 28
-  # production entries went, the next push failed on all of them, and a test
-  # entry could never be added because the no-argument form measures only what
-  # `make -s print-src` lists, which excludes tests/. An entry whose function
-  # was measured and is now below the floor is dropped, so a split shows.
+  # failure message tells a worker to run this for the files the commit changes,
+  # and a rewrite from those deleted every entry it did not measure - 28
+  # production entries went, and the next push failed on all of them. An entry
+  # whose function was measured and is now below the floor is dropped, so a
+  # split shows.
   previous=$(awk '!/^#/ && NF { print $1, $2 }' "$BASELINE" 2>/dev/null)
   merged=$({
     printf '%s\n' "$previous"
@@ -120,6 +144,8 @@ if [ "$UPDATE" -eq 1 ]; then
     echo "# the gate; a function at or above $FLOOR with no entry fails it too, which"
     echo "# is the moment somebody decides the number is acceptable."
     echo "#"
+    echo "# A file under tests/ is not measured: a test body's number is its assertion"
+    echo "# count, and no split of a test keeps the assertions."
     printf '%s\n' "$merged"
   } >"$BASELINE"
   echo "check-complexity: wrote $(awk -v f="$FLOOR" '!/^#/ && $2>=f' "$BASELINE" | wc -l) entries to $BASELINE, $(printf '%s\n' "$measured" | awk -v f="$FLOOR" '$2>=f' | wc -l) measured in this run"
@@ -152,7 +178,7 @@ while read -r name value; do
 done <<<"$measured"
 
 if [ "$problems" -gt 0 ]; then
-  echo "check-complexity: $problems function(s) above the baseline (clang-tidy $TOOL). Split the function along a decision that already exists, or run --update-baseline and say why in the commit." >&2
+  echo "check-complexity: $problems function(s) above the baseline (clang-tidy $TOOL). Split the function along a decision that already exists, or run --update-baseline <the files this commit changes> and say why in the commit." >&2
   if [ "$ADVISORY" -eq 1 ]; then
     # The number is a heuristic and it differs between environments: the same
     # tree and the same clang-tidy reported mod_key_name at 14 here and 38 on a
