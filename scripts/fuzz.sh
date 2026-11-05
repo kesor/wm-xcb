@@ -89,11 +89,16 @@ for harness in tests/fuzz/fuzz-*.c; do
       exit 1
     fi
   fi
-  corpus="tests/fuzz/corpus/${name#fuzz-}"
-  mkdir -p "$corpus"
+  # The tracked corpus is a set of seeds and stays read-only: libFuzzer writes new
+  # units into the first corpus directory it is given, and a run that filled the
+  # tracked one left the tree dirty - which stopped the next publish with "the
+  # tree is dirty; commit or stash first".
+  seeds="tests/fuzz/corpus/${name#fuzz-}"
+  corpus="$OUT/corpus/${name#fuzz-}"
+  mkdir -p "$corpus" "$seeds"
   echo "--- $name for ${SECONDS_PER_TARGET}s (corpus $corpus)"
   if ! "$bin" -max_total_time="$SECONDS_PER_TARGET" -print_final_stats=1 \
-      -artifact_prefix="$OUT/$name-crash-" "$corpus"; then
+      -artifact_prefix="$OUT/$name-crash-" "$corpus" "$seeds"; then
     echo "fuzz: $name found a crash; the input is in $OUT" >&2
     status=1
   fi

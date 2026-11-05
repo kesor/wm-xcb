@@ -120,6 +120,51 @@ record_error(ConfigFile* cf, int line, const char* fmt, ...)
   cf->error_count++;
 }
 
+static bool
+is_blank(char c)
+{
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+/* Step over the blanks between fields. */
+static void
+skip_blanks(char** read)
+{
+  while (is_blank(**read))
+    (*read)++;
+}
+
+/*
+ * Copy one field from `read` to `write`, dropping the quotes and keeping what
+ * they protected.
+ *
+ * Returns false when a quote is still open where the line ends: that field is
+ * broken, not short, and the caller reports the line instead of using what is
+ * left of it.
+ */
+static bool
+read_field(char** read, char** write)
+{
+  bool quoted = false;
+
+  while (**read != '\0') {
+    char c = **read;
+
+    if (c == '"') {
+      quoted = !quoted;
+      (*read)++;
+      continue;
+    }
+    if (!quoted && (is_blank(c) || c == '#'))
+      break;
+
+    *(*write)++ = c;
+    (*read)++;
+  }
+
+  return !quoted;
+}
+
 /*
  * Split a line into whitespace-separated fields. Double quotes inside a field
  * keep the spaces in it (`float title=" - Preferences"`); the quotes
@@ -138,30 +183,15 @@ tokenize(char* line, char** tokens, int max)
   char* write = line;
   int   count = 0;
 
-  while (*read != '\0') {
-    bool quoted = false;
-
-    while (*read == ' ' || *read == '\t' || *read == '\r' || *read == '\n')
-      read++;
+  while (true) {
+    skip_blanks(&read);
     if (*read == '\0' || *read == '#')
       break;
     if (count == max)
       return count;
 
     tokens[count++] = write;
-    while (*read != '\0') {
-      if (*read == '"') {
-        quoted = !quoted;
-        read++;
-        continue;
-      }
-      if (!quoted && (*read == ' ' || *read == '\t' || *read == '\r' || *read == '\n'))
-        break;
-      if (!quoted && *read == '#')
-        break;
-      *write++ = *read++;
-    }
-    if (quoted)
+    if (!read_field(&read, &write))
       return -1;
 
     bool at_end  = *read == '\0';

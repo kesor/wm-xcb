@@ -6,33 +6,33 @@
 # helper's error return is only reachable by breaking the environment.
 # Deleted files are dropped by the next update.
 #
-wm-states.c 0.0
 wm-xcb-events.c 0.0
 src/components/connection-sm.c 0.0
 src/components/monitor-manager.c 22.7
 wm-xcb.c 30.8
 src/components/pertag.c 33.7
-src/components/fullscreen.c 39.6
-src/sm/sm-instance.c 40.6
+wm-states.c 36.7
+src/sm/sm-instance.c 41.8
 src/components/keybinding.c 47.0
 config.c 47.8
 src/actions/terminal.c 51.4
 src/actions/keybinding-binding.c 53.7
+src/components/fullscreen.c 54.2
 src/actions/action-registry.c 57.7
-src/components/tiling.c 59.6
 wm-xcb-ewmh.c 60.6
+src/components/tiling.c 63.9
 src/sm/sm-template.c 64.9
-src/sm/sm-registry.c 65.1
 src/target/tag.c 66.0
 src/target/monitor.c 68.0
 src/actions/launcher.c 69.1
 src/components/client-list.c 71.2
+src/sm/sm-registry.c 71.3
 src/components/focus.c 71.8
 src/components/tag-manager.c 72.0
 src/target/client.c 75.2
 wm-log.c 77.0
 wm-signals.c 78.0
 wm-components.c 78.8
-config-file.c 82.5
-wm-hub.c 87.7
+config-file.c 84.7
+wm-hub.c 87.9
 src/xcb/xcb-handler.c 92.8
