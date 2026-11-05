@@ -65,8 +65,16 @@ LINE_REF='\b[A-Za-z0-9_./-]+\.(c|h|yml|yaml|nix|mk|sh):[0-9]+'
 # so "18 `test-*.c` files" is caught as well as "651 assertions". Spelled-out
 # numbers are left alone: "four lines" and "one component" describe shape, and
 # the false positives cost more than the rare stale "eight components".
+#
+# The separator is a space or a hyphen: "375-line keymap dump" claims the same
+# count as "375 lines", and the hyphenated form passed the gate untouched. A
+# hyphenated count has to start a word, because a file name such as
+# `test-94-lines.sh` carries a number, a hyphen and a noun without claiming
+# how many of anything there are.
 NUMBER='(^|[^§0-9.=])'
-COUNT="(${NUMBER})[0-9][0-9,]* ([\`'\"A-Za-z0-9_*.-]+ )?(assertions?|tests?|files?|lines?|violations?|waived|components?|bindings?|epics?)\b"
+WORD_START='(^|[^§0-9.=[:alnum:]_-])'
+NOUNS='(assertions?|tests?|files?|lines?|violations?|waived|components?|bindings?|epics?)'
+COUNT="((${NUMBER})[0-9][0-9,]* ([\`'\"A-Za-z0-9_*.-]+ )?|(${WORD_START})[0-9][0-9,]*-)${NOUNS}\b"
 
 # 3. completion percentages. Position strings ("50% 50% 50% 50%") and CPU
 # figures ("100% of a core") are not completion claims and must not match, hence
