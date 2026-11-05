@@ -70,7 +70,11 @@ run; if it says "docs updated", read the doc.
    other; nothing in the event loop blocks; new behaviour arrives as a
    registration. Each has a gate — run them: `make test`, `make check-async`,
    `./scripts/format-check.sh`, `./scripts/check-docs.sh`, and `make test-x`
-   when the diff touches windows, keys, focus, or X properties.
+   when the diff touches windows, keys, focus, or X properties, or when the bead
+   is about them and the branch carries no diff to read. A manual-session bead
+   that approved 22 of 32 keybindings was reviewed with no seam run, on an empty
+   diff, and the seam suite was the evidence that did not depend on the author's
+   throwaway scripts.
 4. **Something left broken or half-done and not mentioned.** A behaviour change
    without a test, a document that now contradicts the code, a comment
    describing what the code no longer does, a defect the author noticed and only
