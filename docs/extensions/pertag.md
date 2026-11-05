@@ -116,7 +116,7 @@ typedef struct {
 | **Focus** | Restores `mon->sel` (focused client) per tag |
 | **Bar** | Restores bar visibility per tag |
 | **Gap** | Stores gap settings in pertag arrays |
-| **EWMH desktop** | Responds to `EVT_TAG_VIEW_CHANGED` for `_NET_CURRENT_DESKTOP` |
+| **EWMH desktop** | Responds to `EVT_TAG_CHANGED` for `_NET_CURRENT_DESKTOP` |
 
 ---
 

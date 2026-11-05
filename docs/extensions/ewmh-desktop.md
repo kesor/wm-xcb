@@ -30,7 +30,7 @@ a panel reads as a desktop index that does not exist.
 | Property | Type | Value |
 |----------|------|-------|
 | `_NET_SUPPORTING_WM_CHECK` | WINDOW | a window the WM creates, which carries the same property pointing at itself, and `_NET_WM_NAME` = `wm-xcb` |
-| `_NET_SUPPORTED` | ATOM | the atoms this component sets |
+| `_NET_SUPPORTED` | ATOM | the atoms this component sets, plus `_NET_WM_STATE` and `_NET_WM_STATE_FULLSCREEN`, which the fullscreen component writes on clients |
 | `_NET_NUMBER_OF_DESKTOPS` | CARDINAL | the tag count, `TAG_NUM_TAGS` |
 | `_NET_DESKTOP_NAMES` | UTF8_STRING | the tag names from the config file, NUL-separated; a tag with no name is its number |
 | `_NET_DESKTOP_VIEWPORT` | CARDINAL | all zero: a desktop here is a tag, not a scroll position |

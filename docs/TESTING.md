@@ -590,15 +590,15 @@ command: exit 0
 --- state ---
 screen: 1280 800
 window          x     y     w     h  border  viewable  focus  tags  title
-0x00400000    640     0   638   798       1      yes     no     -  probe-1
-0x00400001      0     0   638   798       1      yes    yes     -  probe-2
+0x00400000    640     0   638   798       1      yes     no     0  probe-1
+0x00400001      0     0   638   798       1      yes    yes     0  probe-2
 viewable: 2 of 2
 --- root properties ---
-_NET_SUPPORTING_WM_CHECK: not set
-_NET_CLIENT_LIST: not set
-_NET_CURRENT_DESKTOP: not set
-_NET_NUMBER_OF_DESKTOPS: not set
-_NET_DESKTOP_NAMES: not set
+_NET_SUPPORTING_WM_CHECK: window id # 0x200000
+_NET_CLIENT_LIST: window id # 0x400000, 0x400001
+_NET_CURRENT_DESKTOP: 0
+_NET_NUMBER_OF_DESKTOPS: 9
+_NET_DESKTOP_NAMES: "1", "2", "3", "4", "5", "6", "7", "8", "9"
 --- wm ---
 wm: running (pid 1234)
 --- wm log (last N lines) ---
@@ -611,9 +611,10 @@ through `tests/x/lib.sh`, so they are the same clients the suite uses.
 
 `viewable` and `focus` are read from the X server, so they say what a user sees
 rather than what the WM intended. `tags` is the client's `_NET_WM_DESKTOP`, and
-prints `-` because the WM publishes no per-client EWMH property yet; the root
-properties section says the same about the root window, and it is there because
-"did it set `_NET_CLIENT_LIST`" is a question the suite asks.
+prints `-` when that property is absent. The root properties section is the
+same read, and it is there because "did it set `_NET_CLIENT_LIST`" is a question
+the suite asks. Window ids in the sample vary from run to run; the desktop
+count and the current desktop do not, until something switches tags.
 
 The pointer starts at the centre of the screen, which is inside one of the
 windows. A warp into the window it is already in sends no enter event, so a
