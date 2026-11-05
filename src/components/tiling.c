@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "src/actions/action-registry.h"
+#include "src/components/floating.h"
 #include "src/components/fullscreen.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
@@ -407,6 +408,26 @@ tiling_client_is_fullscreen(Client* c)
 }
 
 /*
+ * A floating client keeps the rectangle it has: a tiled slot would undo the
+ * geometry it was left with, and the size it keeps across a tag switch.
+ */
+static bool
+tiling_client_is_floating(Client* c)
+{
+  StateMachine* sm = client_get_sm(c, FLOATING_COMPONENT_NAME);
+  return sm != NULL && sm_get_state(sm) == FLOATING_STATE_FLOATING;
+}
+
+/*
+ * Whether the layout places a client at all.
+ */
+static bool
+tiling_client_is_in_the_layout(Client* c)
+{
+  return !tiling_client_is_fullscreen(c) && !tiling_client_is_floating(c);
+}
+
+/*
  * Count managed clients visible on a monitor.
  */
 static uint32_t
@@ -416,7 +437,7 @@ tiling_count_visible_clients(Monitor* m)
   Client*  c     = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->mapped && c->monitor == m && !tiling_client_is_fullscreen(c)) {
+    if (c->managed && c->mapped && c->monitor == m && tiling_client_is_in_the_layout(c)) {
       count++;
     }
     c = c->next;
@@ -450,7 +471,7 @@ tiling_collect_clients(Monitor* m, uint32_t* count)
   Client*  c   = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->mapped && c->monitor == m && !tiling_client_is_fullscreen(c)) {
+    if (c->managed && c->mapped && c->monitor == m && tiling_client_is_in_the_layout(c)) {
       if (idx < capacity) {
         clients[idx++] = c;
       } else {
@@ -723,12 +744,13 @@ tiling_executor(struct HubRequest* req)
 }
 
 /*
- * A fullscreen client is placed by this component, so this is where the state
- * changing has to be heard: enter and exit both change the geometry the monitor
- * should have, and a request is how this component is asked for one.
+ * A client that left the layout, or one that rejoined it, changes the area the
+ * others have, so the monitor is arranged again. Fullscreen and floating are
+ * two reasons for the same arrangement, and the request is how this component
+ * is asked for one.
  */
 static void
-tiling_on_fullscreen_change(struct Event event)
+tiling_on_placement_change(struct Event event)
 {
   Client* c = client_get_by_window((xcb_window_t) event.target);
   if (c == NULL || c->monitor == NULL)
@@ -787,8 +809,10 @@ tiling_component_init(void)
     LOG_WARN("Failed to register monitor.tile action");
   }
 
-  hub_subscribe(EVT_FULLSCREEN_ENTERED, tiling_on_fullscreen_change, NULL);
-  hub_subscribe(EVT_FULLSCREEN_EXITED, tiling_on_fullscreen_change, NULL);
+  hub_subscribe(EVT_FULLSCREEN_ENTERED, tiling_on_placement_change, NULL);
+  hub_subscribe(EVT_FULLSCREEN_EXITED, tiling_on_placement_change, NULL);
+  hub_subscribe(EVT_CLIENT_FLOATED, tiling_on_placement_change, NULL);
+  hub_subscribe(EVT_CLIENT_TILED, tiling_on_placement_change, NULL);
 
   tiling_component.initialized = true;
   LOG_DEBUG("Tiling component initialized successfully");
@@ -808,8 +832,10 @@ tiling_component_shutdown(void)
 
   LOG_DEBUG("Shutting down tiling component");
 
-  hub_unsubscribe(EVT_FULLSCREEN_ENTERED, tiling_on_fullscreen_change);
-  hub_unsubscribe(EVT_FULLSCREEN_EXITED, tiling_on_fullscreen_change);
+  hub_unsubscribe(EVT_FULLSCREEN_ENTERED, tiling_on_placement_change);
+  hub_unsubscribe(EVT_FULLSCREEN_EXITED, tiling_on_placement_change);
+  hub_unsubscribe(EVT_CLIENT_FLOATED, tiling_on_placement_change);
+  hub_unsubscribe(EVT_CLIENT_TILED, tiling_on_placement_change);
 
   action_unregister("monitor.tile");
 

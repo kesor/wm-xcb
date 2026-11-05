@@ -207,7 +207,8 @@ ranges and the base constants the component enums start from:
 | `30`-`39` | `focus` |
 | `40`-`49` | `tiling` |
 | `50`-`59` | `connection` |
-| `60`-`63` | reserved |
+| `60`-`63` | `launcher` |
+| `64`-`71` | `floating` |
 
 Add a new component by taking the next free range there, not the next free
 number. The unit suite walks every constant and fails on a duplicate or a value

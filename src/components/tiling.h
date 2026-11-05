@@ -28,6 +28,12 @@
  * - EVT_FULLSCREEN_ENTERED and EVT_FULLSCREEN_EXITED re-tile that client's
  *   monitor: this component is the one that writes window geometry
  *
+ * Floating clients:
+ * - A client whose floating state machine says FLOATING is left out of the
+ *   layout and keeps the rectangle it has, so its size survives a tag switch
+ * - EVT_CLIENT_FLOATED and EVT_CLIENT_TILED re-tile that client's monitor, so
+ *   the clients still in the layout get the area it gave up
+ *
  * Events Emitted:
  * - EVT_LAYOUT_CHANGED - emitted after layout changes
  */

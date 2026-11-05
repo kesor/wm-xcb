@@ -105,7 +105,10 @@ Short version, and the parts that stay true until they are fixed:
   its border inside it, `_NET_WM_STATE` on the window lists
   `_NET_WM_STATE_FULLSCREEN`, another window on that monitor is tiled as if the
   fullscreen one were not there, and the same key puts the window back into the
-  layout and removes the atom; honouring a client's minimum size from
+  layout and removes the atom; `MOD+Shift+space` takes the focused client out
+  of the layout, so the clients left in it get the area it gave up, and the
+  same key gives it a tiled slot again; while it floats it keeps its size
+  through the tag switches made in between; honouring a client's minimum size from
   `WM_NORMAL_HINTS` at the ICCCM's fixed offsets, and tracking
   which client the pointer is over: a managed window selects pointer enter,
   leave and property change, so the focus component raw-writes `FocusSM` from

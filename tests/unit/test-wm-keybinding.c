@@ -16,6 +16,7 @@
 #include "src/actions/keybinding-binding.h"
 #include "src/actions/launcher.h"
 #include "src/actions/terminal.h"
+#include "src/components/floating.h"
 #include "src/components/focus.h"
 #include "src/components/fullscreen.h"
 #include "src/components/keybinding.h"
@@ -393,6 +394,7 @@ test_keybinding_wired_actions_resolve(void)
   /* keybinding_init wires the default config and owns the action registry. */
   keybinding_init();
   fullscreen_component_init();
+  floating_component_init();
   focus_component_init();
   tag_manager_component_init();
   tiling_component_init();
@@ -422,6 +424,7 @@ test_keybinding_wired_actions_resolve(void)
     "tag-manager.toggle",
     "tag-manager.client-move",
     "fullscreen.toggle",
+    "floating.toggle",
     "monitor.tile",
   };
 
@@ -437,6 +440,7 @@ test_keybinding_wired_actions_resolve(void)
   tag_manager_component_shutdown();
   focus_component_shutdown();
   fullscreen_component_shutdown();
+  floating_component_shutdown();
   keybinding_shutdown();
   xcb_handler_shutdown();
   sm_registry_shutdown();
