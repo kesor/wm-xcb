@@ -120,15 +120,20 @@ that rebase's result. Merge rebases again, and that second rebase is a no-op
 unless the merge ref has moved since. The merge then refuses two states, and
 neither refusal is a gate failure. A `review-<slug>` window still open means
 the review is still running: wait for it, then merge. A HEAD that is not the
-sha in the last `Approved at <sha>` verdict, read before that second rebase,
-means that approval does not cover this commit: review again before merging.
-The close decision is the verdict's last line, `Close: no` or `Close: yes`,
-never a sentence in the body, so the harness can match a line instead of an
-argument. `land` reads it: the merge happens either way, and `Close: no` then
-sets that one bead back to `open` with a comment naming the findings, so
-`bd ready` offers it again; `publish` leaves it open once the pull request
-lands. Every other id the worktree carried still closes, and a missing line
-means close. A worker stops at in_progress: see "Definition of done".
+sha in the last `Approved at <sha>` verdict means that approval does not cover
+this commit: review again before merging. That comparison runs before the
+merge's own rebase, so a merge ref that moved during the review is rebased onto
+the new tip and the pre-push gates judge commits the verdict did not name: a
+merge is not proof the approved sha passed them. Comparing after the rebase
+closes that window, and a no-op rebase still merges because HEAD keeps the
+approved sha. The close decision is the verdict's last line, `Close: no` or
+`Close: yes`, never a sentence in the body, so the harness can match a line
+instead of an argument. `land` reads it: the merge happens either way, and
+`Close: no` then sets that one bead back to `open` with a comment naming the
+findings, so `bd ready` offers it again; `publish` leaves it open once the
+pull request lands. Every other id the worktree carried still closes, and a
+missing line means close. A worker stops at in_progress: see "Definition of
+done".
 
 Rules: read the acceptance criteria before starting. A parent epic is not a
 task. `bd edit` opens an editor and blocks an agent — never use it.
