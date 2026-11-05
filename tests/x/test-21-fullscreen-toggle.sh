@@ -13,7 +13,7 @@ wm_state_has_fullscreen() {
   xprop -id "$1" _NET_WM_STATE 2>/dev/null | grep -q '_NET_WM_STATE_FULLSCREEN'
 }
 
-# wait_wm_state <window-id> <yes|no> [timeout_ms] - the property is written by
+# wait_wm_state <yes|no> <window-id> [timeout_ms] - the property is written by
 # the WM while the key event is handled, so a read straight after the key races
 # it. <yes> waits for the atom to appear, <no> for it to go.
 wait_wm_state() {

@@ -199,10 +199,10 @@ fullscreen_action_write_state(StateMachine* sm, bool fullscreen)
  * Action for entering fullscreen: the transition's own X side effect.
  *
  * The write lives here rather than in the executor so that every path into the
- * machine - a keybinding request today, a direct transition tomorrow - asks the
- * server for the same thing, and a refused transition asks for nothing. The
- * request is ADD rather than TOGGLE so that running it twice leaves one
- * _NET_WM_STATE_FULLSCREEN in the list.
+ * machine - a keybinding request today, a direct transition tomorrow - writes
+ * the same property, and a refused transition writes nothing. The write
+ * replaces the list with one _NET_WM_STATE_FULLSCREEN atom, so a second enter
+ * still leaves one atom rather than appending another.
  */
 bool
 fullscreen_action_enter_fullscreen(StateMachine* sm, void* data)
