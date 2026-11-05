@@ -11,7 +11,7 @@
  *
  * Build:  make tools/xclient
  * Usage:  xclient [-n COUNT] [-t TITLE] [-W WIDTH] [-H HEIGHT] [-s SLEEP]
- *                 [-l LIFETIME] [-c CLASS] [-M MINWxMINH] [-o] [-h]
+ *                 [-l LIFETIME] [-c CLASS] [-M MINWxMINH] [-o] [-e] [-h]
  *
  * -n COUNT     number of windows to create (default 1)
  * -t TITLE     window title prefix; each window is TITLE-<index>
@@ -22,6 +22,10 @@
  * -y           wait for the server to process each map before printing its id
  * -M MINWxMINH write WM_NORMAL_HINTS asking for a minimum size
  * -o           create override-redirect windows, which a WM must leave alone
+ * -e           select no events on the window, so a test reads only what the
+ *              WM selected: X reports the union of every client's mask, and a
+ *              client that selects PropertyChange itself hides whether the WM
+ *              did
  * -l LIFETIME  exit after this many seconds (default: run until killed)
  * -h           print this help
  *
@@ -107,6 +111,7 @@ create_window(
     uint32_t    width,
     uint32_t    height,
     bool        override_redirect,
+    bool        select_nothing,
     uint32_t    min_width,
     uint32_t    min_height)
 {
@@ -123,9 +128,11 @@ create_window(
     mask |= XCB_CW_OVERRIDE_REDIRECT;
     values[next++] = 1;
   }
-  mask |= XCB_CW_EVENT_MASK;
-  values[next++] = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY |
-                   XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE;
+  if (!select_nothing) {
+    mask |= XCB_CW_EVENT_MASK;
+    values[next++] = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY |
+                     XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE;
+  }
 
   xcb_create_window(conn,
                     XCB_COPY_FROM_PARENT,
@@ -188,9 +195,10 @@ main(int argc, char** argv)
   bool        verbose           = false;
   bool        sync              = false;
   bool        override_redirect = false;
+  bool        select_nothing    = false;
 
   int opt;
-  while ((opt = getopt(argc, argv, "n:t:c:W:H:M:s:l:voyh")) != -1) {
+  while ((opt = getopt(argc, argv, "n:t:c:W:H:M:s:l:voyeh")) != -1) {
     switch (opt) {
     case 'n':
       count = atoi(optarg);
@@ -228,10 +236,13 @@ main(int argc, char** argv)
     case 'o':
       override_redirect = true;
       break;
+    case 'e':
+      select_nothing = true;
+      break;
     case 'h':
     default:
       printf("usage: xclient [-n COUNT] [-t TITLE] [-c CLASS] [-W WIDTH] "
-             "[-H HEIGHT] [-M MINWxMINH] [-s SLEEP] [-l LIFETIME] [-v] [-y] [-o] [-h]\n");
+             "[-H HEIGHT] [-M MINWxMINH] [-s SLEEP] [-l LIFETIME] [-v] [-y] [-o] [-e] [-h]\n");
       return opt == 'h' ? 0 : 1;
     }
   }
@@ -271,7 +282,8 @@ main(int argc, char** argv)
   for (int i = 0; i < count; i++) {
     char buf[256];
     snprintf(buf, sizeof(buf), "%s-%d", title, i + 1);
-    wins[i] = create_window(buf, klass, width, height, override_redirect, min_width, min_height);
+    wins[i] = create_window(
+        buf, klass, width, height, override_redirect, select_nothing, min_width, min_height);
     if (sync) {
       /* A request from this client is processed in order, so the reply proves
          the server has seen the map and redirected it. */

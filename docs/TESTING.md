@@ -670,6 +670,7 @@ make tools/xclient
 | `-v` | print each window ID |
 | `-y` | wait for the server to process each map before printing its ID |
 | `-o` | create override-redirect windows, which a WM must leave alone |
+| `-e` | select no events on the window, so `xwininfo -events` shows only what the WM selected |
 
 `xdotool` finds them: `DISPLAY=:2 xdotool search --onlyvisible --class xclient`.
 
@@ -699,6 +700,14 @@ window that does not select `EnterWindow`/`LeaveWindow` sends `ENTER_NOTIFY` to
 the root instead, and the focus handler then sees a crossing that names the root
 rather than the client. `xprop` reports properties and not masks, and `xdotool`
 has no subcommand for them.
+
+`xwininfo -events` reports the union of every client's selection on that
+window, not the WM's alone, and `tools/xclient` selects `Exposure`,
+`StructureNotify`, `FocusChange` and `PropertyChange` on the windows it creates.
+A check of what the WM selected therefore needs a client that asks for nothing:
+`tools/xclient -e` creates one. Whether the WM selected `PropertyChange` is what
+decides if a client's `_NET_WM_STATE` change ever reaches the fullscreen
+component, and this is the only way to see it.
 
 `xmodmap -pm` prints the modifier table: for each of Shift, Lock, Control and
 Mod1 through Mod5, the keycodes that carry it. A keybinding masked with a
