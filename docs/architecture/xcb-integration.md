@@ -191,8 +191,15 @@ what it probes for itself.
 `ewmh_request_wm_state()` asks a client for its `_NET_WM_STATE` and returns the
 cookie; the caller reads the reply from a poll callback, because the
 `PropertyNotify` that prompted the read says the list changed and not what it
-now holds. The same connection writes that property: fullscreen adds and removes
-`_NET_WM_STATE_FULLSCREEN` with `xcb_ewmh_request_change_wm_state()`.
+now holds. The same connection writes that property: fullscreen sets it to a
+one-atom list holding `_NET_WM_STATE_FULLSCREEN`, or to an empty list, with
+`xcb_ewmh_set_wm_state()`. EWMH gives the property to the window manager, and
+`_NET_WM_STATE_FULLSCREEN` is the only flag the WM sets, so the list it writes
+holds that atom or nothing.
+
+The other half of that protocol is not implemented: a client asking for a state
+change sends a `ClientMessage` to the root window, and no component registers a
+handler for `XCB_CLIENT_MESSAGE`, so such a request is ignored.
 
 ---
 

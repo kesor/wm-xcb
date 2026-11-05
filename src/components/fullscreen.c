@@ -372,6 +372,15 @@ fullscreen_set_state(Client* c, FullscreenState state)
 
 /*
  * Update the _NET_WM_STATE X property to reflect fullscreen state.
+ *
+ * EWMH gives the window manager this property: a client asks for a change with
+ * a ClientMessage to the root window, and the WM writes the list. Asking for
+ * the change with a ClientMessage addressed to the WM itself reached nobody -
+ * no component handles ClientMessage - so the property was never written.
+ *
+ * _NET_WM_STATE_FULLSCREEN is the only flag this WM sets, so the list holds
+ * that atom or nothing. A second flag (hidden, demands-attention) has to be
+ * merged into this list rather than written beside it.
  */
 void
 fullscreen_update_x_property(Client* c, bool fullscreen)
@@ -382,28 +391,12 @@ fullscreen_update_x_property(Client* c, bool fullscreen)
   LOG_DEBUG("Updating _NET_WM_STATE for client window=%u fullscreen=%d",
             c->window, fullscreen);
 
-  /* Use EWMH to set/unset _NET_WM_STATE_FULLSCREEN */
-  if (fullscreen) {
-    /* Add fullscreen atom */
-    xcb_ewmh_request_change_wm_state(
-        ewmh,
-        0, /* screen number */
-        c->window,
-        XCB_EWMH_WM_STATE_ADD,
-        ewmh->_NET_WM_STATE_FULLSCREEN,
-        XCB_ATOM_NONE,
-        0);
-  } else {
-    /* Remove fullscreen atom - use REMOVE instead of TOGGLE to avoid sync issues */
-    xcb_ewmh_request_change_wm_state(
-        ewmh,
-        0, /* screen number */
-        c->window,
-        XCB_EWMH_WM_STATE_REMOVE,
-        ewmh->_NET_WM_STATE_FULLSCREEN,
-        XCB_ATOM_NONE,
-        0);
-  }
+  xcb_atom_t fullscreen_atom = ewmh->_NET_WM_STATE_FULLSCREEN;
+
+  if (fullscreen)
+    xcb_ewmh_set_wm_state(ewmh, c->window, 1, &fullscreen_atom);
+  else
+    xcb_ewmh_set_wm_state(ewmh, c->window, 0, NULL);
 }
 
 /*
