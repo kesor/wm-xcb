@@ -35,9 +35,9 @@ when the class stops happening.
 |---|---|---|
 | **Transport** 運搬 | moving work to where it can be done instead of doing it there | a worker copying `build/debug/wm` to `/tmp` to run it; transcripts and logs spread over `$XDG_RUNTIME_DIR/wm-worker-logs`, `archive/`, `sessions/` and `wm-worker-prompts/` |
 | **Inventory** 在庫 | work in process that nobody consumes | 80 commits that had never been pushed; 15 open friction beads; worktrees stranded when a run died |
-| **Motion** 動作 | the worker moving without progress | a reviewer guessing `src/hub`, `src/*.c`, `src/main.c`; `cat` of a 600-line file to find one function |
+| **Motion** 動作 | the worker moving without progress | a reviewer guessing `src/hub`, `src/*.c`, `src/main.c`; `cat` of a whole file to find one function |
 | **Waiting** 手待ち | blocked time, waiting for a person, a model, a check | 40 calls on "why is my DEBUG log empty"; `publish` waiting for checks that did not exist yet; blocked beads |
-| **Overproduction** 作りすぎ | output nobody asked for | an unfilled `CLAUDE.md`; a second managed beads block in `.cursor/rules/`; a second code map inside `AGENTS.md`; a 742-line guide nobody pruned |
+| **Overproduction** 作りすぎ | output nobody asked for | an unfilled `CLAUDE.md`; a second managed beads block in `.cursor/rules/`; a second code map inside `AGENTS.md`; a long guide nobody pruned |
 | **Over-processing** 過剰加工 | more effort than the value needs | an 18-minute review of five beads; re-running gates by hand after a merge that already ran them |
 | **Defects** 不良 | rework caused by getting it wrong first | three false claims in one `AGENTS.md` rewrite; a test that made `make SANITIZE=1 test-x` impossible; a CI gates job green for months with every command skipped |
 | **Unused talent** 人の活用不足 | the actor was not asked, or not given what it needed | workers not told they may file beads; not given the harness to read; not given `xwininfo`, so one wrote a C program instead |
