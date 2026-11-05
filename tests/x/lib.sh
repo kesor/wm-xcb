@@ -28,6 +28,40 @@ XCLIENT="$ROOT_DIR/tools/xclient"
 PASS_COUNT=0
 FAIL_COUNT=0
 
+# output_lines <file> - the number of lines in <file>, or 0 when it cannot be
+# read. `wc -l <missing` prints an error and nothing else, and every comparison
+# against that empty string then reports "[: : integer expected", which names
+# neither the file nor the helper that asked for it.
+output_lines() {
+  local n
+  # The redirect inside the substitution fails in the shell that asks for it, so
+  # the group around it is what keeps "No such file or directory" out of the
+  # seam report; 2>/dev/null on wc itself does not see that error.
+  { n=$(wc -l <"$1"); } 2>/dev/null || n=0
+  n=${n//[[:space:]]/}
+  printf '%s\n' "${n:-0}"
+}
+
+# spawn_client writes here when it comes back without the ids it was asked for.
+# It runs inside a command substitution, so a FAIL_COUNT incremented there dies
+# with the subshell: the file would exit 0 while every assertion after it looked
+# at nothing, and the first of those would report the empty result as WM
+# behaviour. The subshell signals the test shell instead, and the trap turns the
+# file into one failing assertion and stops it before that happens.
+SPAWN_FAILURE_FILE="$TMPDIR_SEAM/spawn-failure.$$"
+# shellcheck disable=SC2329 # the trap calls it
+spawn_failure_reported() {
+  local line
+  [ -s "$SPAWN_FAILURE_FILE" ] || return 0
+  while IFS= read -r line; do
+    fail "$line"
+  done <"$SPAWN_FAILURE_FILE"
+  rm -f "$SPAWN_FAILURE_FILE"
+  finish
+  exit 1
+}
+trap spawn_failure_reported USR1
+
 # Unique per test run so two tests never share a WM_CLASS.
 CLASS="seam-$$-$RANDOM"
 
@@ -108,18 +142,20 @@ spawn_client() {
   echo "$!" >>"$TMPDIR_SEAM/client-pids.$$" 
   # The client prints "0x<id> <title>" per window once each is created.
   local waited=0
-  while [ "$(wc -l <"$out")" -lt "$count" ] && [ "$waited" -lt 200 ]; do
+  while [ "$(output_lines "$out")" -lt "$count" ] && [ "$waited" -lt 200 ]; do
     sleep 0.01
     waited=$((waited + 1))
   done
   local got
-  got=$(wc -l <"$out")
+  got=$(output_lines "$out")
   if [ "$got" -lt "$count" ]; then
-    # Say what actually happened. A test that fails because it has no clients is
-    # a harness failure, and reporting it as a WM behaviour is what turned this
-    # race into a NEW seam failure.
-    echo "spawn_client: asked $XCLIENT for $count window(s), got $got after ${waited}00ms" >&2
-    echo "spawn_client: this is the harness, not the WM; see $out" >&2
+    # One line, because run.sh identifies a failure by the text before the first
+    # colon and one cause must not read as two. It names spawn_client so a
+    # reader of the seam report can tell a client that never ran from a WM that
+    # did nothing about it.
+    printf 'spawn_client: %s wrote %s of %s window id(s) to %s in %sms; that is the harness, not the WM, so this file reports nothing about the WM\n' \
+      "$XCLIENT" "$got" "$count" "$out" "$((waited * 10))" >"$SPAWN_FAILURE_FILE"
+    kill -USR1 $$
   fi
   awk '{print $1}' "$out"
 }
