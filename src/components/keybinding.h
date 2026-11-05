@@ -73,9 +73,15 @@ enum KeybindingTarget {
 };
 
 /*
- * Number of configurable key bindings
+ * Number of configurable key bindings.
+ *
+ * The compiled defaults - a tag action for each of nine tags in three
+ * directions, plus the terminal, focus, fullscreen, floating, tile and launcher
+ * bindings - filled the old table of 32 exactly, so the last one landed on the
+ * limit and was dropped with nothing but a log line to show it. The next
+ * default binding has to fit as well.
  */
-#define KEYBINDING_MAX_BINDINGS 32
+#define KEYBINDING_MAX_BINDINGS 64
 
 /*
  * Number of available tags (standard dwm uses 9)

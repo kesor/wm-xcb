@@ -14,6 +14,7 @@
 #include "src/actions/launcher.h"
 #include "src/components/client-list.h"
 #include "src/components/connection-sm.h"
+#include "src/components/floating.h"
 #include "src/components/focus.h"
 #include "src/components/fullscreen.h"
 #include "src/components/tag-manager.h"
@@ -47,6 +48,9 @@ static const KnownEventType known_events[] = {
   KNOWN(EVT_MONITOR_DISCONNECTED, EVT_CONNECTION_BASE, EVT_CONNECTION_LIMIT),
   KNOWN(EVT_MONITOR_CONNECTED, EVT_CONNECTION_BASE, EVT_CONNECTION_LIMIT),
   KNOWN(EVT_LAUNCHER_FAILED, EVT_LAUNCHER_BASE, EVT_LAUNCHER_LIMIT),
+  KNOWN(EVT_CLIENT_FLOATED, EVT_FLOATING_BASE, EVT_FLOATING_LIMIT),
+  KNOWN(EVT_CLIENT_TILED, EVT_FLOATING_BASE, EVT_FLOATING_LIMIT),
+  KNOWN(EVT_FLOATING_FAILED, EVT_FLOATING_BASE, EVT_FLOATING_LIMIT),
 };
 
 #define KNOWN_EVENT_COUNT (sizeof(known_events) / sizeof(known_events[0]))

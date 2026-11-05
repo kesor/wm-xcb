@@ -5,6 +5,7 @@
 
 #include "src/actions/action-registry.h"
 #include "src/components/client-list.h"
+#include "src/components/floating.h"
 #include "src/components/focus.h"
 #include "src/components/fullscreen.h"
 #include "src/components/keybinding.h"
@@ -25,6 +26,7 @@
 static const WiredModule wired_components[] = {
   { KEYBINDING_COMPONENT_NAME,      keybinding_is_initialized            },
   { FULLSCREEN_COMPONENT_NAME,      fullscreen_component_is_initialized  },
+  { FLOATING_COMPONENT_NAME,        floating_component_is_initialized    },
   { CLIENT_LIST_COMPONENT_NAME,     client_list_component_is_initialized },
   { PERTAG_COMPONENT_NAME,          pertag_component_is_initialized      },
   { TAG_MANAGER_COMPONENT_NAME,     tag_manager_component_is_initialized },
@@ -55,10 +57,11 @@ wm_components_wired_actions(void)
 bool
 wm_components_init(void)
 {
-  /* keybinding_init creates the action registry. fullscreen_component_init
-   * registers an action and aborts the component if that fails, so it follows. */
+  /* keybinding_init creates the action registry. fullscreen and floating each
+   * register an action and abort the component if that fails, so they follow. */
   keybinding_init();
   fullscreen_component_init();
+  floating_component_init();
   client_list_component_init();
   /* pertag, tag-manager, and tiling store state on monitors, and adoption runs
    * when the monitor target is registered. All three go before
@@ -117,6 +120,7 @@ wm_components_shutdown(void)
   tiling_component_shutdown();
   client_list_component_shutdown();
   focus_component_shutdown();
+  floating_component_shutdown();
   fullscreen_component_shutdown();
   /* Action modules go before the registry: the launcher also drops the pipe
    * it registered with the loop and closes it, which would otherwise happen

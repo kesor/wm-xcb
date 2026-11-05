@@ -20,6 +20,7 @@ src/actions/keybinding-binding.c 53.7
 src/components/fullscreen.c 54.2
 src/actions/action-registry.c 57.7
 wm-xcb-ewmh.c 60.6
+src/components/floating.c 63.7
 src/components/tiling.c 63.9
 src/sm/sm-template.c 64.9
 src/target/tag.c 66.0
