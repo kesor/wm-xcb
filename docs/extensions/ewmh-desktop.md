@@ -2,102 +2,87 @@
 
 ## Overview
 
-Provides EWMH-compliant desktop/tag management, allowing external tools (pagers, panels) to interact with the window manager's workspace system. This exposes tag state via `_NET_NUMBER_OF_DESKTOPS`, `_NET_DESKTOP_NAMES`, `_NET_CURRENT_DESKTOP`, etc.
+Publishes the tag model as EWMH desktops, so a panel or pager that knows
+nothing about this WM can find it, list the windows it manages, name the
+desktops, and switch between them.
+
+The component is built in: `src/components/ewmh-desktop.c`, registered as
+`ewmh-desktop` by `wm_components_init()`. It owns no state machine. Tag state
+belongs to the tag manager, and this component reads it from the events the tag
+manager emits.
 
 ## DWM Reference
 
 Based on `view.md`, `clientmessage.md`:
 - `setnumdesktops()`, `setdesktopnames()`, `setcurrentdesktop()`, `setviewport()` in dwm
 - `updatecurrentdesktop()` called after tag changes
-- `_NET_DESKTOP_NAMES` uses UTF8 text property with tag names
-- External apps can request `_NET_CURRENT_DESKTOP` change
+- `_NET_DESKTOP_NAMES` is a UTF8 text property with the tag names
+- An external app asks for `_NET_CURRENT_DESKTOP` with a ClientMessage
 
-## State Machine Events
-
-| Event | Description | Payload |
-|-------|-------------|---------|
-| `EVT_TAG_VIEW_CHANGED` | View changed | `Monitor*`, `tagset` |
-| `EVT_TAG_NAME_CHANGED` | Tag name modified | `tag_index`, `new_name` |
-| `EVT_EWMH_DESKTOP_REQUEST` | External desktop change request | `desktop_index` |
-
-## EWMH Atoms
-
-```c
-// Atoms that this extension manages
-static Atom netatom[] = {
-    [NetNumberOfDesktops] = "_NET_NUMBER_OF_DESKTOPS",
-    [NetDesktopNames] = "_NET_DESKTOP_NAMES",
-    [NetCurrentDesktop] = "_NET_CURRENT_DESKTOP",
-    [NetDesktopViewport] = "_NET_DESKTOP_VIEWPORT",
-};
-```
-
-## Hook Points
-
-```c
-typedef struct {
-    const char** tag_names;     // Tag display names
-    int num_tags;               // Number of tags
-    int ewmh_support;           // Enable EWMH support
-} EwmhConfig;
-
-void on_tag_view_changed(const Event* evt, void* userdata) {
-    // Update _NET_CURRENT_DESKTOP
-    Monitor* mon = evt->source;
-    unsigned int tagset = mon->tagset[mon->seltags];
-    
-    // Find index of active tag (assuming single tag)
-    int idx = 0;
-    unsigned int mask = 1;
-    for (int i = 0; i < num_tags; i++) {
-        if (tagset & mask) {
-            idx = i;
-            break;
-        }
-        mask <<= 1;
-    }
-    
-    // Send to root window
-    long data = idx;
-    XChangeProperty(dpy, root, netatom[NetCurrentDesktop], XA_CARDINAL, 32,
-                    PropModeReplace, (unsigned char*)&data, 1);
-}
-
-void on_ewmh_desktop_request(const Event* evt, void* userdata) {
-    // Handle _NET_CURRENT_DESKTOP from external app
-    int requested = evt->desktop_index;
-    if (requested >= 0 && requested < num_tags) {
-        Arg arg = { .ui = 1 << requested };
-        view(&arg);
-    }
-}
-```
-
-## Configuration
-
-```c
-static EwmhConfig ewmh_config = {
-    .tag_names = (const char*[]){"1", "2", "3", "4", "5", "6", "7", "8", "9"},
-    .num_tags = 9,
-    .ewmh_support = 1,
-};
-```
+Where this differs from dwm: the tag view can show several tags, and EWMH names
+one desktop. The current desktop is the lowest visible tag, and a client on more
+than one tag reports `_NET_WM_DESKTOP` as `0xFFFFFFFF`, which EWMH defines as
+"on every desktop". dwm's EWMH patch writes the client's raw tag bitmask, which
+a panel reads as a desktop index that does not exist.
 
 ## Root Window Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `_NET_NUMBER_OF_DESKTOPS` | CARDINAL | Number of tags/desktops |
-| `_NET_DESKTOP_NAMES` | UTF8_STRING | Tag names (null-separated) |
-| `_NET_CURRENT_DESKTOP` | CARDINAL | Currently active tag index |
-| `_NET_DESKTOP_VIEWPORT` | CARDINAL | Viewport position (for virtual desktops) |
-| `_NET_SUPPORTED` | ATOM | List of supported EWMH atoms |
+| Property | Type | Value |
+|----------|------|-------|
+| `_NET_SUPPORTING_WM_CHECK` | WINDOW | a window the WM creates, which carries the same property pointing at itself, and `_NET_WM_NAME` = `wm-xcb` |
+| `_NET_SUPPORTED` | ATOM | the atoms this component sets, plus `_NET_WM_STATE` and `_NET_WM_STATE_FULLSCREEN`, which the fullscreen component writes on clients |
+| `_NET_NUMBER_OF_DESKTOPS` | CARDINAL | the tag count, `TAG_NUM_TAGS` |
+| `_NET_DESKTOP_NAMES` | UTF8_STRING | the tag names from the config file, NUL-separated; a tag with no name is its number |
+| `_NET_DESKTOP_VIEWPORT` | CARDINAL | all zero: a desktop here is a tag, not a scroll position |
+| `_NET_CURRENT_DESKTOP` | CARDINAL | the lowest visible tag of the selected monitor |
+| `_NET_CLIENT_LIST` | WINDOW | the managed windows, in the order they were mapped |
+
+## Client Window Properties
+
+| Property | Type | Value |
+|----------|------|-------|
+| `_NET_WM_DESKTOP` | CARDINAL | the client's tag index, or `0xFFFFFFFF` when it is on several tags or none |
+
+## What Keeps the Properties Current
+
+| Source | Effect |
+|--------|--------|
+| `EVT_TAG_CHANGED` with a visible mask | rewrite `_NET_CURRENT_DESKTOP`; rewrite every client's `_NET_WM_DESKTOP` |
+| `EVT_TAG_CHANGED` about a client | rewrite every client's `_NET_WM_DESKTOP` |
+| `EVT_CLIENT_MANAGED` | write that client's `_NET_WM_DESKTOP`, rewrite `_NET_CLIENT_LIST` |
+| `EVT_CLIENT_UNMANAGED`, `EVT_CLIENT_DESTROYED` | rewrite `_NET_CLIENT_LIST` without the window the event names |
+| `XCB_CLIENT_MESSAGE` with `_NET_CURRENT_DESKTOP` | send `REQ_TAG_VIEW` for that desktop's tag to the selected monitor |
+
+The last row is the whole request path: a pager's desktop change goes through
+the same request a keybinding sends, so the tag manager decides whether it
+happens, and the events above then carry the result back out. This component
+never sets a tag itself and never calls the tag manager.
+
+A request for a desktop at or above the tag count, and a ClientMessage of any
+other type, are logged and ignored.
+
+## Configuration
+
+There is no separate configuration. `_NET_NUMBER_OF_DESKTOPS` and
+`_NET_DESKTOP_NAMES` come from `TAG_NUM_TAGS` and the `tags` line of the config
+file (`docs/configuration.md`).
+
+## What This Does Not Do Yet
+
+- `_NET_WM_DESKTOP` as a client message: a pager can ask to switch desktops, not
+  to move a window between them.
+- `_NET_ACTIVE_WINDOW`, `_NET_CLOSE_WINDOW`, `_NET_WM_STATE` messages from a
+  panel.
+- A tag name changed at runtime does not rewrite `_NET_DESKTOP_NAMES`.
+- `_NET_DESKTOP_VIEWPORT` is written but never anything other than zero.
 
 ## Interactions
 
-- Required for external panels/pagers (e.g., polybar, xfce-panel)
-- Works with `pertag` (EWMH reflects current view)
-- Tag names can be changed at runtime
+- Required for external panels and pagers (polybar, waybar, rofi, xfce-panel)
+- Follows the tag manager's view, so it reflects `pertag` for the selected
+  monitor
+- A client that is hidden by a tag switch keeps its place in `_NET_CLIENT_LIST`:
+  the window is still managed, and EWMH has no "not on screen now"
 
 ---
 

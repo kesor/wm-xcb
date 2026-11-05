@@ -152,11 +152,20 @@ Short version, and the parts that stay true until they are fixed:
   it, and a cancelled prompt emits a failure event instead of blocking. dmenu
   itself holds the keyboard grab while it is up, so the keys a user presses then
   belong to it; what stays free is the WM's loop, which still handles X events
-  and the other registered pipes.
-- **Does not work:** it sets no EWMH root properties. Visible tags are stored
-  twice: a tag view change updates the tag-view state machine, and a new client
-  still copies its tags from `Monitor.tagset`, which no runtime path writes, so
-  every new client lands on tag 1.
+  and the other registered pipes. `_NET_SUPPORTING_WM_CHECK` on the root points
+  at a window of the WM's own that points back at itself and names the WM, so a
+  panel can tell a live WM from a stale property; `_NET_CLIENT_LIST` lists the
+  managed windows in mapping order; `_NET_NUMBER_OF_DESKTOPS`,
+  `_NET_DESKTOP_NAMES`, `_NET_DESKTOP_VIEWPORT` and `_NET_CURRENT_DESKTOP`
+  publish the tags, with the configured names and the lowest visible tag as the
+  current desktop, and every managed window carries `_NET_WM_DESKTOP`; a
+  `_NET_CURRENT_DESKTOP` ClientMessage from a pager switches the tag view
+  through the same request a keybinding sends. The unit suite and
+  `tests/x/test-60-ewmh-root-properties.sh` pin both halves.
+- **Does not work:** visible tags are stored twice: a tag view change updates
+  the tag-view state machine, and a new client still copies its tags from
+  `Monitor.tagset`, which no runtime path writes, so every new client lands on
+  tag 1.
 
 Do not take that from a document. Ask the tree:
 

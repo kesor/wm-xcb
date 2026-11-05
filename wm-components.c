@@ -5,6 +5,7 @@
 
 #include "src/actions/action-registry.h"
 #include "src/components/client-list.h"
+#include "src/components/ewmh-desktop.h"
 #include "src/components/floating.h"
 #include "src/components/focus.h"
 #include "src/components/fullscreen.h"
@@ -24,16 +25,17 @@
  * way to get an unchecked one.
  */
 static const WiredModule wired_components[] = {
-  { KEYBINDING_COMPONENT_NAME,      keybinding_is_initialized            },
-  { FULLSCREEN_COMPONENT_NAME,      fullscreen_component_is_initialized  },
-  { FLOATING_COMPONENT_NAME,        floating_component_is_initialized    },
-  { CLIENT_LIST_COMPONENT_NAME,     client_list_component_is_initialized },
-  { PERTAG_COMPONENT_NAME,          pertag_component_is_initialized      },
-  { TAG_MANAGER_COMPONENT_NAME,     tag_manager_component_is_initialized },
-  { MONITOR_MANAGER_COMPONENT_NAME, monitor_manager_is_initialized       },
-  { FOCUS_COMPONENT_NAME,           focus_component_is_initialized       },
-  { TILING_COMPONENT_NAME,          tiling_component_is_initialized      },
-  { NULL,                           NULL                                 },
+  { KEYBINDING_COMPONENT_NAME,      keybinding_is_initialized             },
+  { FULLSCREEN_COMPONENT_NAME,      fullscreen_component_is_initialized   },
+  { FLOATING_COMPONENT_NAME,        floating_component_is_initialized     },
+  { CLIENT_LIST_COMPONENT_NAME,     client_list_component_is_initialized  },
+  { PERTAG_COMPONENT_NAME,          pertag_component_is_initialized       },
+  { TAG_MANAGER_COMPONENT_NAME,     tag_manager_component_is_initialized  },
+  { EWMH_DESKTOP_COMPONENT_NAME,    ewmh_desktop_component_is_initialized },
+  { MONITOR_MANAGER_COMPONENT_NAME, monitor_manager_is_initialized        },
+  { FOCUS_COMPONENT_NAME,           focus_component_is_initialized        },
+  { TILING_COMPONENT_NAME,          tiling_component_is_initialized       },
+  { NULL,                           NULL                                  },
 };
 
 static const WiredModule wired_actions[] = {
@@ -70,6 +72,9 @@ wm_components_init(void)
   pertag_component_init();
   tag_manager_component_init();
   tiling_component_init();
+  /* ewmh-desktop subscribes to the tag event a monitor's adoption emits, so it
+   * has to be up before the monitor manager reaches the monitors. */
+  ewmh_desktop_component_init();
   monitor_manager_init();
   focus_component_init();
 
@@ -116,6 +121,7 @@ wm_components_shutdown(void)
    * come from. Unregistering an action needs the registry, so every component
    * goes before keybinding_shutdown(). */
   monitor_manager_shutdown();
+  ewmh_desktop_component_shutdown();
   tag_manager_component_shutdown();
   tiling_component_shutdown();
   client_list_component_shutdown();

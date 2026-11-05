@@ -178,15 +178,18 @@ void monitor_manager_randr_handler(void* event) {
 | `XCB_CONFIGURE_REQUEST` | floating, tiling | May `hub_send_request()` |
 | `XCB_EXPOSE` | bar | `hub_emit(EVT_BAR_DRAW)` |
 | `XCB_RANDR_NOTIFY` | monitor-manager | `sm_raw_write()` to ConnectionSM |
+| `XCB_CLIENT_MESSAGE` | ewmh-desktop | `_NET_CURRENT_DESKTOP` becomes `REQ_TAG_VIEW` |
 
 ## EWMH atoms
 
 `setup_ewmh()` interns the EWMH atom table into one `xcb_ewmh_connection_t`, and
 `destruct_ewmh()` wipes it before freeing it, because `xcb_ewmh_init_atoms()`
-allocates a screen list and one atom per screen inside that struct. The WM writes
-no EWMH root property: `_NET_SUPPORTED`, `_NET_CLIENT_LIST` and
-`_NET_CURRENT_DESKTOP` are open work, so a panel or an external tool sees only
-what it probes for itself.
+allocates a screen list and one atom per screen inside that struct. The
+`ewmh-desktop` component writes the root properties a panel reads:
+`_NET_SUPPORTING_WM_CHECK`, `_NET_SUPPORTED`, `_NET_CLIENT_LIST`,
+`_NET_NUMBER_OF_DESKTOPS`, `_NET_DESKTOP_NAMES`, `_NET_DESKTOP_VIEWPORT` and
+`_NET_CURRENT_DESKTOP`, and `_NET_WM_DESKTOP` on each managed window. A
+`_NET_CURRENT_DESKTOP` ClientMessage is turned into `REQ_TAG_VIEW`.
 
 `ewmh_request_wm_state()` asks a client for its `_NET_WM_STATE` and returns the
 cookie; the caller reads the reply from a poll callback, because the
@@ -198,8 +201,9 @@ one-atom list holding `_NET_WM_STATE_FULLSCREEN`, or to an empty list, with
 holds that atom or nothing.
 
 The other half of that protocol is not implemented: a client asking for a state
-change sends a `ClientMessage` to the root window, and no component registers a
-handler for `XCB_CLIENT_MESSAGE`, so such a request is ignored.
+change sends a `_NET_WM_STATE` ClientMessage to the root window. The
+ClientMessage handler only answers `_NET_CURRENT_DESKTOP`, so a state request
+is ignored.
 
 ---
 

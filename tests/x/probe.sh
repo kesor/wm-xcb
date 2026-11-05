@@ -46,24 +46,25 @@
 #   --- state ---
 #   screen: 1280 800
 #   window          x     y     w     h  border  viewable  focus  tags  title
-#   0x00400000    640     0   638   798       1      yes     no     -  probe-1
-#   0x00400001      0     0   638   798       1      yes    yes     -  probe-2
+#   0x00400000    640     0   638   798       1      yes     no     0  probe-1
+#   0x00400001      0     0   638   798       1      yes    yes     0  probe-2
 #   viewable: 2 of 2
 #   --- root properties ---
-#   _NET_SUPPORTING_WM_CHECK: not set
-#   _NET_CLIENT_LIST: not set
-#   _NET_CURRENT_DESKTOP: not set
-#   _NET_NUMBER_OF_DESKTOPS: not set
-#   _NET_DESKTOP_NAMES: not set
+#   _NET_SUPPORTING_WM_CHECK: window id # 0x200000
+#   _NET_CLIENT_LIST: window id # 0x400000, 0x400001
+#   _NET_CURRENT_DESKTOP: 0
+#   _NET_NUMBER_OF_DESKTOPS: 9
+#   _NET_DESKTOP_NAMES: "1", "2", "3", "4", "5", "6", "7", "8", "9"
 #   --- wm ---
 #   wm: running (pid 1234)
 #   --- wm log (last N lines) ---
 #
 # viewable and focus come from the X server. tags is the client's
-# _NET_WM_DESKTOP, and prints '-' when the WM sets no such property, which is
-# where it stands while no client-side EWMH property is published; the root
-# properties section says the same about the root window. A probe that leaves
-# that out of its own output makes the reader start a second one to find out.
+# _NET_WM_DESKTOP, and prints '-' when that property is absent. The root
+# properties section is the same read. Window ids vary; the desktop count and
+# the current desktop do not, on a WM that has not switched tags. A probe that
+# leaves that out of its own output makes the reader start a second one to find
+# out.
 #
 # The pointer starts at the centre of the screen, which is inside one of the
 # windows. A warp into the window it is already in sends no enter event, so a
@@ -290,9 +291,14 @@ is_viewable() {
   return 1
 }
 
-# prop_value <atom> <window-id|-root> - what xprop prints after the atom's name,
+# prop_value <atom> <window-id|root> - what xprop prints after the atom's name,
 # and empty when the property is absent. xprop answers "not found." for a
 # property nobody set, which is a value only by accident of parsing.
+#
+# A WINDOW value is printed after a colon (`_NET_CLIENT_LIST(WINDOW): window id
+# # 0x1`). A CARDINAL or UTF8_STRING is printed after an equals sign
+# (`_NET_NUMBER_OF_DESKTOPS(CARDINAL) = 9`). Splitting only on the colon reports
+# a set desktop property as absent.
 prop_value() {
   local value
   value=$(
@@ -300,7 +306,7 @@ prop_value() {
       xprop -root "$1" 2>/dev/null
     else
       xprop -id "$2" "$1" 2>/dev/null
-    fi | sed -n '1s/^[^:]*:[[:space:]]*//p'
+    fi | sed -n '1s/^[^:=]*[:=][[:space:]]*//p'
   )
   [ "$value" = "not found." ] && value=""
   printf '%s' "$value"

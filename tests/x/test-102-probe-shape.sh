@@ -68,6 +68,12 @@ check_eq "it reports the command's exit status" 1 "$(grep -c '^command: exit 0$'
 
 check_eq "it prints one line per root property" 5 \
   "$(sed -n '/^--- root properties ---$/,/^--- wm ---$/p' "$OUT" | grep -cE '^_NET_[A-Z_]+: ')"
+# xprop prints a WINDOW value after a colon and a CARDINAL after an equals sign.
+# Splitting only on the colon reports a set CARDINAL as absent.
+check_eq "_NET_NUMBER_OF_DESKTOPS is the tag count" 1 \
+  "$(grep -c '^_NET_NUMBER_OF_DESKTOPS: 9$' "$OUT")"
+check_eq "a client's tags column is its _NET_WM_DESKTOP" 2 \
+  "$(sed -n '/^--- state ---$/,/^viewable: /p' "$OUT" | awk '$1 ~ /^0x/ && $9 == "0"' | grep -c .)"
 check_eq "it reports the WM alive" 1 "$(grep -c '^wm: running (pid [0-9]*)$' "$OUT")"
 check_eq "it prints the WM log" 1 "$(grep -c '^--- wm log (last 40 lines) ---$' "$OUT")"
 
