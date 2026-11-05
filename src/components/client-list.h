@@ -8,8 +8,9 @@
  * XCB Events Handled:
  * - XCB_CREATE_NOTIFY - create Client, register with hub
  * - XCB_DESTROY_NOTIFY - destroy Client, unregister from hub
- * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, select pointer
- *   enter/leave so the focus component sees them, map the window
+ * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, select the event
+ *   mask the focus and fullscreen components read (pointer enter/leave and
+ *   property change), map the window
  * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
  *   itself to hide the client of a tag that is no longer shown
  *
@@ -168,5 +169,12 @@ bool client_list_is_managed(xcb_window_t window);
  * laid out before its hints are known, and this is what corrects that layout.
  */
 void client_list_poll_size_hints(void);
+
+/*
+ * The event mask a managed client window selects: the pointer crossings the
+ * focus component reads, and the property changes the fullscreen component
+ * reads.
+ */
+uint32_t client_list_managed_event_mask(void);
 
 #endif /* _COMPONENT_CLIENT_LIST_H_ */
