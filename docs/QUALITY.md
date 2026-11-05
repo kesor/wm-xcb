@@ -408,13 +408,23 @@ complexity, coverage and a 5-second fuzz run are `pre-push` gates. `scripts/fuzz
 with no argument runs 20 seconds per harness.
 
 **Complexity.** `scripts/check-complexity.sh` runs clang-tidy's
-cognitive-complexity check over every source file and compares the number with
-`tests/quality/complexity-baseline.txt`, which lists `<function> <number>` for
-everything at 11 or above. A function above its number fails, and so does one at
-or above the floor with no entry: a new god-function arrives with somebody
+cognitive-complexity check over the production sources and compares the number
+with `tests/quality/complexity-baseline.txt`, which lists `<function> <number>`
+for everything at 11 or above. A function above its number fails, and so does one
+at or above the floor with no entry: a new god-function arrives with somebody
 deciding the number is acceptable. It writes its own compile database from
 `compile_flags.txt` rather than calling `make compile-commands`, which does a
 full clean build.
+
+A file under `tests/` is not measured. clang-tidy charges each `ASSERT`'s
+`if`/`else` as a decision, so a test body's number is its assertion count, and
+the remedy this gate offers — split the function along a decision — would mean
+deleting assertions. The coverage floors below cover the production sources only,
+for the same reason: a number nobody can act on teaches people to edit the
+baseline by hand instead. `--update-baseline` merges what it measured into the
+entries already recorded rather than rewriting the file, so running it for the
+files a commit changes keeps the rest; an entry goes only when that function was
+measured again and fell below the floor.
 
 In CI the job runs it with `--advisory`, and the reason is in wm-9n0.30: the same
 commit and the same clang-tidy reported `mod_key_name` at 14 on the author's
