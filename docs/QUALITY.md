@@ -404,7 +404,7 @@ scripts/fuzz.sh 60                     # the same, long: by hand or in CI
 ```
 
 In the hook: complexity is a `pre-commit` gate on the changed files, and
-complexity, coverage and a 5-second fuzz run are `pre-push` gates. `scripts/fuzz.sh`
+coverage and a 5-second fuzz run are `pre-push` gates. `scripts/fuzz.sh`
 with no argument runs 20 seconds per harness.
 
 **Complexity.** `scripts/check-complexity.sh` runs clang-tidy's
