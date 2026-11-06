@@ -10,6 +10,10 @@ you. Every session that rediscovers it pays the same cost. File it once, keep
 working, and the harness gets better.
 
 The report is cheap on purpose: three fields, one bead, then back to the task.
+What is worth optimizing at all, and which borrowed techniques do not hold in
+this environment, is `.agents/skills/wm-line/SKILL.md`. A report whose fix would
+be an optimization the four rules refuse does not get filed as friction; it gets
+argued against once, in the bead's comments.
 
 ## When to file
 
@@ -103,5 +107,12 @@ true:
 - a line in `AGENTS.md`, `docs/QUALITY.md`, or `docs/TESTING.md` says what to do,
   or
 - the bead says explicitly why neither applies.
+
+Take the strongest device that fits, in order: make the wrong action impossible,
+then make it fail at the moment it is taken, then write the instruction down. A
+hook is a warning, because `--no-verify` exists; a check that runs in CI on a
+protected branch is a control. A device nobody has seen fail is an assumption, so
+prove a new one by removing the thing it must catch. `DESIGN.md` §10 in the
+harness directory has the three levels.
 
 That is the *shitsuke* step, and it is why the epic exists.

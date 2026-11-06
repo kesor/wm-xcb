@@ -40,6 +40,7 @@ Then read, in this order:
 | Document | Why |
 |----------|-----|
 | `.agents/skills/wm-5s/SKILL.md` | how to file harness friction while you work |
+| `.agents/skills/wm-line/SKILL.md` | what to optimize and what to refuse; read before proposing a change to the loop, a gate, or a measure |
 | `docs/PHILOSOPHY.md` | the four commitments and the rules that follow from them |
 | `docs/architecture/overview.md` | hub, targets, components, two kinds of write |
 | the architecture doc your issue names | e.g. `state-machine.md`, `xcb-integration.md` |
