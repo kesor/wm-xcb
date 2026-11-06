@@ -243,6 +243,11 @@ the failure names the wrong test. `test-94-fresh-wm-per-file.sh` asserts it,
 against the WM's own start time in `/proc`. The server's own state is still
 shared, and that is the part a test has to put back.
 
+`tests/x/run.sh` builds what it runs: `tools/xclient`, the reply-delay shim
+`tools/xcb-ewmh-delay.so`, and the WM variant named by `DEBUG` and `SANITIZE`.
+A run started from it therefore needs no make first, and a missing build
+product cannot arrive as a refusal or as a new seam failure.
+
 `tests/x/lib.sh` has the helpers: `spawn_client`, `wait_viewable`,
 `require_visible`, `rect_of`, `overlap_pairs`, `focused_window`, `press`,
 `root_prop`, and the `check_*` assertions.
@@ -364,8 +369,8 @@ readable; the test holds the first EWMH atom query with
 `tools/xcb-ewmh-delay.so` (an `LD_PRELOAD` shim), maps a window while the WM is
 held, then releases it. The reply wait reads that `MapRequest` into libxcb's
 queue, and a loop that only polls the socket never dispatches it. The shim is
-built by `make test-x`, and `run.sh` refuses to start without it, naming
-`make tools/xcb-ewmh-delay.so` as the command that builds it; it reads
+built by `tests/x/run.sh` at startup, the same way the test client is (and by
+`make test-x`, which builds both through its dependencies); it reads
 `WM_QUEUE_TEST_MARKER` and `WM_QUEUE_TEST_GO` and does nothing when either is
 unset.
 
