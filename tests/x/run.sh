@@ -117,6 +117,13 @@ done
   exit 1
 }
 
+# test-86 dlopens this shim; without it, the test fails and the run reports a
+# missing build artifact as a new X-behaviour failure.
+[ -f "$ROOT_DIR/tools/xcb-ewmh-delay.so" ] || {
+  echo "run.sh: build the reply-delay shim first: make tools/xcb-ewmh-delay.so" >&2
+  exit 1
+}
+
 # Xephyr draws into a parent display, and that display is a private Xvfb this
 # run starts rather than the one the caller is sitting in. The line naming it is
 # printed and recorded next to the logs, so a reader can tell a hermetic run from
