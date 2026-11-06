@@ -91,7 +91,9 @@ Two kinds of write, and the difference matters:
 | `sm_transition()` | someone intends a change: a keybinding, a plugin | consulted | state unchanged, a failure event is emitted |
 
 - **In code:** state is only changed through these two calls. `client->fullscreen = true`
-  is always wrong.
+  is always wrong. The fields are out of a component's reach rather than merely
+  discouraged: `StateMachine` and the client's tracked values are defined in
+  headers no component includes, so that assignment does not compile.
 - **For the user:** the WM and the X server can never quietly disagree. When a
   request cannot be honoured, the user gets a failure event instead of a lie.
 - **What it costs:** a state machine is more code than a boolean, and a badly
@@ -174,7 +176,7 @@ Short enough to check in review.
 | Rule | Why | Where it is checked |
 |------|-----|---------------------|
 | No component calls another component | 2.1 | review, by a person or an agent: `.agents/skills/wm-review/SKILL.md` |
-| No state assignment outside `sm_raw_write` / `sm_transition` | 2.2 | review |
+| No state assignment outside `sm_raw_write` / `sm_transition` | 2.2 | `scripts/check-private-state.sh`: the definition is not in a component's headers, and the gate compiles the forbidden write and requires the compiler to refuse it |
 | No `_reply()` in a handler or action | 2.3 | review + the async audit issue |
 | No blocking call in the loop: `poll`/`wait_for_event` only | 2.3 | `scripts/perf-test.sh` (idle CPU) |
 | One flush per loop iteration | 2.3 | review |
