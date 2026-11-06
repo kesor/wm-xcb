@@ -141,6 +141,27 @@ task. `bd edit` opens an editor and blocks an agent — never use it.
 
 ## Implementing one bead
 
+Before the first edit, answer these. They are the questions the review will
+ask, and a wrong answer costs a rewrite instead of a paragraph:
+
+- **Which commitment does the work exercise, and which rule in
+  `docs/PHILOSOPHY.md` section 3 will judge it?** The four are in section 2:
+  components do not call each other, state machines own state, async first,
+  registration. Say which one in the commit body. The reviewer checks the diff
+  against that rule; the sentence is a claim, not the check.
+- **The extension point question (section 4): does this edit a file it does not
+  own?** If so, name the file and the missing extension point, add the extension
+  point first, and say so in the issue. New per-target state belongs in the
+  target that owns it, so it is not a collision.
+- **Does the change add an event or a request?** Take the range from
+  `src/event-types.h`, give the request a failure event, and add the constants
+  to the list in `tests/unit/test-event-types.c`.
+- **Can a check see the change?** If it changes what X sees (map, tile, focus,
+  a property), write or extend a `tests/x/test-*.sh` and expect to run
+  `make test-x`. Otherwise put the assertion in the component's `test-*.c`.
+
+Then work through the list:
+
 1. Read `bd show <id>` and the docs it names. Then ask whether the work is
    here at all: `scripts/bead-scope.sh <id>` reads the title, the description
    and the comments for a path that only the harness has. Exit 3 means the text
@@ -176,6 +197,11 @@ Name where the list lives and let the worker derive it:
 The second form is also a test, which is the bar: a criterion no command can
 check does not say what done looks like. A number the bead sets on purpose stays
 - an exit status, a latency budget, a limit.
+
+The description is also the pull request body when the branch lands, so it ends
+with the rule check: which rule in `docs/PHILOSOPHY.md` section 3 the change
+exercises, and how it was checked. A description that only restates the title
+leaves the reviewer and the PR with nothing to read.
 
 ## Spawning workers (optional)
 
