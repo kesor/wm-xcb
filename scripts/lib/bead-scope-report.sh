@@ -19,6 +19,17 @@
 # trees have. The small table in bead_scope_harness_names() covers what the file
 # lists cannot: a name that belongs to the harness and has moved or been
 # deleted, which is how a stale bead description misleads a worker.
+#
+# The harness is only half of the question a worker asks. The other half is
+# whether the paths the bead names still exist here: a bead is written months
+# before it is picked up, and one that asks for changes to a file this tree
+# deleted reads exactly like one that asks for changes to a file it has. The
+# file list alone cannot tell those apart, and a tool that answers "workable
+# here" for both sends the worker to resurrect a file its own history removed.
+# So a token this tree does not carry is a finding too: the path, the deletion
+# commit when git records one, and whether the directory that held it is still
+# here. That answer is "cannot tell", not "here" and not "not here": a bead
+# asking for a new file looks the same from the text, and the caller looks.
 
 # bead_scope_harness_dir <repo-root>
 #   The harness checkout beside the main checkout. Three levels up from a
@@ -109,14 +120,116 @@ bead_scope_resolve() {
     }' "$2"
 }
 
-# bead_scope_outside <bead-json> <comments-json> <repo-files> <harness-files>
-#   One line per harness path the bead names, as `<path>TAB<what it is>`.
-#   A token that resolves against the file list is printed as that file. A token
-#   that only matches a known harness name is printed as written. Two tokens that
-#   name the same file are one line. Nothing when no token names the harness.
-bead_scope_outside() {
-  local bead=$1 comments=$2 repo=$3 harness=$4
-  local text tok name what hit rest part matched path
+# bead_scope_present <token> <file-list>
+#   0 when the list carries what the token names: the entry itself, any entry
+#   under it when it is a directory (`src/components/` and `src/components` both
+#   answer the directory), or an entry that ends with it at a path boundary.
+#   The directory case is what keeps a bead that names a directory from reading
+#   as a path this tree has lost.
+bead_scope_present() {
+  awk -v tok="$1" '
+    {
+      n = length(tok)
+      if ($0 == tok || index($0, tok "/") == 1) found = 1
+      m = length($0)
+      if (m > n && substr($0, m - n) == "/" tok) found = 1
+      if (found) exit
+    }
+    END { exit(found ? 0 : 1) }' "$2"
+}
+
+# bead_scope_rooted <first-component> <file-list>
+#   0 when the list carries that name as a directory of its own. A token whose
+#   first component this tree does not have is not a path in this tree at all:
+#   `work/<bead-id>`, `origin/master` and `refs/kept/<bead>` all tokenise to one
+#   and none of them is a file a worker can go and edit.
+bead_scope_rooted() {
+  awk -v tok="$1" '
+    {
+      n = length(tok)
+      if ($0 == tok || (length($0) > n && substr($0, 1, n + 1) == tok "/")) found = 1
+      if (found) exit
+    }
+    END { exit(found ? 0 : 1) }' "$2"
+}
+
+# bead_scope_named_file <token>
+#   0 when the token's last component is a name and an extension, which is what
+#   a file the bead wants edited looks like. A glob keeps its directory and
+#   loses its tail to the tokeniser (`tests/x/test-`), and a bare `.sh` is the
+#   other half of one: neither is a path, and reporting them would make the
+#   answer "cannot tell" for most of the queue.
+bead_scope_named_file() {
+  case "${1##*/}" in
+    ?*.?*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# bead_scope_deletion_log <repo-root>
+#   The commits that deleted paths, as git prints them, ready for
+#   bead_scope_deletions. --all because a bead written against a branch is
+#   picked up after that branch landed; --no-renames because a rename otherwise
+#   reads as an addition and leaves the old path looking like it was never
+#   tracked; core.quotePath=false because a quoted path is one the parser would
+#   read as a name with escapes in it. A checkout with no history prints nothing,
+#   which is an empty list and not an error.
+bead_scope_deletion_log() {
+  git -C "$1" -c core.quotePath=false log --all --diff-filter=D \
+    --pretty=format:'commit %h' --name-only --no-renames 2>/dev/null
+}
+
+# bead_scope_deletions
+#   Reads that output on stdin and prints `<path>TAB<commit>` for the newest
+#   commit that deleted each path. git prints newest first, so the first line for
+#   a path is the one to keep: a file deleted, restored and deleted again is one
+#   finding, and the commit a reader wants is the one that removed what they are
+#   looking for.
+bead_scope_deletions() {
+  awk '
+    /^commit / { commit = $2; next }
+    NF == 0 { next }
+    !($0 in seen) { seen[$0] = 1; print $0 "\t" commit }'
+}
+
+# bead_scope_deleted_for <token> <deleted-list>
+#   The `<path>TAB<commit>` lines whose path the token names at a path boundary.
+#   The list carries a commit column, so bead_scope_resolve cannot read it.
+bead_scope_deleted_for() {
+  awk -v tok="$1" '
+    {
+      path = $0
+      sub(/\t.*/, "", path)
+      n = length(tok)
+      m = length(path)
+      if (path == tok || (m > n && substr(path, m - n) == "/" tok)) print $0
+    }' "$2"
+}
+
+# bead_scope_find <bead-json> <comments-json> <repo-files> <harness-files>
+#                 <deleted-list>
+#   One `<kind>TAB<path>TAB<detail>` line per token that is not simply this
+#   tree's, where kind is OUTSIDE for a harness path and GONE for a path this
+#   tree does not carry. A token is classified once: a harness path is not also
+#   reported as gone, because a reader who is told to stop on the harness does
+#   not need a second line saying the same file is not here.
+#
+#   The harness rule is evidence, not a vocabulary: the token resolves, at a path
+#   boundary, to a file the harness checkout tracks and this repository does not.
+#   The small table in bead_scope_harness_names() covers what the file lists
+#   cannot - a harness name that has moved or been deleted.
+#
+#   The gone rule is shape, not history: an entry of the file list, a directory
+#   the list holds entries under, and a path whose first component this tree
+#   tracks are all fine, and anything else with a file's name and extension is
+#   reported. A token rooted in a directory this tree does not have is not a path
+#   here at all, which is what keeps `work/<bead-id>`, `origin/master` and the
+#   `tests/x/test-` a glob leaves behind out of the answer. The commit column is
+#   empty when no commit deleted the path: that is a bead asking for a new file
+#   as far as the text can tell, and the text cannot tell.
+bead_scope_find() {
+  local bead=$1 comments=$2 repo=$3 harness=$4 deleted=$5
+  local text tok name what hit rest part matched path commit
 
   text=$(mktemp "${TMPDIR:-/tmp}/bead-scope-text.XXXXXX") || return 1
   bead_scope_text "$bead" "$comments" >"$text"
@@ -126,48 +239,72 @@ bead_scope_outside() {
       [ -n "$tok" ] || continue
       # A name both trees carry is this repository's: the question here is what
       # only the harness has.
-      [ -n "$(bead_scope_resolve "$tok" "$repo")" ] && continue
+      bead_scope_present "$tok" "$repo" && continue
       hit=$(bead_scope_resolve "$tok" "$harness")
       if [ -n "$hit" ]; then
         while IFS= read -r path; do
           [ -n "$path" ] || continue
-          printf '%s\t%s\n' "$path" "the harness tracks it"
+          printf 'OUTSIDE\t%s\t%s\n' "$path" "the harness tracks it"
         done <<<"$hit"
         continue
       fi
       rest=$tok
-      while [ -n "$rest" ]; do
+      matched=0
+      while [ -n "$rest" ] && [ "$matched" -eq 0 ]; do
         part=${rest%%/*}
-        matched=0
         while IFS=$'\t' read -r name what; do
           [ -n "$name" ] || continue
           if [ "$part" = "$name" ]; then
-            printf '%s\t%s\n' "$tok" "$what"
+            printf 'OUTSIDE\t%s\t%s\n' "$tok" "$what"
             matched=1
             break
           fi
         done < <(bead_scope_harness_names)
-        if [ "$matched" -eq 1 ]; then
-          break
-        fi
         case "$rest" in
           */*) rest=${rest#*/} ;;
           *) break ;;
         esac
       done
+      [ "$matched" -eq 1 ] && continue
+
+      bead_scope_named_file "$tok" || continue
+      case "$tok" in
+        */*) bead_scope_rooted "${tok%%/*}" "$repo" || continue ;;
+      esac
+      hit=$(bead_scope_deleted_for "$tok" "$deleted")
+      if [ -z "$hit" ]; then
+        printf 'GONE\t%s\t\n' "$tok"
+        continue
+      fi
+      while IFS=$'\t' read -r path commit; do
+        [ -n "$path" ] || continue
+        printf 'GONE\t%s\t%s\n' "$path" "$commit"
+      done <<<"$hit"
     done < <(bead_scope_tokens <"$text")
   } | sort -u
 
   rm -f "$text"
 }
 
+# bead_scope_has_kind <kind> <findings>
+#   0 when bead_scope_find reported at least one finding of that kind, so the
+#   verdict asks the finding list rather than grepping a tab out of it.
+bead_scope_has_kind() {
+  awk -F'\t' -v kind="$1" '$1 == kind { hit = 1 } END { exit(hit ? 0 : 1) }' <<<"$2"
+}
+
 # bead_scope_verify <bead-json> <comments-json> <repo-files> <harness-files>
-#   0 when no token names the harness, 3 when one does, naming what it found.
-#   A bead can name a harness file and still ask for a change in this tree; the
-#   printed verdict says to land that part.
+#                    <deleted-list>
+#   0 when no token names the harness and every path the bead names is in this
+#   tree, 3 when one names the harness, 2 when the tree does not carry a path
+#   it names. A bead can name a harness file and still ask for a change in this
+#   tree, so the harness verdict says to land that part; a path the tree lost is
+#   a different answer - the text cannot say whether the bead asks for the file
+#   back or for one that never existed - so it is 2, the same as a bead the
+#   tracker would not give up.
 bead_scope_verify() {
-  local bead=$1 comments=$2 repo=$3 harness=$4
-  local id status title found why what
+  local bead=$1 comments=$2 repo=$3 harness=$4 deleted=$5
+  local id status title found what why kind dir
 
   IFS=$'\t' read -r id status title < <(
     jq -r '(if type == "array" then .[0] else . end)
@@ -177,20 +314,56 @@ bead_scope_verify() {
 
   printf 'bead-scope: %s (%s) %s\n' "$id" "$status" "$title"
 
-  found=$(bead_scope_outside "$bead" "$comments" "$repo" "$harness")
+  found=$(bead_scope_find "$bead" "$comments" "$repo" "$harness" "$deleted")
+
   if [ -z "$found" ]; then
-    printf '%s: nothing in its text names the harness, so its work is in this worktree.\n' "$id"
+    printf '%s: nothing in its text names the harness or a path this tree has lost,\n' "$id"
+    echo "so its work is in this worktree."
     return 0
   fi
 
-  while IFS=$'\t' read -r what why; do
+  while IFS=$'\t' read -r kind what why; do
     [ -n "$what" ] || continue
-    printf '  OUTSIDE  %s\n' "$what"
-    printf '           %s\n' "$why"
+    if [ "$kind" = "OUTSIDE" ]; then
+      printf '  OUTSIDE  %s\n' "$what"
+      printf '           %s\n' "$why"
+      continue
+    fi
+    printf '  GONE     %s\n' "$what"
+    dir=${what%/*}
+    if [ "$dir" = "$what" ]; then
+      dir=""
+    fi
+    if [ -n "$why" ]; then
+      printf '           deleted by %s\n' "$why"
+    else
+      echo "           no commit in this history deleted it, so the bead may be asking for a new file"
+    fi
+    if [ -z "$dir" ]; then
+      continue
+    elif bead_scope_present "$dir" "$repo"; then
+      printf '           %s/ is still tracked, so look there for what replaced it\n' "$dir"
+    else
+      printf '           nothing under %s/ is tracked now\n' "$dir"
+    fi
   done <<<"$found"
 
-  printf '%s: it names the harness, and no commit on a work/%s branch can carry a\n' "$id" "$id"
-  echo "change there. Land what is in this worktree if the bead has any, record the"
-  echo "rest in a bd comment, and stop: the harness is read here and not edited."
-  return 3
+  if bead_scope_has_kind OUTSIDE "$found"; then
+    printf '%s: it names the harness, and no commit on a work/%s branch can carry a\n' "$id" "$id"
+    echo "change there. Land what is in this worktree if the bead has any, record the"
+    echo "rest in a bd comment, and stop: the harness is read here and not edited."
+    if bead_scope_has_kind GONE "$found"; then
+      echo "It also names a path this tree does not have; read the GONE lines before"
+      echo "you plan."
+    fi
+    return 3
+  fi
+
+  printf '%s: it names a path this tree does not have, so this command cannot say\n' "$id"
+  echo "whether the work is here. A deleted path means the bead was written against a"
+  echo "tree that had it: do the work where the code lives now, or say in the bead"
+  echo "comment why it should not be done. A path no commit deleted may be a file the"
+  echo "bead asks you to add. Return 2: the caller looks, because neither reading is"
+  echo "an answer to what is in this worktree."
+  return 2
 }

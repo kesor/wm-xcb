@@ -14,6 +14,14 @@
 #     path boundary, both of which must stay quiet;
 #   - a brace list, which tokenises as the directory, and a wpy/ path when the
 #     harness file list is empty: both still name the harness;
+#   - a path this tree deleted, which is a bead written before the file went and
+#     looks exactly like one asking for a change to a file that is here: the
+#     path, the commit that removed it, and the directory that is still tracked;
+#   - a path no commit ever tracked, which is a bead asking for a new file as
+#     far as the text can tell, and answers the same "cannot tell";
+#   - a branch name, a ref, and the fragments a glob leaves, none of which is a
+#     path in this tree and none of which may turn the answer into "cannot
+#     tell";
 #   - the harness directory computed from a worktree and from the main checkout,
 #     which are not the same number of levels up.
 source "$(dirname "$0")/lib.sh"
@@ -45,6 +53,18 @@ wpy/commands/review.py
 tests/test_harness.py
 EOF
 
+# The second list the verdict reads: every path a commit deleted, with the
+# newest commit that removed it. The two agent-script paths are the real shape
+# this caught - commit 61b23 deleted them along with the GitHub-era workflow.
+DELETED="$DIR/deleted.txt"
+cat >"$DELETED" <<'EOF'
+.cursor/rules/beads.mdc	b2435
+docs/guides/standing-on-the-shoulders.html	52d68
+hooks/format.sh	9aa01
+scripts/review-agent.sh	61b23
+scripts/task-template.md	61b23
+EOF
+
 bead() { # bead <id> <description>
   cat >"$DIR/bead.json" <<EOF
 [{"id": "$1", "status": "in_progress", "title": "a bead", "description": "$2"}]
@@ -57,13 +77,13 @@ printf '[]\n' >"$no_comments"
 LAST="$DIR/last.txt"
 
 bead wm-b1 'The tiling path drops a client whose size hints are not a multiple of the gap.'
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
 check_eq "a bead about this tree passes" 0 "$?"
-check_eq "and says the work is here" 1 "$(grep -c 'nothing in its text names the harness, so its work is in this worktree' "$LAST")"
-check_eq "and prints no finding" 0 "$(grep -c 'OUTSIDE' "$LAST")"
+check_eq "and says the work is here" 1 "$(grep -c 'so its work is in this worktree' "$LAST")"
+check_eq "and prints no finding" 0 "$(grep -c 'OUTSIDE\|GONE' "$LAST")"
 
 bead wm-b2 'The fix is one edit in wpy/commands/publish.py, where the reset runs.'
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
 check_eq "a description naming a harness path fails" 3 "$?"
 check_eq "and the path is named" 1 "$(grep -c 'OUTSIDE  wpy/commands/publish.py' "$LAST")"
 check_eq "and the verdict says a work branch cannot carry it" 1 "$(grep -c 'no commit on a work/wm-b2 branch' "$LAST")"
@@ -76,21 +96,21 @@ bead wm-b3 'Review the verdict before merging.'
 cat >"$DIR/comments.json" <<'EOF'
 [{"text": "Starting point is wpy/commands/review.py, which posts the marker twice."}]
 EOF
-bead_scope_verify "$DIR/bead.json" "$DIR/comments.json" "$REPO" "$HARNESS" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$DIR/comments.json" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
 check_eq "a path named only in a comment fails" 3 "$?"
 check_eq "and the comment's path is named" 1 "$(grep -c 'OUTSIDE  wpy/commands/review.py' "$LAST")"
 
 # A bare file name is how most of these beads are written, and the answer has to
 # name the path a reader can open, not the fragment they wrote.
 bead wm-b4 'publish.py:548 resets master whether or not it moved.'
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
 check_eq "a bare file name fails" 3 "$?"
 check_eq "and the finding is the full path" 1 "$(grep -c 'OUTSIDE  wpy/commands/publish.py' "$LAST")"
 
 # The same file named twice is one finding: a verdict a reader has to scan twice
 # for the same path reads as two problems.
 bead wm-b5 'Both publish.py and wpy/commands/publish.py hold the reset.'
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
 check_eq "one file named two ways is reported once" 1 "$(grep -c 'OUTSIDE' "$LAST")"
 
 # The stale description: it names a file the harness has since turned into a
@@ -98,21 +118,21 @@ check_eq "one file named two ways is reported once" 1 "$(grep -c 'OUTSIDE' "$LAS
 # "workable here" and sends the worker looking for the file.
 bead wm-b6 'worker.sh merge needs the review-window guard.'
 printf 'worker.py\nwpy/commands/land.py\n' >"$DIR/harness-moved.txt"
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$DIR/harness-moved.txt" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$DIR/harness-moved.txt" "$DELETED" >"$LAST" 2>&1
 check_eq "a harness name the checkout no longer has fails" 3 "$?"
 check_eq "and the finding says the harness left a stub there" 1 "$(grep -c 'the stub the harness left where it used to be started' "$LAST")"
 
 # The harness checkout may be absent - a CI runner, a fresh clone - and the
 # names it is known by are then the whole check.
 : >"$DIR/harness-none.txt"
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$DIR/harness-none.txt" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$DIR/harness-none.txt" "$DELETED" >"$LAST" 2>&1
 check_eq "a named harness file fails without a harness checkout" 3 "$?"
 
 # A name both trees carry is this repository's: both checkouts have a README.md
 # and both have a docs/README.md, and a check that answered "outside" for them
 # would refuse every bead that edits this repository's own documentation.
 bead wm-b7 'README.md and docs/README.md#current-state are stale about the focus path.'
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
 check_eq "a path both trees carry passes" 0 "$?"
 check_eq "and prints no finding" 0 "$(grep -c 'OUTSIDE' "$LAST")"
 
@@ -121,7 +141,7 @@ check_eq "and prints no finding" 0 "$(grep -c 'OUTSIDE' "$LAST")"
 # file. Without the boundary rule any suffix resolves, and a bead about this
 # tree fails for a path it never named.
 bead wm-b8 'a fragment like ds/publish.py is not a path, and src/components/tiling.c is ours.'
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
 check_eq "a suffix that is not a path boundary passes" 0 "$?"
 
 # A brace list does not survive tokenising as file names: the `{` splits
@@ -129,7 +149,7 @@ check_eq "a suffix that is not a path boundary passes" 0 "$?"
 # is still the harness, and a check that only resolves whole files says the work
 # is here.
 bead wm-b9 'The reset is in wpy/commands/{publish,land}.py and nowhere else.'
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
 check_eq "a brace list fails" 3 "$?"
 check_eq "and the directory that survived tokenising is named" 1 "$(grep -c 'OUTSIDE  wpy/commands$' "$LAST")"
 
@@ -138,9 +158,121 @@ check_eq "and the directory that survived tokenising is named" 1 "$(grep -c 'OUT
 # the answer the wrapper's header says is worse than no answer.
 bead wm-b10 'The fix is one edit in wpy/commands/publish.py, where the reset runs.'
 : >"$DIR/harness-empty.txt"
-bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$DIR/harness-empty.txt" >"$LAST" 2>&1
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$DIR/harness-empty.txt" "$DELETED" >"$LAST" 2>&1
 check_eq "a wpy path fails without a harness checkout" 3 "$?"
 check_eq "and the path is still named" 1 "$(grep -c 'OUTSIDE  wpy/commands/publish.py' "$LAST")"
+
+# The other half of the question. A bead is written months before it is picked
+# up, and one that asks for changes to a file commit 61b23 deleted reads the
+# same as one that asks for changes to a file that is here. "Workable here" is
+# what sent a worker to resurrect the workflow that commit removed.
+bead wm-b11 'scripts/review-agent.sh runs the review, and its checks belong next to it.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a path this tree deleted is not an answer" 2 "$?"
+check_eq "and the path is named" 1 "$(grep -c 'GONE     scripts/review-agent.sh' "$LAST")"
+check_eq "and the commit that deleted it is named" 1 "$(grep -c 'deleted by 61b23' "$LAST")"
+check_eq "and the directory that is still tracked is named" 1 "$(grep -c 'scripts/ is still tracked, so look there for what replaced it' "$LAST")"
+check_eq "and it does not answer that the work is here" 0 "$(grep -c 'so its work is in this worktree' "$LAST")"
+
+# Two tokens, one path: the full path and the bare name are one finding, for the
+# same reason the harness list reports one.
+bead wm-b12 'review-agent.sh is scripts/review-agent.sh, named both ways.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "one deleted file named two ways is reported once" 1 "$(grep -c 'GONE' "$LAST")"
+
+# A bare name the history carries: the tokeniser keeps a file name with no
+# directory, and a check that ignored it would miss half the beads.
+bead wm-b13 'format.sh stopped checking the hooks.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a bare name the history carries is reported" 2 "$?"
+check_eq "and with the path a reader can open" 1 "$(grep -c 'GONE     hooks/format.sh' "$LAST")"
+
+# A path whose directory is gone too says so: the caller's next step is a
+# different one when there is nothing to read where the file used to sit.
+bead wm-b14 'The guide at docs/guides/standing-on-the-shoulders.html is where this belongs.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a deleted path whose directory is gone answers the same" 2 "$?"
+check_eq "and says nothing holds that directory now" 1 "$(grep -c 'nothing under docs/guides/ is tracked now' "$LAST")"
+
+# A bead asking for a file that is not here yet reads identically, and the
+# answer is the same "cannot tell": saying "not here" would refuse most of the
+# queue, and saying "here" is the wrong answer for the deleted file.
+bead wm-b15 'Add scripts/check-widget.sh, which fails when a widget has no owner.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a file no commit ever tracked is not an answer either" 2 "$?"
+check_eq "and the path is named" 1 "$(grep -c 'GONE     scripts/check-widget.sh' "$LAST")"
+check_eq "and it says a new file reads the same" 1 "$(grep -c 'may be asking for a new file' "$LAST")"
+
+# What is not a path in this tree: a branch, a ref, a name whose first component
+# is not tracked here, and the fragments a glob leaves behind. Reporting any of
+# them would make "cannot tell" the answer for most of the queue, and a verdict
+# that fires on everything says nothing.
+bead wm-b16 'Land it on work/wm-b16 once refs/kept/wm-b16 and origin/master agree, then add tests/x/test-*.sh.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a branch, a ref and a glob are not paths here" 0 "$?"
+check_eq "and none of them is reported" 0 "$(grep -c 'GONE\|OUTSIDE' "$LAST")"
+
+# A directory is in the tree when the entries under it are, and a bead writes it
+# with the trailing slash the tokeniser strips.
+bead wm-b17 'The tiling code lives in src/components/ and nowhere else.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a tracked directory is not a lost path" 0 "$?"
+
+# A bead that names both: the harness verdict stands, because that part is
+# certain, and the lost path is printed next to it rather than instead of it.
+bead wm-b18 'The reset in wpy/commands/publish.py replaced scripts/review-agent.sh.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a bead naming the harness and a lost path is still the harness verdict" 3 "$?"
+check_eq "and the harness path is printed" 1 "$(grep -c 'OUTSIDE  wpy/commands/publish.py' "$LAST")"
+check_eq "and the lost path is printed next to it" 1 "$(grep -c 'GONE     scripts/review-agent.sh' "$LAST")"
+check_eq "and the lost path is called out before the worker plans" 1 "$(grep -c 'It also names a path this tree does not have' "$LAST")"
+
+# The parser reads what git prints: a commit line, its paths, and a blank line
+# between records. A path deleted twice is one finding, and the commit a reader
+# wants is the newest, because that is the one that removed what they seek.
+cat >"$DIR/deletion-log.txt" <<'EOF'
+commit 52d68
+docs/guides/standing-on-the-shoulders.html
+
+commit e98a4
+docs/guides/standing-on-the-shoulders.html
+
+commit 61b23
+scripts/review-agent.sh
+scripts/task-template.md
+
+commit 4c0de
+
+EOF
+found=$(bead_scope_deletions <"$DIR/deletion-log.txt")
+commit_of() { printf '%s\n' "$found" | awk -F'\t' -v p="$1" '$1 == p { print $2 }'; }
+check_eq "the newest commit that deleted a path is the one reported" "52d68" \
+  "$(commit_of docs/guides/standing-on-the-shoulders.html)"
+check_eq "a path one commit deleted keeps that commit" "61b23" "$(commit_of scripts/review-agent.sh)"
+check_eq "a commit that deleted nothing adds no path" 3 "$(printf '%s\n' "$found" | grep -c .)"
+
+# The walk the wrapper runs, end to end in a throwaway history: the parser is
+# only worth its lines when git answers it with a deletion, and this is the
+# shape (--all, --no-renames, quotePath off) that has to keep answering.
+HIST="$DIR/history-repo"
+rm -rf "$HIST"
+mkdir -p "$HIST/scripts"
+git -C "$HIST" init -q -b main
+printf 'one\n' >"$HIST/scripts/deleted-later.sh"
+printf 'two\n' >"$HIST/keep.sh"
+git -C "$HIST" add -A
+git -C "$HIST" -c user.name=fixture -c user.email=fixture@example.invalid \
+  -c commit.gpgsign=false commit -q -m "add both"
+rm "$HIST/scripts/deleted-later.sh"
+git -C "$HIST" add -A
+git -C "$HIST" -c user.name=fixture -c user.email=fixture@example.invalid \
+  -c commit.gpgsign=false commit -q -m "delete one"
+walk=$(bead_scope_deletion_log "$HIST" | bead_scope_deletions)
+check_eq "the walk names the path a commit deleted" 1 \
+  "$(printf '%s\n' "$walk" | awk -F'\t' '$1 == "scripts/deleted-later.sh" { n++ } END { print n + 0 }')"
+check_eq "and names a commit for it" 1 \
+  "$(printf '%s\n' "$walk" | awk -F'\t' '$1 == "scripts/deleted-later.sh" && $2 ~ /^[0-9a-f]+$/ { n++ } END { print n + 0 }')"
+check_eq "and leaves a file nobody deleted alone" 0 "$(printf '%s\n' "$walk" | grep -c '^keep.sh')"
 
 # Three levels up from a worktree under .worktrees/<bead> is beside the main
 # checkout. The same three levels up from the main checkout is not, and dispatch
