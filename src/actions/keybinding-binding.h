@@ -57,6 +57,16 @@ void keybinding_binding_set_ignored_modifiers(uint32_t mask);
 void keybinding_binding_shutdown(void);
 
 /*
+ * Empty the table and free the binding structs, leaving the ignored-modifier
+ * mask and the system initialized.
+ *
+ * A configuration reload replaces every binding at once. The structs point at
+ * action names owned by the config file that is being dropped, so they have to
+ * go before that file does.
+ */
+void keybinding_binding_clear(void);
+
+/*
  * Register a keybinding with an action.
  *
  * @param modifiers  XCB modifier mask (e.g., XCB_MOD_MASK_4)

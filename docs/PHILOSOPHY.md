@@ -46,7 +46,7 @@ So this is a goal with a status column, not a claim.
 |------|-------------------|
 | No config file needed: defaults that work out of the box | not kept: `terminal.spawn` defaults to `xterm`, so `MOD+Return` runs nothing on a machine without it |
 | Change keybindings, rules, and tag names in a text file, no rebuild | partly kept: a `bind` line changes which action a key invokes without a rebuild; `float` and `tags` lines are read, but the manage path never asks the float rules and nothing creates the tag list at startup |
-| Reload that file without restarting | not kept: the file is read once, at startup |
+| Reload that file without restarting | kept (2026-11-06): SIGHUP rereads the file the WM started with; a line the parser rejects leaves the running configuration in place and prints one error |
 | A wrong line in that file says what is wrong, once, at startup | partly kept: a line the parser cannot read is reported with its path and line number, and a binding to an action nobody registered is reported once with its key and the action name |
 | Every feature a dwm patch provides is a config toggle here | not kept |
 
@@ -277,8 +277,6 @@ beads epic for state machine ergonomics.
 - **Runtime plugin loading.** Compile-time components only, for now
   (`plans/wm-architecture.md`, out of scope for v1). The decoupling is about
   replaceability, not `dlopen`.
-- **Config reload without a restart.** Not yet written. The file is read once, at
-  startup, so an edit needs a restart.
 - **Beating dwm's latency.** The target is "not worse". A WM that freezes is
   worse; see §2.3.
 

@@ -20,6 +20,13 @@
  */
 static int wakeup_pipe[2] = { -1, -1 };
 
+/*
+ * Set by the SIGHUP handler and cleared by the loop when it reads it. A signal
+ * handler cannot read a file or grab keys, so the handler only records the
+ * request and writes the wakeup byte that ends the wait.
+ */
+static volatile sig_atomic_t reload_requested = 0;
+
 static void
 signal_wakeup(void)
 {
@@ -42,6 +49,14 @@ sigchld(int unused)
   while (waitpid(-1, NULL, WNOHANG) > 0)
     ;
   errno = saved_errno;
+}
+
+void
+sighup(int unused)
+{
+  (void) unused;
+  reload_requested = 1;
+  signal_wakeup();
 }
 
 void
@@ -97,6 +112,12 @@ setup_signals()
   if (signal(SIGTERM, sigint) == SIG_ERR)
     LOG_FATAL("cannot install SIGTERM event handler");
 
+  /* SIGHUP means "reread the config file", not "exit": the default action
+     would end the WM on the signal a terminal sends when its window closes. */
+  /* NOLINTNEXTLINE(performance-no-int-to-ptr) */
+  if (signal(SIGHUP, sighup) == SIG_ERR)
+    LOG_FATAL("cannot install SIGHUP event handler");
+
   /* Every child the WM starts is reaped here. The launcher and the terminal
      both fork and must not wait for the result, so neither reaps its own child.
      The launcher learns what dmenu chose from its pipe, not from the exit
@@ -110,6 +131,15 @@ int
 signals_wakeup_fd(void)
 {
   return wakeup_pipe[WAKEUP_READ];
+}
+
+bool
+signals_take_reload_request(void)
+{
+  bool requested = reload_requested != 0;
+
+  reload_requested = 0;
+  return requested;
 }
 
 void

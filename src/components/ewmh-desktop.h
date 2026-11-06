@@ -27,6 +27,8 @@
  *   client
  * - EVT_CLIENT_MANAGED, EVT_CLIENT_UNMANAGED, EVT_CLIENT_DESTROYED: the client
  *   list changed
+ * - EVT_CONFIG_RELOADED: the tag names were reread, so _NET_DESKTOP_NAMES is
+ *   written again
  *
  * The component reads tag state only from events. It never asks the tag
  * manager, and it sends a request instead of setting a tag itself, so a panel

@@ -18,6 +18,18 @@
 
 #include <stdbool.h>
 
+#include "src/event-types.h"
+
+/*
+ * Emitted after a SIGHUP reread the config file and wired what it found. A
+ * component that caches a value read from the configuration rebuilds it here.
+ * A reload the parser rejected emits nothing: the running configuration is
+ * still the one the components already know.
+ */
+enum ConfigEvents {
+  EVT_CONFIG_RELOADED = EVT_CONFIG_BASE + 0,
+};
+
 /*
  * Read the user's configuration file.
  *
@@ -33,6 +45,21 @@
  * them afterwards until the WM restarts.
  */
 bool config_load_runtime(const char* path);
+
+/*
+ * Reread the file the WM started with, after a SIGHUP.
+ *
+ * The parser runs on the whole file before anything changes. A file with any
+ * rejected line leaves the running configuration in place and logs one error:
+ * a typo must not take away the keys the user is typing with. A clean file, or
+ * no file at all, replaces the bindings, the float rules and the tag names,
+ * then emits EVT_CONFIG_RELOADED. Clients, their tags, focus and geometry are
+ * not touched.
+ *
+ * Returns true when the file was applied. Call it from the event loop, after
+ * the components are up: the keybinding table has to exist before it is rebuilt.
+ */
+bool config_reload(void);
 
 /*
  * Initialize the configuration system.

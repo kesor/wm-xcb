@@ -116,15 +116,22 @@ keybinding_binding_shutdown(void)
 
   LOG_DEBUG("Shutting down keybinding binding system");
 
-  /* Free allocated bindings */
-  for (uint32_t i = 0; i < binding_count; i++) {
-    free((void*) bindings[i]);
+  keybinding_binding_clear();
+  initialized = false;
+}
+
+void
+keybinding_binding_clear(void)
+{
+  if (!initialized) {
+    return;
   }
 
-  /* Clear bindings array */
+  for (uint32_t i = 0; i < binding_count; i++)
+    free((void*) bindings[i]);
+
   memset(bindings, 0, sizeof(bindings));
   binding_count = 0;
-  initialized   = false;
 }
 
 bool
