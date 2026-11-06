@@ -80,7 +80,8 @@ run; if it says "docs updated", read the doc.
    is about them and the branch carries no diff to read. A manual-session bead
    that approved 22 of 32 keybindings was reviewed with no seam run, on an empty
    diff, and the seam suite was the evidence that did not depend on the author's
-   throwaway scripts.
+   throwaway scripts. The next section names every rule in `docs/PHILOSOPHY.md`
+   section 3, what a violation of it looks like, and which command catches it.
 4. **Something left broken or half-done and not mentioned.** A behaviour change
    without a test, a document that now contradicts the code, a comment
    describing what the code no longer does, a defect the author noticed and only
@@ -89,6 +90,29 @@ run; if it says "docs updated", read the doc.
 
 Not worth saying: the diff restated, praise, and anything the gates already
 enforce. If the only finding is formatting, the gates will have caught it.
+
+## The philosophy rules, as checks
+
+`docs/PHILOSOPHY.md` section 3 is the list. A rule with no command behind it is
+still a rule, and a review is where it gets checked. Walk every row, not only
+the rows the diff appears to touch: a rule usually breaks in a file the change
+did not mention.
+
+| Rule | A violation looks like | How to check it |
+|------|------------------------|-----------------|
+| No component calls another component | one component includes another's header or calls its functions; a request that exists only as a direct call | read the callers. `hub_send_request()` and `hub_subscribe()` are the only paths between components. Reading a state machine another component stored on the same target is allowed (2.1) |
+| No state assignment outside `sm_raw_write` / `sm_transition` | `client->mapped = true`, `monitor->tagset = ...`, or any field a template tracks written by hand | `scripts/check-private-state.sh`. A tracked field with no `tests/compile-fail/` fixture is still a read of the diff |
+| No `_reply()` in a handler or action | `xcb_get_property_reply()`, `xcb_get_geometry_reply()`, or the plural form, inside anything an event can reach | `make check-async`. The reply belongs in a `wm_loop_add_poll_handler()` callback |
+| No blocking call in the loop | `waitpid()`, `read()` on a child, `sleep()`, or a loop that calls `xcb_poll_for_event()` and never blocks | `make check-async` for the calls; `scripts/perf-test.sh` for idle CPU, which is what a spin costs |
+| One flush per loop iteration | `xcb_flush()` after a request, in a handler, or in an action | read the loop in `wm-xcb.c`: one flush, after the handlers ran |
+| Every request has a failure event | an executor that returns on a refused guard and emits nothing, so a subscriber cannot tell refusal from success | read the executor and its event table against `EVT_FULLSCREEN_FAILED` in `src/components/fullscreen.h` and `EVT_FLOATING_FAILED` in `src/components/floating.h` |
+| New behaviour is a registration, not an edit | a feature that edits a component it does not own instead of adding a request, an event, a subscriber, an SM template, or an action | run the extension point test (section 4): name the file and the missing extension point. New per-target state belongs in the target that owns it, and that is not a collision |
+| Event ids come from the shared registry | a fresh integer in a local `enum`, or a base that overlaps another component's range | `src/event-types.h` for the range, `tests/unit/test-event-types.c` for a collision |
+| `make test` green, `scripts/xephyr-test.sh` no worse | a failing assertion, or a new seam failure missing from `tests/quality/seam-baseline.txt` | `make test`, `make test-x`, and `scripts/xephyr-test.sh` when the diff touches map, tile, focus, or a property |
+| No AI attribution | `Co-Authored-By`, a "generated with" footer, or a robot signature in a commit, comment, doc, or PR body | read the commit messages with `git log` |
+
+Run every command a row names, and say in the verdict that it ran. A row with
+no command is what the read of the diff is for.
 
 ## The two allowed outcomes
 
