@@ -168,7 +168,12 @@ Then work through the list:
    names one; the command prints the paths. Say in a bd comment which part is in
    this tree and which is not, do the part that is here, and stop on the rest.
    Reading the harness to confirm the paths is the cost that command exists to
-   remove.
+   remove. Exit 0 answers only the harness question: a bead written months ago
+   can name a file this tree no longer has, and nothing in the command looks for
+   that. Check each path it names with `git ls-files -- <path>`, and when one is
+   missing run `git log --diff-filter=D --all -- <path>` for the commit that
+   removed it and read why. Then do the work where the code lives now, or say in
+   the bead comment why it should not be done.
 2. If the change is observable through X, write or extend a `tests/x/test-*.sh`
    first; use `require_visible` for preconditions so a test cannot pass because
    the window was never there.
