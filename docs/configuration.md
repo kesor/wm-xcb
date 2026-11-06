@@ -27,6 +27,36 @@ The file is read before the components start, and read again on SIGHUP. The
 first read decides which path the WM uses; a reload reads the same path, even
 when no file was there at startup. See "Reloading without a restart" below.
 
+## Default bindings
+
+A machine with no file gets these, wired in `config.wm.def.h`. The primary
+modifier is `Mod`, Super/Windows.
+
+| Chord | Action | What it does |
+|-------|--------|--------------|
+| `Mod+Return` | `terminal.spawn` | starts a terminal |
+| `Mod+Shift+Return` | `focus.focus-prev` | focuses the previous client |
+| `Mod+p` | `app.launch` | opens dmenu, runs the line you pick |
+| `Mod+1` … `Mod+9` | `tag-manager.view` | shows tag 1 to 9 |
+| `Mod+Shift+1` … `Mod+Shift+9` | `tag-manager.toggle` | adds or removes a tag from the view |
+| `Mod+Shift+Mod5+1` … `…+9` | `tag-manager.client-move` | adds a tag to the focused client's set, so it stays on the tag it was on |
+| `Mod+f` | `fullscreen.toggle` | fullscreen for the focused client, and back |
+| `Mod+Shift+space` | `floating.toggle` | takes the focused client out of the layout, and back |
+| `Mod+i` | `monitor.tile` | tiles the monitor again |
+
+`tag-manager.client-move` toggles the client's membership of the named tag rather
+than moving it: pressing the chord again takes that tag away, and the client
+never leaves the tag it was on. The seam assertion that expects a move is a
+known failure in `tests/quality/seam-baseline.txt`.
+
+`terminal.spawn` runs the first of these that this machine has installed: a
+command set with `terminal_set_command()`, `$TERMINAL`, `x-terminal-emulator`,
+then `alacritty`, `kitty`, `foot`, `urxvt`, `st` and `xterm`. The program is
+looked up on `$PATH`, so `$TERMINAL="alacritty -e tmux"` is used when alacritty
+is installed and skipped when it is not. With none of them installed the WM
+prints one line at startup naming every name it tried, and `Mod+Return` reports
+the same line instead of forking a shell.
+
 ## Format
 
 One directive per line. A line starting with `#` is a comment, and so is

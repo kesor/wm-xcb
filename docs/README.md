@@ -163,8 +163,9 @@ Short version:
   with none of them installed, startup prints one `ERROR` line naming every name
   it tried, and the key reports that line instead of forking a shell to fail on
   a missing binary. A start with no config file and a terminal installed prints
-  no `ERROR` line at all. `tests/x/test-56-terminal-default.sh` pins both.
-  `_NET_SUPPORTING_WM_CHECK` on the root points
+  no `ERROR` line at all. `tests/x/test-56-terminal-default.sh` pins both, and
+  `docs/configuration.md#default-bindings` lists the compiled keys and what each
+  one does. `_NET_SUPPORTING_WM_CHECK` on the root points
   at a window of the WM's own that points back at itself and names the WM, so a
   panel can tell a live WM from a stale property; `_NET_CLIENT_LIST` lists the
   managed windows in mapping order; `_NET_NUMBER_OF_DESKTOPS`,
