@@ -1273,6 +1273,28 @@ test_adoption_for_multiple_targets_of_same_type(void)
 }
 
 void
+test_component_registered_after_target_is_not_adopted(void)
+{
+  LOG_CLEAN("== Testing a component registered after a target does not adopt it");
+  hub_init();
+
+  adopt_count_client = 0;
+
+  /* The target exists first, so there is no component to adopt it yet. */
+  hub_register_target(&test_client1);
+  assert(adopt_count_client == 0);
+
+  hub_register_component(&test_fullscreen);
+  assert(adopt_count_client == 0);
+
+  /* Only a target registered after the component is adopted by it. */
+  hub_register_target(&test_client2);
+  assert(adopt_count_client == 1);
+
+  hub_shutdown();
+}
+
+void
 test_get_components_for_target_type(void)
 {
   LOG_CLEAN("== Testing hub_get_components_for_target_type");
@@ -1356,6 +1378,7 @@ TEST_GROUP(HubComponentAdoption, {
   test_adoption_hooks_called_on_target_register();
   test_adoption_only_for_compatible_targets();
   test_adoption_for_multiple_targets_of_same_type();
+  test_component_registered_after_target_is_not_adopted();
   test_get_components_for_target_type();
   test_unadoption_hooks_called_on_target_unregister();
 });
