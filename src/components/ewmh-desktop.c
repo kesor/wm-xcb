@@ -356,6 +356,21 @@ ewmh_desktop_on_client_gone(Event e)
   ewmh_desktop_write_client_list((xcb_window_t) e.target);
 }
 
+/*
+ * A reload replaced the tag names. The desktop count does not change with the
+ * configuration, so only the names property is written again.
+ */
+static void
+ewmh_desktop_on_config_reloaded(Event e)
+{
+  (void) e;
+
+  if (!ewmh_has_display())
+    return;
+
+  ewmh_desktop_write_names();
+}
+
 static void
 ewmh_desktop_subscribe(void)
 {
@@ -363,6 +378,7 @@ ewmh_desktop_subscribe(void)
   hub_subscribe(EVT_CLIENT_MANAGED, ewmh_desktop_on_client_managed, NULL);
   hub_subscribe(EVT_CLIENT_UNMANAGED, ewmh_desktop_on_client_gone, NULL);
   hub_subscribe(EVT_CLIENT_DESTROYED, ewmh_desktop_on_client_gone, NULL);
+  hub_subscribe(EVT_CONFIG_RELOADED, ewmh_desktop_on_config_reloaded, NULL);
 }
 
 static void
@@ -372,6 +388,7 @@ ewmh_desktop_unsubscribe(void)
   hub_unsubscribe(EVT_CLIENT_MANAGED, ewmh_desktop_on_client_managed);
   hub_unsubscribe(EVT_CLIENT_UNMANAGED, ewmh_desktop_on_client_gone);
   hub_unsubscribe(EVT_CLIENT_DESTROYED, ewmh_desktop_on_client_gone);
+  hub_unsubscribe(EVT_CONFIG_RELOADED, ewmh_desktop_on_config_reloaded);
 }
 
 static void

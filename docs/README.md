@@ -124,6 +124,10 @@ Short version:
   reaches the component that owns it. `docs/configuration.md` has the file
   format; a line the parser cannot read is reported once, with its line
   number, and the compiled bindings stay in place when the file names none.
+  `kill -HUP` rereads that file in the running WM: the binding table, the float
+  rules and the tag names come from the edit, the keys are grabbed again, and
+  every client keeps its tags, focus and geometry. A file with a line the parser
+  rejects changes nothing and prints one error naming that line.
   The tag-manager and tiling components start before monitor discovery, so
   every monitor is adopted with a tag-view and a layout state machine, and
   `tag-manager.view`, `tag-manager.toggle`, and `tag-manager.client-move` are

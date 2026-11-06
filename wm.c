@@ -50,6 +50,13 @@ main(int argc, char** argv)
    * everything that arrived. */
   while (running) {
     wm_xcb_wait_for_events();
+
+    /* A SIGHUP asked for the config file to be reread. The signal handler only
+     * set a flag; the reload runs here, where the binding table and the X
+     * connection are both in a state it can use. */
+    if (signals_take_reload_request())
+      (void) config_reload();
+
     handle_xcb_events();
   }
 

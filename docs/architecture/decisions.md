@@ -371,8 +371,9 @@ modules read. `docs/configuration.md` is the format.
 **Known limit:** gaps, borders and per-application tag rules are still compiled
 in. A `float` or `tags` line is parsed and kept; the manage path does not ask
 the float rules, and nothing creates the tag list at startup, so neither changes
-what the user sees yet. The reload path that would let an edit take effect
-without a restart is not written yet.
+what the user sees yet. A SIGHUP rereads the file and replaces the bindings,
+float rules and tag names without a restart, and a file the parser rejects leaves
+the running configuration in place.
 
 ---
 

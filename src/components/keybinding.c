@@ -29,6 +29,7 @@
 #include "config.h"
 #include "keybinding.h"
 #include "src/actions/keybinding-binding.h"
+#include "src/event-types.h"
 #include "src/xcb/xcb-handler.h"
 #include "wm-hub.h"
 #include "wm-log.h"
@@ -60,6 +61,7 @@ static uint32_t numlock_mask       = 0;
 static bool     numlock_mask_known = false;
 
 static void keybinding_read_numlock_mask(void);
+static void keybinding_on_config_reloaded(Event e);
 
 /*
  * Keybinding component
@@ -113,6 +115,11 @@ keybinding_init(void)
   xcb_handler_register(XCB_KEY_RELEASE, &keybinding_component, keybinding_handle_key_release);
   xcb_handler_register(XCB_MAPPING_NOTIFY, &keybinding_component, keybinding_handle_mapping_notify);
 
+  /* A reload rebuilds the binding table under this component, so the grabs have
+   * to follow it. The reload runs after the table is wired, which is why this
+   * reacts to an event instead of the config module calling in here. */
+  hub_subscribe(EVT_CONFIG_RELOADED, keybinding_on_config_reloaded, NULL);
+
   initialized = true;
   LOG_DEBUG("Keybinding component initialized with %" PRIu32 " bindings",
             keybinding_binding_get_count());
@@ -141,6 +148,7 @@ keybinding_shutdown(void)
 
   /* Unregister XCB handlers */
   xcb_handler_unregister_component(&keybinding_component);
+  hub_unsubscribe(EVT_CONFIG_RELOADED, keybinding_on_config_reloaded);
 
   /* Shutdown keybinding binding system */
   keybinding_binding_shutdown();
@@ -398,6 +406,21 @@ keybinding_validate_bindings(void)
             keybinding_binding_get_count(), unresolved);
 
   return unresolved;
+}
+
+/*
+ * The config file was reread and the binding table rebuilt from it. The grabs
+ * on the root window still name the chords the old file had, so they are
+ * released and taken again: a binding the edit removed has to stop working, and
+ * a chord the edit added has to reach this component.
+ */
+static void
+keybinding_on_config_reloaded(Event e)
+{
+  (void) e;
+
+  keybinding_grab_keys();
+  (void) keybinding_validate_bindings();
 }
 
 /*

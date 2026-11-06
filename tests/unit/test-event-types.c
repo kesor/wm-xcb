@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "config.h"
 #include "src/actions/launcher.h"
 #include "src/components/client-list.h"
 #include "src/components/connection-sm.h"
@@ -51,6 +52,7 @@ static const KnownEventType known_events[] = {
   KNOWN(EVT_CLIENT_FLOATED, EVT_FLOATING_BASE, EVT_FLOATING_LIMIT),
   KNOWN(EVT_CLIENT_TILED, EVT_FLOATING_BASE, EVT_FLOATING_LIMIT),
   KNOWN(EVT_FLOATING_FAILED, EVT_FLOATING_BASE, EVT_FLOATING_LIMIT),
+  KNOWN(EVT_CONFIG_RELOADED, EVT_CONFIG_BASE, EVT_CONFIG_LIMIT),
 };
 
 #define KNOWN_EVENT_COUNT (sizeof(known_events) / sizeof(known_events[0]))

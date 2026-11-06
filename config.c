@@ -31,6 +31,7 @@
 #include "config.h"
 #include "config.wm.def.h"
 #include "src/actions/keybinding-binding.h"
+#include "wm-hub.h"
 #include "wm-log.h"
 #include "wm-xcb.h"
 
@@ -40,6 +41,16 @@ _Static_assert(CONFIG_FILE_MAX_TAGS == CONFIG_TAG_NUM_TAGS, "tag counts differ")
 
 static ConfigFile* runtime_config = NULL;
 static char        runtime_path[PATH_MAX];
+
+/*
+ * The keyboard mapping, fetched once and kept.
+ *
+ * xcb_key_symbols_alloc() waits for the reply to GetKeyboardMapping, and
+ * xcb_key_symbols_get_keycode() only reads the table it filled. Holding the
+ * table is what lets a SIGHUP resolve the new file's keysyms without a round
+ * trip inside the event loop.
+ */
+static xcb_key_symbols_t* key_symbols = NULL;
 
 /*
  * The compiled rules are `static const` arrays in config.def.h. A file that
@@ -96,6 +107,11 @@ config_load_runtime(const char* path)
    * this runs: the binding table holds pointers into it. */
   config_shutdown();
 
+  /* Kept even when no file is there: a reload reads this path again, so
+   * creating the file and sending SIGHUP has to work, and a file removed
+   * before the signal has to bring the compiled configuration back. */
+  (void) snprintf(runtime_path, sizeof runtime_path, "%s", path);
+
   ConfigFile* cf = config_file_load(path);
   if (cf == NULL)
     return false;
@@ -113,7 +129,6 @@ config_load_runtime(const char* path)
   }
 
   runtime_config = cf;
-  (void) snprintf(runtime_path, sizeof runtime_path, "%s", path);
   config_apply_runtime();
 
   LOG_DEBUG("Read %s: %u binding(s), %u float rule(s)%s",
@@ -122,15 +137,116 @@ config_load_runtime(const char* path)
   return true;
 }
 
-void
-config_shutdown(void)
+/*
+ * Drop the file and everything that pointed into it. The binding table holds
+ * the action names, so it has to be empty before this runs; config_shutdown()
+ * relies on the keybinding component having gone first, and config_reload()
+ * empties the table itself.
+ */
+static void
+config_release_file(void)
 {
   config_file_free(runtime_config);
   runtime_config           = NULL;
-  runtime_path[0]          = '\0';
   runtime_float_rule_count = 0;
   for (int i = 0; i < CONFIG_TAG_NUM_TAGS; i++)
     runtime_tag_names[i] = NULL;
+}
+
+void
+config_shutdown(void)
+{
+  config_release_file();
+  runtime_path[0] = '\0';
+
+  if (key_symbols != NULL) {
+    xcb_key_symbols_free(key_symbols);
+    key_symbols = NULL;
+  }
+}
+
+/*
+ * One error line, whatever the file held: a reload the user asked for is
+ * answered with the first thing to fix, and the count of the rest, not with a
+ * page of parser output the user did not scroll to.
+ */
+static void
+config_report_reload_error(const ConfigFile* cf)
+{
+  const ConfigError* first = &cf->errors[0];
+  uint32_t           more  = cf->error_count - 1;
+
+  if (more == 0) {
+    LOG_ERROR("config %s:%d: %s; the running configuration is unchanged",
+              runtime_path, first->line, first->text);
+  } else {
+    LOG_ERROR("config %s:%d: %s (and %u more rejected line%s); the running configuration is unchanged",
+              runtime_path, first->line, first->text, more, more == 1 ? "" : "s");
+  }
+}
+
+bool
+config_reload(void)
+{
+  if (runtime_path[0] == '\0') {
+    LOG_ERROR("cannot reload the configuration: the WM started without a path to look at");
+    return false;
+  }
+
+  /* The parser runs on the whole file before anything is replaced, so a line it
+   * rejects costs the reload rather than half the configuration. */
+  ConfigFile* fresh = config_file_load(runtime_path);
+  if (fresh == NULL)
+    return false;
+
+  if (fresh->error_count > 0) {
+    config_report_reload_error(fresh);
+    config_file_free(fresh);
+    return false;
+  }
+
+  /* The table holds pointers into the file that is about to go, so it is empty
+   * before the file is freed, not after the new one is wired. */
+  keybinding_binding_clear();
+  config_release_file();
+  runtime_config = fresh;
+  config_apply_runtime();
+  config_init();
+
+  /* The subscribers take the new chords and the new tag names before the line
+   * that says the reload applied, so a user who acts on that line does not
+   * race the grabs. */
+  hub_emit(EVT_CONFIG_RELOADED, TARGET_ID_NONE, NULL);
+
+  if (!fresh->found) {
+    LOG_INFO("config %s: no readable file; the compiled configuration applies", runtime_path);
+  } else {
+    LOG_INFO("config %s: reloaded %u binding(s), %u float rule(s)%s",
+             runtime_path, fresh->bind_count, fresh->float_rule_count,
+             fresh->tags_set ? ", tag names" : "");
+  }
+
+  return true;
+}
+
+/*
+ * The keyboard mapping, allocated on first use and kept for the process.
+ *
+ * xcb_key_symbols_alloc() is the call that waits for the reply to
+ * GetKeyboardMapping; config_init() runs it before the event loop starts. A
+ * SIGHUP reload reads the table again instead of asking the server, which is
+ * what keeps the reload out of the loop's way.
+ */
+static xcb_key_symbols_t*
+config_key_symbols(void)
+{
+  if (key_symbols == NULL && dpy != NULL) {
+    /* allow-blocking: config_init() runs before the event loop starts, and a
+       reload reuses what this fetched */
+    key_symbols = xcb_key_symbols_alloc(dpy);
+  }
+
+  return key_symbols;
 }
 
 /*
@@ -147,7 +263,8 @@ binding_keycode(xcb_key_symbols_t* symbols, const ConfigBind* bind)
   if (symbols == NULL)
     return XCB_NO_SYMBOL;
 
-  /* allow-blocking: startup only, the event loop has not started yet */
+  /* allow-blocking: reads the table config_key_symbols() fetched before the
+     event loop started; get_keycode sends no request of its own */
   keycodes = xcb_key_symbols_get_keycode(symbols, (xcb_keysym_t) bind->keysym);
   if (keycodes == NULL)
     return XCB_NO_SYMBOL;
@@ -166,13 +283,8 @@ binding_keycode(xcb_key_symbols_t* symbols, const ConfigBind* bind)
 static void
 config_wire_file_bindings(void)
 {
-  xcb_key_symbols_t* symbols = NULL;
+  xcb_key_symbols_t* symbols = config_key_symbols();
   uint32_t           bound   = 0;
-
-  if (dpy != NULL) {
-    /* allow-blocking: startup only, the event loop has not started yet */
-    symbols = xcb_key_symbols_alloc(dpy);
-  }
 
   for (uint32_t i = 0; i < runtime_config->bind_count; i++) {
     const ConfigBind* bind    = &runtime_config->binds[i];
@@ -197,9 +309,6 @@ config_wire_file_bindings(void)
     }
     bound++;
   }
-
-  if (symbols != NULL)
-    xcb_key_symbols_free(symbols);
 
   if (bound == 0) {
     LOG_ERROR("no binding in %s could be used; the compiled bindings are in place",

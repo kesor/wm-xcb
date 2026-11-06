@@ -8,6 +8,7 @@
  * Tests:
  * - installing the handlers creates a non-blocking wakeup fd
  * - SIGTERM clears `running` and makes the wakeup fd readable
+ * - SIGHUP records a reload request and leaves `running` alone
  * - draining the pipe leaves it empty, so the next poll(2) waits again
  * - a second setup_signals() keeps the pipe the handlers already write to
  */
@@ -27,6 +28,7 @@
 
 static void (*previous_sigint)(int);
 static void (*previous_sigterm)(int);
+static void (*previous_sighup)(int);
 static void (*previous_sigchld)(int);
 
 static int
@@ -46,6 +48,8 @@ remember_signal_dispositions(void)
   signal(SIGINT, previous_sigint);
   previous_sigterm = signal(SIGTERM, SIG_DFL);
   signal(SIGTERM, previous_sigterm);
+  previous_sighup = signal(SIGHUP, SIG_DFL);
+  signal(SIGHUP, previous_sighup);
   previous_sigchld = signal(SIGCHLD, SIG_DFL);
   signal(SIGCHLD, previous_sigchld);
 }
@@ -55,6 +59,7 @@ restore_signal_dispositions(void)
 {
   signal(SIGINT, previous_sigint);
   signal(SIGTERM, previous_sigterm);
+  signal(SIGHUP, previous_sighup);
   signal(SIGCHLD, previous_sigchld);
 }
 
@@ -131,6 +136,36 @@ test_a_second_setup_keeps_the_same_pipe(void)
  * exits. Nothing in the WM calls waitpid() for a child it started.
  */
 void
+test_sighup_asks_for_a_reload_and_keeps_running(void)
+{
+  LOG_CLEAN("  test_sighup_asks_for_a_reload_and_keeps_running...");
+
+  setup_signals();
+  int fd = signals_wakeup_fd();
+  assert_or_abort(fd >= 0);
+
+  signals_drain_wakeups();
+  (void) signals_take_reload_request();
+
+  sig_atomic_t was_running = running;
+  running                  = 1;
+
+  assert(raise(SIGHUP) == 0);
+
+  /* The default action for SIGHUP is to end the process: a WM that dies on a
+     terminal's hangup has not reloaded anything. */
+  assert(running == 1);
+  assert(is_readable(fd, 100));
+
+  /* Reading the request clears it, so the loop reloads once per signal. */
+  assert(signals_take_reload_request() == true);
+  assert(signals_take_reload_request() == false);
+
+  signals_drain_wakeups();
+  running = was_running;
+}
+
+void
 test_sigchld_reaps_a_child_without_a_wait(void)
 {
   LOG_CLEAN("  test_sigchld_reaps_a_child_without_a_wait...");
@@ -165,6 +200,7 @@ TEST_GROUP(SignalWakeup, {
   test_setup_signals_creates_a_nonblocking_wakeup_fd();
   test_sigterm_sets_running_and_wakes_the_loop();
   test_a_second_setup_keeps_the_same_pipe();
+  test_sighup_asks_for_a_reload_and_keeps_running();
   test_sigchld_reaps_a_child_without_a_wait();
   restore_signal_dispositions();
 });
