@@ -197,6 +197,11 @@ The second form is also a test, which is the bar: a criterion no command can
 check does not say what done looks like. A number the bead sets on purpose stays
 - an exit status, a latency budget, a limit.
 
+The description is also the pull request body when the branch lands, so it ends
+with the rule check: which rule in `docs/PHILOSOPHY.md` section 3 the change
+exercises, and how it was checked. A description that only restates the title
+leaves the reviewer and the PR with nothing to read.
+
 ## Spawning workers (optional)
 
 A local harness (`worker.py`, not part of this repository) runs one worker per git
