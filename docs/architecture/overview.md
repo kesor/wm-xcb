@@ -83,22 +83,22 @@ void keybinding_fullscreen(void) {
 
 ## Target Adoption Model
 
-A target adopts the components that are registered when it is created. There is no adopted-components list on the target and no `target_adopt()` call: `client_create()` and `monitor_create()` call `hub_register_target()`, which calls `hub_adopt_components_for_target()`, which calls `on_adopt(target)` on each registered component whose `accepted_target_names` include the target's type.
+A target adopts the components that are registered when it registers. There is no adopted-components list on the target and no `target_adopt()` call: `client_create()`, `monitor_create()`, and `tag_create()` call `hub_register_target()`, which calls `hub_adopt_components_for_target()`, which calls `on_adopt(target)` on each registered component that set the hook and whose `accepted_target_names` include the target's type. The real `client_create()` sets `target.type_id` before it registers; the block below only shows that registration is the adopt call.
 
 ```c
 Client* client_create(xcb_window_t window) {
     Client* c = malloc(sizeof(Client));
     c->window = window;
 
-    // Registration is what adopts the components: it runs their on_adopt
-    // hooks against this target. There is no separate adopt loop here.
+    // Registration is the adopt call: the hub runs on_adopt for each
+    // compatible component that set the hook. There is no separate loop here.
     hub_register_target(&c->target);
 
     return c;
 }
 ```
 
-The component's `on_adopt` is where its state machine is created on that target. The machine is stored by name: `client_set_sm()` and `monitor_set_sm()` write it, and `client_get_sm()` and `monitor_get_sm()` read it. A component registered after the target exists is not adopted by it and gets the targets created after its own registration. [hub.md](hub.md#component-adoption) has the timing and what a component can do about targets that already exist.
+`on_adopt` is not where every component creates its machine. Tiling, tag-manager, and pertag set the hook and store monitor state with `monitor_set_sm()`. Fullscreen, focus, and floating set no hook; they create the client's machine on the first lookup and store it with `client_set_sm()`. `client_get_sm()` and `monitor_get_sm()` read a machine back by name. A component registered after the target exists is not adopted by it and gets the targets created after its own registration. [hub.md](hub.md#component-adoption) has the timing and what a component can do about targets that already exist.
 
 ---
 
@@ -238,7 +238,7 @@ The hub registers components, routes requests, and emits events. It has no hot-p
 
 `hub_unregister_component()` removes a component from the registry and the request index. It does not call `on_unadopt` on the targets that adopted it, so the state machines it created stay on those targets.
 
-The built-in components register at startup in `wm-components.c`, before monitors and clients are created, which is what gives them every target. [hub.md](hub.md#component-adoption) has the sequence.
+The built-in components are compiled in and registered from `wm_components_init()` in `wm-components.c`. Clients are created after that function returns, so a client-accepting component registered there sees every client. Monitors are created inside the function, by `monitor_manager_init()`. Pertag, tag-manager, and tiling register before that call; a monitor-accepting component registered after it does not get those monitors. Focus registers after the monitors exist and accepts only clients, so those monitors are not targets it adopts. [hub.md](hub.md#component-adoption) has the sequence.
 
 ---
 

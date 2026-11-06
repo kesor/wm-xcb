@@ -68,9 +68,11 @@ owns the registry, the request router, and the event bus.
 
 - **In code:** `hub_send_request(REQ_*, target)`, `hub_subscribe(EVT_*, handler)`,
   `hub_register_component()`. No `#include "focus.h"` from inside `tiling.c`.
-- **For the user:** a component's effect on another is only the requests it
-  sends and the events it subscribes to, so a regression in one area cannot be
-  caused by another area reaching into its state.
+- **For the user:** a component does not call another component's functions.
+  It can still read a state machine another component stored on the same
+  target. Tiling reads the fullscreen and floating machines by name, so a
+  change in one machine can change what another component does with that
+  target, without a request between them.
 - **What it costs:** every call that used to be a function call is now a lookup
   and an indirect dispatch, and reading a behaviour means following an event
   chain instead of one call stack.

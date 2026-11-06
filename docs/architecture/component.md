@@ -471,10 +471,10 @@ Component gap_component = {
 
 ## Adding a Component at Runtime
 
-The built-in components register at startup, before targets exist. The hub has no hot-plug path beyond the registry calls:
+The built-in components are compiled in and registered from `wm_components_init()` in `wm-components.c`. Clients are created after that function returns. Monitors are created inside it, by `monitor_manager_init()`. Pertag, tag-manager, and tiling register before that call. Monitor-manager accepts monitors and registers at the start of that call, before the monitors are created. The hub has no hot-plug path beyond the registry calls:
 
-- `hub_register_component()` adds a component to the registry and the request index. It does not adopt targets that already exist. A component registered later is adopted by the targets created after it, through `hub_adopt_components_for_target()`. A component that must cover the current ones walks `hub_get_targets_by_type_name()` and runs its `on_adopt` step on each.
-- `hub_unregister_component()` removes the component from the registry and the request index. It does not call `on_unadopt` on targets, so the state machines the component created stay on them.
+- `hub_register_component()` adds a component to the registry and the request index. It does not adopt targets that already exist. A component registered later is adopted by the targets created after it, through `hub_adopt_components_for_target()`. A component whose `on_adopt` does the work, and that must cover targets that already exist, walks `hub_get_targets_by_type_name()` and calls that hook on each. A component that creates its machine on first lookup does not get the machine from the hook.
+- `hub_unregister_component()` removes the component from the registry and the request index. It does not call `on_unadopt` on targets, so a machine the component already stored stays on them.
 
 There is no `hub_notify_compatible_targets()`, no adopted-components list on a target, and no loader: components are compiled in and registered from `wm-components.c`. See [hub.md](hub.md#component-adoption).
 

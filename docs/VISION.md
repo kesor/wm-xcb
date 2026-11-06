@@ -130,7 +130,7 @@ Every feature is a component. Components don't know about each other. They just 
 | Patch core code | Write a component |
 | Modify shared state | Subscribe to events |
 | One big file | Modular, testable |
-| Conflicts on merge | Hot-pluggable |
+| Conflicts on merge | No shared edits |
 | Hard to debug | Event traces |
 | Replace fork | Replace component |
 

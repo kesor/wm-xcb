@@ -89,14 +89,14 @@ A target is an entity, not a generic struct: `Client`, `Monitor`, and `Tag` each
 
 Adoption runs from the target side, when the target registers:
 
-1. `client_create()` and `monitor_create()` call `hub_register_target()`.
+1. `client_create()`, `monitor_create()`, and `tag_create()` call `hub_register_target()`.
 2. `hub_register_target()` calls `hub_adopt_components_for_target()`.
-3. That asks the registry for the components whose `accepted_target_names` include the target's type, and calls each component's `on_adopt(target)`.
-4. The component's `on_adopt` creates the state machine it owns on that target, with `client_set_sm()` or `monitor_set_sm()`. Components read it back by name with `client_get_sm()` or `monitor_get_sm()`.
+3. That asks the registry for the components whose `accepted_target_names` include the target's type, and calls `on_adopt(target)` on each one that set the hook.
+4. What the hook does is the component's. Tiling, tag-manager, and pertag set it and store monitor state there with `monitor_set_sm()`. Fullscreen, focus, and floating accept clients and set no `on_adopt`; each creates its machine on the first `*_get_sm()` call, which stores it with `client_set_sm()`. A stored machine is read back by name with `client_get_sm()` or `monitor_get_sm()`.
 
-`hub_unregister_target()` calls each component's `on_unadopt` the same way before the target leaves the registry.
+`hub_unregister_target()` removes the target from the type index, then calls each component's `on_unadopt` the same way, then drops it from the id index. The target is still findable by id while the hook runs.
 
-A component is adopted by the targets registered after it. A target that already exists when the component registers is not re-adopted, because the hub has no re-adoption call: a component that has to cover those targets walks `hub_get_targets_by_type_name()` itself and runs its adoption step on each. `hub_unregister_component()` removes the component from the registry and the request index; it does not call `on_unadopt` on the targets it was adopted by.
+A component is adopted by the targets registered after it. A target that already exists when the component registers is not re-adopted, because the hub has no re-adoption call. A component whose work is in `on_adopt`, and that has to cover those targets, walks `hub_get_targets_by_type_name()` itself and calls that hook on each. A component that creates its machine on first lookup does not get the machine from the hook, so the walk is not what creates it. `hub_unregister_component()` removes the component from the registry and the request index; it does not call `on_unadopt` on the targets it was adopted by, so a machine it already stored stays on those targets.
 
 ---
 
@@ -415,9 +415,8 @@ hub_register_component(&floating_component);
 hub_register_component(&focus_component);
 hub_register_component(&urgency_component);
 
-// When a client is created (by listener, on ManageNotify)
+// client_create() registers the target, and that registration adopts.
 Client* c = client_create(window);
-hub_register_target(&c->target);  // target adopts compatible components
 
 // Keybinding sends fullscreen request
 void keybinding_fullscreen(void) {
