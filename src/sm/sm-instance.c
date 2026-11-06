@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "sm-instance.h"
+#include "sm-instance-internal.h"
 #include "sm-registry.h"
 #include "sm-template.h"
 #include "wm-hub.h"
@@ -162,6 +162,22 @@ sm_get_state(StateMachine* sm)
   if (sm == NULL)
     return 0;
   return sm->current_state;
+}
+
+void*
+sm_get_owner(StateMachine* sm)
+{
+  if (sm == NULL)
+    return NULL;
+  return sm->owner;
+}
+
+void*
+sm_get_data(StateMachine* sm)
+{
+  if (sm == NULL)
+    return NULL;
+  return sm->data;
 }
 
 bool

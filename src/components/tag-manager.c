@@ -131,13 +131,13 @@ tag_view_sm_emit(StateMachine* sm, uint32_t from_state, uint32_t to_state, void*
 {
   (void) from_state;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return;
 
-  Monitor* m = (Monitor*) sm->owner;
+  Monitor* m = (Monitor*) sm_get_owner(sm);
 
   /* Get the tag mask from the SM data (stored as void*) */
-  uint32_t* tag_mask_ptr = (uint32_t*) sm->data;
+  uint32_t* tag_mask_ptr = (uint32_t*) sm_get_data(sm);
   uint32_t  new_mask     = tag_mask_ptr ? *tag_mask_ptr : 0;
 
   LOG_DEBUG("Tag view changed for monitor %lu: mask=0x%x",
@@ -304,10 +304,10 @@ tag_manager_get_visible_tags(Monitor* m)
     return 0;
 
   StateMachine* sm = monitor_get_sm(m, TAG_VIEW_SM_NAME);
-  if (sm == NULL || sm->data == NULL)
+  if (sm == NULL || sm_get_data(sm) == NULL)
     return 0;
 
-  uint32_t* tag_mask = (uint32_t*) sm->data;
+  uint32_t* tag_mask = (uint32_t*) sm_get_data(sm);
   return *tag_mask;
 }
 
@@ -324,7 +324,7 @@ tag_manager_set_visible_tags(Monitor* m, uint32_t tag_mask)
   if (sm == NULL)
     return;
 
-  uint32_t* current_mask = (uint32_t*) sm->data;
+  uint32_t* current_mask = (uint32_t*) sm_get_data(sm);
   if (current_mask == NULL)
     return;
 
@@ -731,7 +731,7 @@ tag_manager_on_adopt(HubTarget* target)
   }
 
   /* Initialize with default tag 1 visible */
-  uint32_t* tag_mask = (uint32_t*) sm->data;
+  uint32_t* tag_mask = (uint32_t*) sm_get_data(sm);
   if (tag_mask != NULL) {
     *tag_mask = TAG_MASK(0); /* Tag 1 (index 0) */
   }

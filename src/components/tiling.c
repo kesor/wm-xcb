@@ -162,10 +162,10 @@ tiling_action_on_layout_change(StateMachine* sm, void* data)
 {
   (void) data;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return false;
 
-  Monitor* m = (Monitor*) sm->owner;
+  Monitor* m = (Monitor*) sm_get_owner(sm);
 
   /* Only tile in TILE state */
   if (sm_get_state(sm) == LAYOUT_STATE_TILE) {

@@ -133,7 +133,7 @@ test_monitor_gets_layout_sm_on_adoption(void)
    * demand and would hide a monitor that was never adopted. */
   StateMachine* sm = monitor_get_sm(m, TILING_COMPONENT_NAME);
   assert_or_abort(sm != NULL);
-  assert(sm->owner == m);
+  assert(sm_get_owner(sm) == m);
   assert(tiling_get_state(m) == LAYOUT_STATE_TILE);
 
   tiling_component_shutdown();

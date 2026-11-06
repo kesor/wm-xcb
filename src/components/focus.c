@@ -139,10 +139,10 @@ focus_guard_can_focus(StateMachine* sm, void* data)
 {
   (void) data;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return false;
 
-  Client* c = (Client*) sm->owner;
+  Client* c = (Client*) sm_get_owner(sm);
   return c->managed && c->focusable;
 }
 

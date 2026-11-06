@@ -187,7 +187,7 @@ fake_enter_fullscreen(StateMachine* sm, void* data)
 {
   (void) data;
   fake_enter_calls++;
-  fake_action_owner = (Client*) sm->owner;
+  fake_action_owner = (Client*) sm_get_owner(sm);
   return true;
 }
 

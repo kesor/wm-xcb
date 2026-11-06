@@ -51,30 +51,27 @@ These are independent SMs. A client can be simultaneously:
 
 ## SM Instance Structure
 
-```c
-typedef struct StateMachine {
-    const char* name;
-    
-    // Current state
-    uint32_t current_state;
-    
-    // Owner
-    Target* owner;  // the client/monitor this SM belongs to
-    
-    // Template reference
-    SMTemplate* template;
-    
-    // Hooks for components (optional)
-    Hook* pre_guards;      // executed before guard
-    Hook* post_actions;    // executed after action
-    
-    // Instance-specific data (from template)
-    void* data;
+`StateMachine` is an opaque type in `sm-instance.h`. Its definition is in
+`src/sm/sm-instance-internal.h`, and only `src/sm/sm-instance.c` and the
+framework's own tests include that header. `current_state` is the value the
+single-writer rule is about: while the definition sat in the public header any
+component could assign it and compile, and the WM and the X server would then
+disagree days later with no trace back to the write. A translation unit that
+never sees the definition cannot name the field, so that mistake is a build
+error rather than a review finding.
 
-    // Frees data on sm_destroy; NULL when somebody else owns it
-    void (*data_free)(void*);
-} StateMachine;
-```
+What a component can read, it reads through the accessors:
+
+| Value | Read with | Changed with |
+|-------|-----------|--------------|
+| current state | `sm_get_state()` | `sm_raw_write()`, `sm_transition()` |
+| owner target | `sm_get_owner()` | fixed at `sm_create()` |
+| template | `sm_get_template()` | fixed at `sm_create()` |
+| instance data | `sm_get_data()` | `sm_set_data()`, `sm_set_owned_data()` |
+| name | `sm_get_name()` | from the template |
+
+A guard or an action that needs a value the accessors do not expose is a reason
+to add an accessor, not to include the internal header from a component.
 
 ---
 
@@ -260,9 +257,9 @@ SMTemplate fullscreen_template = {
 
 // Guard functions
 bool fs_guard_can_fullscreen(StateMachine* sm, void* data) {
-    Client* c = (Client*)sm->owner;
+    Client* c = (Client*)sm_get_owner(sm);
     // Can always fullscreen a managed client
-    return c->managed;
+    return client_is_managed(c);
 }
 
 bool fs_guard_can_unfullscreen(StateMachine* sm, void* data) {
@@ -382,25 +379,22 @@ typedef struct StateMachine StateMachine;
 typedef struct Target Target;
 typedef struct Event Event;
 
-// State machine instance
-struct StateMachine {
-    const char* name;
-    uint32_t current_state;
-    Target* owner;
-    
-    struct SMTemplate* template;
-    
-    struct Hook* hooks[HOOK_MAX];
-    void* data;
-};
+// State machine instance: opaque, defined in sm-instance-internal.h
+typedef struct StateMachine StateMachine;
 
 // Operations
-StateMachine* sm_create(Target* owner, struct SMTemplate* tmpl);
+StateMachine* sm_create(void* owner, struct SMTemplate* tmpl, EventEmitter emit, void* emit_userdata);
 void sm_destroy(StateMachine* sm);
 
 void sm_raw_write(StateMachine* sm, uint32_t new_state);
 bool sm_transition(StateMachine* sm, uint32_t target_state);
 uint32_t sm_get_state(StateMachine* sm);
+
+// Read the owner, the template, the instance data and the name
+void* sm_get_owner(StateMachine* sm);
+struct SMTemplate* sm_get_template(StateMachine* sm);
+void* sm_get_data(StateMachine* sm);
+const char* sm_get_name(StateMachine* sm);
 
 // Query
 bool sm_can_transition(StateMachine* sm, uint32_t target_state);
@@ -422,7 +416,6 @@ void sm_add_hook(StateMachine* sm, HookPhase phase, HookFn fn, void* userdata);
 void sm_remove_hook(StateMachine* sm, HookPhase phase, HookFn fn);
 
 // Template helpers
-struct SMTemplate* sm_get_template(StateMachine* sm);
 const char* sm_get_state_name(StateMachine* sm, uint32_t state);
 
 #endif // SM_H

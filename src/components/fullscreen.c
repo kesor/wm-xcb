@@ -158,10 +158,10 @@ fullscreen_guard_can_fullscreen(StateMachine* sm, void* data)
 {
   (void) data;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return false;
 
-  Client* c = (Client*) sm->owner;
+  Client* c = (Client*) sm_get_owner(sm);
   return c->managed;
 }
 
@@ -188,10 +188,10 @@ fullscreen_guard_can_unfullscreen(StateMachine* sm, void* data)
 static bool
 fullscreen_action_write_state(StateMachine* sm, bool fullscreen)
 {
-  if (sm->owner == NULL)
+  if (sm_get_owner(sm) == NULL)
     return false;
 
-  fullscreen_update_x_property((Client*) sm->owner, fullscreen);
+  fullscreen_update_x_property((Client*) sm_get_owner(sm), fullscreen);
   return true;
 }
 
