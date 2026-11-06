@@ -14,7 +14,6 @@
 /* Forward declarations (defined in sm-template.h) */
 typedef struct SMTemplate   SMTemplate;
 typedef struct StateMachine StateMachine;
-typedef struct SMHookList   SMHookList;
 
 /*
  * Event emitter function type
@@ -50,20 +49,11 @@ typedef enum SMHookPhase {
 typedef void (*SMHookFn)(StateMachine*, void*);
 
 /*
- * StateMachine structure
- * Instance of a state machine template.
+ * The StateMachine definition is in sm-instance-internal.h and is not part of
+ * this header. current_state is the value the single-writer rule is about, and
+ * a definition here would let any component assign it and compile. Read the
+ * state with sm_get_state(); change it with sm_raw_write() or sm_transition().
  */
-struct StateMachine {
-  const char*  name;               /* instance name (from template) */
-  uint32_t     current_state;      /* current state value */
-  void*        owner;              /* owner target (client, monitor, etc.) */
-  SMTemplate*  template;           /* reference to the template */
-  void*        data;               /* instance-specific data */
-  SMDataFree   data_free;          /* frees `data` on destroy; NULL when borrowed */
-  SMHookList*  hooks[SM_HOOK_MAX]; /* hook lists for each phase */
-  EventEmitter emit;               /* event emitter function (e.g., hub_emit) */
-  void*        emit_userdata;      /* userdata passed to emit function */
-};
 
 /*
  * Create a new StateMachine instance.
@@ -99,6 +89,18 @@ void sm_destroy(StateMachine* sm);
  * Get the current state of a state machine.
  */
 uint32_t sm_get_state(StateMachine* sm);
+
+/*
+ * Get the target this machine belongs to, as it was passed to sm_create().
+ * This is how a guard or an action reaches its client or monitor.
+ */
+void* sm_get_owner(StateMachine* sm);
+
+/*
+ * Get the instance data, the value set with sm_set_data() or
+ * sm_set_owned_data(). NULL when none is set.
+ */
+void* sm_get_data(StateMachine* sm);
 
 /*
  * Raw write - set state without guards.

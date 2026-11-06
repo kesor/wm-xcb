@@ -275,7 +275,7 @@ test_sm_create_destroy(void)
 
   assert(sm != NULL);
   assert(sm_get_state(sm) == S0);
-  assert(sm->owner == &owner);
+  assert(sm_get_owner(sm) == &owner);
   assert(strcmp(sm_get_name(sm), "test") == 0);
   assert(sm_get_template(sm) == t);
 
@@ -317,11 +317,17 @@ test_sm_set_emitter(void)
   int           owner = 0;
   StateMachine* sm    = sm_create(&owner, t, NULL, NULL);
   assert(sm != NULL);
-  assert(sm->emit == NULL);
+
+  /* With no emitter registered the machine's write reaches nobody, which is
+   * what the counter shows: the hub fallback has no subscriber here. */
+  g_raw_write_events = 0;
+  sm_raw_write(sm, S1);
+  assert(g_raw_write_events == 0);
 
   /* Set emitter after creation */
   sm_set_emitter(sm, test_emitter, NULL);
-  assert(sm->emit == test_emitter);
+  sm_raw_write(sm, S0);
+  assert(g_raw_write_events == 1);
 
   sm_destroy(sm);
   sm_template_destroy(t);
@@ -508,13 +514,13 @@ test_transition_with_guards(void)
 
   int           allow_true = 1;
   StateMachine* sm_allow   = make_sm(&owner, ct);
-  sm_allow->data           = &allow_true;
+  sm_set_data(sm_allow, &allow_true);
   assert(sm_transition(sm_allow, S1) == true);
   sm_destroy(sm_allow);
 
   int           allow_false = 0;
   StateMachine* sm_deny     = make_sm(&owner, ct);
-  sm_deny->data             = &allow_false;
+  sm_set_data(sm_deny, &allow_false);
   assert(sm_transition(sm_deny, S1) == false);
   sm_destroy(sm_deny);
 
@@ -544,8 +550,8 @@ test_transition_with_actions(void)
   /* Action runs on successful transition */
   int           count = 0;
   StateMachine* sm1   = make_sm(&owner, t);
-  sm1->data           = &count;
-  g_raw_write_events  = 0;
+  sm_set_data(sm1, &count);
+  g_raw_write_events = 0;
 
   assert(sm_transition(sm1, S1) == true);
   assert(count == 1);
@@ -555,7 +561,7 @@ test_transition_with_actions(void)
   /* Chain of actions */
   count             = 0;
   StateMachine* sm2 = make_sm(&owner, t);
-  sm2->data         = &count;
+  sm_set_data(sm2, &count);
   assert(sm_transition(sm2, S1) == true);
   assert(sm_transition(sm2, S2) == true);
   assert(count == 2);
@@ -817,16 +823,29 @@ test_sm_owned_data_is_freed_on_destroy(void)
 
   g_data_freed = 0;
   sm_set_owned_data(sm, &g_data_freed, count_data_free);
-  assert(sm->data == &g_data_freed);
-
-  /* Borrowed data set through sm_set_data is not freed, so it carries no
-   * destructor. */
-  sm_set_data(sm, NULL);
-  assert(sm->data_free == NULL);
-  sm_set_owned_data(sm, &g_data_freed, count_data_free);
+  assert(sm_get_data(sm) == &g_data_freed);
 
   sm_destroy(sm);
   assert(g_data_freed == 1);
+
+  /* Borrowed data set through sm_set_data carries no destructor, so destroying
+   * the machine leaves it alone. */
+  StateMachine* borrowed = make_sm(&owner, t);
+  g_data_freed           = 0;
+  sm_set_data(borrowed, &g_data_freed);
+  sm_destroy(borrowed);
+  assert(g_data_freed == 0);
+
+  /* Replacing owned data with borrowed data drops the destructor. Destroy
+   * must not run it on the borrowed pointer. */
+  StateMachine* switched      = make_sm(&owner, t);
+  int           owned         = 0;
+  int           borrowed_flag = 0;
+  sm_set_owned_data(switched, &owned, count_data_free);
+  sm_set_data(switched, &borrowed_flag);
+  sm_destroy(switched);
+  assert(owned == 0);
+  assert(borrowed_flag == 0);
 
   sm_template_destroy(t);
 }

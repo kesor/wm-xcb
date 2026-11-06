@@ -46,6 +46,16 @@ pre-commit:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC, so its assertions never run."
 
+    # The single-writer rule is kept by the compiler, not by a reviewer: a
+    # component that assigns a machine-tracked field must not compile. Each
+    # fixture under tests/compile-fail/ is built twice, once through the
+    # accessor (must succeed) and once assigning the field (must fail), so a
+    # refusal is told apart from a broken include path.
+    private-state:
+      glob: ["*.{c,h}", "tests/compile-fail/*", "scripts/check-private-state.sh"]
+      run: ./scripts/check-private-state.sh
+      fail_text: "A machine-tracked value is writable from a component again. Move the definition out of the public header and expose an accessor."
+
     # A .c file that is tracked but missing from SRC compiles nowhere, and
     # check-async scans the build's list, so a blocking call in it is invisible
     # to both. That is how wm-kbd-mouse.c kept an xcb_grab_pointer_reply().
@@ -153,6 +163,10 @@ pre-push:
     test-src:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC."
+
+    private-state:
+      run: ./scripts/check-private-state.sh
+      fail_text: "A machine-tracked value is writable from a component again. Move the definition out of the public header and expose an accessor."
 
     sources:
       run: ./scripts/check-orphan-sources.sh

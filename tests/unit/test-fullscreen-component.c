@@ -152,7 +152,7 @@ test_fullscreen_request_refused_for_unmanaged_client(void)
 
   Client* c = client_create(701);
   assert_or_abort(c != NULL);
-  assert(c->managed == false);
+  assert(client_is_managed(c) == false);
 
   hub_send_request(REQ_CLIENT_FULLSCREEN, c->target.id);
   assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
@@ -187,7 +187,7 @@ fake_enter_fullscreen(StateMachine* sm, void* data)
 {
   (void) data;
   fake_enter_calls++;
-  fake_action_owner = (Client*) sm->owner;
+  fake_action_owner = (Client*) sm_get_owner(sm);
   return true;
 }
 

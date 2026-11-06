@@ -162,10 +162,10 @@ tiling_action_on_layout_change(StateMachine* sm, void* data)
 {
   (void) data;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return false;
 
-  Monitor* m = (Monitor*) sm->owner;
+  Monitor* m = (Monitor*) sm_get_owner(sm);
 
   /* Only tile in TILE state */
   if (sm_get_state(sm) == LAYOUT_STATE_TILE) {
@@ -437,7 +437,7 @@ tiling_count_visible_clients(Monitor* m)
   Client*  c     = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->mapped && c->monitor == m && tiling_client_is_in_the_layout(c)) {
+    if (client_is_managed(c) && client_is_mapped(c) && c->monitor == m && tiling_client_is_in_the_layout(c)) {
       count++;
     }
     c = c->next;
@@ -471,7 +471,7 @@ tiling_collect_clients(Monitor* m, uint32_t* count)
   Client*  c   = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->mapped && c->monitor == m && tiling_client_is_in_the_layout(c)) {
+    if (client_is_managed(c) && client_is_mapped(c) && c->monitor == m && tiling_client_is_in_the_layout(c)) {
       if (idx < capacity) {
         clients[idx++] = c;
       } else {
@@ -605,7 +605,7 @@ tiling_raise_floating_clients(Monitor* m)
 
   Client* c = client_list_sentinel()->next;
   while (c != client_list_sentinel()) {
-    if (c->managed && c->mapped && c->monitor == m && tiling_client_is_floating(c) &&
+    if (client_is_managed(c) && client_is_mapped(c) && c->monitor == m && tiling_client_is_floating(c) &&
         !tiling_client_is_fullscreen(c)) {
       uint32_t value = XCB_STACK_MODE_ABOVE;
       xcb_configure_window(dpy, c->window, XCB_CONFIG_WINDOW_STACK_MODE, &value);
@@ -625,7 +625,7 @@ tiling_place_fullscreen_clients(Monitor* m)
   Client* c = client_list_sentinel()->next;
 
   while (c != client_list_sentinel()) {
-    if (c->managed && c->mapped && c->monitor == m && tiling_client_is_fullscreen(c))
+    if (client_is_managed(c) && client_is_mapped(c) && c->monitor == m && tiling_client_is_fullscreen(c))
       tiling_place_client(c, m->x, m->y, m->width, m->height);
     c = c->next;
   }

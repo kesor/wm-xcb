@@ -133,7 +133,7 @@ test_monitor_gets_layout_sm_on_adoption(void)
    * demand and would hide a monitor that was never adopted. */
   StateMachine* sm = monitor_get_sm(m, TILING_COMPONENT_NAME);
   assert_or_abort(sm != NULL);
-  assert(sm->owner == m);
+  assert(sm_get_owner(sm) == m);
   assert(tiling_get_state(m) == LAYOUT_STATE_TILE);
 
   tiling_component_shutdown();
@@ -333,9 +333,9 @@ test_tag_view_change_triggers_tiling(void)
 
   tag_manager_set_visible_tags(m, TAG_MASK(1));
 
-  assert(tag_one_first->mapped == false);
-  assert(tag_one_second->mapped == false);
-  assert(tag_two->mapped == true);
+  assert(client_is_mapped(tag_one_first) == false);
+  assert(client_is_mapped(tag_one_second) == false);
+  assert(client_is_mapped(tag_two) == true);
   assert(tag_two->height == TEST_MONITOR_HEIGHT);
 
   tiling_component_shutdown();
@@ -389,7 +389,7 @@ test_client_tag_move_triggers_tiling(void)
   uint32_t tag = 1;
   hub_send_request_data(REQ_TAG_CLIENT_TOGGLE, third->target.id, &tag);
 
-  assert(third->mapped == false);
+  assert(client_is_mapped(third) == false);
   assert(second->height == TEST_MONITOR_HEIGHT);
 
   tiling_component_shutdown();

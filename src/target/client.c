@@ -30,6 +30,19 @@
  */
 static Client client_sentinel;
 
+/*
+ * The client values a component must not write, each one with mutually
+ * exclusive values the WM's behaviour depends on. Defined here and not in
+ * client.h: a component's translation unit cannot name these fields, so
+ * assigning one is a build error instead of a review finding. The accessors
+ * declared in client.h are the only way in.
+ */
+struct ClientState {
+  bool managed; /* added to the window list */
+  bool urgent;  /* has the urgency hint */
+  bool mapped;  /* is currently mapped */
+};
+
 /* Set by client_atoms_init(), read by client_set_wm_state() and by the size
  * hint reader. */
 static xcb_atom_t wm_state_atom        = XCB_ATOM_NONE;
@@ -47,11 +60,12 @@ client_properties_init(Client* c)
   c->border_width = 0;
   c->tags         = 0;
   c->monitor      = NULL;
-  c->managed      = false;
-  c->urgent       = false;
   c->focusable    = true;
-  c->mapped       = false;
   c->stack_mode   = XCB_STACK_MODE_ABOVE;
+
+  c->tracked->managed = false;
+  c->tracked->urgent  = false;
+  c->tracked->mapped  = false;
 
   c->pending_unmaps = 0;
 
@@ -323,6 +337,13 @@ client_create(xcb_window_t window)
     return NULL;
   }
 
+  c->tracked = malloc(sizeof(ClientState));
+  if (c->tracked == NULL) {
+    LOG_ERROR("Failed to allocate Client state");
+    free(c);
+    return NULL;
+  }
+
   /* Initialize base target */
   c->target.id         = (TargetID) window;
   c->target.type_id    = hub_get_target_type_id_by_name("client");
@@ -341,8 +362,10 @@ client_create(xcb_window_t window)
   /* Verify registration succeeded */
   if (!c->target.registered) {
     LOG_ERROR("Failed to register client target for window: %u", window);
-    client_list_remove(c);
-    free(c);
+    /* ClientState is already allocated. free(c) leaks it; client_destroy
+     * frees both, and the client is far enough along for that path: it is on
+     * the list, its state-machine slots are empty, and it is not registered. */
+    client_destroy(c);
     return NULL;
   }
 
@@ -420,6 +443,9 @@ client_destroy(Client* c)
    * for the hints, so the reply may still be on its way. */
   client_discard_size_hints(c);
 
+  free(c->tracked);
+  c->tracked = NULL;
+
   /* Unregister from Hub */
   if (c->target.registered) {
     hub_unregister_target(c->target.id);
@@ -494,7 +520,7 @@ client_count_managed(void)
   uint32_t count = 0;
   Client*  c     = client_sentinel.next;
   while (c != &client_sentinel) {
-    if (c->managed)
+    if (client_is_managed(c))
       count++;
     c = c->next;
   }
@@ -884,9 +910,9 @@ client_has_tag(const Client* c, uint32_t tag)
 void
 client_set_urgent(Client* c, bool urgent)
 {
-  if (c == NULL)
+  if (c == NULL || c->tracked == NULL)
     return;
-  c->urgent = urgent;
+  c->tracked->urgent = urgent;
 }
 
 /*
@@ -895,7 +921,7 @@ client_set_urgent(Client* c, bool urgent)
 bool
 client_is_urgent(const Client* c)
 {
-  return c ? c->urgent : false;
+  return c != NULL && c->tracked != NULL ? c->tracked->urgent : false;
 }
 
 /*
@@ -904,9 +930,9 @@ client_is_urgent(const Client* c)
 void
 client_set_managed(Client* c, bool managed)
 {
-  if (c == NULL)
+  if (c == NULL || c->tracked == NULL)
     return;
-  c->managed = managed;
+  c->tracked->managed = managed;
 }
 
 /*
@@ -915,7 +941,7 @@ client_set_managed(Client* c, bool managed)
 bool
 client_is_managed(const Client* c)
 {
-  return c ? c->managed : false;
+  return c != NULL && c->tracked != NULL ? c->tracked->managed : false;
 }
 
 /*
@@ -924,9 +950,9 @@ client_is_managed(const Client* c)
 void
 client_set_mapped(Client* c, bool mapped)
 {
-  if (c == NULL)
+  if (c == NULL || c->tracked == NULL)
     return;
-  c->mapped = mapped;
+  c->tracked->mapped = mapped;
 }
 
 /*
@@ -935,7 +961,7 @@ client_set_mapped(Client* c, bool mapped)
 bool
 client_is_mapped(const Client* c)
 {
-  return c ? c->mapped : false;
+  return c != NULL && c->tracked != NULL ? c->tracked->mapped : false;
 }
 
 /*

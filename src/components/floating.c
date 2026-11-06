@@ -121,11 +121,11 @@ floating_guard_can_float(StateMachine* sm, void* data)
 {
   (void) data;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return false;
 
-  Client* c = (Client*) sm->owner;
-  return c->managed;
+  Client* c = (Client*) sm_get_owner(sm);
+  return client_is_managed(c);
 }
 
 bool
@@ -152,16 +152,16 @@ floating_action_enter_floating(StateMachine* sm, void* data)
 {
   (void) data;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return false;
 
-  FloatingSavedGeometry* saved = (FloatingSavedGeometry*) sm->data;
+  FloatingSavedGeometry* saved = (FloatingSavedGeometry*) sm_get_data(sm);
   if (saved == NULL) {
     LOG_ERROR("floating: the client's machine has no place to keep its geometry");
     return false;
   }
 
-  Client* c = (Client*) sm->owner;
+  Client* c = (Client*) sm_get_owner(sm);
 
   saved->x      = c->x;
   saved->y      = c->y;
@@ -187,16 +187,16 @@ floating_action_exit_floating(StateMachine* sm, void* data)
 {
   (void) data;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return false;
 
-  FloatingSavedGeometry* saved = (FloatingSavedGeometry*) sm->data;
+  FloatingSavedGeometry* saved = (FloatingSavedGeometry*) sm_get_data(sm);
   if (saved == NULL) {
     LOG_ERROR("floating: the client's machine has no saved geometry to restore");
     return false;
   }
 
-  Client* c = (Client*) sm->owner;
+  Client* c = (Client*) sm_get_owner(sm);
 
   c->x      = saved->x;
   c->y      = saved->y;
@@ -337,7 +337,7 @@ floating_saved_geometry(Client* c)
   if (sm == NULL)
     return NULL;
 
-  return (const FloatingSavedGeometry*) sm->data;
+  return (const FloatingSavedGeometry*) sm_get_data(sm);
 }
 
 /*

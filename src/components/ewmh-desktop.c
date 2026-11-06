@@ -199,7 +199,7 @@ ewmh_desktop_write_client_list(xcb_window_t gone)
     max = 0;
 
   for (Client* c = client_list_get_head(); c != NULL; c = client_get_next(c)) {
-    if (!c->managed || c->window == gone || count == max)
+    if (!client_is_managed(c) || c->window == gone || count == max)
       continue;
     windows[count++] = c->window;
   }
@@ -224,7 +224,7 @@ static void
 ewmh_desktop_write_client_desktops(void)
 {
   for (Client* c = client_list_get_head(); c != NULL; c = client_get_next(c)) {
-    if (!c->managed)
+    if (!client_is_managed(c))
       continue;
     xcb_ewmh_set_wm_desktop(ewmh, c->window, ewmh_desktop_for_client_tags(c->tags));
   }
@@ -341,7 +341,7 @@ ewmh_desktop_on_client_managed(Event e)
     return;
 
   Client* c = client_get_by_window((xcb_window_t) e.target);
-  if (c != NULL && c->managed)
+  if (client_is_managed(c))
     xcb_ewmh_set_wm_desktop(ewmh, c->window, ewmh_desktop_for_client_tags(c->tags));
 
   ewmh_desktop_write_client_list(XCB_NONE);
