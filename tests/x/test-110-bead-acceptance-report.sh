@@ -130,6 +130,14 @@ printf 'wm-a1\n' >"$BASELINE"
 bead_acceptance_verify "$KEPT" "$BASELINE" check-bead-acceptance >"$LAST" 2>&1
 check_eq "an unlisted issue with criteria passes" 0 "$?"
 check_eq "and is reported as not protected" 1 "$(grep -c '1 issue(s) carry acceptance criteria and are not in the baseline' "$LAST")"
+# The report tells the reader to run --update-baseline, and a bead created
+# mid-cycle makes that the last step of a commit already being made. Naming the
+# file is what says so: without it the update reads as a second commit, and the
+# bead stays unprotected until someone runs it by hand.
+check_eq "and names the baseline file the update writes" 1 \
+  "$(grep -c 'tests/quality/bead-acceptance-baseline.txt' "$LAST")"
+check_eq "and that is the file the gate reads" 1 \
+  "$(grep -c '^BASELINE=.*tests/quality/bead-acceptance-baseline.txt"' "$ROOT_DIR/scripts/check-bead-acceptance.sh")"
 
 # A file that is not an issue list is a broken read. The wrapper skips before it
 # gets here, but the verdict is what the gate's meaning rests on, so it refuses
