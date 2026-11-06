@@ -29,6 +29,9 @@
 # second the variant, the binary and the log, so a run never leaves you guessing
 # which binary it was, where its log went, or what it drew on.
 #
+# The test client and the reply-delay shim are build products of their own, and
+# this script builds them on startup, so a run started here needs no make first.
+#
 # A failure that is listed in tests/quality/seam-baseline.txt is a known failure:
 # it is reported and does not fail the run. A failure that is not listed is new
 # and exits non-zero. The seam suite covers parts of the WM that are deliberately
@@ -112,18 +115,6 @@ for cmd in Xephyr xdotool xprop xset xwininfo; do
   }
 done
 
-[ -x "$ROOT_DIR/tools/xclient" ] || {
-  echo "run.sh: build the test client first: make tools/xclient" >&2
-  exit 1
-}
-
-# test-86 dlopens this shim; without it, the test fails and the run reports a
-# missing build artifact as a new X-behaviour failure.
-[ -f "$ROOT_DIR/tools/xcb-ewmh-delay.so" ] || {
-  echo "run.sh: build the reply-delay shim first: make tools/xcb-ewmh-delay.so" >&2
-  exit 1
-}
-
 # Xephyr draws into a parent display, and that display is a private Xvfb this
 # run starts rather than the one the caller is sitting in. The line naming it is
 # printed and recorded next to the logs, so a reader can tell a hermetic run from
@@ -132,6 +123,25 @@ done
 # helper re-executes this script, and a build run twice prints the variant line
 # twice.
 wm_parent_display "${SCRIPT_ARGS[@]}" || exit 1
+
+# The suite needs two build products besides the WM: the test client every file
+# maps windows with, and the reply-delay shim test-86 dlopens. `make test-x`
+# builds both, but the suite is also run straight from this script for one file,
+# and there it refused with one make target per round trip while the docs named
+# only the first. Build them here, after the parent-display call because that
+# helper re-executes the script and a build before it would run twice.
+seam_tools_log=$(mktemp) || exit 1
+if ! make -s -C "$ROOT_DIR" tools/xclient tools/xcb-ewmh-delay.so >"$seam_tools_log" 2>&1; then
+  echo "run.sh: cannot build the tools the seam suite needs: tools/xclient and tools/xcb-ewmh-delay.so" >&2
+  cat "$seam_tools_log" >&2
+  rm -f "$seam_tools_log"
+  exit 1
+fi
+rm -f "$seam_tools_log"
+[ -x "$ROOT_DIR/tools/xclient" ] && [ -f "$ROOT_DIR/tools/xcb-ewmh-delay.so" ] || {
+  echo "run.sh: make reported success but tools/xclient or tools/xcb-ewmh-delay.so is missing" >&2
+  exit 1
+}
 
 LOG_DIR="${TMPDIR:-/tmp}/wm-seam-tests"
 mkdir -p "$LOG_DIR"
