@@ -221,7 +221,7 @@ if update:
         fh.write("# helper's error return is only reachable by breaking the environment.\n")
         fh.write("# Deleted files are dropped by the next update.\n#\n")
         for name, (line_pct, _b, _l, _br) in floored:
-            floor = max(0.0, line_pct - float(os.environ.get("COVERAGE_MARGIN", "1.5")))
+            floor = max(0.0, line_pct - float(os.environ["COVERAGE_MARGIN"]))
             fh.write(f"{name} {floor:.1f}\n")
     print(f"\ncheck-coverage: wrote {len(floored)} floor(s) to {os.path.relpath(baseline_path, root)}")
     sys.exit(0)
