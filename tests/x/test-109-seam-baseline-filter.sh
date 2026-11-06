@@ -143,6 +143,30 @@ check_eq "a filtered update does not say every other entry is unchanged" \
   "$(seam_baseline_filter_note 106 1)"
 check_eq "a run with no filter adds no such line" "" "$(seam_baseline_filter_note '' 12)"
 
+# The summary after a check. A filtered run judges the entries of the files it
+# started, and a stale count printed without that scope reads as a statement
+# about the whole baseline - which is how a --filter run came to argue for
+# deleting entries it never measured.
+check_eq "a full run reports a stale count on its own" \
+  "seam tests: stale baseline entries: 2; run --update-baseline to drop them" \
+  "$(seam_baseline_stale_note '' 12 2)"
+check_eq "a full run with nothing stale adds no line" "" \
+  "$(seam_baseline_stale_note '' 12 0)"
+check_eq "a filtered run says its stale count covers only the files it started" \
+  "seam tests: stale baseline entries in the test file(s) this run started: 1; --update-baseline with the same --filter drops those and keeps the rest" \
+  "$(seam_baseline_stale_note 106 1 1 | sed -n 1p)"
+check_eq "a filtered run with nothing stale still says what it did not judge" \
+  "seam tests: the stale check covered only the 1 test file(s) --filter '106' started; an entry of a test file that did not run was not judged" \
+  "$(seam_baseline_stale_note 106 1 0)"
+check_eq "which is one line, not the scope repeated over the count" 1 \
+  "$(seam_baseline_stale_note 106 1 0 | grep -c .)"
+check_eq "a filtered run with a stale entry prints the count and the scope" 2 \
+  "$(seam_baseline_stale_note 106 1 1 | grep -c .)"
+check_eq "the runner prints its stale summary through that function" 1 \
+  "$(grep -c 'seam_baseline_stale_note ' "$ROOT_DIR/tests/x/run.sh")"
+check_eq "and prints no stale-count line of its own" 0 \
+  "$(grep -c 'stale baseline entries' "$ROOT_DIR/tests/x/run.sh")"
+
 check_eq "the runner replaces the baseline through seam_baseline_install" 1 \
   "$(grep -c 'seam_baseline_install ' "$ROOT_DIR/tests/x/run.sh")"
 check_eq "and does not stage that file under the log directory" 0 \
