@@ -4,7 +4,8 @@
 # deliberately, which is the moment somebody decides what covers it.
 # Test files under tests/ are printed by the run and carry no floor: a
 # helper's error return is only reachable by breaking the environment.
-# Deleted files are dropped by the next update.
+# A full update drops an entry whose file is gone; one that names other
+# files keeps it.
 #
 wm-xcb-events.c 0.0
 src/components/connection-sm.c 0.0

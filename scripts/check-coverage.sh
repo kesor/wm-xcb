@@ -6,8 +6,8 @@
 #                                   [file...]
 #
 # With file arguments only those files are compared, or updated: a path relative
-# to the repository root, or a suffix of one, so `config-file.c` names
-# src/config-file.c. The rest of the baseline is left alone.
+# to the repository root, or a suffix of one, so `tiling.c` names
+# src/components/tiling.c. The rest of the baseline is left alone.
 #
 # A test that passes tells you the path it took works. It says nothing about the
 # paths it never took. This builds the unit suite with gcov instrumentation, runs
@@ -165,7 +165,10 @@ gcov -j -b -o . "${names[@]}" >/dev/null 2>gcov.err || true
 # gcov writes the JSON gzipped, and the dev shell's python has no zlib module.
 gzip -df ./*.gcov.json.gz 2>/dev/null || true
 
-python3 - "$ROOT_DIR" "$SHOW_ZERO" "$UPDATE" "$MEASURED" <<'PY'
+# Stop here when the measurement fails. measured.tsv is the previous run's
+# until this step rewrites it, and the comparison below would pass the gate
+# on those numbers.
+if ! python3 - "$ROOT_DIR" "$SHOW_ZERO" "$UPDATE" "$MEASURED" <<'PY'
 import glob, json, os, sys
 
 root, show_zero, update, measured_path = (
@@ -220,6 +223,9 @@ with open(measured_path, "w") as fh:
     for name, (line_pct, _b, _l, _br) in rows:
         fh.write(f"{name}\t{line_pct:.4f}\n")
 PY
+then
+  exit 1
+fi
 
 args=()
 if [ "$UPDATE" -eq 1 ]; then

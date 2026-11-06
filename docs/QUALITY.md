@@ -481,8 +481,9 @@ to 2.6 points on a CI runner between runs of the same tree.
 `--update-baseline` merges the run into the entries already recorded instead of
 rewriting the file from one run. Name the files the commit changed and only
 their entries move: `scripts/check-coverage.sh --update-baseline config-file.c`
-writes the floor for `src/config-file.c` and leaves every other line alone. A
-path relative to the repository root works too, and so does a suffix of one.
+writes the floor for `config-file.c` and leaves every other line alone. A
+path relative to the repository root works too, and so does a suffix of one,
+so `tiling.c` and `src/components/tiling.c` both name `src/components/tiling.c`.
 Without file arguments every file the run measured is merged; the rest keep
 their floors.
 

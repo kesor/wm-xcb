@@ -13,7 +13,7 @@ Usage:
 
 --measured is one `name<TAB>lines-percent` line per file the run executed.
 --pattern, repeated, restricts the work to the named files: a path relative to
-the root, or a suffix of one, so `config-file.c` names src/config-file.c.
+the root, or a suffix of one, so `tiling.c` names src/components/tiling.c.
 
 A file under tests/ carries no floor here, in the check or in the update. Its
 missed lines are the guards inside the tests' own helpers, and no passing test
@@ -41,7 +41,8 @@ HEADER = [
     "# deliberately, which is the moment somebody decides what covers it.",
     "# Test files under tests/ are printed by the run and carry no floor: a",
     "# helper's error return is only reachable by breaking the environment.",
-    "# Deleted files are dropped by the next update.",
+    "# A full update drops an entry whose file is gone; one that names other",
+    "# files keeps it.",
     "#",
 ]
 
@@ -179,8 +180,8 @@ def update(args):
             # does not change either way.
             if pct < old:
                 notes.append(
-                    f"held {name} at {old:.1f}% (measured {pct:.1f}%): a drop inside the"
-                    " margin holds the floor; --allow-lower if it is real"
+                    f"held {name} at {old:.1f}% (measured {pct:.1f}%): a lower"
+                    " measurement holds the floor; --allow-lower if the drop is real"
                 )
             merged.append((name, old))
             continue
