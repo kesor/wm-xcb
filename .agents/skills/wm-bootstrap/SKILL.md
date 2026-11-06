@@ -164,16 +164,18 @@ Then work through the list:
 
 1. Read `bd show <id>` and the docs it names. Then ask whether the work is
    here at all: `scripts/bead-scope.sh <id>` reads the title, the description
-   and the comments for a path that only the harness has. Exit 3 means the text
-   names one; the command prints the paths. Say in a bd comment which part is in
-   this tree and which is not, do the part that is here, and stop on the rest.
+   and the comments for two answers. Exit 3 means the text names a path only the
+   harness has; the command prints the paths. Say in a bd comment which part is
+   in this tree and which is not, do the part that is here, and stop on the rest.
    Reading the harness to confirm the paths is the cost that command exists to
-   remove. Exit 0 answers only the harness question: a bead written months ago
-   can name a file this tree no longer has, and nothing in the command looks for
-   that. Check each path it names with `git ls-files -- <path>`, and when one is
-   missing run `git log --diff-filter=D --all -- <path>` for the commit that
-   removed it and read why. Then do the work where the code lives now, or say in
-   the bead comment why it should not be done.
+   remove. Exit 2 means it cannot answer: the tracker could not be read, or the
+   bead names a path this tree does not carry. A `GONE` line is that path with
+   the commit that deleted it, so a bead written months ago against a tree that
+   had the file does not read as work you can do here. Read that commit and the
+   code that replaced the file, then do the work where the code lives now, or
+   say in the bead comment why it should not be done. A path no commit deleted
+   is a bead asking for a new file as far as the text can tell, which is why the
+   answer is "cannot tell" rather than either verdict.
 2. If the change is observable through X, write or extend a `tests/x/test-*.sh`
    first; use `require_visible` for preconditions so a test cannot pass because
    the window was never there.
@@ -332,7 +334,10 @@ beads in your final message. This is how the traps below stop being traps.
   comment saying which part of the work is in this tree and which is not, do the
   part that is here, and stop. The search for the harness file is what costs a
   session; the command is one call. A description written before the harness
-  moved still names a file it no longer has, and the command says which.
+  moved still names a file it no longer has, and the command says which. The
+  same command checks the other half: a path this tree deleted is a `GONE` line
+  with the commit that removed it, and exit 2. Beads are written months before
+  they are picked up, so the file a bead names may have gone from either tree.
 - **Do not push, and do not rewrite published history,** unless asked.
 
 ## Definition of done
