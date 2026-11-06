@@ -65,7 +65,9 @@ run; if it says "docs updated", read the doc.
    word is not the proof: remove the exact thing the check is for, once per
    shape it must catch, and watch it fail. For a table walker that is one
    removal per shape of row: a plain row, a self-loop, a row with a guard, a row
-   with no event. "I mutated something and it failed" is not that.
+   with no event. "I mutated something and it failed" is not that. A copy of the
+   script in a temp tree is not executable: run it with `bash` or `chmod +x` it,
+   and read a 126 as the copy's mode, not as the check catching the removal.
 3. **A rule broken.** State machines own state; components do not call each
    other; nothing in the event loop blocks; new behaviour arrives as a
    registration. Each has a gate — run them: `make test`, `make check-async`,
