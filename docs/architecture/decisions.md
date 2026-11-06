@@ -394,7 +394,7 @@ without a restart is not written yet.
 | window ID, title, class | fullscreen status |
 | x, y, width, height | tiling status |
 | output ID, resolution | connection status |
-| tagset, mfact, nmaster | layout selection |
+| mfact, nmaster | layout selection |
 
 **Note:** Some properties ARE controlled by state machines (e.g., monitor resolution → ResolutionSM). But the property holds the current value; the SM tracks the domain.
 

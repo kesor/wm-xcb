@@ -18,6 +18,7 @@
 #include "../target/client.h"
 #include "../target/monitor.h"
 #include "../target/tag.h"
+#include "client-list.h"
 #include "src/actions/action-registry.h"
 #include "tag-manager.h"
 #include "wm-hub.h"
@@ -697,15 +698,39 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
 }
 
 /*
+ * Give a newly managed client the tags of the view it appeared on.
+ *
+ * Client creation leaves tags empty because the visible mask lives in this
+ * component's state machine. The manage event is where the two meet, so a
+ * window that maps while another tag is viewed joins that tag instead of the
+ * one that was visible when the monitor was created.
+ */
+static void
+tag_manager_on_client_managed(Event e)
+{
+  Client* c = client_get_by_window((xcb_window_t) e.target);
+  if (c == NULL)
+    return;
+
+  Monitor* m = client_get_monitor(c);
+  if (m == NULL)
+    return;
+
+  uint32_t visible_tags = tag_manager_get_visible_tags(m);
+  client_set_tags(c, visible_tags);
+
+  LOG_DEBUG("Client %u managed on monitor %lu with tags=0x%x",
+            c->window, (unsigned long) m->target.id, visible_tags);
+}
+
+/*
  * Listener callback - subscribes to relevant events
  */
 void
 tag_manager_listener(Event e)
 {
-  (void) e;
-  /* Currently no external events to handle in the listener.
-   * The executor handles all requests directly.
-   * This is here for future extension if needed. */
+  if (e.type == EVT_CLIENT_MANAGED)
+    tag_manager_on_client_managed(e);
 }
 
 /*
@@ -816,7 +841,7 @@ tag_manager_component_init(void)
   hub_register_component(tag_manager_component());
 
   /* Subscribe to events we care about */
-  hub_subscribe(EVT_TAG_CHANGED, tag_manager_listener, NULL);
+  hub_subscribe(EVT_CLIENT_MANAGED, tag_manager_listener, NULL);
 
   /* Cache the template */
   cached_tag_view_template = tag_view_sm_template_create();
@@ -840,7 +865,7 @@ tag_manager_component_shutdown(void)
   LOG_DEBUG("Shutting down tag manager component");
 
   /* Unsubscribe from events */
-  hub_unsubscribe(EVT_TAG_CHANGED, tag_manager_listener);
+  hub_unsubscribe(EVT_CLIENT_MANAGED, tag_manager_listener);
 
   /* Unregister from hub */
   hub_unregister_component(TAG_MANAGER_COMPONENT_NAME);
