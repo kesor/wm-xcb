@@ -3,9 +3,11 @@
 # for one staged file deleted every entry it did not measure, and a commit that
 # touched only headers failed the gate because clang-tidy reports no function for
 # a header. A test source is not measured at all: a test body's number is its
-# assertion count, and the gate's remedy would mean deleting assertions. All
-# three are pinned here against a stand-in clang-tidy, so the gate is judged
-# without the tool, a compile database, or the tree.
+# assertion count, and the gate's remedy would mean deleting assertions. A
+# regeneration without file arguments reads `make -s print-src`, a different
+# list from the files a commit stages, so that list is pinned too. All four are
+# pinned here against a stand-in clang-tidy, so the gate is judged without the
+# tool, a compile database, or the tree.
 source "$(dirname "$0")/lib.sh"
 
 DIR="$TMPDIR_SEAM/complexity"
@@ -111,5 +113,23 @@ out=$(gate tests/unit/skip.c three.c)
 check_eq "a test source beside an unbaselined source still fails" 1 "$?"
 check_eq "and names the production function" 1 \
   "$(echo "$out" | grep -c 'delta is at 40')"
+
+# A regeneration with no file arguments reads the build's source list, which is
+# not the list the hook hands the gate. When those two disagreed, the baseline
+# lost the entries for files the run did not measure, and a test source in the
+# build's list got an entry the gate could never check.
+cat >"$DIR/Makefile" <<'MAKE'
+print-src:
+	@echo "one.c two.c tests/unit/skip.c"
+MAKE
+seed
+out=$(gate --update-baseline)
+check_eq "regenerating with no file arguments succeeds" 0 "$?"
+check_eq "and measures the build's source list" 2 \
+  "$(grep -cE '^(alpha 20|gamma 30)$' "$BASELINE")"
+check_eq "and gives the test source in it no entry" 0 \
+  "$(grep -c '^test_many_assertions' "$BASELINE")"
+check_eq "and keeps the entry for a file it did not measure" 1 \
+  "$(grep -c '^kept 14$' "$BASELINE")"
 
 finish
