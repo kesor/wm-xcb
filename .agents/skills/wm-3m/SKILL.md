@@ -7,7 +7,9 @@ description: Judge a worker run and find what to improve, using the three Ms —
 
 Load this after a run's transcript exists and before deciding what to change. It
 is the reading half of the loop; `.agents/skills/wm-5s/SKILL.md` is the writing
-half. 5S files a report by the kind of tidying it needs. 3M says what the run
+half, and `.agents/skills/wm-line/SKILL.md` sits upstream of both: it decides what
+to optimize and refuses the optimizations that do not hold here. 5S files a report
+by the kind of tidying it needs. 3M says what the run
 lost, which is a different axis: a report can be a correct seiri that removes
 waiting, and naming both is what lets a session spot the third instance of the
 same thing.
@@ -71,6 +73,14 @@ Unevenness is not automatically bad: a batch of five small doc fixes *should*
 take less than one memory-safety fix. What is bad is not knowing which is which,
 because then a regression hides inside a variation.
 
+Two traps when comparing runs. **Regression to the mean**: an extreme run is
+followed by a less extreme one with no change at all, so "it improved after our
+fix" is the weakest claim available. **Tampering**: reacting to variation the
+process always has, which makes the variation worse rather than better (Deming's
+funnel). Both are why a finding needs a witness — a second instance, or a gate
+that fails — and not a before-and-after of one run. `.agents/skills/wm-line/SKILL.md`
+has the four rules behind this and `DESIGN.md` §12 the terms.
+
 ---
 
 ## Muri: overburden
@@ -105,7 +115,13 @@ Then decide per finding, cheapest first:
 
 1. **Fix it now** if it is one edit and the run is over.
 2. **Gate it** if a command can catch it. A finding that comes back is a
-   missing gate, not a careless worker.
+   missing gate, not a careless worker. Two refinements, from mistake-proofing.
+   First, prefer a device that makes the mistake impossible over one that reports
+   it: a field a component cannot assign to beats a test that notices the
+   assignment. Second, a device that only warns is not a device — a hook is
+   skipped with `--no-verify` — so pair it with something that refuses. Either
+   way, prove it by removing the exact thing it must catch, once per shape it must
+   catch. `DESIGN.md` §10 in the harness directory has the three levels.
 3. **Write it down** if the fix is a rule: a line in `AGENTS.md`, a skill, or
    `docs/QUALITY.md`. Undocumented conventions do not survive a session.
 4. **File it** as a bead when none of the above fits, with the 5S bucket *and*

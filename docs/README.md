@@ -32,6 +32,12 @@
 
 ---
 
+## Teaching and Background
+
+| Document | Purpose |
+|----------|---------|
+| [guides/standing-on-the-shoulders.html](guides/standing-on-the-shoulders.html) | Why this project works the way it does: the factory concepts that transfer to a software loop, the four rules, the arithmetic behind them, Kanban, mistake-proofing, a playbook, and the books behind it. A teaching aid; where it disagrees with the design document in the harness directory, that wins |
+
 ## Key Principles
 
 1. **State machines live on targets** — Each Client has its own FullscreenSM, not a global one.

@@ -34,6 +34,7 @@ cost time. This file holds the rules; that one holds the state.
 | `.agents/skills/wm-5s/SKILL.md` | How to file harness friction as beads while you work |
 | `.agents/skills/wm-review/SKILL.md` | Reviewing a `work/<bead>` branch: depth by module, verdict format, fix-or-record |
 | `.agents/skills/wm-3m/SKILL.md` | Judging a run: muda, mura, muri — what the flow lost, how uneven it was, who was overburdened |
+| `.agents/skills/wm-line/SKILL.md` | What to optimize and what to refuse: four rules, and the test for whether a borrowed technique applies here |
 | `docs/VISION.md` | Why this project exists |
 | `docs/architecture/README.md` | Index to the architecture documents |
 | `docs/architecture/overview.md` | Core concepts and architecture |
