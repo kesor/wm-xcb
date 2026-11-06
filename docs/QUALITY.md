@@ -509,14 +509,13 @@ adds tests: adding one helper that removes a directory dropped
 `tests/unit/test-launcher.c` below a floor set when the file was a third of its
 size, and that failed a merge whose unit suite passed.
 
-A file at 0% is the useful number. Two source files are still never executed by
-any unit test: `wm-xcb-events.c` (the handlers nobody registers) and
-`src/components/connection-sm.c` (the state machine with no instance).
-`wm-states.c` was a third until `tests/unit/test-wm-states.c` drove key, button
-and enter events through it; the transition table it consults still matches no
-row, for the reason `docs/architecture/state-machine.md` records. A branch
-percentage in single digits on the monitor manager is the same signal: the code
-is there, and nothing proves it runs.
+A file at 0% is the useful number. One source file is still never executed by
+any unit test: `src/components/connection-sm.c` (the state machine with no
+instance). `wm-states.c` was another until `tests/unit/test-wm-states.c` drove
+key, button and enter events through it; the transition table it consults still
+matches no row, for the reason `docs/architecture/state-machine.md` records. A
+branch percentage in single digits on the monitor manager is the same signal:
+the code is there, and nothing proves it runs.
 
 **Fuzzing.** `scripts/fuzz.sh` builds `tests/fuzz/fuzz-*.c` with clang, ASan and
 UBSan, and runs each for the seconds given. The two harnesses feed the X event

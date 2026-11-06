@@ -15,7 +15,6 @@
 #include "wm-running.h"
 #include "wm-signals.h"
 #include "wm-states.h"
-#include "wm-xcb-events.h"
 #include "wm-xcb.h"
 
 xcb_connection_t* dpy;
