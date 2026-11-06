@@ -82,7 +82,7 @@ check_eq "and names the database as the thing to check" 1 \
 out=$(gate only.h)
 check_eq "a header alone passes" 0 "$?"
 check_eq "and says why there was nothing to measure" 1 \
-  "$(echo "$out" | grep -c 'no function body')"
+  "$(echo "$out" | grep -c 'nothing for this gate to measure')"
 
 out=$(gate only.h one.c)
 check_eq "a header beside a source measures the source" 0 "$?"

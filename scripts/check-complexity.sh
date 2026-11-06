@@ -113,15 +113,17 @@ measured=$(clang-tidy -p . \
   sort)
 
 if [ -z "$measured" ]; then
-  # A header declares no function body, so a commit that touches only headers
-  # measures nothing. Failing it sent workers to --update-baseline with the
-  # wrong cause. The guard is for the other case: a .c that produced no
-  # measurement is a broken compile database, not a pass.
+  # clang-tidy measures nothing in a header it is handed directly, so a commit
+  # that touches only headers measures nothing. Failing it sent workers to
+  # --update-baseline with the wrong cause. The guard is for the other case: a
+  # .c that produced no measurement is a broken compile database, not a pass.
+  # The message says "not measured", not "no function body": config.wm.def.h
+  # defines config_wire_keybindings and is still skipped, so a body can be here.
   if printf '%s\n' "${files[@]}" | grep -qv '\.h$'; then
     echo "check-complexity: clang-tidy reported nothing; the check or the database is wrong" >&2
     exit 1
   fi
-  echo "check-complexity: ${#files[@]} header(s), no function body to measure"
+  echo "check-complexity: ${#files[@]} header(s), nothing for this gate to measure"
   exit 0
 fi
 
