@@ -416,6 +416,12 @@ deciding the number is acceptable. It writes its own compile database from
 `compile_flags.txt` rather than calling `make compile-commands`, which does a
 full clean build.
 
+A set of headers alone passes without a measurement: a header declares no
+function body, so there is nothing for this gate to compare, and a commit that
+only edits a comment in a header is not a complexity change. The "clang-tidy
+reported nothing" failure stays for a `.c` file that produced no measurement,
+which means the compile database is broken rather than the code simple.
+
 A file under `tests/` is not measured. clang-tidy charges each `ASSERT`'s
 `if`/`else` as a decision, so a test body's number is its assertion count, and
 the remedy this gate offers — split the function along a decision — would mean
