@@ -337,8 +337,10 @@ readable; the test holds the first EWMH atom query with
 `tools/xcb-ewmh-delay.so` (an `LD_PRELOAD` shim), maps a window while the WM is
 held, then releases it. The reply wait reads that `MapRequest` into libxcb's
 queue, and a loop that only polls the socket never dispatches it. The shim is
-built by `make test-x`; it reads `WM_QUEUE_TEST_MARKER` and `WM_QUEUE_TEST_GO`
-and does nothing when either is unset.
+built by `make test-x`, and `run.sh` refuses to start without it, naming
+`make tools/xcb-ewmh-delay.so` as the command that builds it; it reads
+`WM_QUEUE_TEST_MARKER` and `WM_QUEUE_TEST_GO` and does nothing when either is
+unset.
 
 `test-88-adopt-existing-windows.sh` checks the startup scan: it maps two windows
 and an override-redirect window on a bare display, starts the WM afterwards, and
