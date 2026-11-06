@@ -67,7 +67,6 @@ ROOT_SRC = \
 	wm-running.c \
 	wm-hub.c \
 	wm-xcb-ewmh.c \
-	wm-xcb-events.c \
 	wm-states.c \
 	wm-components.c \
 	wm-xcb.c \

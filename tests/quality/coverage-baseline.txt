@@ -7,7 +7,6 @@
 # A full update drops an entry whose file is gone; one that names other
 # files keeps it.
 #
-wm-xcb-events.c 0.0
 src/components/connection-sm.c 0.0
 src/components/monitor-manager.c 22.7
 wm-xcb.c 30.8
