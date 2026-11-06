@@ -38,7 +38,9 @@ They only:
 
 **3. The Hub connects everything.**
 
-Components don't call each other directly. They communicate exclusively through the Hub's request router and event bus. This is what makes hot-plugging possible.
+Components don't call each other directly. They communicate exclusively through the Hub's request router and event bus. A component's behaviour therefore stays reachable without another component's code, and a component can be replaced without editing the ones it talks to.
+
+That is not the same as loading a component into a running WM. A target adopts the components that registered before it was created: `hub_register_target()` calls their `on_adopt` hooks, and the hub has no second pass for targets that already exist. A component registered after startup therefore gets only the targets created afterwards, unless it walks the existing targets itself. See [architecture/hub.md](architecture/hub.md#component-adoption).
 
 ---
 
@@ -128,7 +130,7 @@ Every feature is a component. Components don't know about each other. They just 
 | Patch core code | Write a component |
 | Modify shared state | Subscribe to events |
 | One big file | Modular, testable |
-| Conflicts on merge | Hot-pluggable |
+| Conflicts on merge | No shared edits |
 | Hard to debug | Event traces |
 | Replace fork | Replace component |
 

@@ -1,7 +1,7 @@
 # Decision Log
 
 *Document status: Authoritative — records design decisions and rationale*
-*Last updated: 2026-04-28*
+*Last updated: 2026-11-06*
 
 ---
 
@@ -441,7 +441,7 @@ without a restart is not written yet.
 - Decoupling: Components don't know each other's names.
 - Extensible: New component subscribes to events, doesn't modify existing components.
 - Debuggable: Easy to trace event flow.
-- Hot-pluggable: Can add/remove components without affecting others.
+- Registry: adding or removing a component changes the request index and does not call another component. It does not attach the new component to targets that already exist. See [hub.md](hub.md#component-adoption).
 
 **Alternatives considered:**
 - Direct component calls: Tight coupling, hard to extend.
@@ -466,23 +466,19 @@ without a restart is not written yet.
 
 ## Hot-Plugging
 
-### Decision: Components Can Be Loaded/Unloaded at Runtime
+### Decision: The registry calls exist; a running WM does not load a component
 
-**Decision:** The system supports dynamic component loading/unloading via hub_register_component() and hub_unregister_component().
+**Decision:** `hub_register_component()` and `hub_unregister_component()` add and remove a component in the registry and the request index. They do not adopt or unadopt targets that already exist. There is no loader, so an extension is compiled in and registered from `wm-components.c`. Adoption runs when a target registers: [hub.md](hub.md#component-adoption).
 
-**Rationale:**
-- Plugin extensibility: Users can add extensions without recompiling WM.
-- Development: Can reload components during development.
-- Experimentation: Try different layouts, behaviors without restart.
+**Earlier rationale, not implemented:** adding an extension without recompiling, reloading a component during development, or switching a layout without a restart.
 
 **Alternatives considered:**
-- Static only: Simpler, but limits extensibility.
-- Full module system: Over-engineered for v1.
+- A loader plus a second adoption pass for targets that already exist.
+- A full module system.
 
 **Trade-offs:**
-- Pro: Extensible
-- Con: More complex hub implementation
-- Con: Memory management complexity on unload
+- The request index can point a request type at the last registered component that claimed it. That does not give the new component the targets that already exist.
+- `hub_unregister_component()` does not call `on_unadopt`, so a machine already stored on a target stays there.
 
 ---
 

@@ -1,7 +1,7 @@
 # Component Design
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-30*
+*Last updated: 2026-11-06*
 
 > **💡 Paradigm Shift:** Components don't patch core code. They register with the Hub, provide state machine templates, and handle requests/events. Everything is additive.
 
@@ -469,105 +469,20 @@ Component gap_component = {
 
 ---
 
-## Hot-Plugging
+## Adding a Component at Runtime
 
-Components can be added or removed at runtime.
+The built-in components are compiled in and registered from `wm_components_init()` in `wm-components.c`. Clients are created after that function returns. Monitors are created inside it, by `monitor_manager_init()`. Pertag, tag-manager, and tiling register before that call. Monitor-manager accepts monitors and registers at the start of that call, before the monitors are created. The hub has no hot-plug path beyond the registry calls:
 
-### Register a new component
-```c
-void plugin_load(const char* name) {
-    Component* c = load_component_from_file(name);
-    hub_register_component(c);
-    c->on_init();
-    
-    // Notify all compatible targets to adopt
-    Target** targets = hub_get_targets_by_type(c->accepted_targets[0]);
-    for (int i = 0; targets[i]; i++) {
-        component_adopt(targets[i], c);
-    }
-}
-```
+- `hub_register_component()` adds a component to the registry and the request index. It does not adopt targets that already exist. A component registered later is adopted by the targets created after it, through `hub_adopt_components_for_target()`. A component whose `on_adopt` does the work, and that must cover targets that already exist, walks `hub_get_targets_by_type_name()` and calls that hook on each. A component that creates its machine on first lookup does not get the machine from the hook.
+- `hub_unregister_component()` removes the component from the registry and the request index. It does not call `on_unadopt` on targets, so a machine the component already stored stays on them.
 
-### Unregister a component
-```c
-void plugin_unload(const char* name) {
-    Component* c = hub_get_component(name);
-    
-    // Unadopt from all targets
-    Target** targets = hub_get_all_targets();
-    for (int i = 0; targets[i]; i++) {
-        if (target_has_adopted(targets[i], c)) {
-            component_unadopt(targets[i], c);
-        }
-    }
-    
-    c->on_shutdown();
-    hub_unregister_component(name);
-}
-```
+There is no `hub_notify_compatible_targets()`, no adopted-components list on a target, and no loader: components are compiled in and registered from `wm-components.c`. See [hub.md](hub.md#component-adoption).
 
 ---
 
-## Header: component.h
+## Header: wm-hub.h
 
-```c
-#ifndef COMPONENT_H
-#define COMPONENT_H
-
-// Forward declarations
-typedef struct Component Component;
-typedef struct Target Target;
-typedef struct Request Request;
-typedef struct Event Event;
-typedef struct SMTemplate SMTemplate;
-typedef uint32_t TargetType;
-typedef uint32_t RequestType;
-typedef uint32_t EventType;
-
-struct Component {
-    const char* name;
-    
-    TargetType* accepted_targets;
-    uint32_t num_targets;
-    
-    RequestType* requests;
-    uint32_t num_requests;
-    
-    EventType* events;
-    uint32_t num_events;
-    
-    // Lifecycle
-    void (*on_init)(void);
-    void (*on_shutdown)(void);
-    void (*on_adopt)(Target* t);
-    void (*on_unadopt)(Target* t);
-    
-    // Operations
-    void (*executor)(Request* req);
-    void (*listener)(Target* t, Event* e);
-    
-    // SM template
-    SMTemplate* (*get_sm_template)(void);
-    
-    // Internal
-    void* instance_data;
-};
-
-// Component lifecycle
-void component_init(Component* c);
-void component_destroy(Component* c);
-
-// Target adoption
-void component_adopt(Component* c, Target* t);
-void component_unadopt(Component* c, Target* t);
-
-// Query
-bool component_handles_request(Component* c, RequestType type);
-bool component_emits_event(Component* c, EventType type);
-bool component_accepts_target(Component* c, TargetType type);
-
-#endif // COMPONENT_H
-```
+`HubComponent` is declared in `wm-hub.h`, together with the registration, lookup and unregistration calls. This document does not copy the header: a second copy drifts from the one the compiler reads.
 
 ---
 
@@ -576,7 +491,7 @@ bool component_accepts_target(Component* c, TargetType type);
 1. **Unit tests for each component**: Send requests, verify SM transitions
 2. **Unit tests for listeners**: Send events, verify SM raw_write
 3. **Integration tests**: Full flow request → executor → SM → event emission
-4. **Hot-plug tests**: Load/unload component, verify adoption
+4. **Adoption tests**: Register a component, create a target, verify the component's `on_adopt` hook received it; register the component after the target and verify it did not.
 
 ---
 
