@@ -1,7 +1,7 @@
 # Architecture Overview
 
 *Document status: Authoritative*
-*Last updated: 2026-04-30*
+*Last updated: 2026-11-06*
 
 > **TL;DR:** Extensions coexist without conflict by subscribing to events instead of patching code. Read [VISION.md](../VISION.md) for the inspiration and [decisions.md](decisions.md) for the rationale.
 
@@ -83,38 +83,22 @@ void keybinding_fullscreen(void) {
 
 ## Target Adoption Model
 
-When a target (Client, Monitor) is created, it adopts compatible components from the registry.
+A target adopts the components that are registered when it is created. There is no adopted-components list on the target and no `target_adopt()` call: `client_create()` and `monitor_create()` call `hub_register_target()`, which calls `hub_adopt_components_for_target()`, which calls `on_adopt(target)` on each registered component whose `accepted_target_names` include the target's type.
 
 ```c
 Client* client_create(xcb_window_t window) {
     Client* c = malloc(sizeof(Client));
     c->window = window;
-    c->adopted_components = NULL;
-    c->state_machines = NULL;
-    
-    // Hub matches target type to components that accept TARGET_TYPE_CLIENT
-    Component** compatible = hub_get_components_for_target(TARGET_TYPE_CLIENT);
-    
-    for (int i = 0; compatible[i]; i++) {
-        component_adopt(c, compatible[i]);
-    }
-    
+
+    // Registration is what adopts the components: it runs their on_adopt
+    // hooks against this target. There is no separate adopt loop here.
+    hub_register_target(&c->target);
+
     return c;
 }
 ```
 
-**Adoption does:**
-1. Attaches component's listener (filtered for this target's ID)
-2. Attaches component's SM template (not yet allocated)
-
-**On-demand state machine allocation:**
-
-```c
-// Target decides when to create SM - not at target creation
-StateMachine* sm = target_get_sm(client, COMPONENT_FULLSCREEN);
-// First call to sm_create() allocates and initializes the SM
-// SM allocated only when actually needed
-```
+The component's `on_adopt` is where its state machine is created on that target. The machine is stored by name: `client_set_sm()` and `monitor_set_sm()` write it, and `client_get_sm()` and `monitor_get_sm()` read it. A component registered after the target exists is not adopted by it and gets the targets created after its own registration. [hub.md](hub.md#component-adoption) has the timing and what a component can do about targets that already exist.
 
 ---
 
@@ -248,20 +232,13 @@ Components receive concrete target IDs and don't need to know how resolution wor
 
 ---
 
-## Hot-Plugging Components
+## Adding a Component to a Running WM
 
-Components can be added or removed at runtime:
+The hub registers components, routes requests, and emits events. It has no hot-plug path: `hub_register_component()` adds a component to the registry and the request index, but it does not adopt existing targets, and there is no `hub_notify_compatible_targets()`. A component registered at runtime is adopted only by targets created after it.
 
-```c
-// Register a new component
-hub_register_component(&urgency_component);
+`hub_unregister_component()` removes a component from the registry and the request index. It does not call `on_unadopt` on the targets that adopted it, so the state machines it created stay on those targets.
 
-// Existing targets can adopt it
-target_adopt(existing_client, &urgency_component);
-
-// Or: notify all compatible targets to adopt
-hub_notify_compatible_targets(COMPONENT_URGENCY);
-```
+The built-in components register at startup in `wm-components.c`, before monitors and clients are created, which is what gives them every target. [hub.md](hub.md#component-adoption) has the sequence.
 
 ---
 

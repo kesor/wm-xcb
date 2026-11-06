@@ -1,9 +1,9 @@
 # Hub Design
 
 *Part of architecture documentation — Authoritative*
-*Last updated: 2026-04-30*
+*Last updated: 2026-11-06*
 
-> **💡 Paradigm Shift:** Components never talk to each other directly. They always go through the Hub. This decouples everything and enables true hot-plugging.
+> **💡 Paradigm Shift:** Components never talk to each other directly. They always go through the Hub. Registry, router and event bus keep one component's code out of another's; they do not by themselves make a component replaceable in a running WM. See [Component adoption](#component-adoption) for when a component gets a target.
 
 ---
 
@@ -83,15 +83,20 @@ Target* hub_get_target(TargetID id) {
 }
 ```
 
-### Compatible Components for Target Type
+### Component Adoption
 
-```c
-// When target is created, it needs to adopt compatible components
-Component** hub_get_components_for_target_type(TargetType type) {
-    // Iterate components[], filter by accepted_targets[]
-    // Return array of compatible components
-}
-```
+A target is an entity, not a generic struct: `Client`, `Monitor`, and `Tag` each embed a `HubTarget` and keep their own state. There is no `Target` base type, no adopted-components list, and no `target_adopt()` or `hub_notify_compatible_targets()`.
+
+Adoption runs from the target side, when the target registers:
+
+1. `client_create()` and `monitor_create()` call `hub_register_target()`.
+2. `hub_register_target()` calls `hub_adopt_components_for_target()`.
+3. That asks the registry for the components whose `accepted_target_names` include the target's type, and calls each component's `on_adopt(target)`.
+4. The component's `on_adopt` creates the state machine it owns on that target, with `client_set_sm()` or `monitor_set_sm()`. Components read it back by name with `client_get_sm()` or `monitor_get_sm()`.
+
+`hub_unregister_target()` calls each component's `on_unadopt` the same way before the target leaves the registry.
+
+A component is adopted by the targets registered after it. A target that already exists when the component registers is not re-adopted, because the hub has no re-adoption call: a component that has to cover those targets walks `hub_get_targets_by_type_name()` itself and runs its adoption step on each. `hub_unregister_component()` removes the component from the registry and the request index; it does not call `on_unadopt` on the targets it was adopted by.
 
 ---
 
