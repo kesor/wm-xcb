@@ -68,6 +68,10 @@ run; if it says "docs updated", read the doc.
    with no event. "I mutated something and it failed" is not that. A copy of the
    script in a temp tree is not executable: run it with `bash` or `chmod +x` it,
    and read a 126 as the copy's mode, not as the check catching the removal.
+   Restore each mutation from a copy of the file, not with `git checkout --`:
+   the file you mutated is often one you are also fixing, and checkout restores
+   the author's version and takes your fix with it. `cp f /tmp/f.ok` before the
+   first mutation and copy it back, or commit the fix before you mutate.
 3. **A rule broken.** State machines own state; components do not call each
    other; nothing in the event loop blocks; new behaviour arrives as a
    registration. Each has a gate — run them: `make test`, `make check-async`,
