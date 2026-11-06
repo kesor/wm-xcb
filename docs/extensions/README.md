@@ -134,28 +134,19 @@ attach-policy ──→ (standalone, minimal deps)
 
 ## Implementation Order Suggestion
 
-### Phase 1: Core Infrastructure
-1. **ewmh-desktop** — Required for external tools to work with the WM
-2. **pertag** — Foundation for multi-tag workflows
+Build the six extension points in the table above (and the bar component,
+wm-rh6.4) before any design the audit marked core edit. Without them those
+designs edit shared files, which is the collision section 4 exists to avoid.
 
-### Phase 2: Basic Extensions
-3. **gap** — Very common feature, demonstrates hook system
-4. **bstack** — New layout, proves layout extensibility
-5. **cfact** — Relative sizing, enhances tiling
+Once the points exist, the order among additive designs is preference:
 
-### Phase 3: User Experience
-6. **floatpos** — Floating window positioning
-7. **scratchpad** — Quick access windows
-8. **bar-style** — Visual customization
-
-### Phase 4: Polish
-9. **urgency** — Attention-getting
-10. **actualfullscreen** — Fullscreen enhancement
-11. **resizecorners** — Resize UX
-12. **focus-adjacent** — Navigation convenience
-
-### Phase 5: Advanced
-13. **attach-policy** — Client ordering
+1. **ewmh-desktop** — already built
+2. **floatpos**, **focus-adjacent**, **resizecorners** — additive or new state today
+3. **gap**, **bar-style**, **actualfullscreen** — after the work area (wm-46k.18) and the bar
+4. **bstack**, **cfact** — after the layout registry (wm-46k.19)
+5. **pertag** — after layout parameters on the monitor (wm-46k.20)
+6. **scratchpad**, **urgency** — after the tag-mask request (wm-46k.21) and `REQ_CLIENT_FOCUS` (wm-46k.22); urgency also wants the urgency machine (wm-46k.17) and the bar
+7. **attach-policy** — after the insertion policy (wm-46k.23)
 
 ## Event Coverage
 
