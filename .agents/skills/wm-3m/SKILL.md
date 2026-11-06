@@ -1,6 +1,6 @@
 ---
 name: wm-3m
-description: Judge a worker run and find what to improve, using the three Ms — muda (what the flow lost), mura (how uneven it was), muri (how overburdened it was). Use after a run finishes, when asked how a run went, when deciding whether a friction report is worth filing, or when comparing two runs to see whether a change helped.
+description: Judge a worker run and find what to improve, using the three Ms — muda (what the flow lost), mura (how uneven it was), muri (how overburdened it was) — then close the judgement with one dated target condition. Use after a run finishes, when asked how a run went, when deciding whether a friction report is worth filing, or when comparing two runs to see whether a change helped.
 ---
 
 # 3M: judging a run
@@ -43,6 +43,14 @@ when the class stops happening.
 | **Over-processing** 過剰加工 | more effort than the value needs | an 18-minute review of five beads; re-running gates by hand after a merge that already ran them |
 | **Defects** 不良 | rework caused by getting it wrong first | three false claims in one `AGENTS.md` rewrite; a test that made `make SANITIZE=1 test-x` impossible; a CI gates job green for months with every command skipped |
 | **Unused talent** 人の活用不足 | the actor was not asked, or not given what it needed | workers not told they may file beads; not given the harness to read; not given `xwininfo`, so one wrote a C program instead |
+
+Ohno identified seven of those. The eighth is contested: Womack and Jones name
+"goods and services which do not meet the needs of the customer", and this
+project chose unused talent instead. In a loop that builds a tool for its own
+operator, unused talent is the waste that recurs — a worker not told it may file
+friction, a reviewer not given the log. In a product loop the other eighth is the
+bigger one. Do not add a ninth without a witness; two candidates for the last row
+is already one more than the list can settle.
 
 Two rules that keep the list honest:
 
@@ -99,8 +107,15 @@ Look for the load on a single actor:
 
 ## How to judge a run
 
-Read the transcript, then fill this in before deciding anything. Six lines, no
-prose:
+Read the transcript itself before the summary. `worker.py metrics` prints counts
+and percentiles, and a percentile cannot tell you what an item waited for. The
+log can. That is the map-and-territory distinction doing real work: when the
+metric and the transcript disagree, the transcript is right, and no amount of
+reading summaries will find the thing only the log shows. (A CI job here reported
+success in 0.03 seconds for months; the summary was green and the log had every
+command skipped.)
+
+Then fill this in before deciding anything. Six lines, no prose:
 
 ```
 run:      <ids>            commits: N   rounds: R
@@ -110,6 +125,12 @@ mura:     <what varied against comparable runs>
 muri:     <who was overburdened, with the number>
 value:    <defects found, beads closed, gates now running>
 ```
+
+Before the list, one preference. Deleting a step costs nothing; a retry, a longer
+timeout or one more parallel chain costs every future run. Imai's version for a
+factory: eliminating muda costs nothing while buying capacity costs money. So a
+finding that can be answered by removing work beats one answered by adding
+machinery, even when the machinery is the more obvious fix.
 
 Then decide per finding, cheapest first:
 
@@ -128,6 +149,28 @@ Then decide per finding, cheapest first:
    the muda category in the title: `friction(seiton, waiting): ...`. The bucket
    says how to fix it; the muda says what it costs.
 5. **Drop it** if the value was real. Not every long run is waste.
+
+---
+
+## Close the judgement with one target condition
+
+A judgement that ends in a list of fixes gives the next cycle nothing to check
+itself against. End it with one **target condition**: a condition on the process,
+not on the result, observable, reachable in weeks, and carrying a date.
+
+- "Reviews are faster" is a result. "By the 14th, every item in review has a
+  recorded start time and a recorded decision time" is a target condition. Rother's
+  point is blunt: a target that specifies only a result is not a target at all.
+- Ask the five questions against the transcript rather than at a desk: what is the
+  target condition; what is the condition now; which obstacle are you addressing;
+  what is the next step and what do you expect to learn from it; when can we go and
+  see?
+- **The next step does not have to be a fix.** Very often it is to look more
+  carefully, and a session told to produce a remedy before it has understood will
+  invent one.
+- When the judgement produced three or more findings, name the one that moves the
+  target condition and file the rest. A cycle that changes five things cannot say
+  which one worked, which is the same argument as one knob at a time.
 
 ---
 

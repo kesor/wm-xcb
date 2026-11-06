@@ -15,6 +15,13 @@ this environment, is `.agents/skills/wm-line/SKILL.md`. A report whose fix would
 be an optimization the four rules refuse does not get filed as friction; it gets
 argued against once, in the bead's comments.
 
+These five words are housekeeping's: sort, set in order, shine, standardise,
+sustain. This project uses them to file friction against a loop, not to tidy a
+workplace. The difference is not pedantry — an Imai 5S audit looks at shelves and
+floor markings; this one looks at commands, gates and documents that cost a
+session its time. Do not report a tidy desk under this skill, and do not let a
+real housekeeping problem hide inside it either.
+
 ## When to file
 
 File a bead when any of these happens:
@@ -44,6 +51,11 @@ Filing the bucket is what makes the report actionable.
 | **seisō** 清掃 | shine: clean the surface | formatting drift, compiler warnings, lint noise, a leak reported by a sanitizer | P2 |
 | **seiketsu** 清潔 | standardise: write the rule down | undocumented convention, contradictory instructions, a rule that lives only in someone's head | **P1** |
 | **shitsuke** 躾 | sustain: make it stick | a fixed problem with no gate, a gate that can be skipped silently, a check that does not run in CI | **P1** |
+
+A standard here is the current best known way to do the job, and the people who
+do the work are the ones who revise it — a rule written by someone who never ran
+the command is a wish with a heading. Sustaining it is the work, not the
+ceremony: a document nobody re-reads has already decayed.
 
 Two rules override the table: anything that makes work stop gets **P0**, and a
 `shitsuke` report (add the gate) is always worth **P1**, because it is the one
@@ -121,5 +133,16 @@ hook is a warning, because `--no-verify` exists; a check that runs in CI on a
 protected branch is a control. A device nobody has seen fail is an assumption, so
 prove a new one by removing the thing it must catch. `DESIGN.md` §10 in the
 harness directory has the three levels.
+
+Two more rules for the triage, both learned the hard way:
+
+- **Prefer the fix that removes work over the fix that adds capacity.** Deleting
+  a step costs nothing; a retry, a longer timeout, or one more parallel chain
+  costs every future run. If the bead can be closed by removing the thing that
+  failed rather than by making failure cheaper, remove it.
+- **A fix outside this project's sphere of control is not a fix, it is a
+  handover.** Another team's pipeline, a vendor's tool, a service nobody here
+  operates: say so in the bead and name who owns it. Otherwise the report sits
+  open, and the next session reads it as work it can pick up.
 
 That is the *shitsuke* step, and it is why the epic exists.
