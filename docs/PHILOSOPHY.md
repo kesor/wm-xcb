@@ -181,19 +181,21 @@ makes the decoupling claim true. The audit and its current result live in
 
 ## 3. Rules that follow, and where they are enforced
 
-Short enough to check in review.
+Short enough to check in review. A rule whose column says review is checked
+with `.agents/skills/wm-review/SKILL.md`, "The philosophy rules, as checks": it
+names each rule below, what a violation looks like, and how to check it.
 
 | Rule | Why | Where it is checked |
 |------|-----|---------------------|
 | No component calls another component | 2.1 | review, by a person or an agent: `.agents/skills/wm-review/SKILL.md` |
 | No state assignment outside `sm_raw_write` / `sm_transition` | 2.2 | `scripts/check-private-state.sh` refuses the assignments in `tests/compile-fail/`. A tracked field with no fixture there is still review |
-| No `_reply()` in a handler or action | 2.3 | review + the async audit issue |
-| No blocking call in the loop: `poll`/`wait_for_event` only | 2.3 | `scripts/perf-test.sh` (idle CPU) |
+| No `_reply()` in a handler or action | 2.3 | `scripts/check-async.sh`, and review for a reply reached through a helper |
+| No blocking call in the loop: `poll`/`wait_for_event` only | 2.3 | `scripts/check-async.sh` (the calls) and `scripts/perf-test.sh` (idle CPU, which is what a spin costs) |
 | One flush per loop iteration | 2.3 | review |
 | Every request has a failure event | 2.2 | review: a request with only a success path is incomplete |
 | New behaviour is a registration, not an edit (see §2.4 test) | 2.4 | review |
 | Event ids come from the shared registry, never a fresh local enum | two components that share a value receive each other's events | `src/event-types.h`, `tests/unit/test-event-types.c` |
-| `make test` green, `scripts/xephyr-test.sh` no worse than before | promise 4 | CI (planned) |
+| `make test` green, `scripts/xephyr-test.sh` no worse than before | promise 4 | `make test` and `make test-x`, which compares against `tests/quality/seam-baseline.txt`; `scripts/xephyr-test.sh` by hand |
 | No AI attribution in commits, comments, or files | project rule | review |
 
 ---
