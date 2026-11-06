@@ -89,6 +89,11 @@ branch; `scripts/fuzz.sh` runs the two libFuzzer harnesses against the X event
 dispatcher and the window-rule matcher. `docs/QUALITY.md` has both, what the
 baseline means, and why a 0% file is the number worth reading.
 
+The coverage floors cover the production sources only. A file under `tests/` is
+printed in the table and carries no floor, in the baseline or in the comparison:
+its missed lines are the guards inside the tests' own helpers, and no passing
+test reaches one without breaking its environment.
+
 ### A test that early-returns is not coverage
 
 A unit test whose subject gives up for lack of an X connection asserts on a

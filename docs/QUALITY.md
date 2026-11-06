@@ -438,9 +438,9 @@ below its recorded floor in `tests/quality/coverage-baseline.txt` fails, and so
 does a source file with no floor at all: a new file arrives with somebody
 deciding what covers it. `--update-baseline` rewrites the floors from the
 current run; doing that to turn a red run green is the same as deleting a test,
-so say why in the commit. The floor written is the measured value less 1.5
-points, because the launcher tests fork and exec and their coverage moves by
-about a point between runs of the same tree.
+so say why in the commit. The floor written is the measured value less 3.0
+points, because the launcher tests fork and exec and their coverage moves by up
+to 2.6 points on a CI runner between runs of the same tree.
 
 The floors cover the production sources only. A file under `tests/` is printed
 in the table and carries no floor, in the baseline or in the comparison: its
