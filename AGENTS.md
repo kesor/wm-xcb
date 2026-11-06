@@ -329,18 +329,24 @@ check already handled proves nothing about the one it does not.
 
 ```c
 // BAD: Iterator pointer invalidated by callback
-for (Client* c = head; c != NULL; c = c->next) {
+for (Client* c = client_list_get_head(); c != NULL; c = client_get_next(c)) {
     callback(c);  // May free c!
     // c is now dangling
 }
 
 // GOOD: Snapshot next before callback
-for (Client* c = head; c != NULL;) {
-    Client* next = c->next;
+for (Client* c = client_list_get_head(); c != NULL;) {
+    Client* next = client_get_next(c);
     callback(c);
     c = next;
 }
+```
 
+The walk goes through `client_get_next()`, never `c->next`. The client list is
+circular around a sentinel: the last client's `next` points at the sentinel, not
+at NULL, so a loop that follows `c->next` until NULL never ends.
+
+```c
 // GOOD: Null pointer after free
 void cleanup(Component* comp) {
     if (comp->data != NULL) {
