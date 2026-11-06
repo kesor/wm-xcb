@@ -295,6 +295,15 @@ decisions, and `tests/x/test-109-seam-baseline-filter.sh` pins them. The one
 entry an update drops without measuring it is the one whose test file no longer
 exists.
 
+The header of each reviewed baseline is written by its generator, and the
+generator replaces the whole file: a note added to the committed file by hand is
+gone at the next refresh. `tests/x/test-112-baseline-refresh.sh` regenerates
+`tests/quality/seam-baseline.txt` and `tests/quality/async-baseline.txt` from
+their own entries and fails when the result differs from what is committed, so a
+hand-written line is caught before a refresh removes it. A note that belongs
+with a baseline goes in the generator's header; what the entries mean is
+explained here.
+
 Layout: the unit tests live in `tests/unit/`, the seam tests in `tests/x/`, and
 the reviewed baselines in `tests/quality/`. The repository root is the window
 manager itself.
