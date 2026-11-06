@@ -9,9 +9,9 @@
 # trip, while the documentation named only the first. A fresh checkout
 # following that documentation stopped twice before it ran a test.
 #
-# The two are removed here and the run has to put them back. The filter matches
-# no test file, because the question is whether the run starts at all, not what
-# it does with a test.
+# The two are removed here and the run has to put them back. The filter names
+# test-109, which starts no client and no WM of its own, so the nested run
+# reaches it without depending on the tools this test removed.
 
 set -uo pipefail
 
@@ -34,7 +34,7 @@ rm -f "$XCLIENT" "$SHIM"
 # $TMPDIR/wm-seam-tests, which is this run's WM log directory too.
 mkdir -p "$DIR"
 timeout 120 env TMPDIR="$DIR" "$ROOT_DIR/tests/x/run.sh" \
-  --filter=no-test-file-by-that-name >"$OUT" 2>&1
+  --filter=test-109 >"$OUT" 2>&1
 rc=$?
 
 check_eq "run.sh starts with the seam tools removed" 0 "$rc"
