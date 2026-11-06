@@ -145,9 +145,10 @@ Before the first edit, answer these. They are the questions the review will
 ask, and a wrong answer costs a rewrite instead of a paragraph:
 
 - **Which commitment does the work exercise, and which rule in
-  `docs/PHILOSOPHY.md` section 3 will judge it?** Registration, request, state
-  machine, or async. Say it in the commit body; it is the first thing the
-  reviewer checks.
+  `docs/PHILOSOPHY.md` section 3 will judge it?** The four are in section 2:
+  components do not call each other, state machines own state, async first,
+  registration. Say which one in the commit body. The reviewer checks the diff
+  against that rule; the sentence is a claim, not the check.
 - **The extension point question (section 4): does this edit a file it does not
   own?** If so, name the file and the missing extension point, add the extension
   point first, and say so in the issue. New per-target state belongs in the

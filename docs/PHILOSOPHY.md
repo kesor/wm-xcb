@@ -183,7 +183,7 @@ makes the decoupling claim true. The audit and its current result live in
 
 Short enough to check in review. A rule whose column says review is checked
 with `.agents/skills/wm-review/SKILL.md`, "The philosophy rules, as checks": it
-names each rule below, what a violation looks like, and the command to run.
+names each rule below, what a violation looks like, and how to check it.
 
 | Rule | Why | Where it is checked |
 |------|-----|---------------------|

@@ -81,7 +81,7 @@ run; if it says "docs updated", read the doc.
    that approved 22 of 32 keybindings was reviewed with no seam run, on an empty
    diff, and the seam suite was the evidence that did not depend on the author's
    throwaway scripts. The next section names every rule in `docs/PHILOSOPHY.md`
-   section 3, what a violation of it looks like, and which command catches it.
+   section 3, what a violation of it looks like, and how to check it.
 4. **Something left broken or half-done and not mentioned.** A behaviour change
    without a test, a document that now contradicts the code, a comment
    describing what the code no longer does, a defect the author noticed and only
