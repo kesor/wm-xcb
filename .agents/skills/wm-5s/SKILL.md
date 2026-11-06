@@ -66,6 +66,7 @@ Parent epic: `wm-dfg` ("Harness friction"). Verify with
 bd list --status=open --limit 0 | grep -i -e lefthook -e PATH
 
 bd create --type=chore --priority=1 --parent=wm-dfg --labels=friction \
+  --no-inherit-labels \
   --title "friction(seiton): lefthook missing from the worker shell" \
   --description "What I tried: lefthook run pre-commit
 What happened: command not found
@@ -73,6 +74,12 @@ What worked: nix develop --command lefthook run pre-commit
 Cost: one guess, plus reading the hook script to find the fallback.
 Suggested fix: start the worker shell inside the dev shell."
 ```
+
+`--no-inherit-labels` is not optional: `bd` copies the parent's labels onto the
+child, and `wm-dfg` carries `harness`, so a bead created without it is born
+labelled as a harness fix and the loop skips it without reading it. Add
+`--labels=friction,harness` yourself, and only when the fix is in the worker
+harness repository rather than this tree.
 
 Title shape: `friction(<bucket>): <the thing>, <the symptom>`.
 Description: four lines — tried, happened, worked, cost — plus a suggested fix
