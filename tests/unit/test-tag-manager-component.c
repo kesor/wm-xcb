@@ -564,7 +564,7 @@ test_tag_manager_client_move_action(void)
   };
   assert(action_invoke("tag-manager.client-move", &inv) == true);
   assert(c->tags == 0);
-  assert(c->mapped == false);
+  assert(client_is_mapped(c) == false);
 
   tag_manager_component_shutdown();
   focus_component_shutdown();

@@ -489,6 +489,19 @@ how `wm-kbd-mouse.c` kept an `xcb_grab_pointer_reply()` with every gate green.
 probe files: one blocking call per line must be reported, and a `//` comment, a
 string literal, a block comment and a `poll_for_reply` call must not.
 
+`scripts/check-private-state.sh` checks the other half of the state rules
+mechanically: a component that assigns a machine-tracked value must not compile.
+Each fixture under `tests/compile-fail/` is built twice, once with
+`-DPRIVATE_STATE_CONTROL` through its accessor, which has to succeed, and once
+assigning the field itself, which must be refused. The control build is what
+tells a refusal from a fixture that stopped compiling because an include path
+moved. Adding a tracked value means adding a fixture for it; the values that are
+still public and the reason for each are in `docs/architecture/state-machine.md`.
+
+The fixtures are ordinary C files and are formatted like the rest of the tree.
+They are not part of `SRC`, so the build, `check-async` and the coverage floors
+never see them: what makes them pass is the compiler refusing them.
+
 `xcb_poll_for_event()` is not on the list. It returns NULL instead of waiting,
 which is what the loop does to drain the events libxcb queued after `poll(2)`
 reported the connection readable, and a grep cannot tell that from the spin it

@@ -131,13 +131,13 @@ tag_view_sm_emit(StateMachine* sm, uint32_t from_state, uint32_t to_state, void*
 {
   (void) from_state;
 
-  if (sm == NULL || sm->owner == NULL)
+  if (sm == NULL || sm_get_owner(sm) == NULL)
     return;
 
-  Monitor* m = (Monitor*) sm->owner;
+  Monitor* m = (Monitor*) sm_get_owner(sm);
 
   /* Get the tag mask from the SM data (stored as void*) */
-  uint32_t* tag_mask_ptr = (uint32_t*) sm->data;
+  uint32_t* tag_mask_ptr = (uint32_t*) sm_get_data(sm);
   uint32_t  new_mask     = tag_mask_ptr ? *tag_mask_ptr : 0;
 
   LOG_DEBUG("Tag view changed for monitor %lu: mask=0x%x",
@@ -304,10 +304,10 @@ tag_manager_get_visible_tags(Monitor* m)
     return 0;
 
   StateMachine* sm = monitor_get_sm(m, TAG_VIEW_SM_NAME);
-  if (sm == NULL || sm->data == NULL)
+  if (sm == NULL || sm_get_data(sm) == NULL)
     return 0;
 
-  uint32_t* tag_mask = (uint32_t*) sm->data;
+  uint32_t* tag_mask = (uint32_t*) sm_get_data(sm);
   return *tag_mask;
 }
 
@@ -324,7 +324,7 @@ tag_manager_set_visible_tags(Monitor* m, uint32_t tag_mask)
   if (sm == NULL)
     return;
 
-  uint32_t* current_mask = (uint32_t*) sm->data;
+  uint32_t* current_mask = (uint32_t*) sm_get_data(sm);
   if (current_mask == NULL)
     return;
 
@@ -382,21 +382,21 @@ tag_manager_update_visibility(Monitor* m)
   /* Iterate all clients and update their visibility */
   Client* c = client_list_get_head();
   while (c != NULL) {
-    if (c->monitor == m && c->managed) {
+    if (c->monitor == m && client_is_managed(c)) {
       bool should_be_visible = (c->tags & visible_tags) != 0;
 
-      if (should_be_visible && !c->mapped) {
+      if (should_be_visible && !client_is_mapped(c)) {
         /* Show client */
         LOG_DEBUG("Showing client %u (tags=0x%x, visible=0x%x)",
                   c->window, c->tags, visible_tags);
         client_show(c->window);
-        c->mapped = true;
-      } else if (!should_be_visible && c->mapped) {
+        client_set_mapped(c, true);
+      } else if (!should_be_visible && client_is_mapped(c)) {
         /* Hide client */
         LOG_DEBUG("Hiding client %u (tags=0x%x, visible=0x%x)",
                   c->window, c->tags, visible_tags);
         client_hide(c->window);
-        c->mapped = false;
+        client_set_mapped(c, false);
       }
     }
     c = client_get_next(c);
@@ -663,16 +663,13 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
     return;
   }
 
-  tag_index         = tag_index - 1; /* Convert to 0-based */
-  uint32_t tag_mask = TAG_MASK(tag_index);
+  tag_index = tag_index - 1; /* Convert to 0-based */
 
   /* Toggle the tag on the client */
-  if ((c->tags & tag_mask) != 0) {
-    /* Remove tag */
-    c->tags &= ~tag_mask;
+  if (client_has_tag(c, tag_index)) {
+    client_remove_tag(c, tag_index);
   } else {
-    /* Add tag */
-    c->tags |= tag_mask;
+    client_add_tag(c, tag_index);
   }
 
   LOG_DEBUG("Tag client toggle: client=%u, new_tags=0x%x", c->window, c->tags);
@@ -685,12 +682,12 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
     uint32_t visible_tags      = tag_manager_get_visible_tags(m);
     bool     should_be_visible = (c->tags & visible_tags) != 0;
 
-    if (should_be_visible && !c->mapped) {
+    if (should_be_visible && !client_is_mapped(c)) {
       client_show(c->window);
-      c->mapped = true;
-    } else if (!should_be_visible && c->mapped) {
+      client_set_mapped(c, true);
+    } else if (!should_be_visible && client_is_mapped(c)) {
       client_hide(c->window);
-      c->mapped = false;
+      client_set_mapped(c, false);
     }
   }
 
@@ -731,7 +728,7 @@ tag_manager_on_adopt(HubTarget* target)
   }
 
   /* Initialize with default tag 1 visible */
-  uint32_t* tag_mask = (uint32_t*) sm->data;
+  uint32_t* tag_mask = (uint32_t*) sm_get_data(sm);
   if (tag_mask != NULL) {
     *tag_mask = TAG_MASK(0); /* Tag 1 (index 0) */
   }

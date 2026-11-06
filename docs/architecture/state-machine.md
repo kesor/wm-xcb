@@ -51,30 +51,91 @@ These are independent SMs. A client can be simultaneously:
 
 ## SM Instance Structure
 
-```c
-typedef struct StateMachine {
-    const char* name;
-    
-    // Current state
-    uint32_t current_state;
-    
-    // Owner
-    Target* owner;  // the client/monitor this SM belongs to
-    
-    // Template reference
-    SMTemplate* template;
-    
-    // Hooks for components (optional)
-    Hook* pre_guards;      // executed before guard
-    Hook* post_actions;    // executed after action
-    
-    // Instance-specific data (from template)
-    void* data;
+`StateMachine` is an opaque type in `sm-instance.h`. Its definition is in
+`src/sm/sm-instance-internal.h`, which only `src/sm/sm-instance.c` includes.
+`current_state` is the value the
+single-writer rule is about: while the definition sat in the public header any
+component could assign it and compile, and the WM and the X server would then
+disagree days later with no trace back to the write. A translation unit that
+never sees the definition cannot name the field, so that mistake is a build
+error rather than a review finding.
 
-    // Frees data on sm_destroy; NULL when somebody else owns it
-    void (*data_free)(void*);
-} StateMachine;
-```
+What a component can read, it reads through the accessors:
+
+| Value | Read with | Changed with |
+|-------|-----------|--------------|
+| current state | `sm_get_state()` | `sm_raw_write()`, `sm_transition()` |
+| owner target | `sm_get_owner()` | fixed at `sm_create()` |
+| template | `sm_get_template()` | fixed at `sm_create()` |
+| instance data | `sm_get_data()` | `sm_set_data()`, `sm_set_owned_data()` |
+| name | `sm_get_name()` | from the template |
+
+A guard or an action that needs a value the accessors do not expose is a reason
+to add an accessor, not to include the internal header from a component.
+
+---
+
+## Values a component cannot write
+
+Each of these is tracked state: the WM's behaviour depends on the value, and the
+value has mutually exclusive states. A component cannot assign any of them,
+because the definition is in a header no component includes.
+
+| Value | Written by | How the field is kept out of reach |
+|-------|-----------|-----------------------------------|
+| `StateMachine.current_state` | `sm_raw_write()`, `sm_transition()` | `sm-instance.h` declares the type only; the definition is in `sm-instance-internal.h` |
+| `ClientState.managed`, `.urgent`, `.mapped` | `client_set_managed()`, `client_set_urgent()`, `client_set_mapped()` | `client.h` declares the type and a pointer to it; the definition is in `client.c` |
+
+`scripts/check-private-state.sh` compiles every fixture under `tests/compile-fail/`
+twice: with `-DPRIVATE_STATE_CONTROL` through the accessor, which must succeed, and
+without it assigning the field, which must not compile. The control build is what
+tells a refusal from a fixture that fails because an include path moved. The
+fixtures include the public headers only. A file that includes
+`sm-instance-internal.h` can assign `current_state`. A file that includes
+`client.h` can assign `Client.tracked` itself, and swapping two clients' pointers
+exchanges managed, urgent and mapped without an accessor. Neither assignment is
+a fixture, so neither is what the gate refuses.
+
+The tracked values that are still public, and why:
+
+- **`Monitor.tagset` and `prevtagset`** are written only by `monitor.c`'s own tag
+  helpers, so no component assigns them today. They are also a second copy of
+  the tag view TagViewSM holds in its instance data, and nothing keeps the two in
+  agreement: a client created between them takes its tags from the field and is
+  shown or hidden by the machine. That duplicate is wm-46k.6. Hiding the field
+  before the duplicate is gone would hide the defect, not the write.
+- **`struct Context.state`** in `wm-states.h` is the pre-hub transition table's
+  state. Only `wm-states.c` and its test write it, and the table is due for
+  removal in favour of the component that owns pointer input, so it does not earn
+  an accessor layer first. wm-46k.15 tracks that subsystem.
+- **`Client.tags`** is the set of tags the client is assigned to, not exclusive
+  state, and it is written through `client_set_tags()`, `client_add_tag()` and
+  `client_remove_tag()`.
+- **`Client.focusable`, `Client.monitor` and `Client.stack_mode`** are a
+  capability from WM_HINTS, an association, and a mirror of the X stack order.
+- **`Client.urgent`** is behind an accessor but has no machine, even though the
+  built-in list below still promises an UrgencySM. wm-46k.17 decides which of the
+  two is wrong.
+- **`selected_monitor`** is an `extern` in `monitor.h`. Only `monitor.c` assigns
+  it; other files use `monitor_get_selected()` and `monitor_set_selected()`. It is
+  which monitor is selected. The built-in table names a SelectedSM, and this
+  pointer is the store that exists. It is not a field of `StateMachine` or
+  `Client`, so making those opaque does not reach it.
+- **`FocusComponent.focused_window`** is a field of the public component struct in
+  `focus.h`. Only `focus.c` assigns it; readers use `focus_get_focused_window()`.
+  It is a second copy of the client's focus machine: `current_state` is
+  unreachable, and this window id is not. Taking the field out of the public
+  struct is a change to that component, and it is not this one.
+- **`Pertag.curtag` and `prevtag`** are fields of `struct Pertag`, which `pertag.h`
+  publishes and `pertag_get_data()` returns, so a caller can assign them. No file
+  outside `pertag.c` does. The live tag view is TagViewSM; this index is a second
+  store the running WM does not read. Making `Pertag` incomplete would hide the
+  write and would also hide the per-tag arrays the header exists to expose.
+
+The client's fullscreen, floating and focus machines, the monitor's layout and
+tag view, and the connection template are state machine instances, so the row for
+`StateMachine.current_state` covers their state. It does not cover the copies
+named above.
 
 ---
 
@@ -260,9 +321,9 @@ SMTemplate fullscreen_template = {
 
 // Guard functions
 bool fs_guard_can_fullscreen(StateMachine* sm, void* data) {
-    Client* c = (Client*)sm->owner;
+    Client* c = (Client*)sm_get_owner(sm);
     // Can always fullscreen a managed client
-    return c->managed;
+    return client_is_managed(c);
 }
 
 bool fs_guard_can_unfullscreen(StateMachine* sm, void* data) {
@@ -382,25 +443,22 @@ typedef struct StateMachine StateMachine;
 typedef struct Target Target;
 typedef struct Event Event;
 
-// State machine instance
-struct StateMachine {
-    const char* name;
-    uint32_t current_state;
-    Target* owner;
-    
-    struct SMTemplate* template;
-    
-    struct Hook* hooks[HOOK_MAX];
-    void* data;
-};
+// State machine instance: opaque, defined in sm-instance-internal.h
+typedef struct StateMachine StateMachine;
 
 // Operations
-StateMachine* sm_create(Target* owner, struct SMTemplate* tmpl);
+StateMachine* sm_create(void* owner, struct SMTemplate* tmpl, EventEmitter emit, void* emit_userdata);
 void sm_destroy(StateMachine* sm);
 
 void sm_raw_write(StateMachine* sm, uint32_t new_state);
 bool sm_transition(StateMachine* sm, uint32_t target_state);
 uint32_t sm_get_state(StateMachine* sm);
+
+// Read the owner, the template, the instance data and the name
+void* sm_get_owner(StateMachine* sm);
+struct SMTemplate* sm_get_template(StateMachine* sm);
+void* sm_get_data(StateMachine* sm);
+const char* sm_get_name(StateMachine* sm);
 
 // Query
 bool sm_can_transition(StateMachine* sm, uint32_t target_state);
@@ -422,7 +480,6 @@ void sm_add_hook(StateMachine* sm, HookPhase phase, HookFn fn, void* userdata);
 void sm_remove_hook(StateMachine* sm, HookPhase phase, HookFn fn);
 
 // Template helpers
-struct SMTemplate* sm_get_template(StateMachine* sm);
 const char* sm_get_state_name(StateMachine* sm, uint32_t state);
 
 #endif // SM_H

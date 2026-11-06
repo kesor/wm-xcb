@@ -109,6 +109,45 @@ test_client_create_none_window(void)
 }
 
 /*
+ * Registration can fail after ClientState is allocated. Filling the hub's
+ * target table is what makes hub_register_target() refuse the client. The
+ * assertions check the refusal; the leak sanitizer is what sees a refusal
+ * path that frees the Client and not the state block.
+ */
+void
+test_client_create_refused_when_target_table_is_full(void)
+{
+  LOG_CLEAN("== Testing client create frees its state when registration is refused");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+
+  Client*  created[300];
+  uint32_t n = 0;
+  while (n < 300) {
+    Client* c = client_create((xcb_window_t) (n + 1));
+    if (c == NULL)
+      break;
+    created[n++] = c;
+  }
+
+  assert(n > 0);
+  assert(n < 300);
+  assert(hub_target_count() == n);
+
+  /* A second refusal must not grow the table either. */
+  assert(client_create(10000) == NULL);
+  assert(hub_target_count() == n);
+
+  for (uint32_t i = 0; i < n; i++)
+    client_destroy(created[i]);
+
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+/*
  * Test client destruction
  */
 void
@@ -319,10 +358,13 @@ test_client_properties(void)
   assert(client_has_tag(c, 7) == true);
   assert(client_has_tag(c, 8) == false);
 
-  /* Test state flags */
+  /* Test state flags. A new client is in neither exclusive state, and each
+   * one is read and written only through its accessor. */
+  assert(client_is_urgent(c) == false);
   client_set_urgent(c, true);
   assert(client_is_urgent(c) == true);
 
+  assert(client_is_managed(c) == false);
   client_set_managed(c, true);
   assert(client_is_managed(c) == true);
 
@@ -331,6 +373,7 @@ test_client_properties(void)
   assert(client_is_focusable(c) == false);
 
   /* Test mapped state */
+  assert(client_is_mapped(c) == false);
   client_set_mapped(c, true);
   assert(client_is_mapped(c) == true);
   client_set_mapped(c, false);
@@ -814,6 +857,7 @@ TEST_GROUP(ClientTarget, {
   test_client_list_init();
   test_client_create();
   test_client_create_none_window();
+  test_client_create_refused_when_target_table_is_full();
   test_client_destroy();
   test_client_destroy_by_window();
   test_client_sentinel_list();
