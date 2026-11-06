@@ -115,6 +115,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, cites a line of that program on its third, is named after that program, and names one that is installed on `PATH` outside the fake directory. The check resolves that name to a path, requires a regular file, and looks for the cited line in it. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it |
+| bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
@@ -315,6 +316,30 @@ a fresh clone - skips it. The verdict lives in
 `scripts/lib/bead-description-report.sh`, and
 `tests/x/test-103-bead-description-report.sh` feeds it recorded issue lists, so
 the shapes it has to catch are pinned with no tracker involved.
+
+## The bead-acceptance baseline
+
+`scripts/check-bead-acceptance.sh` fails when an issue listed in
+`tests/quality/bead-acceptance-baseline.txt` has no acceptance criteria, has
+only whitespace, or is missing from the list the gate read.
+
+The command it watches is `bd update <id> --acceptance "$(...)"`. An empty value
+prints "Updated issue" and exits 0. `--description` has a stdin form that refuses
+an empty body; `--acceptance` has none, so nothing in `bd` refuses the empty
+value at all. `bd` also writes no key for an empty field, so an issue that lost
+its criteria and one that never had any read the same in `bd list --json`. That
+is why this gate carries a baseline instead of only an exception list: the
+entries are the issues that had text, and one of them losing it is the change
+the gate can see. `bd history <id> --events` keeps the text each update
+replaced, under `Old:`.
+
+The list comes from the tracker, so a machine without that database skips the
+gate. When the tracker list carries no acceptance key at all, the gate reads
+`.beads/issues.jsonl`, the export beside the database, which carries the field
+and is where the gate can still see it on a `bd` whose list output dropped it.
+The verdict lives in `scripts/lib/bead-acceptance-report.sh`, and
+`tests/x/test-110-bead-acceptance-report.sh` feeds it recorded issue lists, so
+each refusal is pinned with no tracker involved.
 
 ## Adding a gate
 
