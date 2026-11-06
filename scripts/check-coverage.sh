@@ -2,7 +2,12 @@
 #
 # check-coverage.sh - what the unit suite actually executes, per file.
 #
-# Usage: scripts/check-coverage.sh [--update-baseline] [--show-zero]
+# Usage: scripts/check-coverage.sh [--update-baseline] [--allow-lower] [--show-zero]
+#                                   [file...]
+#
+# With file arguments only those files are compared, or updated: a path relative
+# to the repository root, or a suffix of one, so `config-file.c` names
+# src/config-file.c. The rest of the baseline is left alone.
 #
 # A test that passes tells you the path it took works. It says nothing about the
 # paths it never took. This builds the unit suite with gcov instrumentation, runs
@@ -33,9 +38,13 @@
 # are the launcher's, and making them deterministic would let it go back to one
 # point.
 #
-# --update-baseline rewrites the floors from this run. Doing that to make a red
-# run green is the same as deleting a test: say in the commit why the drop is
-# acceptable.
+# --update-baseline merges this run into the floors already recorded rather than
+# rewriting the file: the entries for files the run did not measure, or that were
+# not named, keep their floors, and so does a file this run measured lower than
+# its floor - that is the measurement moving, not a coverage decision, and a
+# lowered floor cannot notice the loss that follows. Code removed, or a test
+# deleted on purpose, is --allow-lower, and the commit that uses it says why:
+# lowering a floor to make a red run green is the same as deleting a test.
 #
 # Exit status: 0 when every file meets its floor, 1 otherwise.
 
@@ -44,20 +53,30 @@ set -uo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR" || exit 1
 
-BASELINE="tests/quality/coverage-baseline.txt"
+# Absolute: the run happens with the build directory as its working directory.
+BASELINE="$ROOT_DIR/tests/quality/coverage-baseline.txt"
 MARGIN=3.0
 UPDATE=0
+ALLOW_LOWER=0
 SHOW_ZERO=0
+FILES=()
 for arg in "$@"; do
   case $arg in
     --update-baseline) UPDATE=1 ;;
+    --allow-lower) ALLOW_LOWER=1 ;;
     --show-zero) SHOW_ZERO=1 ;;
-    *)
+    -*)
       echo "check-coverage: unknown argument '$arg'" >&2
       exit 1
       ;;
+    *) FILES+=("$arg") ;;
   esac
 done
+
+if [ "$ALLOW_LOWER" -eq 1 ] && [ "$UPDATE" -eq 0 ]; then
+  echo "check-coverage: --allow-lower only means something with --update-baseline" >&2
+  exit 1
+fi
 
 if ! command -v gcov >/dev/null 2>&1; then
   echo "check-coverage: gcov is not on PATH. Start the dev shell." >&2
@@ -69,6 +88,7 @@ fi
 # sanitize to rebuild its variant). Keeping the cache under build/ meant those
 # gates turned a 0.45s check into a 7s one.
 BUILD=.cache/coverage
+MEASURED="$ROOT_DIR/$BUILD/measured.tsv"
 mkdir -p "$BUILD"
 # Incremental: the object files are valid until their source changes, and the
 # counters reset by deleting the .gcda. A full rebuild took 7s every time, which
@@ -145,11 +165,11 @@ gcov -j -b -o . "${names[@]}" >/dev/null 2>gcov.err || true
 # gcov writes the JSON gzipped, and the dev shell's python has no zlib module.
 gzip -df ./*.gcov.json.gz 2>/dev/null || true
 
-COVERAGE_MARGIN=$MARGIN python3 - "$ROOT_DIR" "$UPDATE" "$SHOW_ZERO" "$BASELINE" <<'PY'
+python3 - "$ROOT_DIR" "$SHOW_ZERO" "$UPDATE" "$MEASURED" <<'PY'
 import glob, json, os, sys
 
-root, update, show_zero = sys.argv[1], sys.argv[2] == "1", sys.argv[3] == "1"
-baseline_path = os.path.join(root, sys.argv[4])
+root, show_zero, update, measured_path = (
+    sys.argv[1], sys.argv[2] == "1", sys.argv[3] == "1", sys.argv[4])
 
 files = {}
 for path in glob.glob("*.gcov.json"):
@@ -193,54 +213,21 @@ if zero and (show_zero or not update):
     for name in zero:
         print(f"  {name}")
 
-baseline = {}
-if os.path.exists(baseline_path):
-    for line in open(baseline_path):
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        parts = line.split()
-        if len(parts) >= 2:
-            baseline[parts[0]] = float(parts[1])
-
-# A test file's missed lines are its helpers' failure returns, which only a
-# broken environment reaches. The row is printed for the reader and left out of
-# both the comparison and the baseline, so no floor there can go stale.
-def carries_floor(name):
-    return not name.startswith("tests/")
-
-floored = [(name, v) for name, v in rows if carries_floor(name)]
-
-if update:
-    with open(baseline_path, "w") as fh:
-        fh.write("# Line-coverage floors for the unit suite, per production source file.\n")
-        fh.write("# Written by scripts/check-coverage.sh --update-baseline. A file that\n")
-        fh.write("# drops below its floor fails the gate; a new file must be added here\n")
-        fh.write("# deliberately, which is the moment somebody decides what covers it.\n")
-        fh.write("# Test files under tests/ are printed by the run and carry no floor: a\n")
-        fh.write("# helper's error return is only reachable by breaking the environment.\n")
-        fh.write("# Deleted files are dropped by the next update.\n#\n")
-        for name, (line_pct, _b, _l, _br) in floored:
-            floor = max(0.0, line_pct - float(os.environ["COVERAGE_MARGIN"]))
-            fh.write(f"{name} {floor:.1f}\n")
-    print(f"\ncheck-coverage: wrote {len(floored)} floor(s) to {os.path.relpath(baseline_path, root)}")
-    sys.exit(0)
-
-problems = []
-for name, (line_pct, _b, _l, _br) in files.items():
-    if not carries_floor(name):
-        continue
-    floor = baseline.get(name)
-    if floor is None:
-        problems.append(f"{name}: no floor recorded ({line_pct:.1f}% lines); add it to the baseline deliberately")
-    elif line_pct + 0.05 < floor:
-        problems.append(f"{name}: {line_pct:.1f}% lines, below its floor of {floor:.1f}%")
-
-if problems:
-    print()
-    for p in problems:
-        print(f"check-coverage: {p}", file=sys.stderr)
-    sys.exit(1)
-unfloored = len(rows) - len(floored)
-print(f"\ncheck-coverage: every file meets its recorded floor ({unfloored} test file(s) reported, not compared)")
+# The decision on what this run does to the floors is scripts/lib/coverage-baseline.py:
+# merging into the recorded entries instead of rewriting them is a rule about the
+# baseline, and it is pinned there by tests/x/test-111-coverage-baseline.sh.
+with open(measured_path, "w") as fh:
+    for name, (line_pct, _b, _l, _br) in rows:
+        fh.write(f"{name}\t{line_pct:.4f}\n")
 PY
+
+args=()
+if [ "$UPDATE" -eq 1 ]; then
+  args=(update)
+  if [ "$ALLOW_LOWER" -eq 1 ]; then args+=(--allow-lower); fi
+else
+  args=(check)
+fi
+args+=(--measured "$MEASURED" --baseline "$BASELINE" --root "$ROOT_DIR" --margin "$MARGIN")
+for f in "${FILES[@]}"; do args+=(--pattern "$f"); done
+python3 "$ROOT_DIR/scripts/lib/coverage-baseline.py" "${args[@]}"
