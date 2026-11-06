@@ -8,8 +8,9 @@
  * definition in the public header, a component that assigns it compiles and the
  * WM and the X server then disagree, days later, with no trace to the write. A
  * translation unit that does not include this header cannot name the field, so
- * that mistake is a build error. Include it from src/sm/sm-instance.c and from
- * the tests that check the framework's own internals, and from nowhere else.
+ * that mistake is a build error. Only src/sm/sm-instance.c includes it: a
+ * guard or an action that needs a field the accessors do not expose gets a new
+ * accessor, not this header.
  */
 
 #include <stdbool.h>

@@ -52,8 +52,8 @@ These are independent SMs. A client can be simultaneously:
 ## SM Instance Structure
 
 `StateMachine` is an opaque type in `sm-instance.h`. Its definition is in
-`src/sm/sm-instance-internal.h`, and only `src/sm/sm-instance.c` and the
-framework's own tests include that header. `current_state` is the value the
+`src/sm/sm-instance-internal.h`, which only `src/sm/sm-instance.c` includes.
+`current_state` is the value the
 single-writer rule is about: while the definition sat in the public header any
 component could assign it and compile, and the WM and the X server would then
 disagree days later with no trace back to the write. A translation unit that
