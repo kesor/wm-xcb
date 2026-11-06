@@ -624,8 +624,9 @@ void config_pointer_init(void) {
   done for `bind` lines. `float` and `tags` lines are parsed and not applied yet.
   See `docs/configuration.md`
 - Gaps, borders and per-application tag rules are still compiled in
-- Reloading without a restart needs `action_unregister()` for a keybinding hot
-  reload; not written
+- A SIGHUP reloads the file without a restart: `config_reload()` parses the
+  whole file first, then clears and rewires the binding table, so the keybinding
+  component has to release and take its grabs again on `EVT_CONFIG_RELOADED`
 
 ---
 

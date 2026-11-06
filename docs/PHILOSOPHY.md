@@ -277,8 +277,6 @@ beads epic for state machine ergonomics.
 - **Runtime plugin loading.** Compile-time components only, for now
   (`plans/wm-architecture.md`, out of scope for v1). The decoupling is about
   replaceability, not `dlopen`.
-- **Config reload without a restart.** Not yet written. The file is read once, at
-  startup, so an edit needs a restart.
 - **Beating dwm's latency.** The target is "not worse". A WM that freezes is
   worse; see §2.3.
 

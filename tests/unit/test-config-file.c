@@ -26,6 +26,17 @@
 #include "test-wm.h"
 #include "wm-hub.h"
 
+/* Counts the event the config module emits when a reload applies, so a test
+ * can tell an applied reload from a rejected one. */
+static int reload_event_count = 0;
+
+static void
+count_reload_event(Event e)
+{
+  (void) e;
+  reload_event_count++;
+}
+
 /*
  * Write `text` to a fresh file and put its path in `path`. The caller unlinks
  * it. Returns false when the temporary file cannot be made.
@@ -56,6 +67,26 @@ write_config(char* path, size_t size, const char* text)
   (void) fputs(text, file);
   (void) fclose(file);
   return true;
+}
+
+/*
+ * Replace the contents of an existing config file, the way a user editing it
+ * does. The reload reads the path the WM started with, so a test that wants a
+ * new configuration has to change that file, not create another one.
+ */
+static bool
+rewrite_config(const char* path, const char* text)
+{
+  FILE* file = fopen(path, "w");
+
+  if (file == NULL)
+    return false;
+
+  bool written = fputs(text, file) >= 0;
+
+  if (fclose(file) != 0)
+    written = false;
+  return written;
 }
 
 void
@@ -503,6 +534,124 @@ test_config_file_tag_names_reach_tags(void)
   unlink(path);
 }
 
+/*
+ * A SIGHUP edit reaches the running WM. The event matters as much as the
+ * accessors: the components that cache a value read from the configuration
+ * rebuild it from this event, not from anything the config module calls.
+ */
+void
+test_config_reload_applies_a_clean_file(void)
+{
+  LOG_CLEAN("== Testing a reload applies a clean file");
+
+  char path[256];
+
+  assert(write_config(path, sizeof path, "float class=Pavucontrol\ntags dev chat\n"));
+  assert(config_load_runtime(path) == true);
+  assert(config_should_float("Pavucontrol", NULL, NULL) == true);
+  assert(config_get_tag_name(0) != NULL && strcmp(config_get_tag_name(0), "dev") == 0);
+
+  hub_init();
+  xcb_handler_init();
+  reload_event_count = 0;
+  hub_subscribe(EVT_CONFIG_RELOADED, count_reload_event, NULL);
+  keybinding_init();
+
+  assert(rewrite_config(path, "float class=Gimp\ntags work play\n"));
+  assert(config_reload() == true);
+
+  assert(reload_event_count == 1);
+  assert(config_should_float("Gimp", NULL, NULL) == true);
+  assert(config_should_float("Pavucontrol", NULL, NULL) == false);
+  assert(config_get_tag_name(0) != NULL && strcmp(config_get_tag_name(0), "work") == 0);
+  assert(config_get_tag_name(1) != NULL && strcmp(config_get_tag_name(1), "play") == 0);
+
+  keybinding_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+  config_shutdown();
+  unlink(path);
+}
+
+/*
+ * A file with a line the parser cannot read changes nothing: the rules and the
+ * names of the file already running stay, and no component hears that anything
+ * happened.
+ */
+void
+test_config_reload_rejects_a_bad_edit(void)
+{
+  LOG_CLEAN("== Testing a reload leaves a rejected file out of the WM");
+
+  char path[256];
+
+  assert(write_config(path, sizeof path, "tags dev chat\n"));
+  assert(config_load_runtime(path) == true);
+
+  hub_init();
+  xcb_handler_init();
+  reload_event_count = 0;
+  hub_subscribe(EVT_CONFIG_RELOADED, count_reload_event, NULL);
+  keybinding_init();
+
+  assert(rewrite_config(path, "tags work\nbogus directive\n"));
+  assert(config_reload() == false);
+
+  assert(reload_event_count == 0);
+  assert(config_get_tag_name(0) != NULL && strcmp(config_get_tag_name(0), "dev") == 0);
+  assert(config_get_tag_name(1) != NULL && strcmp(config_get_tag_name(1), "chat") == 0);
+
+  /* The bad edit was refused, not kept as the file to run: fixing that one line
+   * and asking again applies the file. */
+  assert(rewrite_config(path, "tags work play\n"));
+  assert(config_reload() == true);
+  assert(reload_event_count == 1);
+  assert(config_get_tag_name(0) != NULL && strcmp(config_get_tag_name(0), "work") == 0);
+
+  keybinding_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+  config_shutdown();
+  unlink(path);
+}
+
+/*
+ * A file removed before the signal brings the compiled configuration back, the
+ * same way starting with no file never left it.
+ */
+void
+test_config_reload_without_a_file_restores_the_compiled_rules(void)
+{
+  LOG_CLEAN("== Testing a reload with the file gone restores the compiled rules");
+
+  char     path[256];
+  uint32_t compiled = config_get_float_rule_count();
+
+  assert(compiled > 0);
+  assert(write_config(path, sizeof path, "float class=Pavucontrol\ntags dev\n"));
+  assert(config_load_runtime(path) == true);
+  assert(config_get_float_rule_count() == 1);
+
+  hub_init();
+  xcb_handler_init();
+  reload_event_count = 0;
+  hub_subscribe(EVT_CONFIG_RELOADED, count_reload_event, NULL);
+  keybinding_init();
+
+  assert(unlink(path) == 0);
+  assert(config_reload() == true);
+
+  assert(reload_event_count == 1);
+  assert(config_get_float_rule_count() == compiled);
+  assert(config_should_float("steam", NULL, NULL) == true);
+  assert(config_get_tag_name(0) == NULL);
+
+  keybinding_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+  config_shutdown();
+}
+
 TEST_GROUP(ConfigFile, {
   test_config_file_missing();
   test_config_file_parses_bindings();
@@ -517,4 +666,7 @@ TEST_GROUP(ConfigFile, {
   test_config_file_absent_keeps_compiled_bindings();
   test_config_file_float_rules_apply();
   test_config_file_tag_names_reach_tags();
+  test_config_reload_applies_a_clean_file();
+  test_config_reload_rejects_a_bad_edit();
+  test_config_reload_without_a_file_restores_the_compiled_rules();
 });

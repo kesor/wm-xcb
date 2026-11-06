@@ -14,6 +14,7 @@
  *  50 - 59  connection   monitor connect and disconnect
  *  60 - 63  launcher     launcher failure: no selection, or no dmenu
  *  64 - 71  floating     client float and tile transitions
+ *  72 - 79  config       the running configuration was replaced
  */
 
 #ifndef _EVENT_TYPES_H_
@@ -45,6 +46,9 @@
 #define EVT_FLOATING_BASE     64
 #define EVT_FLOATING_LIMIT    72
 
+#define EVT_CONFIG_BASE       72
+#define EVT_CONFIG_LIMIT      80
+
 _Static_assert(EVT_CLIENT_LIST_LIMIT <= EVT_FULLSCREEN_BASE, "client-list range overlaps fullscreen");
 _Static_assert(EVT_FULLSCREEN_LIMIT <= EVT_TAG_MANAGER_BASE, "fullscreen range overlaps tag-manager");
 _Static_assert(EVT_TAG_MANAGER_LIMIT <= EVT_FOCUS_BASE, "tag-manager range overlaps focus");
@@ -54,5 +58,7 @@ _Static_assert(EVT_CONNECTION_LIMIT <= HUB_MAX_EVENT_TYPES, "connection range ex
 _Static_assert(EVT_CONNECTION_LIMIT <= EVT_LAUNCHER_BASE, "connection range overlaps launcher");
 _Static_assert(EVT_LAUNCHER_LIMIT <= EVT_FLOATING_BASE, "launcher range overlaps floating");
 _Static_assert(EVT_FLOATING_LIMIT <= HUB_MAX_EVENT_TYPES, "floating range exceeds the event bus");
+_Static_assert(EVT_FLOATING_LIMIT <= EVT_CONFIG_BASE, "floating range overlaps config");
+_Static_assert(EVT_CONFIG_LIMIT <= HUB_MAX_EVENT_TYPES, "config range exceeds the event bus");
 
 #endif /* _EVENT_TYPES_H_ */

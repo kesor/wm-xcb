@@ -23,9 +23,9 @@ The path is the first of these whose variable is set and non-empty:
 A variable that is set wins even when that path names no file. The WM does not
 fall through to the next one; a missing file means the compiled configuration.
 
-The file is read once, before the components start. A change takes effect on the
-next start; the running WM does not reread it. Reloading without a restart is
-not implemented yet.
+The file is read before the components start, and read again on SIGHUP. The
+first read decides which path the WM uses; a reload reads the same path, even
+when no file was there at startup. See "Reloading without a restart" below.
 
 ## Format
 
@@ -107,7 +107,36 @@ name on either.
 
 - gaps and border widths and colours are compiled in
 - the tag a particular application lands on (`TagRule` in `config.def.h`)
-- reloading without a restart
+
+## Reloading without a restart
+
+`kill -HUP <wm pid>` rereads the file the WM started with. A clean read replaces
+the bindings, the float rules and the tag names, and grabs the keys again on the
+root window, so a `bind` line an edit adds or removes works without a restart.
+Nothing else changes: every client keeps its tags, its focus and its geometry,
+because no client is recreated.
+
+The parser reads the whole file before anything is replaced. One line it cannot
+use refuses the reload: the running configuration stays in place, and one ERROR
+names the line to fix.
+
+```
+ERROR: config $HOME/.config/wm/config:4: unknown directive 'bogus': use bind, float or tags (and 2 more rejected lines); the running configuration is unchanged
+```
+
+A reload that applies says what it took, on stdout:
+
+```
+INFO:  config $HOME/.config/wm/config: reloaded N binding(s), N float rule(s), tag names
+```
+
+Removing the file and sending SIGHUP brings the compiled configuration back. A
+file that cannot be read is treated the way it is at startup: the WM logs why
+and the compiled configuration applies.
+
+A reload does not move a window that is already managed. The new float rules are
+what `config_should_float()` answers for the next window; nothing on the manage
+path asks that question yet, so no window floats before or after a reload.
 
 ## When the file says something wrong
 

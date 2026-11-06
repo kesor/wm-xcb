@@ -18,7 +18,7 @@ typedef uint32_t RequestType;
 typedef uint32_t EventType;
 
 /* Number of slots in the event bus; event values run from 0 to this minus 1. */
-#define HUB_MAX_EVENT_TYPES 72
+#define HUB_MAX_EVENT_TYPES 80
 
 /*
  * Target Type
