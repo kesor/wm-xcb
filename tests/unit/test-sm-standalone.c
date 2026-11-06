@@ -836,6 +836,17 @@ test_sm_owned_data_is_freed_on_destroy(void)
   sm_destroy(borrowed);
   assert(g_data_freed == 0);
 
+  /* Replacing owned data with borrowed data drops the destructor. Destroy
+   * must not run it on the borrowed pointer. */
+  StateMachine* switched      = make_sm(&owner, t);
+  int           owned         = 0;
+  int           borrowed_flag = 0;
+  sm_set_owned_data(switched, &owned, count_data_free);
+  sm_set_data(switched, &borrowed_flag);
+  sm_destroy(switched);
+  assert(owned == 0);
+  assert(borrowed_flag == 0);
+
   sm_template_destroy(t);
 }
 

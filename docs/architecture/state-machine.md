@@ -86,11 +86,15 @@ because the definition is in a header no component includes.
 | `StateMachine.current_state` | `sm_raw_write()`, `sm_transition()` | `sm-instance.h` declares the type only; the definition is in `sm-instance-internal.h` |
 | `ClientState.managed`, `.urgent`, `.mapped` | `client_set_managed()`, `client_set_urgent()`, `client_set_mapped()` | `client.h` declares the type and a pointer to it; the definition is in `client.c` |
 
-`scripts/check-private-state.sh` is what keeps that table true. It compiles every
-fixture under `tests/compile-fail/` twice: with `-DPRIVATE_STATE_CONTROL` through
-the accessor, which must succeed, and without it assigning the field, which must
-not compile. The control build is what tells a refusal from a fixture that fails
-because an include path moved.
+`scripts/check-private-state.sh` compiles every fixture under `tests/compile-fail/`
+twice: with `-DPRIVATE_STATE_CONTROL` through the accessor, which must succeed, and
+without it assigning the field, which must not compile. The control build is what
+tells a refusal from a fixture that fails because an include path moved. The
+fixtures include the public headers only. A file that includes
+`sm-instance-internal.h` can assign `current_state`. A file that includes
+`client.h` can assign `Client.tracked` itself, and swapping two clients' pointers
+exchanges managed, urgent and mapped without an accessor. Neither assignment is
+a fixture, so neither is what the gate refuses.
 
 The tracked values that are still public, and why:
 
@@ -112,10 +116,26 @@ The tracked values that are still public, and why:
 - **`Client.urgent`** is behind an accessor but has no machine, even though the
   built-in list below still promises an UrgencySM. wm-46k.17 decides which of the
   two is wrong.
+- **`selected_monitor`** is an `extern` in `monitor.h`. Only `monitor.c` assigns
+  it; other files use `monitor_get_selected()` and `monitor_set_selected()`. It is
+  which monitor is selected. The built-in table names a SelectedSM, and this
+  pointer is the store that exists. It is not a field of `StateMachine` or
+  `Client`, so making those opaque does not reach it.
+- **`FocusComponent.focused_window`** is a field of the public component struct in
+  `focus.h`. Only `focus.c` assigns it; readers use `focus_get_focused_window()`.
+  It is a second copy of the client's focus machine: `current_state` is
+  unreachable, and this window id is not. Taking the field out of the public
+  struct is a change to that component, and it is not this one.
+- **`Pertag.curtag` and `prevtag`** are fields of `struct Pertag`, which `pertag.h`
+  publishes and `pertag_get_data()` returns, so a caller can assign them. No file
+  outside `pertag.c` does. The live tag view is TagViewSM; this index is a second
+  store the running WM does not read. Making `Pertag` incomplete would hide the
+  write and would also hide the per-tag arrays the header exists to expose.
 
-Every other tracked value is already a state machine instance — the client's
-fullscreen, floating and focus machines, the monitor's layout and tag view, the
-connection — so the row for `StateMachine.current_state` covers it.
+The client's fullscreen, floating and focus machines, the monitor's layout and
+tag view, and the connection template are state machine instances, so the row for
+`StateMachine.current_state` covers their state. It does not cover the copies
+named above.
 
 ---
 

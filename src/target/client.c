@@ -362,8 +362,10 @@ client_create(xcb_window_t window)
   /* Verify registration succeeded */
   if (!c->target.registered) {
     LOG_ERROR("Failed to register client target for window: %u", window);
-    client_list_remove(c);
-    free(c);
+    /* ClientState is already allocated. free(c) leaks it; client_destroy
+     * frees both, and the client is far enough along for that path: it is on
+     * the list, its state-machine slots are empty, and it is not registered. */
+    client_destroy(c);
     return NULL;
   }
 
