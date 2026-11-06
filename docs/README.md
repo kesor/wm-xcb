@@ -1,6 +1,6 @@
 # wm/ Project Documentation
 
-*Last updated: 2026-11-02*
+*Last updated: 2026-11-06*
 
 ---
 
@@ -157,7 +157,14 @@ Short version:
   it, and a cancelled prompt emits a failure event instead of blocking. dmenu
   itself holds the keyboard grab while it is up, so the keys a user presses then
   belong to it; what stays free is the WM's loop, which still handles X events
-  and the other registered pipes. `_NET_SUPPORTING_WM_CHECK` on the root points
+  and the other registered pipes. `MOD+Return` starts the first terminal
+  emulator this machine has installed among `$TERMINAL`, `x-terminal-emulator`,
+  `alacritty`, `kitty`, `foot`, `urxvt`, `st` and `xterm`, looked up on `$PATH`;
+  with none of them installed, startup prints one `ERROR` line naming every name
+  it tried, and the key reports that line instead of forking a shell to fail on
+  a missing binary. A start with no config file and a terminal installed prints
+  no `ERROR` line at all. `tests/x/test-56-terminal-default.sh` pins both.
+  `_NET_SUPPORTING_WM_CHECK` on the root points
   at a window of the WM's own that points back at itself and names the WM, so a
   panel can tell a live WM from a stale property; `_NET_CLIENT_LIST` lists the
   managed windows in mapping order; `_NET_NUMBER_OF_DESKTOPS`,
