@@ -220,13 +220,15 @@ bead_scope_deleted_for() {
 #   cannot - a harness name that has moved or been deleted.
 #
 #   The gone rule is shape, not history: an entry of the file list, a directory
-#   the list holds entries under, and a path whose first component this tree
-#   tracks are all fine, and anything else with a file's name and extension is
-#   reported. A token rooted in a directory this tree does not have is not a path
-#   here at all, which is what keeps `work/<bead-id>`, `origin/master` and the
-#   `tests/x/test-` a glob leaves behind out of the answer. The commit column is
-#   empty when no commit deleted the path: that is a bead asking for a new file
-#   as far as the text can tell, and the text cannot tell.
+#   the list holds entries under, and a path whose first component heads a
+#   tracked path or a deleted one are all fine, and anything else with a file's name
+#   and extension is reported. A first component that heads neither a tracked
+#   path nor a deleted one is not a path here at all, which is what keeps
+#   `work/<bead-id>`, `origin/master` and the `tests/x/test-` a glob leaves
+#   behind out of the answer. A directory the tree deleted entirely is absent
+#   from the file list; the deletion list is what says it was here. The commit
+#   column is empty when no commit deleted the path: that is a bead asking for
+#   a new file as far as the text can tell, and the text cannot tell.
 bead_scope_find() {
   local bead=$1 comments=$2 repo=$3 harness=$4 deleted=$5
   local text tok name what hit rest part matched path commit
@@ -268,8 +270,16 @@ bead_scope_find() {
       [ "$matched" -eq 1 ] && continue
 
       bead_scope_named_file "$tok" || continue
+      # ls-files has no entry under a directory the tree deleted entirely, which
+      # is also true of work/ and origin/. The deletion list is the difference:
+      # a commit removed something under .cursor/, and nothing removed work/.
+      # Its commit column sits after a tab, so a prefix check still sees the path.
       case "$tok" in
-        */*) bead_scope_rooted "${tok%%/*}" "$repo" || continue ;;
+        */*)
+          bead_scope_rooted "${tok%%/*}" "$repo" \
+            || bead_scope_rooted "${tok%%/*}" "$deleted" \
+            || continue
+          ;;
       esac
       hit=$(bead_scope_deleted_for "$tok" "$deleted")
       if [ -z "$hit" ]; then
@@ -342,7 +352,11 @@ bead_scope_verify() {
     if [ -z "$dir" ]; then
       continue
     elif bead_scope_present "$dir" "$repo"; then
-      printf '           %s/ is still tracked, so look there for what replaced it\n' "$dir"
+      if [ -n "$why" ]; then
+        printf '           %s/ is still tracked, so look there for what replaced it\n' "$dir"
+      else
+        printf '           %s/ is still tracked\n' "$dir"
+      fi
     else
       printf '           nothing under %s/ is tracked now\n' "$dir"
     fi

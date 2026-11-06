@@ -17,8 +17,11 @@
 #   - a path this tree deleted, which is a bead written before the file went and
 #     looks exactly like one asking for a change to a file that is here: the
 #     path, the commit that removed it, and the directory that is still tracked;
+#   - a path under a top-level directory the tree removed entirely, which
+#     ls-files cannot root and the deletion list can;
 #   - a path no commit ever tracked, which is a bead asking for a new file as
-#     far as the text can tell, and answers the same "cannot tell";
+#     far as the text can tell, and answers the same "cannot tell" without
+#     sending the caller to look for a replacement;
 #   - a branch name, a ref, and the fragments a glob leaves, none of which is a
 #     path in this tree and none of which may turn the answer into "cannot
 #     tell";
@@ -202,6 +205,28 @@ bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" 
 check_eq "a file no commit ever tracked is not an answer either" 2 "$?"
 check_eq "and the path is named" 1 "$(grep -c 'GONE     scripts/check-widget.sh' "$LAST")"
 check_eq "and it says a new file reads the same" 1 "$(grep -c 'may be asking for a new file' "$LAST")"
+check_eq "and the tracked directory is named" 1 "$(grep -c 'scripts/ is still tracked$' "$LAST")"
+check_eq "and it does not send the caller looking for a replacement" 0 "$(grep -c 'look there for what replaced it' "$LAST")"
+
+# ls-files has no entry under a directory the tree deleted entirely, which is
+# also true of work/ and origin/. A root check that only reads the tracked list
+# drops the token and answers "work is here" for a path a commit removed.
+bead wm-b19 'The rule lives in .cursor/rules/beads.mdc.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a path under a removed top-level directory is not an answer" 2 "$?"
+check_eq "and the path is named" 1 "$(grep -c 'GONE     .cursor/rules/beads.mdc' "$LAST")"
+check_eq "and the commit that deleted it is named" 1 "$(grep -c 'deleted by b2435' "$LAST")"
+check_eq "and it does not say that directory is still tracked" 0 "$(grep -c 'still tracked' "$LAST")"
+check_eq "and it says nothing under that directory is tracked" 1 "$(grep -c 'nothing under .cursor/rules/ is tracked now' "$LAST")"
+check_eq "and it does not answer that the work is here" 0 "$(grep -c 'so its work is in this worktree' "$LAST")"
+
+# A file-shaped token whose first component this tree never tracked and never
+# deleted is still not a path here. Dropping the root check to catch .cursor/
+# would report this and make "cannot tell" the answer for most of the queue.
+bead wm-b20 'not-a-tree/left-pad.sh is not a file in this tree.'
+bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" >"$LAST" 2>&1
+check_eq "a file under a root this tree never had is not a path here" 0 "$?"
+check_eq "and it is not reported" 0 "$(grep -c 'GONE\|OUTSIDE' "$LAST")"
 
 # What is not a path in this tree: a branch, a ref, a name whose first component
 # is not tracked here, and the fragments a glob leaves behind. Reporting any of
