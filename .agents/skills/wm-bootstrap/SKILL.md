@@ -159,6 +159,24 @@ task. `bd edit` opens an editor and blocks an agent — never use it.
 5. Commit one topic: subject says what changed, body says why. Leave the bead
    in_progress and say in the final message what is done; the merge closes it.
 
+## Writing one bead
+
+An acceptance criterion names a command, a file, or an observable behaviour. It
+never counts the items a file already enumerates. The count is a second copy of
+that list: it goes stale at the next commit, and a reader cannot tell a stale
+number from a requirement. `scripts/check-docs.sh` fails a document for the same
+reason, and a bead costs more, because the worker plans from the criterion
+before it opens the code.
+
+Name where the list lives and let the worker derive it:
+
+- not: `action_lookup()` returns non-NULL for all nine names
+- instead: every action name `config.wm.def.h` wires resolves
+
+The second form is also a test, which is the bar: a criterion no command can
+check does not say what done looks like. A number the bead sets on purpose stays
+- an exit status, a latency budget, a limit.
+
 ## Spawning workers (optional)
 
 A local harness (`worker.py`, not part of this repository) runs one worker per git
