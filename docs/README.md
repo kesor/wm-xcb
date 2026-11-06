@@ -86,7 +86,7 @@ Nothing in this repository depends on them being present.
 
 ## Current state
 
-Short version, and the parts that stay true until they are fixed:
+Short version:
 
 - **Built:** hub (registry, request router, event bus), state machine framework,
   targets (`Client`, `Monitor`, `Tag`), and the built-in components. The unit
@@ -97,8 +97,9 @@ Short version, and the parts that stay true until they are fixed:
   were already on the display when the WM started, through that same map path,
   so they are tiled and tracked too (an override-redirect window, or one its
   client left unmapped, is skipped), attaching every new client to the selected
-  monitor with that monitor's visible tags, tiling that monitor's visible
-  clients when a window is managed or unmanaged so that each client's border
+  monitor and giving a newly managed client the tags of the view it appeared
+  on, tiling that monitor's visible clients when a window is managed or
+  unmanaged so that each client's border
   falls inside the area it was given - neighbours touch, and a client alone on
   the monitor fills it - and `MOD+f` makes the focused client fullscreen as
   both the user and the client can see it: its window covers the monitor with
@@ -162,10 +163,6 @@ Short version, and the parts that stay true until they are fixed:
   `_NET_CURRENT_DESKTOP` ClientMessage from a pager switches the tag view
   through the same request a keybinding sends. The unit suite and
   `tests/x/test-60-ewmh-root-properties.sh` pin both halves.
-- **Does not work:** visible tags are stored twice: a tag view change updates
-  the tag-view state machine, and a new client still copies its tags from
-  `Monitor.tagset`, which no runtime path writes, so every new client lands on
-  tag 1.
 
 Do not take that from a document. Ask the tree:
 

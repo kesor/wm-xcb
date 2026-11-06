@@ -747,8 +747,9 @@ test_client_size_hints_without_connection(void)
 /*
  * Test client with monitor association
  *
- * A new client belongs to the selected monitor and carries that monitor's
- * visible tags, because tiling and tag membership both read those fields.
+ * A new client belongs to the selected monitor. Its tags stay empty here:
+ * the tag-manager component assigns them from the monitor's tag-view state
+ * machine when the client is managed.
  */
 void
 test_client_monitor_association(void)
@@ -762,13 +763,11 @@ test_client_monitor_association(void)
 
   Monitor* m = monitor_create(200);
   monitor_set_geometry(m, 0, 0, 800, 600);
-  monitor_set_tagset(m, 1U << 2); /* tag 3 */
 
   Client* c = client_create(100);
 
   assert(client_get_monitor(c) == m);
-  assert(client_has_tag(c, 2));
-  assert(c->tags == m->tagset);
+  assert(c->tags == 0);
 
   client_destroy(c);
   monitor_destroy(m);
@@ -826,22 +825,17 @@ test_client_monitor_selection_and_fallback(void)
 
   Monitor* older = monitor_create(301);
   Monitor* newer = monitor_create(302);
-  monitor_set_tagset(older, MONITOR_TAG_MASK(1));
-  monitor_set_tagset(newer, MONITOR_TAG_MASK(3));
 
   assert(monitor_list_get_first() == newer);
   monitor_set_selected(older);
 
   Client* on_selected = client_create(401);
   assert(client_get_monitor(on_selected) == older);
-  assert(on_selected->tags == older->tagset);
-  assert(on_selected->tags != newer->tagset);
 
   monitor_set_selected(NULL);
 
   Client* on_first = client_create(402);
   assert(client_get_monitor(on_first) == newer);
-  assert(on_first->tags == newer->tagset);
 
   client_destroy(on_selected);
   client_destroy(on_first);

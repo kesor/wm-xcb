@@ -7,13 +7,12 @@
  * Core responsibilities:
  * - RandR properties (output, crtc)
  * - Geometry (position and resolution)
- * - Tag state (which tags this monitor is viewing)
  * - Target registration with the Hub
  * - State machine storage (for components to attach their data)
  *
- * Note: Tag state is stored here because it's specific to monitor-view
- * semantics (a monitor "views" certain tags). The actual tag management
- * is handled by the tag-manager component.
+ * The tags this monitor views are not stored here. The tag-manager component
+ * keeps that mask in the monitor's tag-view state machine, so the machine and
+ * the monitor cannot disagree about which tags are visible.
  *
  * Features like tiling, bar display, and client associations are implemented
  * as separate components that query monitors via the Hub.
@@ -29,18 +28,6 @@
 
 #include "../sm/sm.h"
 #include "wm-hub.h"
-
-/*
- * Number of available tags (bits in tag mask)
- * Standard dwm uses 9 tags (0-8)
- */
-#define MONITOR_NUM_TAGS    9
-
-/*
- * Tag mask helpers
- */
-#define MONITOR_TAG_MASK(n) ((uint32_t) 1 << ((n) % MONITOR_NUM_TAGS))
-#define MONITOR_ALL_TAGS    ((uint32_t) ((1 << MONITOR_NUM_TAGS) - 1))
 
 /*
  * Monitor structure
@@ -62,10 +49,6 @@ typedef struct Monitor {
   int16_t  y;
   uint16_t width;
   uint16_t height;
-
-  /* Tag state - which tags this monitor is viewing */
-  uint32_t tagset;     /* currently visible tags */
-  uint32_t prevtagset; /* previous tagset for switching */
 
   /* Adopted state machines - dynamically allocated on demand by components.
    * Components store their data here, keyed by name (e.g., "pertag"). */
@@ -163,35 +146,6 @@ TargetID monitor_get_current_monitor(void);
  * (this is a simplification - can be updated later)
  */
 extern Monitor* selected_monitor;
-
-/*
- * Tag operations
- */
-
-/*
- * Check if a tag is visible on a monitor.
- */
-bool monitor_tag_visible(Monitor* m, int tag);
-
-/*
- * Set the visible tags on a monitor.
- */
-void monitor_set_tagset(Monitor* m, uint32_t tagset);
-
-/*
- * Add a tag to the visible set.
- */
-void monitor_tag_add(Monitor* m, int tag);
-
-/*
- * Remove a tag from the visible set.
- */
-void monitor_tag_remove(Monitor* m, int tag);
-
-/*
- * Toggle a tag in the visible set.
- */
-void monitor_tag_toggle(Monitor* m, int tag);
 
 /*
  * Iterate over all monitors.
