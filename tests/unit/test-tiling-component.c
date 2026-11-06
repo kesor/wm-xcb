@@ -372,6 +372,10 @@ test_client_tag_move_triggers_tiling(void)
   Client* third  = client_create(2003);
   assert_or_abort(first != NULL && second != NULL && third != NULL);
 
+  client_set_tags(first, TAG_MASK(0));
+  client_set_tags(second, TAG_MASK(0));
+  client_set_tags(third, TAG_MASK(0));
+
   client_set_managed(first, true);
   client_set_mapped(first, true);
   client_set_managed(second, true);

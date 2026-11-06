@@ -657,7 +657,6 @@ test_managed_client_lands_on_monitor(void)
 
   Monitor* m = monitor_create(77);
   monitor_set_geometry(m, 0, 0, 800, 600);
-  monitor_set_tagset(m, MONITOR_TAG_MASK(2));
 
   xcb_map_request_event_t map_event = {
     .response_type = 20, /* XCB_MAP_REQUEST */
@@ -670,7 +669,6 @@ test_managed_client_lands_on_monitor(void)
   Client* c = client_get_by_window(800);
   assert(c != NULL);
   assert(client_get_monitor(c) == m);
-  assert(c->tags == MONITOR_TAG_MASK(2));
 
   /* Tile: the only client is master and there is no stack, so it gets the whole
    * monitor. The window is that area minus one border on each side, because X

@@ -154,7 +154,6 @@ test_monitor_create_destroy(void)
   assert(m->y == 0);
   assert(m->width == 0);
   assert(m->height == 0);
-  assert(m->tagset == MONITOR_TAG_MASK(0));
   assert(m->next == NULL);
 
   /* Verify it's registered with hub */
@@ -312,52 +311,6 @@ test_monitor_selection(void)
   assert(monitor_get_selected() == m2);
 
   /* Clean up */
-  monitor_list_shutdown();
-  hub_shutdown();
-}
-
-void
-test_monitor_tag_operations(void)
-{
-  LOG_CLEAN("== Testing monitor tag operations");
-
-  hub_init();
-  monitor_list_init();
-
-  Monitor* m = monitor_create(100);
-
-  /* Default tagset should be tag 0 */
-  assert(monitor_tag_visible(m, 0) == true);
-  assert(monitor_tag_visible(m, 1) == false);
-
-  /* Set tagset */
-  monitor_set_tagset(m, MONITOR_TAG_MASK(1) | MONITOR_TAG_MASK(2));
-  assert(monitor_tag_visible(m, 1) == true);
-  assert(monitor_tag_visible(m, 2) == true);
-  assert(monitor_tag_visible(m, 0) == false);
-
-  /* prevtagset should be saved */
-  assert(m->prevtagset == MONITOR_TAG_MASK(0));
-
-  /* Tag add/remove */
-  monitor_tag_add(m, 3);
-  assert(monitor_tag_visible(m, 3) == true);
-
-  monitor_tag_remove(m, 1);
-  assert(monitor_tag_visible(m, 1) == false);
-
-  /* Tag toggle */
-  monitor_tag_toggle(m, 2);
-  assert(monitor_tag_visible(m, 2) == false);
-  monitor_tag_toggle(m, 2);
-  assert(monitor_tag_visible(m, 2) == true);
-
-  /* Invalid tag index should be safe */
-  assert(monitor_tag_visible(m, -1) == false);
-  assert(monitor_tag_visible(m, 9) == false); /* MONITOR_NUM_TAGS = 9 */
-
-  /* Clean up */
-  monitor_destroy(m);
   monitor_list_shutdown();
   hub_shutdown();
 }
@@ -536,7 +489,6 @@ TEST_GROUP(Monitor, {
   test_monitor_list_iteration();
   test_monitor_find_by_output();
   test_monitor_selection();
-  test_monitor_tag_operations();
   test_monitor_geometry();
   test_monitor_multiple_monitors();
   test_monitor_double_create();

@@ -98,12 +98,6 @@ a fixture, so neither is what the gate refuses.
 
 The tracked values that are still public, and why:
 
-- **`Monitor.tagset` and `prevtagset`** are written only by `monitor.c`'s own tag
-  helpers, so no component assigns them today. They are also a second copy of
-  the tag view TagViewSM holds in its instance data, and nothing keeps the two in
-  agreement: a client created between them takes its tags from the field and is
-  shown or hidden by the machine. That duplicate is wm-46k.6. Hiding the field
-  before the duplicate is gone would hide the defect, not the write.
 - **`struct Context.state`** in `wm-states.h` is the pre-hub transition table's
   state. Only `wm-states.c` and its test write it, and the table is due for
   removal in favour of the component that owns pointer input, so it does not earn

@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "src/actions/action-registry.h"
+#include "src/components/client-list.h"
 #include "src/components/focus.h"
 #include "src/components/tag-manager.h"
 #include "src/target/client.h"
@@ -551,6 +552,7 @@ test_tag_manager_client_move_action(void)
 
   Client* c = client_create(500);
   assert_or_abort(c != NULL);
+  client_set_tags(c, TAG_MASK(0));
   client_set_managed(c, true);
   client_set_focusable(c, true);
   client_set_mapped(c, true);
@@ -574,6 +576,55 @@ test_tag_manager_client_move_action(void)
   monitor_list_shutdown();
   tag_list_shutdown();
   sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * A client that appears while another tag is viewed belongs to that tag.
+ *
+ * Client creation leaves tags empty because the visible mask belongs to this
+ * component. The manage event is where the client gets the tags of the view it
+ * appeared on, not the tag that was visible when the monitor was created.
+ */
+void
+test_tag_manager_new_client_takes_the_view_tags(void)
+{
+  LOG_CLEAN("== Testing a new client takes the visible tags");
+
+  hub_init();
+  tag_list_init();
+  monitor_list_init();
+  client_list_init();
+  action_registry_init();
+  tag_manager_component_init();
+
+  Monitor* m = monitor_create(800);
+  assert_or_abort(m != NULL);
+
+  uint32_t tag = 3;
+  hub_send_request_data(REQ_TAG_VIEW, m->target.id, &tag);
+  assert(tag_manager_get_visible_tags(m) == TAG_MASK(2));
+
+  Client* c = client_create(900);
+  assert_or_abort(c != NULL);
+  assert(c->tags == 0);
+
+  client_set_managed(c, true);
+  hub_emit(EVT_CLIENT_MANAGED, c->target.id, NULL);
+  assert(c->tags == TAG_MASK(2));
+
+  /* A later view change does not move the client. */
+  tag = 1;
+  hub_send_request_data(REQ_TAG_VIEW, m->target.id, &tag);
+  assert(c->tags == TAG_MASK(2));
+
+  client_destroy(c);
+  monitor_destroy(m);
+  client_list_shutdown();
+  monitor_list_shutdown();
+  tag_list_shutdown();
+  tag_manager_component_shutdown();
+  action_registry_shutdown();
   hub_shutdown();
 }
 
@@ -636,5 +687,6 @@ TEST_GROUP(TagManager, {
   test_tag_manager_actions_registered();
   test_tag_manager_view_and_toggle_actions();
   test_tag_manager_client_move_action();
+  test_tag_manager_new_client_takes_the_view_tags();
   test_tag_manager_starts_with_the_wm();
 });

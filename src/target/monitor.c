@@ -6,7 +6,6 @@
  * Core responsibilities:
  * - RandR properties (output, crtc)
  * - Geometry (position and resolution)
- * - Tag state (which tags this monitor is viewing)
  * - Hub registration
  * - State machine storage for components
  *
@@ -42,10 +41,6 @@ monitor_properties_init(Monitor* m, xcb_randr_output_t output)
   m->y      = 0;
   m->width  = 0;
   m->height = 0;
-
-  /* Initialize tag state */
-  m->tagset     = MONITOR_TAG_MASK(0); /* tag 0 */
-  m->prevtagset = MONITOR_TAG_MASK(0);
 
   /* Initialize SM storage */
   m->sms.machines = NULL;
@@ -460,63 +455,6 @@ monitor_set_selected(Monitor* m)
   if (m != NULL) {
     LOG_DEBUG("Selected monitor: output=%u", m->output);
   }
-}
-
-/*
- * Check if a tag is visible on a monitor.
- */
-bool
-monitor_tag_visible(Monitor* m, int tag)
-{
-  if (m == NULL || tag < 0 || tag >= MONITOR_NUM_TAGS)
-    return false;
-  return (m->tagset & MONITOR_TAG_MASK(tag)) != 0;
-}
-
-/*
- * Set the visible tags on a monitor.
- */
-void
-monitor_set_tagset(Monitor* m, uint32_t tagset)
-{
-  if (m == NULL)
-    return;
-  m->prevtagset = m->tagset;
-  m->tagset     = tagset & MONITOR_ALL_TAGS;
-  LOG_DEBUG("Monitor tagset changed: output=%u, tagset=%u", m->output, m->tagset);
-}
-
-/*
- * Add a tag to the visible set.
- */
-void
-monitor_tag_add(Monitor* m, int tag)
-{
-  if (m == NULL || tag < 0 || tag >= MONITOR_NUM_TAGS)
-    return;
-  m->tagset |= MONITOR_TAG_MASK(tag);
-}
-
-/*
- * Remove a tag from the visible set.
- */
-void
-monitor_tag_remove(Monitor* m, int tag)
-{
-  if (m == NULL || tag < 0 || tag >= MONITOR_NUM_TAGS)
-    return;
-  m->tagset &= ~MONITOR_TAG_MASK(tag);
-}
-
-/*
- * Toggle a tag in the visible set.
- */
-void
-monitor_tag_toggle(Monitor* m, int tag)
-{
-  if (m == NULL || tag < 0 || tag >= MONITOR_NUM_TAGS)
-    return;
-  m->tagset ^= MONITOR_TAG_MASK(tag);
 }
 
 /*

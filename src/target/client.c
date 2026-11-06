@@ -369,16 +369,16 @@ client_create(xcb_window_t window)
     return NULL;
   }
 
-  /* A client with no monitor is invisible to tiling and belongs to no tag, so
-   * the association is made here rather than left to the layout component. */
+  /* A client with no monitor is invisible to tiling, so the association is made
+   * here rather than left to the layout component. Its tags are assigned by the
+   * tag-manager component when the client is managed, from the view that owns
+   * them. */
   Monitor* m = client_default_monitor();
-  if (m != NULL) {
+  if (m != NULL)
     client_set_monitor(c, m);
-    client_set_tags(c, m->tagset);
-  }
 
-  LOG_DEBUG("Client created: window=%u, monitor=%u, tags=0x%x",
-            window, m != NULL ? m->output : 0, c->tags);
+  LOG_DEBUG("Client created: window=%u, monitor=%u",
+            window, m != NULL ? m->output : 0);
   return c;
 }
 

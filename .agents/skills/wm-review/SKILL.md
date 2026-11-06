@@ -101,7 +101,7 @@ did not mention.
 | Rule | A violation looks like | How to check it |
 |------|------------------------|-----------------|
 | No component calls another component | one component includes another's header or calls its functions; a request that exists only as a direct call | read the callers. `hub_send_request()` and `hub_subscribe()` are the only paths between components. Reading a state machine another component stored on the same target is allowed (2.1) |
-| No state assignment outside `sm_raw_write` / `sm_transition` | `client->mapped = true`, `monitor->tagset = ...`, or any field a template tracks written by hand | `scripts/check-private-state.sh`. A tracked field with no `tests/compile-fail/` fixture is still a read of the diff |
+| No state assignment outside `sm_raw_write` / `sm_transition` | `client->mapped = true`, `selected_monitor = ...`, or any field a template tracks written by hand | `scripts/check-private-state.sh`. A tracked field with no `tests/compile-fail/` fixture is still a read of the diff |
 | No `_reply()` in a handler or action | `xcb_get_property_reply()`, `xcb_get_geometry_reply()`, or the plural form, inside anything an event can reach | `make check-async`. The reply belongs in a `wm_loop_add_poll_handler()` callback |
 | No blocking call in the loop | `waitpid()`, `read()` on a child, `sleep()`, or a loop that calls `xcb_poll_for_event()` and never blocks | `make check-async` for the calls; `scripts/perf-test.sh` for idle CPU, which is what a spin costs |
 | One flush per loop iteration | `xcb_flush()` after a request, in a handler, or in an action | read the loop in `wm-xcb.c`: one flush, after the handlers ran |

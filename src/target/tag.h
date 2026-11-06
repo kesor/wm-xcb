@@ -9,7 +9,7 @@
  * 1. Tags exist independently - they don't need a monitor to exist
  * 2. Monitors "view" tags - via the pertag component, a monitor indicates which tags it displays
  * 3. Client ↔ Tag relationship - clients have a tagmask; they're visible when their
- *    tags overlap with a monitor's visible tagset
+ *    tags overlap with the tags the monitor's tag-view state machine shows
  */
 
 #ifndef _TAG_H_
@@ -22,13 +22,11 @@
 
 /*
  * Number of available tags (standard dwm uses 9 tags, 0-8)
- * This matches MONITOR_NUM_TAGS in monitor.h for consistency
  */
 #define TAG_NUM_TAGS   9
 
 /*
  * Tag mask helpers
- * These are compatible with MONITOR_TAG_MASK for easy bitwise operations
  */
 #define TAG_MASK(n)    ((uint32_t) 1 << ((n) % TAG_NUM_TAGS))
 #define TAG_ALL_TAGS   ((uint32_t) ((1 << TAG_NUM_TAGS) - 1))

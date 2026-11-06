@@ -148,7 +148,9 @@ Client* client_create(xcb_window_t window) {
     if (m == NULL)
         m = monitor_list_get_first();
     c->monitor = m;
-    c->tags = m ? m->tagset : 0;
+    // Tags are assigned by the tag-manager component when the client is
+    // managed, from the mask in the monitor's tag-view state machine.
+    c->tags = 0;
     
     return c;
 }
@@ -171,12 +173,8 @@ struct Monitor {
     int x, y;               // screen position
     uint16_t width, height; // resolution
     
-    // Tag state — **Note:** This is a temporary simplification.
-    // Tags should be their own targets (see TAG Target section below).
-    // The proper design uses the `pertag` component to bridge TAG → MONITOR.
-    // TODO: Remove tagset/prevtagset once TAG targets are implemented.
-    uint32_t tagset;         // bitmask of visible tags
-    uint32_t prevtagset;     // for switching
+    // Which tags this monitor views lives in its tag-view state machine, not
+    // in a field here: the tag-manager component owns that machine.
     
     // Layout
     Layout* current_layout;
@@ -214,7 +212,6 @@ Monitor* monitor_create(xcb_randr_output_t output) {
     m->crtc = XCB_NONE;
     
     // Default state
-    m->tagset = 1 << 0;  // tag 1
     m->mfact = 0.5;
     m->nmaster = 1;
     m->current_layout = &layouts[LAYOUT_TILE];
@@ -264,15 +261,16 @@ struct Tag {
 
 1. **Tags exist independently** — A tag like "tag 1" exists whether or not any monitor is viewing it
 2. **Monitors "view" tags** — via the `pertag` component, a monitor indicates which tags it displays
-3. **Client ↔ Tag relationship** — clients have a tagmask; they're visible on monitors whose tagset overlaps
+3. **Client ↔ Tag relationship** — clients have a tagmask; they're visible on monitors whose tag-view mask overlaps
 4. **TAG target is simple** — tags don't adopt many components; they're mainly referenced by `pertag`
 
 ### Tag → Client Visibility
 
-A client is visible on a monitor when:
+A client is visible on a monitor when its tags overlap the mask the monitor's
+tag-view state machine holds:
 ```c
 bool client_visible_on_monitor(Client* c, Monitor* m) {
-    return (c->tags & m->tagset) != 0;
+    return (c->tags & tag_manager_get_visible_tags(m)) != 0;
 }
 ```
 
@@ -680,10 +678,6 @@ struct Monitor {
     // Geometry
     int x, y;
     uint16_t width, height;
-    
-    // Tag state
-    uint32_t tagset;
-    uint32_t prevtagset;
     
     // Tiling
     float mfact;
