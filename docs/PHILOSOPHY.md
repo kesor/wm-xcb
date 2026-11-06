@@ -174,7 +174,8 @@ that stacks them. Registrations only help for the part of a feature that is
 
 Run that test on every extension design in `docs/extensions/` and the result is
 a list of extension points to build. That list, not the file layout, is what
-makes the decoupling claim true.
+makes the decoupling claim true. The audit and its current result live in
+[extensions/README.md](extensions/README.md#status-and-the-extension-point-audit).
 
 ---
 
