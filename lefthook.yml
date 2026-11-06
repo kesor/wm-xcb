@@ -78,6 +78,14 @@ pre-commit:
       run: ./scripts/check-bead-descriptions.sh
       fail_text: "A beads issue has no description: one was wiped by an empty --description, or never written. The text before a wipe is in 'bd history <id> --events', and 'bd update <id> --stdin' is the write path that refuses an empty body."
 
+    # The same wipe on the other free-form field a rewrite goes through. There is
+    # no stdin form for --acceptance, so nothing in bd refuses an empty value, and
+    # bd omits the key when it is empty: only the baseline can tell a wipe from a
+    # bead that never had criteria.
+    bead-acceptance:
+      run: ./scripts/check-bead-acceptance.sh
+      fail_text: "A beads issue lost the acceptance criteria a baseline says it had: an empty --acceptance prints 'Updated issue' and exits 0. The text before a wipe is in 'bd history <id> --events', under Old:."
+
     docs:
       glob: "*.md"
       run: ./scripts/check-docs.sh
@@ -161,6 +169,10 @@ pre-push:
     bead-descriptions:
       run: ./scripts/check-bead-descriptions.sh
       fail_text: "A beads issue has no description: one was wiped by an empty --description, or never written."
+
+    bead-acceptance:
+      run: ./scripts/check-bead-acceptance.sh
+      fail_text: "A beads issue lost the acceptance criteria a baseline says it had: an empty --acceptance prints 'Updated issue' and exits 0."
 
     docs:
       run: ./scripts/check-docs.sh
