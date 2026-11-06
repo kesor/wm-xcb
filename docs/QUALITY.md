@@ -426,6 +426,8 @@ Shifted left, the person who wrote the code is the one who sees the number.
 scripts/check-complexity.sh            # per-function cognitive complexity (0.3s)
 scripts/check-coverage.sh              # line and branch coverage of the unit suite (7s warm)
 scripts/check-coverage.sh --show-zero  # also list what the suite never executes
+scripts/check-coverage.sh --update-baseline config-file.c
+                                       # raise that file's floor, leave the rest
 scripts/fuzz.sh 5                      # the fuzzers, short: the hook's version
 scripts/fuzz.sh 60                     # the same, long: by hand or in CI
 ```
@@ -472,11 +474,30 @@ baseline was measured.
 instrumentation, runs it, and prints line and branch coverage per file. A file
 below its recorded floor in `tests/quality/coverage-baseline.txt` fails, and so
 does a source file with no floor at all: a new file arrives with somebody
-deciding what covers it. `--update-baseline` rewrites the floors from the
-current run; doing that to turn a red run green is the same as deleting a test,
-so say why in the commit. The floor written is the measured value less 3.0
+deciding what covers it. The floor written is the measured value less 3.0
 points, because the launcher tests fork and exec and their coverage moves by up
 to 2.6 points on a CI runner between runs of the same tree.
+
+`--update-baseline` merges the run into the entries already recorded instead of
+rewriting the file from one run. Name the files the commit changed and only
+their entries move: `scripts/check-coverage.sh --update-baseline config-file.c`
+writes the floor for `config-file.c` and leaves every other line alone. A
+path relative to the repository root works too, and so does a suffix of one,
+so `tiling.c` and `src/components/tiling.c` both name `src/components/tiling.c`.
+Without file arguments every file the run measured is merged; the rest keep
+their floors.
+
+A floor does not follow the measurement down. A run that measures below a
+recorded floor holds that floor and says so, because a point or two between two
+runs of the same tree is the measurement moving, not code losing its tests, and
+a floor lowered to clear a red run cannot notice the loss that comes after it.
+A drop that is real - code removed, a test deleted on purpose - is
+`--allow-lower`, off by default, and the commit that uses it says why: lowering
+a floor to make a red run green is the same as deleting a test. A measurement
+that gained less than the margin also holds the floor, without a note: the gate
+reads the same either way. An entry for a file that is no longer in the tree is
+dropped by a full update and kept by one that names other files, since the
+worker cannot know what else moved.
 
 The floors cover the production sources only. A file under `tests/` is printed
 in the table and carries no floor, in the baseline or in the comparison: its
