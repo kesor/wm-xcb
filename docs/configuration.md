@@ -49,11 +49,12 @@ than moving it: pressing the chord again takes that tag away, and the client
 never leaves the tag it was on. The seam assertion that expects a move is a
 known failure in `tests/quality/seam-baseline.txt`.
 
-`terminal.spawn` runs the first of these that this machine has installed: a
-command set with `terminal_set_command()`, `$TERMINAL`, `x-terminal-emulator`,
-then `alacritty`, `kitty`, `foot`, `urxvt`, `st` and `xterm`. The program is
-looked up on `$PATH`, so `$TERMINAL="alacritty -e tmux"` is used when alacritty
-is installed and skipped when it is not. With none of them installed the WM
+A command set with `terminal_set_command()` is used as given, and is not looked
+up on `$PATH`. Otherwise `terminal.spawn` runs the first of these that this
+machine has installed: `$TERMINAL`, `x-terminal-emulator`, then `alacritty`,
+`kitty`, `foot`, `urxvt`, `st` and `xterm`. The program is looked up on
+`$PATH`, so `$TERMINAL="alacritty -e tmux"` is used when alacritty is installed
+and skipped when it is not. With none of them installed the WM
 prints one line at startup naming every name it tried, and `Mod+Return` reports
 the same line instead of forking a shell.
 

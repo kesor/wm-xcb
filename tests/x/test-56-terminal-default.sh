@@ -103,10 +103,14 @@ fi
 
 # install_terminal <program> - an executable under that name which records that
 # it ran, so a terminal the WM started is told from one it only resolved.
+#
+# The record is a line, not an empty file. `: >file` creates a file whose
+# line count is 0, the same count a program that never ran produces, so a
+# check that xterm did not start could not fail.
 install_terminal() { # install_terminal <program>
   cat >"$DIR/bin/$1" <<FAKE
 #!/bin/sh
-: >"\${WM_TERMINAL_MARKER_DIR:?}/$1"
+printf 'ran\n' >>"\${WM_TERMINAL_MARKER_DIR:?}/$1"
 exit 0
 FAKE
   chmod 0755 "$DIR/bin/$1"
@@ -156,9 +160,7 @@ press_until_started() { # press_until_started <marker> <what>
 }
 
 count_started() { # count_started <program>
-  local n
-  n=$(cat "$DIR/started/$1" 2>/dev/null | wc -l)
-  printf '%s\n' "${n:-0}"
+  output_lines "$DIR/started/$1"
 }
 
 # First: both terminals installed. x-terminal-emulator is the distribution's
