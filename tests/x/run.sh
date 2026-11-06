@@ -373,9 +373,7 @@ while IFS= read -r key; do
 done < <(seam_baseline_stale "$BASELINE" "$ROOT_DIR/tests/x" "$STARTED_FILE" "$MEASURED_FILE")
 
 echo "seam tests: $TOTAL_PASS passed, $TOTAL_KNOWN known failed, $TOTAL_NEW new failed, logs in $LOG_DIR"
-if [ "$STALE" -gt 0 ]; then
-  echo "seam tests: $STALE stale baseline entries; run --update-baseline to drop them"
-fi
+seam_baseline_stale_note "$FILTER" "${#TESTS[@]}" "$STALE"
 if [ "$TOTAL_NEW" -gt 0 ]; then
   echo "new failures: ${FAILED_FILES[*]}"
   exit 1

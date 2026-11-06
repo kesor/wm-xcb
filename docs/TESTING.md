@@ -290,10 +290,16 @@ test file exists and this run did not start is kept as it was, so
 files it ran and leaves every other existing test's entries alone. The
 stale-entry report follows the same rule: an entry for a file a filtered run
 never started says nothing about the tree, so it is not stale, and the
-suggestion to drop it is not made. `scripts/lib/seam-baseline.sh` holds both
-decisions, and `tests/x/test-109-seam-baseline-filter.sh` pins them. The one
-entry an update drops without measuring it is the one whose test file no longer
-exists.
+suggestion to drop it is not made. When a filtered run does have stale entries,
+it says "--update-baseline with the same --filter drops those and keeps the
+rest" rather than telling you to drop the baseline. Every filtered run also
+says what its stale check covered ("the stale check covered the <count> test
+file(s) --filter '<name>' started, and any entry whose test file is gone"),
+because a stale count printed without that scope reads as a statement about
+the whole baseline. `scripts/lib/seam-baseline.sh` holds the two decisions and
+that summary, and `tests/x/test-109-seam-baseline-filter.sh` pins them.
+The one entry an update drops without measuring it is the one whose test file no
+longer exists.
 
 The header of each reviewed baseline is written by its generator, and the
 generator replaces the whole file: a note added to the committed file by hand is

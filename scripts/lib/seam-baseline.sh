@@ -16,6 +16,12 @@
 # entries as stale named that rewrite as the cure. So an entry for a file that
 # exists and did not run is neither stale nor dropped.
 #
+# What such a run judged is narrower than what a full run judged, so the summary
+# has to say which one it was. A filtered run judges the files it started and
+# any entry whose test file is gone, not the rest of the baseline. A reader who
+# takes the count for the whole baseline deletes entries nothing measured.
+# seam_baseline_stale_note is that line.
+#
 # A file that no longer exists is the other case: no run can measure it, so its
 # entries are stale in every run and are dropped by an update.
 
@@ -125,4 +131,24 @@ seam_baseline_filter_note() {
   local filter=$1 count=$2
   [ -n "$filter" ] || return 0
   echo "seam tests: --filter '$filter' started $count test file(s); an entry whose test file exists and was not started is unchanged"
+}
+
+# seam_baseline_stale_note <filter> <started-count> <stale-count>
+#
+# The lines after the pass/fail summary. A filtered run's stale set is the
+# started files' assertions that now pass, and any entry whose test file is
+# gone. The count line cannot say the entries were in the files that started:
+# this function is not told which kind they are. --update-baseline with the
+# same filter drops both and keeps the rest.
+seam_baseline_stale_note() {
+  local filter=$1 count=$2 stale=$3
+  if [ "$stale" -gt 0 ]; then
+    if [ -n "$filter" ]; then
+      echo "seam tests: stale baseline entries: $stale; --update-baseline with the same --filter drops those and keeps the rest"
+    else
+      echo "seam tests: stale baseline entries: $stale; run --update-baseline to drop them"
+    fi
+  fi
+  [ -n "$filter" ] || return 0
+  echo "seam tests: the stale check covered the $count test file(s) --filter '$filter' started, and any entry whose test file is gone; an entry of a test file that exists and did not run was not judged"
 }
