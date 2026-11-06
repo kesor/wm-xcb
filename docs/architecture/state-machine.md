@@ -75,6 +75,50 @@ to add an accessor, not to include the internal header from a component.
 
 ---
 
+## Values a component cannot write
+
+Each of these is tracked state: the WM's behaviour depends on the value, and the
+value has mutually exclusive states. A component cannot assign any of them,
+because the definition is in a header no component includes.
+
+| Value | Written by | How the field is kept out of reach |
+|-------|-----------|-----------------------------------|
+| `StateMachine.current_state` | `sm_raw_write()`, `sm_transition()` | `sm-instance.h` declares the type only; the definition is in `sm-instance-internal.h` |
+| `ClientState.managed`, `.urgent`, `.mapped` | `client_set_managed()`, `client_set_urgent()`, `client_set_mapped()` | `client.h` declares the type and a pointer to it; the definition is in `client.c` |
+
+`scripts/check-private-state.sh` is what keeps that table true. It compiles every
+fixture under `tests/compile-fail/` twice: with `-DPRIVATE_STATE_CONTROL` through
+the accessor, which must succeed, and without it assigning the field, which must
+not compile. The control build is what tells a refusal from a fixture that fails
+because an include path moved.
+
+The tracked values that are still public, and why:
+
+- **`Monitor.tagset` and `prevtagset`** are written only by `monitor.c`'s own tag
+  helpers, so no component assigns them today. They are also a second copy of
+  the tag view TagViewSM holds in its instance data, and nothing keeps the two in
+  agreement: a client created between them takes its tags from the field and is
+  shown or hidden by the machine. That duplicate is wm-46k.6. Hiding the field
+  before the duplicate is gone would hide the defect, not the write.
+- **`struct Context.state`** in `wm-states.h` is the pre-hub transition table's
+  state. Only `wm-states.c` and its test write it, and the table is due for
+  removal in favour of the component that owns pointer input, so it does not earn
+  an accessor layer first. wm-46k.15 tracks that subsystem.
+- **`Client.tags`** is the set of tags the client is assigned to, not exclusive
+  state, and it is written through `client_set_tags()`, `client_add_tag()` and
+  `client_remove_tag()`.
+- **`Client.focusable`, `Client.monitor` and `Client.stack_mode`** are a
+  capability from WM_HINTS, an association, and a mirror of the X stack order.
+- **`Client.urgent`** is behind an accessor but has no machine, even though the
+  built-in list below still promises an UrgencySM. wm-46k.17 decides which of the
+  two is wrong.
+
+Every other tracked value is already a state machine instance — the client's
+fullscreen, floating and focus machines, the monitor's layout and tag view, the
+connection — so the row for `StateMachine.current_state` covers it.
+
+---
+
 ## SM Template Structure
 
 ```c

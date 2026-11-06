@@ -111,6 +111,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
+| private state | `scripts/check-private-state.sh` | no component can assign a machine-tracked field: every fixture under `tests/compile-fail/` that assigns one fails to compile, and the same fixture built through its accessor succeeds, so a refusal is told apart from a broken include path |
 | sources | `scripts/check-orphan-sources.sh` | every tracked `.c` outside `tests/` and `tools/` is in `make -s print-src`, so the compiler and `check-async` see it |
 | fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, cites a line of that program on its third, is named after that program, and names one that is installed on `PATH` outside the fake directory. The check resolves that name to a path, requires a regular file, and looks for the cited line in it. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
@@ -386,6 +387,7 @@ scripts/check-harness-variant.sh  # the harnesses run the variant they report
 scripts/check-fakes.sh      # every stand-in names an installed program and cites a line of it
 scripts/check-bead-descriptions.sh   # every bead description is still there
 scripts/check-orphan-sources.sh   # every tracked source is in the build
+scripts/check-private-state.sh   # a component cannot assign a machine-tracked field
 ```
 
 Pass `--no-auto-install` to a by-hand `lefthook run`: the hook wrapper passes it,
