@@ -6,6 +6,8 @@
  *
  * Design:
  * - Action: "terminal.spawn" with ACTION_TARGET_NONE (no target needed)
+ * - Picks a terminal that is installed: $TERMINAL, x-terminal-emulator, then
+ *   the names in terminal_candidates
  * - Forks a child process to execute the terminal
  * - Returns immediately (fire-and-forget)
  *
@@ -14,11 +16,15 @@
  */
 
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include "action-registry.h"
@@ -51,38 +57,176 @@ static bool initialized = false;
 static char* custom_terminal = NULL;
 
 /*
- * Default fallback terminal
- */
-#define DEFAULT_TERMINAL     "xterm"
-
-/*
  * Maximum terminal command length
  */
 #define TERMINAL_MAX_CMD_LEN 256
 
 /*
- * Get the terminal command to execute.
- * Returns the custom command if set, otherwise $TERMINAL env var,
- * or the fallback default.
+ * Looked up on $PATH in this order when the user has no usable $TERMINAL.
  *
- * @return  terminal command string (owned by this module, do not free)
+ * x-terminal-emulator goes first because the distribution already points it at
+ * the terminal this machine is set up for; a user who installed kitty and kept
+ * xterm would otherwise get xterm. xterm goes last for that reason, not because
+ * it is missing anywhere.
+ */
+static const char* const terminal_candidates[] = {
+  "x-terminal-emulator",
+  "alacritty",
+  "kitty",
+  "foot",
+  "urxvt",
+  "st",
+  "xterm",
+};
+
+/*
+ * Length of the program word in a command line: everything before the first
+ * blank, so "$TERMINAL=alacritty -e tmux" is looked up as alacritty.
+ */
+static size_t
+terminal_program_length(const char* cmd)
+{
+  size_t len = 0;
+
+  while (cmd[len] != '\0' && cmd[len] != ' ' && cmd[len] != '\t')
+    len++;
+
+  return len;
+}
+
+static bool
+terminal_is_executable(const char* path)
+{
+  struct stat st;
+
+  return stat(path, &st) == 0 && S_ISREG(st.st_mode) && access(path, X_OK) == 0;
+}
+
+static bool
+terminal_in_directory(const char* dir, size_t dir_len, const char* program)
+{
+  char path[PATH_MAX];
+  int  written;
+
+  if (dir_len == 0) /* an empty PATH component is the current directory */
+    written = snprintf(path, sizeof(path), "%s", program);
+  else
+    written = snprintf(path, sizeof(path), "%.*s/%s", (int) dir_len, dir, program);
+
+  return written > 0 && (size_t) written < sizeof(path) && terminal_is_executable(path);
+}
+
+/*
+ * Whether the program a command line starts with can be run. A command that
+ * names a directory is checked where it stands; a bare name is searched on
+ * $PATH, which is the same lookup execlp() does in the child.
+ */
+static bool
+terminal_installed(const char* cmd)
+{
+  char   program[TERMINAL_MAX_CMD_LEN];
+  size_t len = terminal_program_length(cmd);
+
+  if (len == 0 || len >= sizeof(program))
+    return false;
+
+  memcpy(program, cmd, len);
+  program[len] = '\0';
+
+  if (strchr(program, '/') != NULL)
+    return terminal_is_executable(program);
+
+  const char* path = getenv("PATH");
+  if (path == NULL)
+    return false;
+
+  for (;;) {
+    const char* colon   = strchr(path, ':');
+    size_t      dir_len = colon != NULL ? (size_t) (colon - path) : strlen(path);
+
+    if (terminal_in_directory(path, dir_len, program))
+      return true;
+    if (colon == NULL)
+      return false;
+    path = colon + 1;
+  }
+}
+
+/*
+ * Get the terminal command to execute: the custom command if one was set,
+ * otherwise the first of $TERMINAL and terminal_candidates that is installed.
+ *
+ * A $TERMINAL that names a program this machine does not have falls through
+ * instead of being returned, because a key bound to a missing binary does
+ * nothing at all and says nothing about why.
+ *
+ * @return  terminal command string (owned by this module, do not free), or
+ *          NULL when no terminal emulator is installed
  */
 const char*
 terminal_get_default(void)
 {
-  /* Use custom command if set */
-  if (custom_terminal != NULL && custom_terminal[0] != '\0') {
+  if (custom_terminal != NULL && custom_terminal[0] != '\0')
     return custom_terminal;
-  }
 
-  /* Try $TERMINAL environment variable */
   const char* env_term = getenv("TERMINAL");
   if (env_term != NULL && env_term[0] != '\0') {
-    return env_term;
+    if (terminal_installed(env_term))
+      return env_term;
+
+    LOG_DEBUG("$TERMINAL names '%s', which is not installed; looking for another terminal", env_term);
   }
 
-  /* Fallback to default */
-  return DEFAULT_TERMINAL;
+  for (size_t i = 0; i < sizeof(terminal_candidates) / sizeof(terminal_candidates[0]); i++) {
+    if (terminal_installed(terminal_candidates[i]))
+      return terminal_candidates[i];
+  }
+
+  return NULL;
+}
+
+/*
+ * Append to a bounded buffer, truncating rather than writing past its end.
+ */
+static void
+terminal_append(char* buf, size_t size, size_t* used, const char* text)
+{
+  if (*used >= size - 1)
+    return;
+
+  size_t room = size - 1 - *used;
+  size_t len  = strlen(text);
+
+  if (len > room)
+    len = room;
+
+  memcpy(buf + *used, text, len);
+  *used += len;
+  buf[*used] = '\0';
+}
+
+/*
+ * One line naming every program that was tried, so the two places that notice
+ * a machine with no terminal emulator say the same thing: startup, and the key
+ * press that needs one.
+ *
+ * @return  the report, owned by this module and valid until the next call
+ */
+const char*
+terminal_missing_report(void)
+{
+  static char report[512];
+  size_t      used = 0;
+
+  report[0] = '\0';
+  terminal_append(report, sizeof(report), &used, "terminal.spawn: no terminal emulator installed; tried $TERMINAL");
+
+  for (size_t i = 0; i < sizeof(terminal_candidates) / sizeof(terminal_candidates[0]); i++) {
+    terminal_append(report, sizeof(report), &used, ", ");
+    terminal_append(report, sizeof(report), &used, terminal_candidates[i]);
+  }
+
+  return report;
 }
 
 /*
@@ -149,7 +293,16 @@ terminal_init(void)
    */
 
   initialized = true;
-  LOG_DEBUG("Terminal module initialized (using: %s)", terminal_get_default());
+
+  /* Resolve once here so a machine with no terminal emulator says so at
+   * startup, before the key is pressed, instead of only when the key does
+   * nothing. */
+  const char* terminal = terminal_get_default();
+  if (terminal != NULL) {
+    LOG_DEBUG("Terminal module initialized (using: %s)", terminal);
+  } else {
+    LOG_ERROR("%s", terminal_missing_report());
+  }
 }
 
 /*
@@ -208,6 +361,18 @@ terminal_action_spawn(ActionInvocation* inv)
 bool
 terminal_spawn(void)
 {
+  const char* term_cmd = terminal_get_default();
+
+  /*
+   * Nothing to exec. Forking a shell to run a name that is not installed only
+   * adds its own "not found" line to the report, so the WM does not fork at
+   * all and says what it looked for.
+   */
+  if (term_cmd == NULL) {
+    LOG_ERROR("%s", terminal_missing_report());
+    return false;
+  }
+
   pid_t pid = fork();
 
   if (pid < 0) {
@@ -239,8 +404,6 @@ terminal_spawn(void)
       /* Continue anyway - the exec will likely work */
     }
 
-    const char* term_cmd = terminal_get_default();
-
     /*
      * Use sh -c to parse the command, allowing:
      * - Commands with arguments: "alacritty -e tmux"
@@ -257,6 +420,6 @@ terminal_spawn(void)
     _exit(1);
   }
 
-  LOG_DEBUG("Terminal spawned: pid=%d cmd=%s", (int) pid, terminal_get_default());
+  LOG_DEBUG("Terminal spawned: pid=%d cmd=%s", (int) pid, term_cmd);
   return true;
 }

@@ -327,7 +327,14 @@ These files start their own display, because the condition they check cannot
 be produced once the WM is already up: `test-86-queued-event.sh`,
 `test-88-adopt-existing-windows.sh`, and `test-54-config-file-binding.sh`.
 `test-102-probe-shape.sh` starts one too, by running `tests/x/probe.sh`, so the
-probe does not take the display the suite is using.
+probe does not take the display the suite is using. `test-56-terminal-default.sh`
+starts one for a different reason: it hands the WM a `PATH` of its own, so the
+terminal `MOD+Return` starts is one the test installed and not whatever the
+developer's machine happens to have. It asserts that a start with no config file
+prints no `ERROR`, that the terminal the WM picks is `x-terminal-emulator` when
+both it and `xterm` are there, that it falls through to `xterm` when
+`x-terminal-emulator` is not, and that a machine with neither gets one line
+naming what was tried and no shell's `not found` line on top of it.
 
 `run.sh` points `WM_CONFIG` at a path that does not exist, so the suite always
 meets the compiled bindings whatever the developer running it has in
