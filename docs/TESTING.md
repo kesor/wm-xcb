@@ -224,6 +224,11 @@ make DEBUG=1 test-x         # the same suite against the debug WM
 make SANITIZE=1 test-x      # the same suite against the sanitized WM
 ```
 
+A `--filter` that matches no test file exits non-zero and names the pattern and
+`tests/x/test-*.sh`, the glob it was matched against. A filtered run that starts
+nothing is a mistyped filter or a renamed file, not a suite with nothing to do,
+and reporting it as an empty run made it read as a pass.
+
 A seam test asserts what the X server sees, not what the WM thinks: the window
 is viewable, `WM_STATE` is `Normal`, two windows do not overlap, the input focus
 is where the WM said it would be, `_NET_CLIENT_LIST` exists. Those are the

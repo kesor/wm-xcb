@@ -279,6 +279,15 @@ for f in "$ROOT_DIR"/tests/x/test-*.sh; do
   TESTS+=("$f")
 done
 
+# A filter that names no file used to report "0 file(s)" and exit 0, so a typo
+# or a renamed test read as a green run that judged nothing. The no-filter case
+# is different: an empty tests/x directory is a broken checkout, not a mistyped
+# argument.
+if [ -n "$FILTER" ] && [ "${#TESTS[@]}" -eq 0 ]; then
+  echo "run.sh: --filter '$FILTER' matched no test file under $ROOT_DIR/tests/x/test-*.sh" >&2
+  exit 1
+fi
+
 BASELINE="$ROOT_DIR/tests/quality/seam-baseline.txt"
 declare -A BASELINE_KEYS=()
 if [ -f "$BASELINE" ] && [ "$UPDATE_BASELINE" -eq 0 ]; then
