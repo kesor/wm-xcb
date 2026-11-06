@@ -319,10 +319,13 @@ test_client_properties(void)
   assert(client_has_tag(c, 7) == true);
   assert(client_has_tag(c, 8) == false);
 
-  /* Test state flags */
+  /* Test state flags. A new client is in neither exclusive state, and each
+   * one is read and written only through its accessor. */
+  assert(client_is_urgent(c) == false);
   client_set_urgent(c, true);
   assert(client_is_urgent(c) == true);
 
+  assert(client_is_managed(c) == false);
   client_set_managed(c, true);
   assert(client_is_managed(c) == true);
 
@@ -331,6 +334,7 @@ test_client_properties(void)
   assert(client_is_focusable(c) == false);
 
   /* Test mapped state */
+  assert(client_is_mapped(c) == false);
   client_set_mapped(c, true);
   assert(client_is_mapped(c) == true);
   client_set_mapped(c, false);

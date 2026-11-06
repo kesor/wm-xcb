@@ -28,6 +28,14 @@
 typedef struct Monitor Monitor;
 
 /*
+ * The client's machine-tracked values: the ones with a mutually exclusive state
+ * that the WM's behaviour depends on. The definition is in client.c, so a
+ * component that assigns one of these fields cannot compile; read and write them
+ * through the client_is_*() and client_set_*() accessors below.
+ */
+typedef struct ClientState ClientState;
+
+/*
  * The bits of ICCCM WM_NORMAL_HINTS this WM reads. The min and max size, the
  * base size and the size increment are what constrains a tiled window.
  * Position and gravity are for windows that place themselves, and aspect is
@@ -129,11 +137,13 @@ typedef struct Client {
   /* Tags - bitmask of assigned tags */
   uint32_t tags;
 
-  /* Managed state */
-  bool                  managed;    /* added to window list */
-  bool                  urgent;     /* has urgency hint */
-  bool                  focusable;  /* can receive focus */
-  bool                  mapped;     /* is currently mapped */
+  /* Managed, urgent and mapped state. The definition of ClientState is not in
+   * this header: see the typedef above. */
+  ClientState* tracked;
+
+  /* Can receive focus, from WM_HINTS. Not tracked state: a capability. */
+  bool focusable;
+
   enum xcb_stack_mode_t stack_mode; /* X11 stack mode */
 
   /* Unmaps the WM asked the server for whose UnmapNotify has not been read
@@ -388,6 +398,9 @@ bool client_has_tag(const Client* c, uint32_t tag);
 
 /*
  * Urgency
+ *
+ * Urgent, managed and mapped are the values a component must not assign. They
+ * live in a definition client.c keeps to itself; these are the only way in.
  */
 void client_set_urgent(Client* c, bool urgent);
 bool client_is_urgent(const Client* c);

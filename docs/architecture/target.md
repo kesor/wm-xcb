@@ -95,10 +95,14 @@ struct Client {
     // Tags
     uint32_t tags;          // bitmask of assigned tags
     
-    // Managed state
-    bool managed;           // added to window list
-    bool urgent;            // has urgency hint
-    bool focusable;          // can receive focus
+    // Managed, urgent and mapped state live behind accessors: the definition
+    // of ClientState is in client.c, so a component cannot assign one of those
+    // fields and compile. docs/architecture/state-machine.md lists which
+    // values are tracked and why.
+    ClientState* tracked;
+
+    // Capability, not tracked state
+    bool focusable;         // can receive focus
     
     // For clientlist ordering
     Client* next;
@@ -125,8 +129,6 @@ Client* client_create(xcb_window_t window) {
     c->window = window;
     c->title = NULL;
     c->class_name = NULL;
-    c->managed = false;
-    c->urgent = false;
     c->focusable = true;
     c->next = c->prev = NULL;
     c->slist_next = NULL;
@@ -643,8 +645,7 @@ struct Client {
     uint32_t tags;
     
     // State
-    bool managed;
-    bool urgent;
+    ClientState* tracked;
     bool focusable;
     
     // List

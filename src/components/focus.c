@@ -143,7 +143,7 @@ focus_guard_can_focus(StateMachine* sm, void* data)
     return false;
 
   Client* c = (Client*) sm_get_owner(sm);
-  return c->managed && c->focusable;
+  return client_is_managed(c) && c->focusable;
 }
 
 /*
@@ -402,7 +402,7 @@ focus_focus_client(Client* c)
 static bool
 focus_can_take_focus(const Client* c)
 {
-  return c != NULL && c->managed && c->focusable && c->mapped;
+  return c != NULL && client_is_managed(c) && c->focusable && client_is_mapped(c);
 }
 
 /*
@@ -695,7 +695,7 @@ focus_on_enter_notify(void* event)
   }
 
   /* Check if client is focusable */
-  if (!c->focusable || !c->managed) {
+  if (!c->focusable || !client_is_managed(c)) {
     LOG_DEBUG("Client window=%u is not focusable or not managed", e->event);
     return;
   }

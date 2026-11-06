@@ -162,7 +162,7 @@ fullscreen_guard_can_fullscreen(StateMachine* sm, void* data)
     return false;
 
   Client* c = (Client*) sm_get_owner(sm);
-  return c->managed;
+  return client_is_managed(c);
 }
 
 /*

@@ -382,21 +382,21 @@ tag_manager_update_visibility(Monitor* m)
   /* Iterate all clients and update their visibility */
   Client* c = client_list_get_head();
   while (c != NULL) {
-    if (c->monitor == m && c->managed) {
+    if (c->monitor == m && client_is_managed(c)) {
       bool should_be_visible = (c->tags & visible_tags) != 0;
 
-      if (should_be_visible && !c->mapped) {
+      if (should_be_visible && !client_is_mapped(c)) {
         /* Show client */
         LOG_DEBUG("Showing client %u (tags=0x%x, visible=0x%x)",
                   c->window, c->tags, visible_tags);
         client_show(c->window);
-        c->mapped = true;
-      } else if (!should_be_visible && c->mapped) {
+        client_set_mapped(c, true);
+      } else if (!should_be_visible && client_is_mapped(c)) {
         /* Hide client */
         LOG_DEBUG("Hiding client %u (tags=0x%x, visible=0x%x)",
                   c->window, c->tags, visible_tags);
         client_hide(c->window);
-        c->mapped = false;
+        client_set_mapped(c, false);
       }
     }
     c = client_get_next(c);
@@ -663,16 +663,13 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
     return;
   }
 
-  tag_index         = tag_index - 1; /* Convert to 0-based */
-  uint32_t tag_mask = TAG_MASK(tag_index);
+  tag_index = tag_index - 1; /* Convert to 0-based */
 
   /* Toggle the tag on the client */
-  if ((c->tags & tag_mask) != 0) {
-    /* Remove tag */
-    c->tags &= ~tag_mask;
+  if (client_has_tag(c, tag_index)) {
+    client_remove_tag(c, tag_index);
   } else {
-    /* Add tag */
-    c->tags |= tag_mask;
+    client_add_tag(c, tag_index);
   }
 
   LOG_DEBUG("Tag client toggle: client=%u, new_tags=0x%x", c->window, c->tags);
@@ -685,12 +682,12 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
     uint32_t visible_tags      = tag_manager_get_visible_tags(m);
     bool     should_be_visible = (c->tags & visible_tags) != 0;
 
-    if (should_be_visible && !c->mapped) {
+    if (should_be_visible && !client_is_mapped(c)) {
       client_show(c->window);
-      c->mapped = true;
-    } else if (!should_be_visible && c->mapped) {
+      client_set_mapped(c, true);
+    } else if (!should_be_visible && client_is_mapped(c)) {
       client_hide(c->window);
-      c->mapped = false;
+      client_set_mapped(c, false);
     }
   }
 

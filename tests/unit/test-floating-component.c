@@ -345,7 +345,7 @@ test_floating_request_refused_for_unmanaged_client(void)
 
   Client* c = client_create(2300);
   assert_or_abort(c != NULL);
-  assert(c->managed == false);
+  assert(client_is_managed(c) == false);
 
   hub_send_request(REQ_CLIENT_FLOAT, c->target.id);
 
