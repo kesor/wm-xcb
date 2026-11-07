@@ -159,6 +159,9 @@ ask, and a wrong answer costs a rewrite instead of a paragraph:
 - **Can a check see the change?** If it changes what X sees (map, tile, focus,
   a property), write or extend a `tests/x/test-*.sh` and expect to run
   `make test-x`. Otherwise put the assertion in the component's `test-*.c`.
+- **Does the bead list seam cases?** Before the first edit, `grep -l` each case
+  in `tests/x/` and comment which already have a test file. The work is the
+  cases with no file.
 
 Then work through the list:
 
@@ -204,6 +207,15 @@ Name where the list lives and let the worker derive it:
 The second form is also a test, which is the bar: a criterion no command can
 check does not say what done looks like. A number the bead sets on purpose stays
 - an exit status, a latency budget, a limit.
+
+A bead that lists seam cases names the test file for each one, or says "no test
+yet" after `grep -l` in `tests/x/`. A case with neither sends the worker to
+re-read and re-run a test that already exists.
+
+- not: blocked child, minimum size hint
+- instead: blocked child is `tests/x/test-92-launcher-does-not-block.sh`;
+  minimum size hint is `tests/x/test-31-size-hints.sh`; a case `grep -l` does
+  not find is written `no test yet`, with the pattern that was grepped
 
 The description is also the pull request body when the branch lands, so it ends
 with the rule check: which rule in `docs/PHILOSOPHY.md` section 3 the change
