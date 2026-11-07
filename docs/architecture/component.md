@@ -98,7 +98,7 @@ void keybinding_handler(void* event) {
 
 ### XCB Infrastructure Dispatches Directly
 
-The event loop in `wm-xcb.c` routes events to registered handlers. It waits in
+The event loop in `src/core/wm-xcb.c` routes events to registered handlers. It waits in
 `poll(2)` first, so the dispatch below only runs when there is something to
 dispatch. `poll(2)` does not see an event libxcb has already read into its own
 queue, so the wait takes that event first and the dispatch handles it before the
@@ -145,7 +145,7 @@ void handle_xcb_events() {
 
 - `src/xcb/xcb-handler.c` — handler registration and dispatch implementation
 - `src/xcb/xcb-handler.h` — public API and event type constants
-- `wm-xcb.c` — event loop integration (calls `xcb_handler_init()`, `xcb_handler_shutdown()`, `xcb_handler_dispatch()`)
+- `src/core/wm-xcb.c` — event loop integration (calls `xcb_handler_init()`, `xcb_handler_shutdown()`, `xcb_handler_dispatch()`)
 
 ---
 
@@ -471,18 +471,18 @@ Component gap_component = {
 
 ## Adding a Component at Runtime
 
-The built-in components are compiled in and registered from `wm_components_init()` in `wm-components.c`. Clients are created after that function returns. Monitors are created inside it, by `monitor_manager_init()`. Pertag, tag-manager, and tiling register before that call. Monitor-manager accepts monitors and registers at the start of that call, before the monitors are created. The hub has no hot-plug path beyond the registry calls:
+The built-in components are compiled in and registered from `wm_components_init()` in `src/core/wm-components.c`. Clients are created after that function returns. Monitors are created inside it, by `monitor_manager_init()`. Pertag, tag-manager, and tiling register before that call. Monitor-manager accepts monitors and registers at the start of that call, before the monitors are created. The hub has no hot-plug path beyond the registry calls:
 
 - `hub_register_component()` adds a component to the registry and the request index. It does not adopt targets that already exist. A component registered later is adopted by the targets created after it, through `hub_adopt_components_for_target()`. A component whose `on_adopt` does the work, and that must cover targets that already exist, walks `hub_get_targets_by_type_name()` and calls that hook on each. A component that creates its machine on first lookup does not get the machine from the hook.
 - `hub_unregister_component()` removes the component from the registry and the request index. It does not call `on_unadopt` on targets, so a machine the component already stored stays on them.
 
-There is no `hub_notify_compatible_targets()`, no adopted-components list on a target, and no loader: components are compiled in and registered from `wm-components.c`. See [hub.md](hub.md#component-adoption).
+There is no `hub_notify_compatible_targets()`, no adopted-components list on a target, and no loader: components are compiled in and registered from `src/core/wm-components.c`. See [hub.md](hub.md#component-adoption).
 
 ---
 
-## Header: wm-hub.h
+## Header: src/core/wm-hub.h
 
-`HubComponent` is declared in `wm-hub.h`, together with the registration, lookup and unregistration calls. This document does not copy the header: a second copy drifts from the one the compiler reads.
+`HubComponent` is declared in `src/core/wm-hub.h`, together with the registration, lookup and unregistration calls. This document does not copy the header: a second copy drifts from the one the compiler reads.
 
 ---
 

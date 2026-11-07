@@ -8,7 +8,7 @@
 #include <string.h>
 
 #include "connection-sm.h"
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 /*
  * Guard functions

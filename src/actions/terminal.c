@@ -28,9 +28,9 @@
 #include <sys/types.h>
 
 #include "action-registry.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb.h"
 #include "terminal.h"
-#include "wm-log.h"
-#include "wm-xcb.h"
 
 /*
  * Action definition for terminal.spawn

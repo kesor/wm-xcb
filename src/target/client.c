@@ -14,9 +14,9 @@
 #include "../sm/sm.h"
 #include "client.h"
 #include "monitor.h"
-#include "wm-hub.h"
-#include "wm-log.h"
-#include "wm-xcb.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb.h"
 
 /*
  * Sentinel-based client list

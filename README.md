@@ -34,9 +34,9 @@ gcc, make and pkg-config.
 `LOG_DEBUG()` into output. `docs/TESTING.md` has that build, the nested session,
 the sanitizer runs and the performance harness.
 
-Configuration is compiled in. Keybindings are wired in `config.wm.def.h` to
+Configuration is compiled in. Keybindings are wired in `src/config/config.wm.def.h` to
 action names from the registry; tags, window rules, gaps and border colours are
-in `config.def.h`. Edit, then `make` again. The default keys — a terminal on
+in `src/config/config.def.h`. Edit, then `make` again. The default keys — a terminal on
 `Mod+Return`, a launcher on `Mod+p`, nine tags on `Mod+1`…`Mod+9` — and what
 each one does are listed in
 [docs/configuration.md](docs/configuration.md#default-bindings).

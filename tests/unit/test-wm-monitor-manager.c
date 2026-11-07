@@ -12,10 +12,10 @@
 #include <string.h>
 
 #include "src/components/monitor-manager.h"
+#include "src/core/wm-hub.h"
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-wm.h"
-#include "wm-hub.h"
 
 void
 test_monitor_manager_component_init_shutdown(void)

@@ -14,12 +14,12 @@
 #include "src/components/client-list.h"
 #include "src/components/focus.h"
 #include "src/components/tag-manager.h"
+#include "src/core/wm-components.h"
+#include "src/core/wm-hub.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "test-wm.h"
-#include "wm-components.h"
-#include "wm-hub.h"
 
 /*
  * Track events received during tests

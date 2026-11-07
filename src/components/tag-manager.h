@@ -28,8 +28,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "src/core/wm-hub.h"
 #include "src/event-types.h"
-#include "wm-hub.h"
 
 /* Forward declarations */
 typedef struct Monitor      Monitor;

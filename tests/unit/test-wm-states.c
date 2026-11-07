@@ -10,10 +10,10 @@
 
 #include <string.h>
 
+#include "src/core/wm-states.h"
+#include "src/core/wm-xcb.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-states.h"
-#include "wm-xcb.h"
 
 #define TEST_ROOT 0x5A5A
 

@@ -22,7 +22,7 @@
  * Base configuration types
  * wm-states.h defines StateTransition used in config.def.h
  */
-#include "wm-states.h"
+#include "src/core/wm-states.h"
 
 /*
  * Keybinding registration API

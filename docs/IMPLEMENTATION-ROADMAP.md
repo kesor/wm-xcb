@@ -62,7 +62,7 @@ displays state that the other components produce.
 Runtime configuration, reload without restart, and errors that say what is
 wrong instead of failing silently. Epic `wm-lle`.
 
-The compiled-in defaults in `config.def.h` and `config.wm.def.h` are a
+The compiled-in defaults in `src/config/config.def.h` and `src/config/config.wm.def.h` are a
 development convenience; the promise in [PHILOSOPHY.md](PHILOSOPHY.md) is that a
 user changes keybindings and rules in a text file. This phase is ordered after
 the WM works because a configuration file for a WM that shows nothing is not
@@ -88,7 +88,7 @@ Phases 1 and 2 are not as separable as the list suggests: mapping a window,
 assigning it a monitor and tags, tiling it, and focusing it all touch the same
 component init and client-list code. Treat `wm-4f6` as one queue and check
 `bd show` for blockers before starting a second issue in it; two agents editing
-`client-list.c` and `wm.c` at once is how a merge becomes a redesign.
+`client-list.c` and `src/core/wm.c` at once is how a merge becomes a redesign.
 
 ---
 

@@ -17,6 +17,9 @@
 #include "src/actions/action-registry.h"
 #include "src/components/floating.h"
 #include "src/components/fullscreen.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
@@ -24,9 +27,6 @@
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
 #include "tiling.h"
-#include "wm-hub.h"
-#include "wm-log.h"
-#include "wm-xcb.h"
 
 /*
  * Cached LayoutSM template - created once at init, reused for all monitors.

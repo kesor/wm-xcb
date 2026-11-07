@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "sm-instance.h"
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 /* Registry entry - uses separate typed function pointer fields to avoid
  * casting between function pointers and data pointers (UB in standard C) */

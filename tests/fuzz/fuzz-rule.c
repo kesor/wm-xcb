@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "config.def.h"
+#include "src/config/config.def.h"
 
 int
 LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)

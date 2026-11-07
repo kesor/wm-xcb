@@ -35,8 +35,8 @@ with `patch`, and stepping on the other patches. That is the same criticism this
 project makes about patch conflicts, seen from the user's side instead of the
 maintainer's.
 
-wm is no better today: gaps and borders are still compiled into `config.def.h`
-and `config.wm.def.h`. Keybindings, float rules and tag names come from a text
+wm is no better today: gaps and borders are still compiled into `src/config/config.def.h`
+and `src/config/config.wm.def.h`. Keybindings, float rules and tag names come from a text
 file (`docs/configuration.md`), and a binding that names an action nobody
 registered is reported once at startup with its key and the action name. The
 float rules and the tag names are read and kept, and nothing consults them yet.

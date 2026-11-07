@@ -26,14 +26,14 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
 
-#include "config-file.h"
-#include "config.def.h"
-#include "config.h"
-#include "config.wm.def.h"
 #include "src/actions/keybinding-binding.h"
-#include "wm-hub.h"
-#include "wm-log.h"
-#include "wm-xcb.h"
+#include "src/config/config-file.h"
+#include "src/config/config.def.h"
+#include "src/config/config.h"
+#include "src/config/config.wm.def.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb.h"
 
 /* The file and the tag targets have to agree on how many tags there are, or a
  * `tags` line would name a tag the WM does not have. */

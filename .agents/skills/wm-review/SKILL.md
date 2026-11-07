@@ -51,7 +51,7 @@ run; if it says "docs updated", read the doc.
 
 | The diff touches | Read it like |
 |---|---|
-| `src/xcb/`, `wm-xcb.c` (at the checkout root, not under `src/`), `src/components/client-list.c`, anything mapping or configuring windows | seam — the unit tests cannot see it, so the seam tests and a live run are the evidence. Distrust a green unit suite here |
+| `src/xcb/`, `src/core/wm-xcb.c`, `src/components/client-list.c`, anything mapping or configuring windows | seam — the unit tests cannot see it, so the seam tests and a live run are the evidence. Distrust a green unit suite here |
 | event loop, hub, state machines, `src/target/` | rules — the four commitments in `docs/PHILOSOPHY.md`. A state write outside a machine, a component calling another component, or anything blocking is a P1 |
 | a new component or a new event/request | contracts — who owns the state, what refuses a transition, which event fires, what happens when the request fails |
 | docs, scripts, `Makefile`, `.github/` | mechanics — does the command in the doc actually run; does the doc's description of its output match what it prints; does a count or a line number appear; does the new gate execute in CI |
@@ -104,7 +104,7 @@ did not mention.
 | No state assignment outside `sm_raw_write` / `sm_transition` | `client->mapped = true`, `selected_monitor = ...`, or any field a template tracks written by hand | `scripts/check-private-state.sh`. A tracked field with no `tests/compile-fail/` fixture is still a read of the diff |
 | No `_reply()` in a handler or action | `xcb_get_property_reply()`, `xcb_get_geometry_reply()`, or the plural form, inside anything an event can reach | `make check-async`. The reply belongs in a `wm_loop_add_poll_handler()` callback |
 | No blocking call in the loop | `waitpid()`, `read()` on a child, `sleep()`, or a loop that calls `xcb_poll_for_event()` and never blocks | `make check-async` for the calls; `scripts/perf-test.sh` for idle CPU, which is what a spin costs |
-| One flush per loop iteration | `xcb_flush()` after a request, in a handler, or in an action | read the loop in `wm-xcb.c`: one flush, after the handlers ran |
+| One flush per loop iteration | `xcb_flush()` after a request, in a handler, or in an action | read the loop in `src/core/wm-xcb.c`: one flush, after the handlers ran |
 | Every request has a failure event | an executor that returns on a refused guard and emits nothing, so a subscriber cannot tell refusal from success | read the executor and its event table against `EVT_FULLSCREEN_FAILED` in `src/components/fullscreen.h` and `EVT_FLOATING_FAILED` in `src/components/floating.h` |
 | New behaviour is a registration, not an edit | a feature that edits a component it does not own instead of adding a request, an event, a subscriber, an SM template, or an action | run the extension point test (section 4): name the file and the missing extension point. New per-target state belongs in the target that owns it, and that is not a collision |
 | Event ids come from the shared registry | a fresh integer in a local `enum`, or a base that overlaps another component's range | `src/event-types.h` for the range, `tests/unit/test-event-types.c` for a collision |

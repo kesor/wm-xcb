@@ -9,13 +9,13 @@
 #include <xcb/xinput.h>
 
 #include "src/components/client-list.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-running.h"
+#include "src/core/wm-signals.h"
+#include "src/core/wm-states.h"
+#include "src/core/wm-xcb.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
-#include "wm-log.h"
-#include "wm-running.h"
-#include "wm-signals.h"
-#include "wm-states.h"
-#include "wm-xcb.h"
 
 xcb_connection_t* dpy;
 xcb_window_t      root;

@@ -27,7 +27,7 @@
 #include <xcb/xcb.h>
 
 #include "../sm/sm.h"
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 /*
  * Monitor structure

@@ -28,7 +28,7 @@
 
 #include "src/actions/action-registry.h"
 #include "src/actions/terminal.h"
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 #include "test-registry.h"
 #include "test-terminal.h"

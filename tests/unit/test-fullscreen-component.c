@@ -14,10 +14,10 @@
 #include "src/components/client-list.h"
 #include "src/components/focus.h"
 #include "src/components/fullscreen.h"
+#include "src/core/wm-hub.h"
 #include "src/sm/sm-registry.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-wm.h"
-#include "wm-hub.h"
 
 /*
  * Test: fullscreen.toggle is registered against the focused client.

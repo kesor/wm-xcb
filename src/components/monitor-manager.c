@@ -19,9 +19,9 @@
 #include "../target/monitor.h"
 #include "../xcb/xcb-handler.h"
 #include "monitor-manager.h"
-#include "wm-hub.h"
-#include "wm-log.h"
-#include "wm-xcb.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb.h"
 
 /*
  * RandR constants for connection state
