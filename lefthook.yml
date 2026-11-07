@@ -167,6 +167,12 @@ pre-push:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory."
 
+    # Same allowlist as the commit hook. CI and the merge run this list, not
+    # pre-commit, so a root file committed with the hooks off has to fail here.
+    root:
+      run: ./scripts/check-root.sh
+      fail_text: "A tracked file sits at the repository root outside the allowlist. Move a source file under src/, or add the new kind of root entry to scripts/lib/root-report.sh in the commit that introduces it."
+
     test-src:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC."

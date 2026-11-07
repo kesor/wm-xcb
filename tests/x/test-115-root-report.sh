@@ -56,4 +56,12 @@ check_eq "and says git gave nothing to check" 1 \
 "$ROOT_DIR/scripts/check-root.sh" >"$LAST" 2>&1
 check_eq "this tree's root is on the allowlist" 0 "$?"
 
+# The merge and the CI gates job run lefthook's pre-push list, not pre-commit.
+# A gate named only on the commit hook is skipped by both, so a file committed
+# with the hooks off lands at the root and nothing in CI names it.
+check_eq "the push hook runs the root gate" 1 \
+  "$("$ROOT_DIR/scripts/gate-list.sh" pre-push | grep -cx '  root')"
+check_eq "the commit hook runs the root gate" 1 \
+  "$("$ROOT_DIR/scripts/gate-list.sh" pre-commit | grep -cx '  root')"
+
 finish
