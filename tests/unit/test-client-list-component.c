@@ -323,7 +323,7 @@ test_managed_event_mask_covers_the_readers(void)
 /*
  * Test MAP_REQUEST sets the border width in the model
  *
- * The unit suite runs without an X connection, so client_list_map_client()
+ * The unit suite runs without an X connection, so client_list_prepare_client()
  * sends no request; the width it asks X for still has to reach the client.
  */
 void
@@ -929,6 +929,81 @@ test_shutdown_with_clients(void)
   hub_shutdown();
 }
 
+/*
+ * The manage path asks whether the window belongs on screen before it maps it,
+ * and the request carries the client's target id so the component that owns the
+ * answer knows which client is being asked about. The responder here stands in
+ * for the tag manager, which is the component that answers in the WM.
+ */
+static bool     visibility_answer = true;
+static TargetID visibility_target = TARGET_ID_NONE;
+
+static void
+visibility_stub_executor(struct HubRequest* req)
+{
+  visibility_target = req->target;
+  if (req->data != NULL)
+    *(bool*) req->data = visibility_answer;
+}
+
+static HubComponent visibility_stub = {
+  .name     = "visibility-stub",
+  .requests = (RequestType[]) { REQ_CLIENT_VISIBLE, 0 },
+  .executor = visibility_stub_executor,
+};
+
+/*
+ * Test MAP_REQUEST maps a client only when its tags are on screen
+ *
+ * A client whose tags the view is not on is still managed: it keeps the border
+ * and the list entry, and the component that said no maps it when a tag it is
+ * on is shown.
+ */
+void
+test_map_request_maps_only_a_client_on_screen(void)
+{
+  LOG_CLEAN("== Testing MAP_REQUEST maps a client only when its tags are on screen");
+
+  hub_init();
+  xcb_handler_init();
+  client_list_component_init();
+  hub_register_component(&visibility_stub);
+
+  xcb_map_request_event_t map_event = {
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 1,
+    .parent        = 100,
+    .window        = 800,
+  };
+
+  visibility_answer = false;
+  visibility_target = TARGET_ID_NONE;
+  xcb_handler_dispatch(&map_event);
+
+  Client* off = client_get_by_window(800);
+  assert_or_abort(off != NULL);
+  assert(visibility_target == off->target.id);
+  assert(client_is_managed(off) == true);
+  assert(client_is_mapped(off) == false);
+  assert(off->border_width == 1);
+
+  /* The answer is not a property of the component: the next window, whose tags
+   * are on the view, is mapped. */
+  visibility_answer  = true;
+  map_event.sequence = 2;
+  map_event.window   = 801;
+  xcb_handler_dispatch(&map_event);
+
+  Client* on = client_get_by_window(801);
+  assert_or_abort(on != NULL);
+  assert(client_is_mapped(on) == true);
+
+  hub_unregister_component(visibility_stub.name);
+  client_list_component_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(ClientListComponent, {
   test_client_list_component_init();
   test_client_list_component_shutdown();
@@ -940,6 +1015,7 @@ TEST_GROUP(ClientListComponent, {
   test_property_notify_ignores_other_properties();
   test_map_request_sets_border_width();
   test_map_request_creates_client_if_not_exists();
+  test_map_request_maps_only_a_client_on_screen();
   test_unmap_notify_unmanages_client();
   test_unmap_notify_of_a_wm_unmap_keeps_the_client();
   test_unmap_notify_of_a_hide_after_a_show_keeps_the_client();

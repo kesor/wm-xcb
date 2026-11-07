@@ -10,7 +10,9 @@
  * - XCB_DESTROY_NOTIFY - destroy Client, unregister from hub
  * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, select the event
  *   mask the focus and fullscreen components read (pointer enter/leave and
- *   property change), map the window
+ *   property change), and map the window when its tags are on the current view;
+ *   a client whose tags are not on the view stays managed and unmapped until a
+ *   tag it is on is shown
  * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
  *   itself to hide the client of a tag that is no longer shown
  * - XCB_PROPERTY_NOTIFY - re-read a managed client's WM_NORMAL_HINTS when the
@@ -19,10 +21,15 @@
  * Events Emitted:
  * - EVT_CLIENT_CREATED - emitted after client creation
  * - EVT_CLIENT_DESTROYED - emitted after client destruction
- * - EVT_CLIENT_MANAGED - emitted after the client's window is mapped
+ * - EVT_CLIENT_MANAGED - emitted when the client becomes managed. The window
+ *   may still be unmapped: a client whose tags are not on the view is managed
+ *   without a map, and this event still fires
  * - EVT_CLIENT_UNMANAGED - emitted when client is unmanaged
  *
  * Requests Sent:
+ * - REQ_CLIENT_VISIBLE - before mapping a window it has just managed, so the
+ *   component that owns the tag view answers whether the window belongs on
+ *   screen; an unhandled request leaves the window mapped
  * - REQ_MONITOR_TILE - after a client is managed, unmanaged, or destroyed,
  *   so the monitor's remaining windows are rearranged; and again when a
  *   client's size hints arrive after the first layout, or change while it is
@@ -132,7 +139,8 @@ void client_list_on_destroy_notify(void* event);
 /*
  * Handle XCB_MAP_REQUEST event.
  * Manages the window: adds it to the client list, sets its border and
- * WM_STATE=Normal, and maps it.
+ * WM_STATE=Normal, and maps it when its tags are on the current view. A
+ * client whose tags are not on the view stays managed and unmapped.
  */
 void client_list_on_map_request(void* event);
 

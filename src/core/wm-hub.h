@@ -55,7 +55,17 @@ enum {
   REQ_MONITOR_TILE      = 20,
   REQ_CLIENT_FLOAT      = 30,
   REQ_CLIENT_TILE       = 40,
+  REQ_CLIENT_VISIBLE    = 50,
 };
+
+/*
+ * REQ_CLIENT_VISIBLE is a query, not a change: "should this client's window be
+ * on screen now?". `data` points at a bool the caller sets to the answer it
+ * uses when no component handles the request, and the handler writes the real
+ * answer over it. The router runs the executor before hub_send_request_data()
+ * returns, so the caller reads the answer on the next line. No handler is not
+ * a failure: the client list maps a window nobody has an opinion about.
+ */
 
 /*
  * Backward compatibility: Legacy target type constants
