@@ -64,4 +64,10 @@ check_eq "the push hook runs the root gate" 1 \
 check_eq "the commit hook runs the root gate" 1 \
   "$("$ROOT_DIR/scripts/gate-list.sh" pre-commit | grep -cx '  root')"
 
+# Cut after "is", the clause sits next to "is not a finding" and reads as the
+# committed file also not being one. scripts/check-root.sh treats a file in the
+# index as a finding, so the row has to say that.
+check_eq "QUALITY.md says a file being committed is a finding" 1 \
+  "$(grep -c 'a file being committed is a finding' "$ROOT_DIR/docs/QUALITY.md")"
+
 finish
