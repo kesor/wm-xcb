@@ -272,7 +272,10 @@ void fullscreen_executor(Request* req) {
 ```
 
 The listener still uses `sm_raw_write()`: an X property change the WM did not
-ask for is reality, and reality is authoritative.
+ask for is reality, and reality is authoritative. A reply already in flight
+when a local write moved the machine is not that change. The read stored the
+machine's generation, and a reply from an older generation is freed and not
+applied.
 
 ### Executor and XCB Error Handling
 

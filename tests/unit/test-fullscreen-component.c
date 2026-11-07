@@ -8,6 +8,7 @@
 
 #include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "src/actions/action-registry.h"
@@ -15,6 +16,7 @@
 #include "src/components/focus.h"
 #include "src/components/fullscreen.h"
 #include "src/core/wm-hub.h"
+#include "src/core/wm-xcb-ewmh.h"
 #include "src/sm/sm-registry.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-wm.h"
@@ -372,6 +374,203 @@ test_fullscreen_state_read_stops_at_unarrived_head(void)
   fullscreen_state_read_queue_reset_for_tests();
 }
 
+/*
+ * A fake _NET_WM_STATE reply. libxcb's accessors read the atoms at reply + 1,
+ * and value_len counts them. The fullscreen atom is the one the fake connection
+ * below names.
+ */
+#define TEST_FULLSCREEN_ATOM 4242u
+
+typedef struct FakeWmStateReply {
+  xcb_get_property_reply_t header;
+  xcb_atom_t               atom;
+} FakeWmStateReply;
+
+static xcb_get_property_reply_t*
+wm_state_reply(bool fullscreen)
+{
+  FakeWmStateReply* fake = calloc(1, sizeof *fake);
+  assert_or_abort(fake != NULL);
+  fake->header.format = 32;
+  if (fullscreen) {
+    fake->header.value_len = 1;
+    fake->atom             = TEST_FULLSCREEN_ATOM;
+  }
+  return &fake->header;
+}
+
+typedef struct HandedReplies {
+  xcb_get_property_reply_t* replies[2];
+  size_t                    count;
+  size_t                    next;
+} HandedReplies;
+
+static bool
+hand_state_reply(void*                     userdata,
+                 xcb_get_property_cookie_t cookie,
+                 xcb_window_t              window,
+                 void**                    reply)
+{
+  HandedReplies* handed = (HandedReplies*) userdata;
+  (void) cookie;
+  (void) window;
+
+  if (handed->next >= handed->count)
+    return false;
+
+  *reply = handed->replies[handed->next++];
+  return true;
+}
+
+static void
+syncing_state_apply(void* userdata, xcb_window_t window, void* reply)
+{
+  (void) userdata;
+  fullscreen_state_reply_apply_for_tests(window, reply);
+  free(reply);
+}
+
+static void
+free_unhanded_replies(HandedReplies* handed)
+{
+  while (handed->next < handed->count) {
+    free(handed->replies[handed->next]);
+    handed->replies[handed->next] = NULL;
+    handed->next++;
+  }
+}
+
+static void
+fullscreen_reply_test_setup(void)
+{
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  client_list_init();
+  action_registry_init();
+  fullscreen_component_init();
+  fullscreen_state_read_queue_reset_for_tests();
+}
+
+static void
+fullscreen_reply_test_shutdown(xcb_ewmh_connection_t* saved_ewmh)
+{
+  ewmh = saved_ewmh;
+  fullscreen_state_read_queue_reset_for_tests();
+  client_list_shutdown();
+  fullscreen_component_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * A read queued for state A must not be applied after a keybinding moved the
+ * machine to B: the reply carries the property from before that write. A reply
+ * queued after the write is applied, so this cannot pass by dropping every reply.
+ */
+void
+test_fullscreen_stale_reply_does_not_overwrite_local_write(void)
+{
+  LOG_CLEAN("== Testing a stale _NET_WM_STATE reply does not overwrite a local write");
+
+  xcb_ewmh_connection_t* saved = ewmh;
+  ewmh                         = NULL;
+  fullscreen_reply_test_setup();
+
+  Client* c = client_create(703);
+  assert_or_abort(c != NULL);
+  client_set_managed(c, true);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+
+  /* The reply says windowed: the property as it was before the keybinding. */
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(1), c->window));
+
+  /* The request the keybinding sends. It transitions, it does not raw-write. */
+  hub_send_request(REQ_CLIENT_FULLSCREEN, c->target.id);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  xcb_ewmh_connection_t fake_ewmh;
+  memset(&fake_ewmh, 0, sizeof fake_ewmh);
+  fake_ewmh._NET_WM_STATE_FULLSCREEN = TEST_FULLSCREEN_ATOM;
+  ewmh                               = &fake_ewmh;
+
+  HandedReplies handed = {
+    .replies = { wm_state_reply(false), NULL },
+    .count   = 1,
+  };
+  size_t applied = fullscreen_state_read_drain(hand_state_reply, syncing_state_apply, &handed);
+
+  assert(applied == 0);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+  assert(fullscreen_state_read_queue_count_for_tests() == 0);
+
+  /* Same reply, queued after the write: the current generation is applied. */
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(2), c->window));
+  handed.replies[0] = wm_state_reply(false);
+  handed.count      = 1;
+  handed.next       = 0;
+  applied           = fullscreen_state_read_drain(hand_state_reply, syncing_state_apply, &handed);
+
+  assert(applied == 1);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+
+  free_unhanded_replies(&handed);
+  fullscreen_reply_test_shutdown(saved);
+}
+
+/*
+ * Applying a reply must not bump the generation. Two reads queued together are
+ * both applied, in order. A raw write through fullscreen_set_state is a local
+ * write, so a read queued before it is not.
+ */
+void
+test_fullscreen_reply_apply_does_not_bump_generation(void)
+{
+  LOG_CLEAN("== Testing a _NET_WM_STATE reply does not bump the generation");
+
+  xcb_ewmh_connection_t* saved = ewmh;
+  xcb_ewmh_connection_t  fake_ewmh;
+  memset(&fake_ewmh, 0, sizeof fake_ewmh);
+  fake_ewmh._NET_WM_STATE_FULLSCREEN = TEST_FULLSCREEN_ATOM;
+  ewmh                               = &fake_ewmh;
+
+  fullscreen_reply_test_setup();
+
+  Client* c = client_create(704);
+  assert_or_abort(c != NULL);
+  client_set_managed(c, true);
+
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(1), c->window));
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(2), c->window));
+
+  HandedReplies handed = {
+    .replies = { wm_state_reply(true), wm_state_reply(false) },
+    .count   = 2,
+  };
+  size_t applied = fullscreen_state_read_drain(hand_state_reply, syncing_state_apply, &handed);
+
+  assert(applied == 2);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+
+  /* Queued before the raw write, so the windowed reply must not undo it. */
+  assert_or_abort(fullscreen_state_read_queue_push_for_tests(fake_cookie(3), c->window));
+  fullscreen_set_state(c, FULLSCREEN_STATE_FULLSCREEN);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  handed.replies[0] = wm_state_reply(false);
+  handed.count      = 1;
+  handed.next       = 0;
+  applied           = fullscreen_state_read_drain(hand_state_reply, syncing_state_apply, &handed);
+
+  assert(applied == 0);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  free_unhanded_replies(&handed);
+  fullscreen_reply_test_shutdown(saved);
+}
+
 TEST_GROUP(FullscreenComponent, {
   test_fullscreen_action_registered();
   test_fullscreen_toggle_action();
@@ -380,4 +579,6 @@ TEST_GROUP(FullscreenComponent, {
   test_fullscreen_request_runs_the_template_action();
   test_fullscreen_state_read_applies_oldest_first();
   test_fullscreen_state_read_stops_at_unarrived_head();
+  test_fullscreen_stale_reply_does_not_overwrite_local_write();
+  test_fullscreen_reply_apply_does_not_bump_generation();
 });

@@ -119,7 +119,8 @@ Short version:
   instead of the ones it was managed with; and tracking
   which client the pointer is over: a managed window selects pointer enter,
   leave and property change, so the focus component raw-writes `FocusSM` from
-  the crossings and the fullscreen component syncs a client's `_NET_WM_STATE`;
+  the crossings and the fullscreen component syncs a client's `_NET_WM_STATE`,
+  dropping a reply already in flight when a keybinding wrote that machine;
   the focus component points the X input focus at the focused window with
   `xcb_set_input_focus`, a newly managed client takes focus, and the newest
   remaining client takes it back when the focused one is unmanaged or destroyed.

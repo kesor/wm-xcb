@@ -144,8 +144,9 @@ StateMachine* fullscreen_get_sm(Client* c);
 bool fullscreen_is_fullscreen(Client* c);
 
 /*
- * Set fullscreen state directly (for raw_write from listeners).
- * Does not run guards - use for authoritative external state changes.
+ * Set fullscreen state directly. No guards: the caller is stating the state,
+ * not requesting it. The call is a local write, so a _NET_WM_STATE reply
+ * queued before it is not applied.
  */
 void fullscreen_set_state(Client* c, FullscreenState state);
 
@@ -182,6 +183,11 @@ void fullscreen_on_property_notify(void* event);
  * and owns it. Applying can queue another read, which has to stay behind the
  * ones still in flight, so the head is dropped before `apply` runs.
  *
+ * A read stores the fullscreen machine's generation. A reply whose generation
+ * is behind the machine's is freed by the walk and not handed to `apply`: a
+ * local write landed while it was in flight, and the reply carries the property
+ * from before that write.
+ *
  * The split exists because a unit test has no server to make a reply arrive,
  * and the order the walk applies them in is the behaviour worth keeping.
  */
@@ -202,6 +208,12 @@ bool   fullscreen_state_read_queue_push_for_tests(xcb_get_property_cookie_t cook
                                                   xcb_window_t              window);
 size_t fullscreen_state_read_queue_count_for_tests(void);
 void   fullscreen_state_read_queue_reset_for_tests(void);
+
+/*
+ * Apply one arrived reply the way the poll callback does. The caller frees it.
+ * The walk drops a stale reply before `apply`, so this does not check generation.
+ */
+void fullscreen_state_reply_apply_for_tests(xcb_window_t window, void* reply);
 #endif
 
 /*
