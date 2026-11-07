@@ -170,7 +170,7 @@ void monitor_manager_randr_handler(void* event) {
 | `XCB_ENTER_NOTIFY` | focus | `sm_raw_write()` to FocusSM |
 | `XCB_FOCUS_IN` | focus | `sm_raw_write()` |
 | `XCB_FOCUS_OUT` | focus | `sm_raw_write()` |
-| `XCB_PROPERTY_NOTIFY` | fullscreen, urgency | Check atoms, maybe `sm_raw_write()` |
+| `XCB_PROPERTY_NOTIFY` | fullscreen, client-list, urgency | Check atoms; fullscreen raw-writes its SM, client-list re-reads `WM_NORMAL_HINTS` |
 | `XCB_CREATE_NOTIFY` | client-list | Create client target |
 | `XCB_DESTROY_NOTIFY` | client-list | Destroy client target |
 | `XCB_MAP_REQUEST` | client-list | Manage client |
