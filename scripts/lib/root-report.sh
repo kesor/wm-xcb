@@ -31,7 +31,6 @@ ROOT_ALLOWED_FILES=(
 ROOT_ALLOWED_DIRS=(
   .agents
   .beads
-  .codex
   .githooks
   .github
   docs
