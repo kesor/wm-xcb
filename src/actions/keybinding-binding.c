@@ -13,7 +13,7 @@
 #include <string.h>
 
 #include "action-registry.h"
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 /*
  * Keybinding storage - extra slot for NULL terminator

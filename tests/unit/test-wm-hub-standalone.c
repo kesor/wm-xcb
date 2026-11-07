@@ -13,7 +13,7 @@
  */
 int running = 1;
 
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 #define assert(EXPRESSION)                                         \
   if (!(EXPRESSION)) {                                             \

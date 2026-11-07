@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 void
 logger(FILE* io, const char* fmt, ...)

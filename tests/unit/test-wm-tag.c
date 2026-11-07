@@ -16,11 +16,11 @@
 #include <string.h>
 
 #include "src/components/pertag.h"
+#include "src/core/wm-hub.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "test-wm-tag.h"
 #include "test-wm.h"
-#include "wm-hub.h"
 
 /*
  * Global callback for tag iteration tests

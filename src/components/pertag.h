@@ -24,7 +24,7 @@
 #include <stdint.h>
 
 #include "../target/tag.h"
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 /*
  * Number of tags (matches TAG_NUM_TAGS)

@@ -1,10 +1,10 @@
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 /* Registry data structures */
 #define MAX_COMPONENTS    64

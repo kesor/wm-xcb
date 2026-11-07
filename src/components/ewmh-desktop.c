@@ -13,18 +13,18 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_ewmh.h>
 
-#include "config.h"
 #include "ewmh-desktop.h"
 #include "src/components/client-list.h"
 #include "src/components/tag-manager.h"
+#include "src/config/config.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb-ewmh.h"
+#include "src/core/wm-xcb.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "src/xcb/xcb-handler.h"
-#include "wm-hub.h"
-#include "wm-log.h"
-#include "wm-xcb-ewmh.h"
-#include "wm-xcb.h"
 
 /*
  * The name _NET_WM_NAME carries on the check window. A client that finds

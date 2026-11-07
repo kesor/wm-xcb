@@ -5,9 +5,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "wm-log.h"
-#include "wm-running.h"
-#include "wm-signals.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-running.h"
+#include "src/core/wm-signals.h"
 
 #define WAKEUP_READ  0
 #define WAKEUP_WRITE 1

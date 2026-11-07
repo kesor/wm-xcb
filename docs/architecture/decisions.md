@@ -247,7 +247,7 @@ static const KeyBinding keybindings[] = {
 
 **Better (RESOLVED - PR #92):**
 ```c
-// config.wm.def.h - Decoupled keybinding wiring
+// src/config/config.wm.def.h - Decoupled keybinding wiring
 static void config_wire_keybindings(void) {
     KB(MODKEY, 36, "focus.focus-current");        // Mod+Enter
     KB(MODKEY, 41, "fullscreen.toggle");        // Mod+f
@@ -255,7 +255,7 @@ static void config_wire_keybindings(void) {
 }
 ```
 
-**Implementation:** Keybindings are wired in `config.wm.def.h` using action name strings. The keybinding component has no hardcoded bindings. Config does the wiring.
+**Implementation:** Keybindings are wired in `src/config/config.wm.def.h` using action name strings. The keybinding component has no hardcoded bindings. Config does the wiring.
 
 ---
 
@@ -276,7 +276,7 @@ We now have a defined mechanism for:
 - Actions are looked up by name and invoked with resolved targets
 
 **Wiring mechanism:**
-- `config.wm.def.h` contains `config_wire_keybindings()` function
+- `src/config/config.wm.def.h` contains `config_wire_keybindings()` function
 - Uses `keybinding_binding_register()` to map key combinations to action names
 - `config_init()` calls this function at startup
 
@@ -287,7 +287,7 @@ We now have a defined mechanism for:
 
 **Example:**
 ```c
-// config.wm.def.h - User configures keybindings here
+// src/config/config.wm.def.h - User configures keybindings here
 static void config_wire_keybindings(void) {
   KB(MODKEY, 36, "focus.focus-current");        // Mod+Enter
   KB(MODKEY, 41, "fullscreen.toggle");        // Mod+f
@@ -306,19 +306,19 @@ static void config_wire_keybindings(void) {
 ### Problem (RESOLVED)
 
 Configuration has been decoupled from components:
-- `config.def.h` provides generic config (rules, gaps, borders, transitions)
-- `config.wm.def.h` wires keybindings to action names
+- `src/config/config.def.h` provides generic config (rules, gaps, borders, transitions)
+- `src/config/config.wm.def.h` wires keybindings to action names
 - Neither config nor keybinding component hardcodes the wiring
 
 ### Implementation (RESOLVED - PR #92)
 
-**Generic config system (`config.def.h`):**
+**Generic config system (`src/config/config.def.h`):**
 - Provides `FloatRule`, `TagRule`, `GapConfig`, `BorderConfig`
 - State machine transitions for mouse/keyboard interactions
 - No knowledge of keybindings or specific action types
 
-**WM-specific wiring (`config.wm.def.h`):**
-- Includes `config.def.h` for base config
+**WM-specific wiring (`src/config/config.wm.def.h`):**
+- Includes `src/config/config.def.h` for base config
 - Includes `keybinding-binding.h` for binding registration API
 - Defines `config_wire_keybindings()` to register default keybindings
 - Uses action NAME strings (e.g., `"fullscreen.toggle"`), not enum values
@@ -346,13 +346,13 @@ Configuration has been decoupled from components:
 
 **Decision:** the WM reads one text file at startup (`$WM_CONFIG`, else
 `$XDG_CONFIG_HOME/wm/config`, else `$HOME/.config/wm/config`). It holds `bind`,
-`float`, and `tags` lines. `config-file.c` parses it and touches no X server;
-`config.c` wires what it found into the keybinding table and the accessors other
+`float`, and `tags` lines. `src/config/config-file.c` parses it and touches no X server;
+`src/config/config.c` wires what it found into the keybinding table and the accessors other
 modules read. `docs/configuration.md` is the format.
 
 **Rationale:**
 - One parser, no X: the format and its error messages are unit-testable, and a
-  keysym becomes a keycode only in `config.c`, which already knows the server.
+  keysym becomes a keycode only in `src/config/config.c`, which already knows the server.
 - The compiled configuration stays the fallback, so a machine with no file runs
   the configuration the unit tests cover and behaves the same as before.
 - A rejected line is reported with its path and line number and skipped, so one
@@ -362,7 +362,7 @@ modules read. `docs/configuration.md` is the format.
   session, which is the first thing a user changes.
 
 **Alternatives considered:**
-- dwm's model (`config.h` and a rebuild): what this exists to replace.
+- dwm's model (`src/config/config.h` and a rebuild): what this exists to replace.
 - A JSON or YAML file: a parser dependency and a syntax whose errors point at
   byte offsets, for a file that needs three directives.
 - Wiring the file only when it exists, keeping compiled bindings alongside: two
@@ -469,7 +469,7 @@ the running configuration in place.
 
 ### Decision: The registry calls exist; a running WM does not load a component
 
-**Decision:** `hub_register_component()` and `hub_unregister_component()` add and remove a component in the registry and the request index. They do not adopt or unadopt targets that already exist. There is no loader, so an extension is compiled in and registered from `wm-components.c`. Adoption runs when a target registers: [hub.md](hub.md#component-adoption).
+**Decision:** `hub_register_component()` and `hub_unregister_component()` add and remove a component in the registry and the request index. They do not adopt or unadopt targets that already exist. There is no loader, so an extension is compiled in and registered from `src/core/wm-components.c`. Adoption runs when a target registers: [hub.md](hub.md#component-adoption).
 
 **Earlier rationale, not implemented:** adding an extension without recompiling, reloading a component during development, or switching a layout without a restart.
 

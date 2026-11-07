@@ -238,7 +238,7 @@ The hub registers components, routes requests, and emits events. It has no hot-p
 
 `hub_unregister_component()` removes a component from the registry and the request index. It does not call `on_unadopt` on the targets that adopted it, so the state machines it created stay on those targets.
 
-The built-in components are compiled in and registered from `wm_components_init()` in `wm-components.c`. Clients are created after that function returns, so a client-accepting component registered there sees every client. Monitors are created inside the function, by `monitor_manager_init()`. Pertag, tag-manager, and tiling register before that call; a monitor-accepting component registered after it does not get those monitors. Focus registers after the monitors exist and accepts only clients, so those monitors are not targets it adopts. [hub.md](hub.md#component-adoption) has the sequence.
+The built-in components are compiled in and registered from `wm_components_init()` in `src/core/wm-components.c`. Clients are created after that function returns, so a client-accepting component registered there sees every client. Monitors are created inside the function, by `monitor_manager_init()`. Pertag, tag-manager, and tiling register before that call; a monitor-accepting component registered after it does not get those monitors. Focus registers after the monitors exist and accepts only clients, so those monitors are not targets it adopts. [hub.md](hub.md#component-adoption) has the sequence.
 
 ---
 

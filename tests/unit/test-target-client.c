@@ -9,14 +9,14 @@
  */
 
 #include <string.h>
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-hub.h"
-#include "wm-log.h"
 
 /* Callback helper for foreach tests */
 static int g_callback_count = 0;

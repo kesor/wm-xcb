@@ -5,7 +5,7 @@
  * globals, no state that outlives a ConfigFile.
  */
 
-#include "config-file.h"
+#include "src/config/config-file.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -17,7 +17,7 @@
 #include <xcb/xcb.h>
 #include <X11/keysym.h>
 
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 /*
  * One line of the file may carry this many whitespace-separated fields. The

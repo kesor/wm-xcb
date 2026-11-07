@@ -5,8 +5,8 @@
 #ifndef TEST_WM_XCB_HANDLER_H
 #define TEST_WM_XCB_HANDLER_H
 
+#include "src/core/wm-hub.h"
 #include "src/xcb/xcb-handler.h"
-#include "wm-hub.h"
 
 /* Mock component for testing */
 extern HubComponent mock_component;

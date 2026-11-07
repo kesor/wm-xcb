@@ -9,10 +9,10 @@
 #include <stdlib.h>
 
 #include "client-list.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb.h"
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
-#include "wm-log.h"
-#include "wm-xcb.h"
 
 /*
  * Border drawn around a managed window. config.def.h has the same value in

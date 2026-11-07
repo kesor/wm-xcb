@@ -20,9 +20,9 @@
 #include "../target/tag.h"
 #include "client-list.h"
 #include "src/actions/action-registry.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
 #include "tag-manager.h"
-#include "wm-hub.h"
-#include "wm-log.h"
 
 /*
  * Tag Manager SM template name

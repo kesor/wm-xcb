@@ -25,7 +25,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 #define KEYBINDING_COMPONENT_NAME "keybinding"
 

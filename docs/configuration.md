@@ -6,7 +6,7 @@ The window manager reads one text file at startup. A `bind` line changes which
 keys are bound, without a rebuild. `float` and `tags` lines are read too; what
 they do not yet change is under each directive below.
 
-The compiled configuration (`config.def.h`, `config.wm.def.h`) stays in place
+The compiled configuration (`src/config/config.def.h`, `src/config/config.wm.def.h`) stays in place
 for a directive the file does not use. A machine with no file at all runs the
 compiled one. A `bind` line replaces the compiled bindings, and a `float` line
 replaces the compiled float rules: the file is the whole list, not an addition
@@ -29,7 +29,7 @@ when no file was there at startup. See "Reloading without a restart" below.
 
 ## Default bindings
 
-A machine with no file gets these, wired in `config.wm.def.h`. The primary
+A machine with no file gets these, wired in `src/config/config.wm.def.h`. The primary
 modifier is `Mod`, Super/Windows.
 
 | Chord | Action | What it does |
@@ -137,7 +137,7 @@ name on either.
 ## What the file does not decide yet
 
 - gaps and border widths and colours are compiled in
-- the tag a particular application lands on (`TagRule` in `config.def.h`)
+- the tag a particular application lands on (`TagRule` in `src/config/config.def.h`)
 
 ## Reloading without a restart
 

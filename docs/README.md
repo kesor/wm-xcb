@@ -118,7 +118,7 @@ Short version:
   `xcb_set_input_focus`, a newly managed client takes focus, and the newest
   remaining client takes it back when the focused one is unmanaged or destroyed.
   The keys come from the user's config file when it names a binding this keyboard
-  can use, and from `config.wm.def.h` otherwise, and are grabbed on the root
+  can use, and from `src/config/config.wm.def.h` otherwise, and are grabbed on the root
   window when the keybinding component starts, with the CapsLock and NumLock
   masks a press can carry, and grabbed again on `MappingNotify`, so a press
   reaches the component that owns it. `docs/configuration.md` has the file
@@ -134,7 +134,7 @@ Short version:
   in the registry. A unit test runs the startup order and fails if a component
   that adopts a monitor registers after the monitor manager. The components
   `main` starts register the actions they own. A unit test inits
-  every owner and fails if a name in `config.wm.def.h` is not registered after
+  every owner and fails if a name in `src/config/config.wm.def.h` is not registered after
   that. Once the last component is up, startup checks every wired binding
   against the action registry and logs one error line per binding whose action
   nobody registered, naming the chord and the action; a binding that resolves

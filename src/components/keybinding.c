@@ -26,14 +26,14 @@
 #include <xcb/xcb_keysyms.h>
 #include <X11/keysym.h>
 
-#include "config.h"
 #include "keybinding.h"
 #include "src/actions/keybinding-binding.h"
+#include "src/config/config.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb.h"
 #include "src/event-types.h"
 #include "src/xcb/xcb-handler.h"
-#include "wm-hub.h"
-#include "wm-log.h"
-#include "wm-xcb.h"
 
 /*
  * Action name constants for backward compatibility

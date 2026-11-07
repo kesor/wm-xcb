@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "wm-running.h"
+#include "src/core/wm-running.h"
 
 void logger(FILE* io, const char* fmt, ...);
 

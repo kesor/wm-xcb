@@ -3,8 +3,8 @@
 #include "sm-instance-internal.h"
 #include "sm-registry.h"
 #include "sm-template.h"
-#include "wm-hub.h"
-#include "wm-log.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
 
 /*
  * Hook storage for each state machine instance

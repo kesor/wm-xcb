@@ -22,7 +22,7 @@
 
 #include "../sm/sm-registry.h"
 #include "../sm/sm.h"
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 /* Forward declaration */
 typedef struct Monitor Monitor;

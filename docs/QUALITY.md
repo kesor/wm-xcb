@@ -426,7 +426,7 @@ Shifted left, the person who wrote the code is the one who sees the number.
 scripts/check-complexity.sh            # per-function cognitive complexity (0.3s)
 scripts/check-coverage.sh              # line and branch coverage of the unit suite (7s warm)
 scripts/check-coverage.sh --show-zero  # also list what the suite never executes
-scripts/check-coverage.sh --update-baseline config-file.c
+scripts/check-coverage.sh --update-baseline src/config/config-file.c
                                        # raise that file's floor, leave the rest
 scripts/fuzz.sh 5                      # the fuzzers, short: the hook's version
 scripts/fuzz.sh 60                     # the same, long: by hand or in CI
@@ -451,7 +451,7 @@ compare, and a commit that only edits a comment in a header is not a complexity
 change. The "clang-tidy reported nothing" failure stays for a `.c` file that
 produced no measurement, which means the compile database is broken rather than
 the code simple. A function defined in a header, such as
-`config_wire_keybindings` in `config.wm.def.h`, is therefore not measured
+`config_wire_keybindings` in `src/config/config.wm.def.h`, is therefore not measured
 either.
 
 A file under `tests/` is not measured. clang-tidy charges each `ASSERT`'s
@@ -480,8 +480,8 @@ to 2.6 points on a CI runner between runs of the same tree.
 
 `--update-baseline` merges the run into the entries already recorded instead of
 rewriting the file from one run. Name the files the commit changed and only
-their entries move: `scripts/check-coverage.sh --update-baseline config-file.c`
-writes the floor for `config-file.c` and leaves every other line alone. A
+their entries move: `scripts/check-coverage.sh --update-baseline src/config/config-file.c`
+writes the floor for `src/config/config-file.c` and leaves every other line alone. A
 path relative to the repository root works too, and so does a suffix of one,
 so `tiling.c` and `src/components/tiling.c` both name `src/components/tiling.c`.
 Without file arguments every file the run measured is merged; the rest keep
@@ -511,7 +511,7 @@ size, and that failed a merge whose unit suite passed.
 
 A file at 0% is the useful number. One source file is still never executed by
 any unit test: `src/components/connection-sm.c` (the state machine with no
-instance). `wm-states.c` was another until `tests/unit/test-wm-states.c` drove
+instance). `src/core/wm-states.c` was another until `tests/unit/test-wm-states.c` drove
 key, button and enter events through it; the transition table it consults still
 matches no row, for the reason `docs/architecture/state-machine.md` records. A
 branch percentage in single digits on the monitor manager is the same signal:

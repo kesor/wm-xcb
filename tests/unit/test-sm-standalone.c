@@ -43,9 +43,9 @@ sig_atomic_t running = 1;
     printf("%s:%d: %s - pass\n", __FILE__, __LINE__, #EXPRESSION); \
   }
 
+#include "src/core/wm-hub.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm.h"
-#include "wm-hub.h"
 
 /* ==================== TEST FIXTURE ==================== */
 

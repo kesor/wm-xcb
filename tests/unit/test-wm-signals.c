@@ -21,10 +21,10 @@
 
 #include <sys/wait.h>
 
+#include "src/core/wm-running.h"
+#include "src/core/wm-signals.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-running.h"
-#include "wm-signals.h"
 
 static void (*previous_sigint)(int);
 static void (*previous_sigterm)(int);

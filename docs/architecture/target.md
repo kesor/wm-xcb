@@ -471,7 +471,7 @@ PluginConfig gap_config = {
 };
 
 // Option 2: User config specifies
-// config.def.h:
+// src/config/config.def.h:
 target "monitor" adopt: gap, bar, connection, ...
 ```
 

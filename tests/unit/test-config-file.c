@@ -15,16 +15,16 @@
 
 #include <X11/keysym.h>
 
-#include "config-file.h"
-#include "config.def.h"
-#include "config.h"
 #include "src/actions/keybinding-binding.h"
 #include "src/components/keybinding.h"
+#include "src/config/config-file.h"
+#include "src/config/config.def.h"
+#include "src/config/config.h"
+#include "src/core/wm-hub.h"
 #include "src/target/tag.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-hub.h"
 
 /* Counts the event the config module emits when a reload applies, so a test
  * can tell an applied reload from a rejected one. */

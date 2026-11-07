@@ -12,7 +12,7 @@
 #define _MONITOR_MANAGER_H_
 
 #include "../xcb/xcb-handler.h"
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 /*
  * Monitor Manager Component

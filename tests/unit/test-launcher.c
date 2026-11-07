@@ -16,10 +16,10 @@
 
 #include "src/actions/action-registry.h"
 #include "src/actions/launcher.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-xcb.h"
 #include "test-launcher.h"
 #include "test-registry.h"
-#include "wm-hub.h"
-#include "wm-xcb.h"
 
 /*
  * The shared counters, so a failed assertion here fails `make test`. A private

@@ -18,7 +18,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 /*
  * Number of available tags (standard dwm uses 9 tags, 0-8)
