@@ -15,7 +15,11 @@
 #
 # Not flagged, on purpose: standard home locations such as ~/.config or
 # ~/.agents, and /nix/store paths in Dockerfile and flake.nix, which describe a
-# container image layout rather than a person's filesystem.
+# container image layout rather than a person's filesystem. A directory a test
+# builds for itself is not a person's filesystem either: the pattern in
+# scripts/lib/path-report.sh matches a home only at the start of a field, so
+# /tmp/home/.config is a fixture and /home/someone/.config is a finding. The
+# search lives in that library too: color forced off, binaries read as text.
 #
 # Exit status: 0 when no tracked file names a home directory, 1 otherwise.
 
@@ -34,27 +38,25 @@ case "${1:-}" in
     ;;
 esac
 
-# /home/<user>, /Users/<user>, C:\Users\<user>, and a personal source tree.
-PATTERN='/home/[A-Za-z0-9._-]+/|/Users/[A-Za-z0-9._-]+/|[Cc]:\\Users\\|~/src/|~/suckless/'
+# shellcheck source=lib/path-report.sh
+. "$ROOT_DIR/scripts/lib/path-report.sh"
 
-# This script has to spell out the patterns it looks for, so it matches itself.
-SELF="scripts/check-paths.sh"
+HITS=$(mktemp "${TMPDIR:-/tmp}/path-hits.XXXXXX") || exit 1
+trap 'rm -f "$HITS"' EXIT
 
-FOUND=0
-while IFS= read -r hit; do
-  case "$hit" in
-    "$SELF":*) continue ;;
-  esac
-  [ -n "$hit" ] || continue
-  FOUND=$((FOUND + 1))
-  printf '  HOME PATH  %s\n' "$hit"
-done < <(git grep -nE "$PATTERN" -- . 2>/dev/null)
+# 1 is "no match", which is the answer this gate wants. Anything above it is a
+# search that did not run, and an empty result read as a clean tree is the one
+# verdict a gate must never give.
+path_hits "$HITS"
+case $? in
+  0 | 1) ;;
+  *)
+    echo "check-paths: git grep failed, so no tracked file was searched" >&2
+    exit 1
+    ;;
+esac
 
-if [ "$FOUND" -eq 0 ]; then
-  [ "$VERBOSE" -eq 1 ] && echo "check-paths: no home directory paths in $(git ls-files | wc -l) tracked files"
-  exit 0
-fi
+path_verify "$HITS" check-paths || exit 1
 
-echo "check-paths: $FOUND line(s) name a home directory or personal source tree."
-echo "Use a path relative to the repository, or a placeholder like <path-to-repo>."
-exit 1
+[ "$VERBOSE" -eq 1 ] && echo "check-paths: no home directory paths in $(git ls-files | wc -l) tracked files"
+exit 0

@@ -414,9 +414,9 @@ test_config_file_default_path(void)
   assert(strcmp(buffer, "/tmp/xdg/wm/config") == 0);
 
   (void) unsetenv("XDG_CONFIG_HOME");
-  (void) setenv("HOME", "/tmp/elsewhere", 1);
+  (void) setenv("HOME", "/tmp/home", 1);
   assert(config_file_default_path(buffer, sizeof buffer));
-  assert(strcmp(buffer, "/tmp/elsewhere/.config/wm/config") == 0);
+  assert(strcmp(buffer, "/tmp/home/.config/wm/config") == 0);
 
   (void) unsetenv("HOME");
   assert(config_file_default_path(buffer, sizeof buffer) == false);
