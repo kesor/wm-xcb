@@ -136,6 +136,10 @@ bd comment <bead-id> "..."      # what you found, for whoever continues
 Read the comments before you plan. `bd show` prints them. An earlier review
 may have left the finding that changes the design.
 
+A bead that lists seam cases names the test file for each one, or says "no test
+yet" after `grep -l` in `tests/x/`. Before the first edit, comment which of
+those cases already have a file. The work is the cases with no file.
+
 `bd edit` opens an editor and blocks an agent. Never use it.
 
 One bead per branch is the usual case, named `work/<bead-id>`. Several beads
