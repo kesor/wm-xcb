@@ -31,17 +31,12 @@ if [ -z "$OUTPUT" ] || [ -z "$ORIG_MODE" ]; then
   exit 1
 fi
 
-# The largest mode below the current width, so the clients that fit the old
+# The widest mode below the current width, so the clients that fit the old
 # screen cannot fit the new one without a new layout.
-TARGET=""
-for candidate in $(xrandr --query 2>/dev/null |
-  awk '/^[[:space:]]+[0-9]+x[0-9]+/{print $1}' | sort -u); do
-  width=${candidate%x*}
-  if [ "$width" -lt "$xorgh" ]; then
-    TARGET=$candidate
-    break
-  fi
-done
+TARGET=$(xrandr --query 2>/dev/null |
+  awk '/^[[:space:]]+[0-9]+x[0-9]+/{print $1}' |
+  sort -t x -k1,1n |
+  awk -F x -v max="$xorgh" '$1 < max {target = $0} END {print target}')
 if [ -z "$TARGET" ]; then
   fail "the nested server offers no mode narrower than ${xorgh}px, so nothing can be resized"
   finish
