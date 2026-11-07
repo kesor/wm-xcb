@@ -118,9 +118,13 @@ bead_acceptance_verify() {
     [ -n "${known[$id]:-}" ] || unlisted=$((unlisted + 1))
   done
 
+  # A bead created during a cycle - by the worker or by the review - is
+  # unlisted, and "run --update-baseline" is read as "a second commit" by a
+  # reviewer who is one command from done. The baseline is a tracked file, so
+  # naming it says the update fits in the commit already being made.
   local hint=""
   if [ "$unlisted" -gt 0 ]; then
-    hint="$gate: $unlisted issue(s) carry acceptance criteria and are not in the baseline; --update-baseline adds them to what this protects"
+    hint="$gate: $unlisted issue(s) carry acceptance criteria and are not in the baseline; scripts/check-bead-acceptance.sh --update-baseline writes tests/quality/bead-acceptance-baseline.txt, a tracked file to stage in the commit that created the bead"
   fi
 
   for id in "${absent[@]}"; do
