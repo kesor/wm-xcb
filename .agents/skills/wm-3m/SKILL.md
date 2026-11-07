@@ -132,23 +132,37 @@ factory: eliminating muda costs nothing while buying capacity costs money. So a
 finding that can be answered by removing work beats one answered by adding
 machinery, even when the machinery is the more obvious fix.
 
-Then decide per finding, cheapest first:
+Then decide per finding. One that is a single edit made after the run gets fixed
+now, and needs no bead, gate or rule behind it. Everything else goes through the
+two questions in `DESIGN.md` section 10a, in the harness directory — can a
+command catch it, and if not, would a general statement have caught the class? —
+and the answers give a finding one of three homes, never a fourth:
 
-1. **Fix it now** if it is one edit and the run is over.
-2. **Gate it** if a command can catch it. A finding that comes back is a
-   missing gate, not a careless worker. Two refinements, from mistake-proofing.
-   First, prefer a device that makes the mistake impossible over one that reports
-   it: a field a component cannot assign to beats a test that notices the
-   assignment. Second, a device that only warns is not a device — a hook is
-   skipped with `--no-verify` — so pair it with something that refuses. Either
-   way, prove it by removing the exact thing it must catch, once per shape it must
-   catch. `DESIGN.md` §10 in the harness directory has the three levels.
-3. **Write it down** if the fix is a rule: a line in `AGENTS.md`, a skill, or
-   `docs/QUALITY.md`. Undocumented conventions do not survive a session.
-4. **File it** as a bead when none of the above fits, with the 5S bucket *and*
-   the muda category in the title: `friction(seiton, waiting): ...`. The bucket
-   says how to fix it; the muda says what it costs.
-5. **Drop it** if the value was real. Not every long run is waste.
+1. **A deterministic check** when a command can catch it. A finding that comes
+   back is a missing gate, not a careless worker. Two refinements, from
+   mistake-proofing. First, prefer a device that makes the mistake impossible
+   over one that reports it: a field a component cannot assign to beats a test
+   that notices the assignment. Second, a device that only warns is not a device
+   — a hook is skipped with `--no-verify` — so pair it with something that
+   refuses. Either way, prove it by removing the exact thing it must catch, once
+   per shape it must catch. `DESIGN.md` section 10 has the three levels.
+2. **A general rule** when no command can catch it, but a general statement
+   would have caught the class: a line in `AGENTS.md`, a skill, or
+   `docs/QUALITY.md`, placed where the work happens. The statement, not the
+   incident — "a mutation is restored from a copy" outlives the run that produced
+   it, "do not use `git checkout --` here" does not. Undocumented conventions do
+   not survive a session.
+3. **Nothing** when neither holds: no command can catch it, and no general
+   statement would have caught the class. One line in the summary, no edit, and
+   no bead. A rule written for it anyway would name one incident, and the next
+   reader would still have to decide whether it applied to them.
+
+A gate or a rule this run cannot land is filed with `wm-5s`: a bead titled with
+its 5S bucket *and* its muda category, `friction(seiton, waiting): ...`, carrying
+an acceptance criterion that names a file or a command. The bucket says how to
+fix it; the muda says what it costs. A finding in the third home is not filed,
+because a bead asking for a gate no command can provide costs every session that
+reads it. A run that found real defects can be long and still not be waste.
 
 ---
 
@@ -169,8 +183,9 @@ not on the result, observable, reachable in weeks, and carrying a date.
   carefully, and a session told to produce a remedy before it has understood will
   invent one.
 - When the judgement produced three or more findings, name the one that moves the
-  target condition and file the rest. A cycle that changes five things cannot say
-  which one worked, which is the same argument as one knob at a time.
+  target condition and give the rest their homes without acting on them. A cycle
+  that changes five things cannot say which one worked, which is the same argument
+  as one knob at a time.
 
 ---
 
