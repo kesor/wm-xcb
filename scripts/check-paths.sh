@@ -18,7 +18,8 @@
 # container image layout rather than a person's filesystem. A directory a test
 # builds for itself is not a person's filesystem either: the pattern in
 # scripts/lib/path-report.sh matches a home only at the start of a field, so
-# /tmp/home/.config is a fixture and /home/someone/.config is a finding.
+# /tmp/home/.config is a fixture and /home/someone/.config is a finding. The
+# search lives in that library too: color forced off, binaries read as text.
 #
 # Exit status: 0 when no tracked file names a home directory, 1 otherwise.
 
@@ -46,7 +47,7 @@ trap 'rm -f "$HITS"' EXIT
 # 1 is "no match", which is the answer this gate wants. Anything above it is a
 # search that did not run, and an empty result read as a clean tree is the one
 # verdict a gate must never give.
-git grep -nE "$PATH_PATTERN" -- . >"$HITS" 2>/dev/null
+path_hits "$HITS"
 case $? in
   0 | 1) ;;
   *)

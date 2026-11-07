@@ -2,19 +2,18 @@
 #
 # lib/path-report.sh - decide whether a committed path names somebody's home.
 #
-# Sourced by scripts/check-paths.sh, which feeds it git grep's output, and by
-# tests/x/test-117-path-report.sh, which feeds it recorded hits so both answers
-# are pinned without a dirty tree.
+# Sourced by scripts/check-paths.sh. path_hits runs the search; path_verify
+# decides. tests/x/test-117-path-report.sh feeds path_verify recorded hits, and
+# points path_hits at a fixture repository, so both answers are pinned without
+# a dirty tree.
 #
-# The question is where a path starts, not whether its text appears somewhere in
-# a line: a home path is one that starts a field. A test builds a fake home to
-# run against, and a fixture under /tmp/home read as somebody's home: the gate
+# A home path is one that starts a field. A test builds a fake home to run
+# against, and a fixture under /tmp/home read as somebody's home: the gate
 # failed the commit, and the author renamed the fixture to get past it. That made
 # the gate decide what a test may call its own scratch directory, and the cheap
-# answer was to weaken the fixture. The field boundary below is the distinction
-# the gate wants: a home directory starts a field, so the character in front of
-# it is either the beginning of the line or one that cannot be part of a path
-# segment. /tmp/home does not start a field; /home/someone does.
+# answer was to weaken the fixture. The character in front of a home is the
+# beginning of the line, or one that cannot be part of a path segment.
+# /tmp/home does not start a field; /home/someone does.
 
 # A home directory or a personal source tree, at the start of a field. The
 # alternatives are inside the boundary group rather than repeated in front of
@@ -30,6 +29,21 @@ PATH_SELF_FILES=(
   scripts/lib/path-report.sh
   tests/x/test-117-path-report.sh
 )
+
+# path_hits <dest>
+#   Write git grep's hits for PATH_PATTERN into <dest>, searching the repository
+#   of the current directory. Returns git grep's status: 0 found, 1 none, above
+#   1 the search did not run.
+#   color.ui is forced off on the command. A config of always paints the
+#   file:line: prefix even when stdout is a file, and the exemption compares that
+#   prefix as text, so the gate then flags the files it searches past.
+#   -a is required. Without it a binary match is the line "Binary file <path>
+#   matches", which does not contain the pattern, so the re-check below treats
+#   a hit as a clean tree.
+path_hits() {
+  local dest=$1
+  git -c color.ui=false grep -a -nE "$PATH_PATTERN" -- . >"$dest" 2>/dev/null
+}
 
 # path_verify <hits-file> <gate>
 #   <hits-file> is `git grep -n` output: one `file:line:text` hit per line, and

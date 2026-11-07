@@ -100,13 +100,67 @@ check_eq "and the one that is not exempt is the one named" 1 "$(grep -c 'HOME PA
 path_verify "$HITS" check-paths >"$LAST" 2>&1
 check_eq "no hits is a clean tree" 0 "$?"
 
-# The script the hooks run reads git's index, so what it sees is this tree. The
-# fixture it refused is back in the unit suite, so this assertion fails if the
-# boundary is dropped again.
+# The script searches tracked files in the worktree, from the repository root.
+# The fixture it refused is back in the unit suite, so this assertion fails if
+# the boundary is dropped again.
 "$ROOT_DIR/scripts/check-paths.sh" >"$LAST" 2>&1
 check_eq "this tree names no home directory" 0 "$?"
 "$ROOT_DIR/scripts/check-paths.sh" --verbose >"$LAST" 2>&1
 check_eq "and the verbose pass line counts the files it searched" 1 \
   "$(grep -cE 'check-paths: no home directory paths in [0-9]+ tracked files' "$LAST")"
+
+# git grep's own defaults disagree with the re-check. A binary match is the line
+# "Binary file <path> matches", which does not contain the pattern, so a verdict
+# that only re-applies the pattern calls a hit a clean tree. A color.ui of
+# always paints the file:line: prefix even when stdout is a file, and the
+# exemption then misses the files it searches past. Both are pinned on the
+# search the gate runs, not on a recorded line.
+REPO="$DIR/binary-repo"
+rm -rf "$REPO"
+mkdir -p "$REPO"
+git -C "$REPO" init -q
+printf 'note /home/someone/src\0more' >"$REPO/notes.dat"
+git -C "$REPO" add notes.dat
+(
+  cd "$REPO" || exit 1
+  path_hits "$DIR/binary-hits.txt"
+)
+path_verify "$DIR/binary-hits.txt" check-paths >"$LAST" 2>&1
+check_eq "a home path in a binary file is a finding" 1 "$?"
+
+REPO="$DIR/col0-repo"
+rm -rf "$REPO"
+mkdir -p "$REPO"
+git -C "$REPO" init -q
+printf '/home/someone/src\n' >"$REPO/col0.txt"
+printf '/tmp/home/.config/wm/config\n' >"$REPO/fixture.txt"
+git -C "$REPO" add col0.txt fixture.txt
+(
+  cd "$REPO" || exit 1
+  path_hits "$DIR/col0-hits.txt"
+)
+check_eq "a home path at column 0 is a hit" 1 \
+  "$(grep -c '^col0.txt:1:/home/someone/src$' "$DIR/col0-hits.txt")"
+check_eq "and a fixture under /tmp is not a git grep hit" 0 \
+  "$(grep -c 'fixture.txt' "$DIR/col0-hits.txt")"
+
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=color.ui GIT_CONFIG_VALUE_0=always \
+  "$ROOT_DIR/scripts/check-paths.sh" >"$LAST" 2>&1
+check_eq "forced color does not flag the files the gate searches past" 0 "$?"
+
+# Exit 1 is "no match". Anything above it is a search that did not run, and an
+# empty file read as a clean tree is the verdict the gate must not give.
+FAKE="$DIR/fake-bin"
+mkdir -p "$FAKE"
+cat >"$FAKE/git" <<'EOF'
+#!/bin/sh
+echo "git: refused" >&2
+exit 2
+EOF
+chmod +x "$FAKE/git"
+PATH="$FAKE:$PATH" "$ROOT_DIR/scripts/check-paths.sh" >"$LAST" 2>&1
+check_eq "a search that did not run fails the gate" 1 "$?"
+check_eq "and the refusal says no file was searched" 1 \
+  "$(grep -c 'check-paths: git grep failed, so no tracked file was searched' "$LAST")"
 
 finish

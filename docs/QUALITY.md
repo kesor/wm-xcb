@@ -215,6 +215,10 @@ down is what they do. A real home path in any other file is still a finding.
 The verdict is in the library, so `tests/x/test-117-path-report.sh` feeds it
 recorded `git grep` hits and pins both answers: a fixture under /tmp passes, a
 home at the start of a field fails, and the tree as committed names no home.
+The search is in the library too. Color is forced off, and binaries are read as
+text: a painted `file:line:` prefix makes the exemption miss, and git's
+binary-match line does not contain the pattern, so the re-check would call a
+hit a clean tree.
 
 ## The async baseline
 
