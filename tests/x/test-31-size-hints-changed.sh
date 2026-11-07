@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # A client that changes its size constraints while it is running is laid out
 # again with the new ones, in both directions: a minimum it adds makes the
-# window grow, and removing the property makes it shrink back to the area the
-# layout gives it.
+# window grow, a maximum it adds makes the window shrink, and removing the
+# property makes it return to the area the layout gives it.
 #
 # The hints are read once when a client is managed, so a WM that only reads them
 # there keeps a running client at the size its first hints allowed. The change
@@ -24,14 +24,22 @@ BIG_H=1000
 
 # write_minimum <window-id> <width> <height> - publish WM_NORMAL_HINTS the way
 # Xlib's XSetWMNormalHints() lays it out: 18 slots, the flag word first, and the
-# minimum at slots 5 and 6. Slot 0 is PMinSize.
+# minimum at slots 5 and 6. The flag word's value 16 is PMinSize.
 write_minimum() {
   xprop -id "$1" -f WM_NORMAL_HINTS 32i -set WM_NORMAL_HINTS \
     "16, 0, 0, 0, 0, $2, $3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0" 2>/dev/null
 }
 
+# write_maximum <window-id> <width> <height> - the same 18 slots, with PMaxSize
+# (32) in the flag word and the maximum at slots 7 and 8. No other flag is set,
+# so a comparison that ignores the maximum fields sees no change.
+write_maximum() {
+  xprop -id "$1" -f WM_NORMAL_HINTS 32i -set WM_NORMAL_HINTS \
+    "32, 0, 0, 0, 0, 0, 0, $2, $3, 0, 0, 0, 0, 0, 0, 0, 0, 0" 2>/dev/null
+}
+
 # wait_size <window-id> <comparison> <width> <height> [timeout_ms] - returns 0
-# once both dimensions satisfy <comparison> (ge or lt). The WM answers the
+# once both dimensions satisfy <comparison> (ge, lt, or eq). The WM answers the
 # notification with a GetProperty of its own and lays the window out one round
 # trip later, so the geometry has to be waited for rather than read once.
 wait_size() {
@@ -42,6 +50,9 @@ wait_size() {
       return 0
     fi
     if [ "$op" = lt ] && [ "$w" -lt "$want_w" ] && [ "$h" -lt "$want_h" ]; then
+      return 0
+    fi
+    if [ "$op" = eq ] && [ "$w" -eq "$want_w" ] && [ "$h" -eq "$want_h" ]; then
       return 0
     fi
     sleep 0.02
@@ -94,7 +105,31 @@ else
   fail "the window shrinks back once it removes its minimum: still ${w}x${h}"
 fi
 
+# A maximum, on a window of its own. The slot the layout gives it is larger
+# than this maximum, so a WM that never re-reads the property, or a comparison
+# that ignores the maximum fields, leaves the window at that slot. An upper
+# bound alone would also pass if the window collapsed to nothing, so the size
+# has to be the maximum itself.
+MAX_W=200
+MAX_H=150
+third=$(spawn_client 1 400 300 rehinted-max | head -n 1)
+read -r _ _ start_w start_h <<<"$(rect_of "$third")"
+if [ "$start_w" -gt "$MAX_W" ] && [ "$start_h" -gt "$MAX_H" ]; then
+  pass "the window starts larger than the maximum it asks for later (${start_w}x${start_h})"
+else
+  fail "the window starts larger than the maximum it asks for later: ${start_w}x${start_h} is already at or below ${MAX_W}x${MAX_H}, so this file would prove nothing"
+fi
+
+write_maximum "$third" "$MAX_W" "$MAX_H"
+
+if wait_size "$third" eq "$MAX_W" "$MAX_H"; then
+  pass "the window shrinks to the maximum it asked for after being managed"
+else
+  read -r _ _ w h <<<"$(rect_of "$third")"
+  fail "the window shrinks to the maximum it asked for after being managed: ${w}x${h}, want ${MAX_W}x${MAX_H}"
+fi
+
 check_wm_alive
-require_visible 2 "the windows are still viewable after the hint changes"
+require_visible 3 "the windows are still viewable after the hint changes"
 
 finish

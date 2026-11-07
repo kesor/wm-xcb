@@ -781,6 +781,34 @@ test_client_size_hints_equal(void)
   incremented.inc_height      = 6;
   assert(client_size_hints_equal(&minimum, &incremented) == false);
 
+  /* One field at a time. The pairs above set two fields, so a comparison that
+   * drops one of the pair still fails those asserts and the dropped field is
+   * never caught. Maximum and base are not in the pairs at all. */
+  ClientSizeHints one = none;
+  one.min_width       = 1;
+  assert(client_size_hints_equal(&none, &one) == false);
+  one            = none;
+  one.min_height = 1;
+  assert(client_size_hints_equal(&none, &one) == false);
+  one           = none;
+  one.max_width = 1;
+  assert(client_size_hints_equal(&none, &one) == false);
+  one            = none;
+  one.max_height = 1;
+  assert(client_size_hints_equal(&none, &one) == false);
+  one            = none;
+  one.base_width = 1;
+  assert(client_size_hints_equal(&none, &one) == false);
+  one             = none;
+  one.base_height = 1;
+  assert(client_size_hints_equal(&none, &one) == false);
+  one           = none;
+  one.inc_width = 1;
+  assert(client_size_hints_equal(&none, &one) == false);
+  one            = none;
+  one.inc_height = 1;
+  assert(client_size_hints_equal(&none, &one) == false);
+
   assert(client_size_hints_equal(NULL, NULL) == true);
   assert(client_size_hints_equal(&none, NULL) == false);
 }
