@@ -11,9 +11,19 @@
 #
 # The WM it measures is the variant named by DEBUG and SANITIZE in the
 # environment, exactly as `make DEBUG=1` and `make SANITIZE=1` build it, and the
-# first line of output names the variant, the binary and the log. A number is
+# second line of output names the variant, the binary and the log. A number is
 # only worth the build that produced it: a debug build is -O0, so its idle and
 # burst CPU are not comparable with the release baseline in docs/TESTING.md.
+#
+# The parent display Xephyr draws into is a private Xvfb this run starts, so the
+# session is left alone, whatever DISPLAY says; see
+# scripts/lib/private-display.sh. The parent-display line is printed before the
+# variant line. A measurement holds the display for seconds and takes the input
+# focus with -noreset, which is the interruption this avoids.
+#
+# --keep leaves the session on that private display, which nobody can see and
+# which goes away with the run, so looking at a measurement by eye means both:
+#   WM_USE_SESSION_DISPLAY=1 scripts/perf-test.sh --keep
 #
 # What is measured (all numbers printed with units):
 #   idle CPU      WM CPU time consumed over 2 s with no activity; more than
@@ -37,6 +47,10 @@
 #             open, or SIGTERM did not stop the WM.
 
 set -uo pipefail
+
+# The parent-display helper re-executes this script, so it needs the arguments
+# from before the loop below consumed them.
+SCRIPT_ARGS=("$@")
 
 WINDOWS=10
 DISPLAY_NUM=""
@@ -66,7 +80,7 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     -h | --help)
-      sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+      awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"
       exit 0
       ;;
     *)
@@ -98,6 +112,8 @@ export PATH
 
 # shellcheck source=lib/wm-variant.sh
 . "$ROOT_DIR/scripts/lib/wm-variant.sh"
+# shellcheck source=lib/private-display.sh
+. "$ROOT_DIR/scripts/lib/private-display.sh"
 
 for cmd in Xephyr xdotool; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -110,15 +126,27 @@ if [ ! -x "$XCLIENT_BIN" ]; then
   exit 1
 fi
 
+# Before the build: the helper re-executes this script, and a build run twice
+# prints the variant line twice, which reads as two runs in the log.
+wm_parent_display "${SCRIPT_ARGS[@]}" || exit 1
+
 wm_build_variant "$WM_LOG" || exit 1
 
-if [ -z "$DISPLAY_NUM" ]; then
+pick_display() {
+  local n
   for n in 2 3 4 5 6 7 8 9; do
-    if [ ! -e "/tmp/.X11-unix/X$n" ] && [ ! -e "/tmp/.X$n-lock" ]; then
-      DISPLAY_NUM="$n"
-      break
+    # wm_display_free clears a lock whose server is gone and says so, instead of
+    # skipping that display for every run from then on.
+    if wm_display_free "$n"; then
+      echo "$n"
+      return 0
     fi
   done
+  echo ""
+}
+
+if [ -z "$DISPLAY_NUM" ]; then
+  DISPLAY_NUM="$(pick_display)"
 fi
 if [ -z "$DISPLAY_NUM" ]; then
   echo "perf-test: no free X display in :2..:9" >&2
@@ -133,6 +161,10 @@ XEPHYR_PID=""
 cleanup() {
   if [ "$KEEP" -eq 1 ]; then
     echo "perf-test: keeping session on $TEST_DISPLAY (wm pid $WM_PID)"
+    if [ "${WM_PARENT_DISPLAY_KIND:-private}" = "private" ]; then
+      echo "perf-test: the parent display $WM_PARENT_DISPLAY is a private Xvfb this run started, and it goes away with the run." >&2
+      echo "perf-test: to look at a kept session, use the session's display: WM_USE_SESSION_DISPLAY=1 scripts/perf-test.sh --keep" >&2
+    fi
     return
   fi
   [ -n "$XCLIENT_PID" ] && kill "$XCLIENT_PID" 2>/dev/null
@@ -169,7 +201,9 @@ viewable_count() {
   DISPLAY="$TEST_DISPLAY" xdotool search --onlyvisible --class xclient 2>/dev/null | wc -l
 }
 
-"$(command -v Xephyr)" "$TEST_DISPLAY" -screen "${SCREEN_W}x${SCREEN_H}" -noreset \
+# DISPLAY may be a nested server a caller already started. The parent to draw
+# into is the one the helper named.
+DISPLAY="$WM_PARENT_DISPLAY" "$(command -v Xephyr)" "$TEST_DISPLAY" -screen "${SCREEN_W}x${SCREEN_H}" -noreset \
   >"$XEPHYR_LOG" 2>&1 &
 XEPHYR_PID=$!
 
