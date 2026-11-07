@@ -3,6 +3,7 @@
  *
  * Handles tag view state for monitors. This component:
  * - Registers REQ_TAG_VIEW and REQ_TAG_TOGGLE requests
+ * - Answers REQ_CLIENT_VISIBLE, the manage path's question about one client
  * - Manages the TagViewSM state machine for monitors
  * - Shows/hides clients based on tag membership
  * - Emits EVT_TAG_CHANGED on tag state changes

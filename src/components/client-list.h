@@ -10,7 +10,9 @@
  * - XCB_DESTROY_NOTIFY - destroy Client, unregister from hub
  * - XCB_MAP_REQUEST - manage Client, set border and WM_STATE, select the event
  *   mask the focus and fullscreen components read (pointer enter/leave and
- *   property change), map the window
+ *   property change), and map the window when its tags are on the current view;
+ *   a client whose tags are not on the view stays managed and unmapped until a
+ *   tag it is on is shown
  * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
  *   itself to hide the client of a tag that is no longer shown
  * - XCB_PROPERTY_NOTIFY - re-read a managed client's WM_NORMAL_HINTS when the
@@ -23,6 +25,9 @@
  * - EVT_CLIENT_UNMANAGED - emitted when client is unmanaged
  *
  * Requests Sent:
+ * - REQ_CLIENT_VISIBLE - before mapping a window it has just managed, so the
+ *   component that owns the tag view answers whether the window belongs on
+ *   screen; an unhandled request leaves the window mapped
  * - REQ_MONITOR_TILE - after a client is managed, unmanaged, or destroyed,
  *   so the monitor's remaining windows are rearranged; and again when a
  *   client's size hints arrive after the first layout, or change while it is
