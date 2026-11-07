@@ -119,20 +119,25 @@ workarounds you used that you did not file.
 
 ## Triage
 
-When closing a friction bead, the fix is not complete until one of these is
-true:
+When closing a friction bead, the test that chooses is `DESIGN.md` section 10a,
+in the harness directory: first, can a command catch it; second, if not, would a
+general statement have caught the class? The answers give the bead one of three
+outcomes:
 
-- a gate in `lefthook.yml` and `.github/workflows/quality.yml` covers it, or
-- a line in `AGENTS.md`, `docs/QUALITY.md`, or `docs/TESTING.md` says what to do,
-  or
-- the bead says explicitly why neither applies.
+- **a gate** covers it, in `lefthook.yml` and `.github/workflows/quality.yml`, or
+- **a rule** says what to do, in `AGENTS.md`, `docs/QUALITY.md`, or
+  `docs/TESTING.md`, or
+- **nothing**: no command can catch it and no general statement would have caught
+  the class. Say in the bead which of the two questions it failed, add no gate and
+  no rule, and close it. A rule written here anyway would name one incident, and
+  the next reader would still have to decide whether it applied to them.
 
-Take the strongest device that fits, in order: make the wrong action impossible,
-then make it fail at the moment it is taken, then write the instruction down. A
-hook is a warning, because `--no-verify` exists; a check that runs in CI on a
-protected branch is a control. A device nobody has seen fail is an assumption, so
-prove a new one by removing the thing it must catch. `DESIGN.md` §10 in the
-harness directory has the three levels.
+When the answer is a device, take the strongest that fits, in order: make the
+wrong action impossible, then make it fail at the moment it is taken, then write
+the instruction down. A hook is a warning, because `--no-verify` exists; a check
+that runs in CI on a protected branch is a control. A device nobody has seen fail
+is an assumption, so prove a new one by removing the thing it must catch.
+`DESIGN.md` section 10 has the three levels.
 
 Two more rules for the triage, both learned the hard way:
 
