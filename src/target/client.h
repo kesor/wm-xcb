@@ -352,11 +352,27 @@ void client_request_size_hints(Client* c);
 /*
  * Take the WM_NORMAL_HINTS reply for a client if it has arrived.
  *
- * Returns true when the reply was consumed and it names a constraint, so the
- * caller knows the client's geometry has to be computed again. Returns false
- * when the reply is not there yet, and when it carried no size block.
+ * Returns true when the reply was consumed and the constraints it names differ
+ * from the ones the client had, so the caller knows the geometry it computed
+ * from the old ones is out of date. That covers both directions: a client that
+ * raises its minimum and one that drops it or removes the property entirely.
+ * Returns false when the reply is not there yet, and when it names what the
+ * client already had.
  */
 bool client_poll_size_hints(Client* c);
+
+/*
+ * Whether two constraint sets are the same. Used by the reader above to tell a
+ * reply that changes nothing from one that invalidates the client's geometry.
+ */
+bool client_size_hints_equal(const ClientSizeHints* a, const ClientSizeHints* b);
+
+/*
+ * Whether `atom` is WM_NORMAL_HINTS, the property a client writes its size
+ * constraints into. Returns false when the atom was never interned, which is
+ * the case without an X connection (unit tests).
+ */
+bool client_is_normal_hints_atom(xcb_atom_t atom);
 
 /*
  * Parse the values of a WM_NORMAL_HINTS property into constraints.

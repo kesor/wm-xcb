@@ -13,6 +13,8 @@
  *   property change), map the window
  * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
  *   itself to hide the client of a tag that is no longer shown
+ * - XCB_PROPERTY_NOTIFY - re-read a managed client's WM_NORMAL_HINTS when the
+ *   client changes them, and re-tile once the reply arrives
  *
  * Events Emitted:
  * - EVT_CLIENT_CREATED - emitted after client creation
@@ -23,7 +25,8 @@
  * Requests Sent:
  * - REQ_MONITOR_TILE - after a client is managed, unmanaged, or destroyed,
  *   so the monitor's remaining windows are rearranged; and again when a
- *   client's size hints arrive after the first layout
+ *   client's size hints arrive after the first layout, or change while it is
+ *   managed
  * *
  * Acceptance Criteria:
  * [x] New window appears -> Client created -> added to list
@@ -142,6 +145,16 @@ void client_list_on_map_request(void* event);
 void client_list_on_unmap_notify(void* event);
 
 /*
+ * Handle XCB_PROPERTY_NOTIFY event.
+ *
+ * Asks for the size hints again when a managed client rewrites
+ * WM_NORMAL_HINTS, and does nothing for any other property: _NET_WM_STATE
+ * belongs to the fullscreen component, which registers its own handler for the
+ * same event type.
+ */
+void client_list_on_property_notify(void* event);
+
+/*
  * Client lifecycle helpers
  */
 
@@ -166,14 +179,16 @@ bool client_list_is_managed(xcb_window_t window);
  *
  * A property reply is not an event, so nothing dispatches it: the event loop
  * calls this once per iteration, after it has drained the events. A client is
- * laid out before its hints are known, and this is what corrects that layout.
+ * laid out before its hints are known, and this is what corrects that layout -
+ * both the first read after a map and a re-read after the client changed the
+ * property while it was running.
  */
 void client_list_poll_size_hints(void);
 
 /*
  * The event mask a managed client window selects: the pointer crossings the
- * focus component reads, and the property changes the fullscreen component
- * reads.
+ * focus component reads, and the property changes the fullscreen and client
+ * list components read.
  */
 uint32_t client_list_managed_event_mask(void);
 
