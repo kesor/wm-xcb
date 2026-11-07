@@ -158,8 +158,9 @@ make DEBUG=1 test-x                # the seam suite against the debug WM
 DEBUG=1 ./tests/x/run.sh           # the same thing spelled out
 ```
 
-`scripts/xephyr-test.sh` and `tests/x/run.sh` print two lines before they start
-anything: the parent display they will draw into, then the build they will run.
+`scripts/xephyr-test.sh`, `tests/x/run.sh` and `scripts/perf-test.sh` print two
+lines before they start anything: the parent display they will draw into, then
+the build they will run.
 
 ```
 xephyr-test.sh: parent display = :99 (private Xvfb), session display = :0
@@ -583,12 +584,12 @@ under test runs as the only WM on that second display.
 ### The parent display
 
 Xephyr needs a parent display to draw its window into. `scripts/xephyr-test.sh`,
-`tests/x/run.sh`, `tests/x/probe.sh`, `scripts/check-seam.sh` and
-`scripts/check-sanitize-x.sh` get a private Xvfb for it, started by the run
-itself, whether or not `DISPLAY` is set: no Xephyr window appears on the desktop
-you are working on, and the run answers the same on a display with another depth
-or a wedged server. The rule lives in `scripts/lib/private-display.sh`, and each
-run prints the display it used:
+`tests/x/run.sh`, `tests/x/probe.sh`, `scripts/check-seam.sh`,
+`scripts/check-sanitize-x.sh` and `scripts/perf-test.sh` get a private Xvfb for
+it, started by the run itself, whether or not `DISPLAY` is set: no Xephyr window
+appears on the desktop you are working on, and the run answers the same on a
+display with another depth or a wedged server. The rule lives in
+`scripts/lib/private-display.sh`, and each run prints the display it used:
 
 ```
 run.sh: parent display = :99 (private Xvfb), session display = :0
@@ -605,6 +606,7 @@ run and a kept session on it would have nothing to draw into:
 ```bash
 WM_USE_SESSION_DISPLAY=1 make test-x TEST_X_ARGS=--keep
 WM_USE_SESSION_DISPLAY=1 scripts/xephyr-test.sh --keep --verbose
+WM_USE_SESSION_DISPLAY=1 scripts/perf-test.sh --keep
 ```
 
 `xvfb-run` and `Xvfb` come from the dev shell. Without them the scripts stop
@@ -814,11 +816,29 @@ since the WM maps windows on `MapRequest`; checks 3 and 4 wait for tiling
 scripts/perf-test.sh [--windows N] [--display :N] [--keep]
 ```
 
-It starts the same way as `xephyr-test.sh`: it builds the WM variant named by
-`DEBUG` and `SANITIZE`, prints the line that names the variant, the binary and
-the log, and runs that binary. The baseline below was measured on the release
-build; a debug build is `-Og` and its numbers are not comparable with it, which
-is why the variant is in the output. It then prints these numbers:
+`--keep` leaves the nested session running for inspection, and like the other
+harnesses it leaves it on the run's private Xvfb, which nobody can see and which
+goes away when the script exits. Watching a kept run means using the session's
+display as well:
+
+```bash
+WM_USE_SESSION_DISPLAY=1 scripts/perf-test.sh --keep
+```
+
+That run is not hermetic: the numbers come from your own display, and its depth
+is now part of what they measure.
+
+It starts the same way as `xephyr-test.sh`: it gets a private Xvfb for the
+parent display, builds the WM variant named by `DEBUG` and `SANITIZE`, prints
+the line that names the parent display and then the line that names the
+variant, the binary and the log, and runs that binary. A measurement holds the
+display for seconds at a time, so it is the last harness that should draw on
+yours. `tests/x/test-116-perf-parent-display.sh` asserts that it nests into the
+seam run's private parent and puts no Xephyr window on the display under test.
+
+The baseline below was measured on the release build; a debug build is `-Og`
+and its numbers are not comparable with it, which is why the variant is in the
+output. It then prints these numbers:
 
 | Number | How it is measured | Why it matters |
 |--------|--------------------|----------------|
