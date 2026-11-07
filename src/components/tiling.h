@@ -48,6 +48,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
+#include "src/core/wm-hub.h"
 #include "src/event-types.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
@@ -55,7 +56,6 @@
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
-#include "wm-hub.h"
 
 /*
  * Component name

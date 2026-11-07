@@ -51,15 +51,15 @@ For testing mechanics, `docs/TESTING.md`. For the gate list, `docs/QUALITY.md`.
 
 | Path | Contents |
 |------|----------|
-| `wm.c` | entry point: init order, event loop, shutdown order |
-| `wm-hub.c/.h` | registry, request router, event bus |
+| `src/core/wm.c` | entry point: init order, event loop, shutdown order |
+| `src/core/wm-hub.c/.h` | registry, request router, event bus |
 | `src/sm/` | state machine framework: templates, instances, guards, hooks |
 | `src/target/` | `Client`, `Monitor`, `Tag`; each owns its state machines |
 | `src/components/` | client-list, focus, fullscreen, keybinding, monitor-manager, pertag, tag-manager, tiling |
 | `src/actions/` | action registry, keybinding bindings, launcher, terminal |
 | `src/xcb/` | XCB handler registry; components register their handlers |
-| `wm-xcb.c` | connection, root window, startup rescan, event loop |
-| `config*.h`, `config.c` | compiled-in configuration and keybinding wiring |
+| `src/core/wm-xcb.c` | connection, root window, startup rescan, event loop |
+| `src/config/` | compiled-in configuration, the config file parser and the keybinding wiring |
 | `tests/x/` | seam tests: assert what the X server sees |
 | `scripts/` | gates and harnesses, each runnable by hand |
 
@@ -199,7 +199,7 @@ before it opens the code.
 Name where the list lives and let the worker derive it:
 
 - not: `action_lookup()` returns non-NULL for all nine names
-- instead: every action name `config.wm.def.h` wires resolves
+- instead: every action name `src/config/config.wm.def.h` wires resolves
 
 The second form is also a test, which is the bar: a criterion no command can
 check does not say what done looks like. A number the bead sets on purpose stays
@@ -294,7 +294,7 @@ beads in your final message. This is how the traps below stop being traps.
   land on another component's event. `hub_emit()` logs and drops a value at or
   above `HUB_MAX_EVENT_TYPES`.
 - **Adoption happens when a target is created**, so init order decides which
-  components a monitor or client adopts (`wm.c`).
+  components a monitor or client adopts (`src/core/wm.c`).
 - **No AI attribution anywhere**: no `Co-Authored-By`, no "generated with", no
   robot footer. The git author is the only attribution.
 - **No personal paths**: this repository is public. `scripts/check-paths.sh`

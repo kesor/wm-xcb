@@ -7,11 +7,11 @@
 
 #include "src/components/client-list.h"
 #include "src/components/tiling.h"
+#include "src/core/wm-hub.h"
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-hub.h"
 
 /* Counts EVT_CLIENT_UNMANAGED so a test can tell the WM hiding a window from a
  * client taking its window away. */

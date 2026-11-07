@@ -41,7 +41,7 @@ Checks: >
   -clang-diagnostic-error
 
 WarningsAsErrors: '*'
-HeaderFilterRegex: '^wm-.*$|^test-.*$'
+HeaderFilterRegex: '(^|/)wm-.*$|(^|/)test-.*$'
 FormatStyle: file
 HeaderFileExtensions:
   - h

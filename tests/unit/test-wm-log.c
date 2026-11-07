@@ -11,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 #include "test-registry.h"
 

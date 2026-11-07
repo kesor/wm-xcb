@@ -14,8 +14,8 @@
 #include "../target/monitor.h"
 #include "../target/tag.h"
 #include "pertag.h"
-#include "wm-hub.h"
-#include "wm-log.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
 
 /*
  * Name used to store Pertag data in monitor's SM storage

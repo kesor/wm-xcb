@@ -184,8 +184,8 @@ Precedent to copy, module by module:
 - `src/components/client-list.c` — a component: registration, XCB handlers, state
 - `src/target/client.c` — a target: holds its state machines by name, owns the client list
 - `src/xcb/xcb-handler.c` — the handler registry a component registers into
-- `wm-hub.c` — registry, request router, event bus
-- `wm-log.c` — logging
+- `src/core/wm-hub.c` — registry, request router, event bus
+- `src/core/wm-log.c` — logging
 
 ---
 
@@ -357,15 +357,15 @@ void cleanup(Component* comp) {
 ```
 
 ### 7. Include Path Inconsistency (6+ occurrences)
-- **Symptom**: Using relative paths (`../../wm-hub.h`) instead of include paths
-- **Fix**: Use include-path-based includes (`#include "wm-hub.h"`)
+- **Symptom**: Using relative paths (`../../src/core/wm-hub.h`) instead of a path from the repository root
+- **Fix**: Use an include the root `-I.` resolves (`#include "src/core/wm-hub.h"`)
 
 ```c
 // BAD
-#include "../../wm-hub.h"
+#include "../../src/core/wm-hub.h"
 
 // GOOD (matches rest of codebase)
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 ```
 
 ### 8. Event Type Collisions (4+ occurrences)

@@ -17,13 +17,13 @@
 #include "src/components/keybinding.h"
 #include "src/components/tag-manager.h"
 #include "src/components/tiling.h"
+#include "src/core/wm-hub.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-hub.h"
 
 #define TEST_MONITOR_OUTPUT 70
 #define TEST_MONITOR_WIDTH  800

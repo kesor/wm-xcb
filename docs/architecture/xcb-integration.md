@@ -213,7 +213,7 @@ is ignored.
 
 - `src/xcb/xcb-handler.h` — Public API
 - `src/xcb/xcb-handler.c` — Implementation
-- `wm-xcb.c` — Event loop integration
+- `src/core/wm-xcb.c` — Event loop integration
 
 ### Public API
 

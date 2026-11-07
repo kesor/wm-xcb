@@ -58,21 +58,11 @@ BUILD_DIR = build/$(BUILD_VARIANT)
 # Source file lists - grouped by module for easy extension
 # ---------------------------------------------------------------------------
 
-# Root-level source files
-ROOT_SRC = \
-	config-file.c \
-	config.c \
-	wm-log.c \
-	wm-signals.c \
-	wm-running.c \
-	wm-hub.c \
-	wm-xcb-ewmh.c \
-	wm-states.c \
-	wm-components.c \
-	wm-xcb.c \
-	wm.c
-
-# Subdirectory sources (use wildcards for easy extension)
+# Source directories. Each is a wildcard, so a new file joins the build without
+# an edit here; scripts/check-orphan-sources.sh fails a tracked .c that no
+# wildcard reaches.
+SRC_CORE    = $(wildcard src/core/*.c)
+SRC_CONFIG  = $(wildcard src/config/*.c)
 SRC_SM      = $(wildcard src/sm/*.c)
 SRC_XCB     = $(wildcard src/xcb/*.c)
 SRC_TARGET  = $(wildcard src/target/*.c)
@@ -80,10 +70,10 @@ SRC_COMP    = $(wildcard src/components/*.c)
 SRC_ACTIONS = $(wildcard src/actions/*.c)
 
 # Main executable object (must be excluded from test link)
-MAIN_OBJ = $(BUILD_DIR)/$(NAME).o
+MAIN_OBJ = $(BUILD_DIR)/src/core/$(NAME).o
 
 # All main source files
-SRC = $(ROOT_SRC) $(SRC_SM) $(SRC_XCB) $(SRC_TARGET) $(SRC_COMP) $(SRC_ACTIONS)
+SRC = $(SRC_CORE) $(SRC_CONFIG) $(SRC_SM) $(SRC_XCB) $(SRC_TARGET) $(SRC_COMP) $(SRC_ACTIONS)
 OBJ = $(SRC:%.c=$(BUILD_DIR)/%.o)
 
 # Test source files
@@ -266,11 +256,11 @@ complexity: FORCE
 fuzz: FORCE
 	./scripts/fuzz.sh
 
-test-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o tests/unit/test-wm-hub-standalone.c FORCE
+test-standalone: $(BUILD_DIR)/src/core/wm-hub.o $(BUILD_DIR)/src/core/wm-log.o tests/unit/test-wm-hub-standalone.c FORCE
 	$(CC) $(CFLAGS) -o $@ $(filter-out FORCE,$^)
 	./test-standalone
 
-test-sm-standalone: $(BUILD_DIR)/wm-hub.o $(BUILD_DIR)/wm-log.o $(filter-out %.c,$(SRC_SM:%.c=$(BUILD_DIR)/%.o)) tests/unit/test-sm-standalone.c FORCE
+test-sm-standalone: $(BUILD_DIR)/src/core/wm-hub.o $(BUILD_DIR)/src/core/wm-log.o $(filter-out %.c,$(SRC_SM:%.c=$(BUILD_DIR)/%.o)) tests/unit/test-sm-standalone.c FORCE
 	$(CC) $(CFLAGS) -o $@ $(filter-out FORCE,$^)
 	./test-sm-standalone
 

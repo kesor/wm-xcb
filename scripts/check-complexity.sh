@@ -60,7 +60,7 @@ TOOL=$(clang-tidy --version 2>/dev/null | sed -n 's/^ *LLVM version \(.*\)/\1/p'
 TOOL=${TOOL:-unknown}
 
 if [ "${#files[@]}" -eq 0 ]; then
-  mapfile -t files < <(make -s print-src | tr ' ' '\n' | grep -v '^wm\.c$' | grep -v '^$')
+  mapfile -t files < <(make -s print-src | tr ' ' '\n' | grep -vE '(^|/)wm\.c$' | grep -v '^$')
 fi
 
 skipped_tests=0

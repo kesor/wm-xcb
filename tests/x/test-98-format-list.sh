@@ -22,8 +22,8 @@ check_eq "the probe is not in the index yet" 0 \
 LIST="$TMPDIR_SEAM/format-list.txt"
 "$ROOT_DIR/scripts/format-check.sh" --list >"$LIST" 2>&1
 
-check_eq "a tracked source is in the list the gate owns" 1 "$(grep -cx 'wm.c' "$LIST")"
-check_eq "a tracked header is in it" 1 "$(grep -cx 'wm-hub.h' "$LIST")"
+check_eq "a tracked source is in the list the gate owns" 1 "$(grep -cx 'src/core/wm.c' "$LIST")"
+check_eq "a tracked header is in it" 1 "$(grep -cx 'src/core/wm-hub.h' "$LIST")"
 check_eq "an untracked source is in it, before anything stages it" 1 "$(grep -cx "$PROBE_REL" "$LIST")"
 check_eq "the list names a file once" 0 "$(sort "$LIST" | uniq -d | grep -c .)"
 

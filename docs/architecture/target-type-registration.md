@@ -8,7 +8,7 @@
 
 ## Problem
 
-Previously, target types were hardcoded in `wm-hub.h`:
+Previously, target types were hardcoded in `src/core/wm-hub.h`:
 
 ```c
 enum {

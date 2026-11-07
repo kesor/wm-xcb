@@ -11,7 +11,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "config.h"
 #include "src/actions/launcher.h"
 #include "src/components/client-list.h"
 #include "src/components/connection-sm.h"
@@ -20,10 +19,11 @@
 #include "src/components/fullscreen.h"
 #include "src/components/tag-manager.h"
 #include "src/components/tiling.h"
+#include "src/config/config.h"
+#include "src/core/wm-hub.h"
 #include "src/event-types.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-hub.h"
 
 typedef struct KnownEventType {
   const char* name;

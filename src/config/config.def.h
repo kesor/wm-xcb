@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
-#include "wm-states.h"
+#include "src/core/wm-states.h"
 
 /* Forward declarations */
 typedef struct KeyBinding KeyBinding;

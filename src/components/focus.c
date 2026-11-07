@@ -19,14 +19,14 @@
 #include <string.h>
 
 #include "src/components/client-list.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb.h"
 #include "src/sm/sm-instance.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
-#include "wm-hub.h"
-#include "wm-log.h"
-#include "wm-xcb.h"
 
 #include "focus.h"
 #include "src/actions/action-registry.h"

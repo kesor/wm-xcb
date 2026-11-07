@@ -4,9 +4,9 @@
 #include <xcb/xcb_atom.h>
 #include <xcb/xcb_ewmh.h>
 
-#include "wm-log.h"
-#include "wm-xcb-ewmh.h"
-#include "wm-xcb.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-xcb-ewmh.h"
+#include "src/core/wm-xcb.h"
 
 xcb_ewmh_connection_t* ewmh;
 

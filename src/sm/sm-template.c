@@ -3,7 +3,7 @@
 
 #include "sm-instance.h"
 #include "sm-template.h"
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 SMTemplate*
 sm_template_create(

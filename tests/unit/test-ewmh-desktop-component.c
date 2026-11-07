@@ -16,18 +16,18 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_ewmh.h>
 
-#include "config.h"
 #include "src/actions/action-registry.h"
 #include "src/components/ewmh-desktop.h"
 #include "src/components/tag-manager.h"
+#include "src/config/config.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-xcb-ewmh.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-hub.h"
-#include "wm-xcb-ewmh.h"
 
 /*
  * Test: a client on exactly one tag names that desktop; one on several or on

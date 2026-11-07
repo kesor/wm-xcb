@@ -2,10 +2,10 @@
 #include <string.h>
 #include <xcb/xcb.h>
 
-#include "config.def.h"
-#include "wm-log.h"
-#include "wm-states.h"
-#include "wm-xcb.h"
+#include "src/config/config.def.h"
+#include "src/core/wm-log.h"
+#include "src/core/wm-states.h"
+#include "src/core/wm-xcb.h"
 
 void state_idle(struct Context* ctx);
 void state_window_move(struct Context* ctx);

@@ -14,7 +14,7 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_ewmh.h>
 
-#include "wm-xcb-ewmh.h"
+#include "src/core/wm-xcb-ewmh.h"
 
 #include "test-registry.h"
 #include "test-wm.h"

@@ -20,7 +20,7 @@
 #ifndef _EVENT_TYPES_H_
 #define _EVENT_TYPES_H_
 
-#include "wm-hub.h"
+#include "src/core/wm-hub.h"
 
 #define EVT_CLIENT_LIST_BASE  0
 #define EVT_CLIENT_LIST_LIMIT 10

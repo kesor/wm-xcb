@@ -109,6 +109,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | unit | `scripts/check-unit.sh` | the unit suite across hub, state machines, targets, components. The gate captures the run and prints its log only when it fails: a passing suite is a single summary line and lefthook prints the verdict and the duration as its own summary, so attaching the log to every commit spends the reader's attention on a step that passed. A run whose summary line is missing, or whose summary counts a failure, fails the gate whatever make exited with. `DEBUG` and `SANITIZE` select the variant, and the pass line names the one make built, so the debug gate's suite cannot pass as release |
 | coverage | `scripts/check-coverage.sh` | no production source file is below its line floor in `tests/quality/coverage-baseline.txt`, and no production source file is missing one. Files under `tests/` are printed and carry no floor: a helper's error return is only reachable by breaking the environment |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
+| root | `scripts/check-root.sh` | every tracked root entry is on the allowlist in `scripts/lib/root-report.sh`: the build files, the documentation entry points and the directories that group the code. A source file at the top level belongs to no group, and the next one would have to guess; it fails the commit and the push instead. The list comes from git's index, so an untracked scratch file is not a finding and a file being committed is |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
 | private state | `scripts/check-private-state.sh` | no component can assign a machine-tracked field: every fixture under `tests/compile-fail/` that assigns one fails to compile, and the same fixture built through its accessor succeeds, so a refusal is told apart from a broken include path |
@@ -386,6 +387,7 @@ scripts/check-build-variants.sh   # release, sanitize and debug builds in one tr
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
 scripts/check-fakes.sh      # every stand-in names an installed program and cites a line of it
 scripts/check-bead-descriptions.sh   # every bead description is still there
+scripts/check-root.sh       # every tracked root entry is on the allowlist
 scripts/check-orphan-sources.sh   # every tracked source is in the build
 scripts/check-private-state.sh   # a component cannot assign a machine-tracked field
 ```
@@ -426,7 +428,7 @@ Shifted left, the person who wrote the code is the one who sees the number.
 scripts/check-complexity.sh            # per-function cognitive complexity (0.3s)
 scripts/check-coverage.sh              # line and branch coverage of the unit suite (7s warm)
 scripts/check-coverage.sh --show-zero  # also list what the suite never executes
-scripts/check-coverage.sh --update-baseline config-file.c
+scripts/check-coverage.sh --update-baseline src/config/config-file.c
                                        # raise that file's floor, leave the rest
 scripts/fuzz.sh 5                      # the fuzzers, short: the hook's version
 scripts/fuzz.sh 60                     # the same, long: by hand or in CI
@@ -451,7 +453,7 @@ compare, and a commit that only edits a comment in a header is not a complexity
 change. The "clang-tidy reported nothing" failure stays for a `.c` file that
 produced no measurement, which means the compile database is broken rather than
 the code simple. A function defined in a header, such as
-`config_wire_keybindings` in `config.wm.def.h`, is therefore not measured
+`config_wire_keybindings` in `src/config/config.wm.def.h`, is therefore not measured
 either.
 
 A file under `tests/` is not measured. clang-tidy charges each `ASSERT`'s
@@ -480,8 +482,8 @@ to 2.6 points on a CI runner between runs of the same tree.
 
 `--update-baseline` merges the run into the entries already recorded instead of
 rewriting the file from one run. Name the files the commit changed and only
-their entries move: `scripts/check-coverage.sh --update-baseline config-file.c`
-writes the floor for `config-file.c` and leaves every other line alone. A
+their entries move: `scripts/check-coverage.sh --update-baseline src/config/config-file.c`
+writes the floor for `src/config/config-file.c` and leaves every other line alone. A
 path relative to the repository root works too, and so does a suffix of one,
 so `tiling.c` and `src/components/tiling.c` both name `src/components/tiling.c`.
 Without file arguments every file the run measured is merged; the rest keep
@@ -511,7 +513,7 @@ size, and that failed a merge whose unit suite passed.
 
 A file at 0% is the useful number. One source file is still never executed by
 any unit test: `src/components/connection-sm.c` (the state machine with no
-instance). `wm-states.c` was another until `tests/unit/test-wm-states.c` drove
+instance). `src/core/wm-states.c` was another until `tests/unit/test-wm-states.c` drove
 key, button and enter events through it; the transition table it consults still
 matches no row, for the reason `docs/architecture/state-machine.md` records. A
 branch percentage in single digits on the monitor manager is the same signal:

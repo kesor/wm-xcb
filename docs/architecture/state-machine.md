@@ -98,8 +98,8 @@ a fixture, so neither is what the gate refuses.
 
 The tracked values that are still public, and why:
 
-- **`struct Context.state`** in `wm-states.h` is the pre-hub transition table's
-  state. Only `wm-states.c` and its test write it, and the table is due for
+- **`struct Context.state`** in `src/core/wm-states.h` is the pre-hub transition table's
+  state. Only `src/core/wm-states.c` and its test write it, and the table is due for
   removal in favour of the component that owns pointer input, so it does not earn
   an accessor layer first. wm-46k.15 tracks that subsystem.
 - **`Client.tags`** is the set of tags the client is assigned to, not exclusive
@@ -481,13 +481,13 @@ const char* sm_get_state_name(StateMachine* sm, uint32_t state);
 
 ---
 
-## The pre-hub state machine in `wm-states.c`
+## The pre-hub state machine in `src/core/wm-states.c`
 
-`wm-states.c` predates this framework and is still linked into the WM. It keeps
+`src/core/wm-states.c` predates this framework and is still linked into the WM. It keeps
 one global `struct Context` for the whole display. `dispatch_event()` in
-`wm-xcb.c` calls `handle_state_event()` after the handler registry for every
+`src/core/wm-xcb.c` calls `handle_state_event()` after the handler registry for every
 event that is not an X error. A key or button event is matched against
-`transitions[]` in `config.def.h`, and the function of the current state is
+`transitions[]` in `src/config/config.def.h`, and the function of the current state is
 called.
 
 No row matches. `window_target_type` is set only from `EnterNotify`, and that

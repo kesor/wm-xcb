@@ -24,7 +24,7 @@ This decouples keybindings from component internals. A component owns its action
 ┌─────────────────────────────────────────────────────────────────┐
 │                        CONFIG LAYER                              │
 │                                                                  │
-│  config.def.h:                                                   │
+│  src/config/config.def.h:                                       │
 │    keybinding_register("Mod+f",  "fullscreen.toggle");           │
 │    keybinding_register("Mod+1",  "tag-manager.view", 1);         │
 │    keybinding_register("Mod+Enter", "focus.focus-current");      │
@@ -452,11 +452,11 @@ tag_manager_init(void)
 
 ## Configuration Layer
 
-### config.def.h Style
+### src/config/config.def.h Style
 
 ```c
 /*
- * config.def.h - Default keybindings
+ * src/config/config.def.h - Default keybindings
  *
  * This file wires key combinations to component actions.
  * Components own their actions; this layer just wires triggers to them.
@@ -593,7 +593,7 @@ void config_pointer_init(void) {
 | `src/actions/action-registry.c/h` | Action registration, lookup, and invocation |
 | `src/actions/keybinding-binding.c/h` | Runtime binding storage and lookup |
 | `src/components/keybinding.c` | Key event handling with action invocation |
-| `config.def.h` | Compiled configuration and its accessors |
+| `src/config/config.def.h` | Compiled configuration and its accessors |
 
 ---
 
@@ -617,7 +617,7 @@ void config_pointer_init(void) {
 ### Phase 2: Binding Refactor
 - Remove hardcoded `KeyBinding.action` enum
 - Replace with `action_name` string
-- Update `config.def.h` to use action names
+- Update `src/config/config.def.h` to use action names
 
 ### Phase 3: Runtime Config
 - A text config file read at startup, with the compiled wiring as the fallback:

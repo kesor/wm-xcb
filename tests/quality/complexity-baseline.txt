@@ -8,6 +8,7 @@
 # count, and no split of a test keeps the assertions.
 client_sm_set_internal 11
 config_file_load 12
+config_should_float 14
 config_wire_file_bindings 11
 focus_on_enter_notify 21
 focus_set_state 14

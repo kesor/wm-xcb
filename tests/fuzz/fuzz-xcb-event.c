@@ -26,8 +26,8 @@
 #include "src/components/keybinding.h"
 #include "src/components/monitor-manager.h"
 #include "src/components/tag-manager.h"
+#include "src/core/wm-hub.h"
 #include "src/xcb/xcb-handler.h"
-#include "wm-hub.h"
 
 /* X events are 32 bytes. The dispatch reads the first, handlers read the rest. */
 #define EVENT_BYTES 32

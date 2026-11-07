@@ -18,10 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
+#include "src/config/config.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
 #include "tag.h"
-#include "wm-hub.h"
-#include "wm-log.h"
 
 /*
  * Global tag list

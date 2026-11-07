@@ -2,7 +2,7 @@
 #define _TEST_WM_H_
 
 #include <stdlib.h>
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 /*
  * Test assertion macro that tracks pass/fail counts

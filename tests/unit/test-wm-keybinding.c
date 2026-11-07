@@ -22,12 +22,12 @@
 #include "src/components/keybinding.h"
 #include "src/components/tag-manager.h"
 #include "src/components/tiling.h"
+#include "src/core/wm-hub.h"
+#include "src/core/wm-log.h"
 #include "src/sm/sm-registry.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-wm.h"
-#include "wm-hub.h"
-#include "wm-log.h"
 
 /*
  * Test: keybinding component registers with hub

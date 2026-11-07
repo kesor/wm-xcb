@@ -1,4 +1,4 @@
-#include "wm-running.h"
+#include "src/core/wm-running.h"
 #include <signal.h>
 
 /* initialize the running flag */

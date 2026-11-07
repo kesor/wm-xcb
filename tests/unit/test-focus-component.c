@@ -9,11 +9,11 @@
 #include "src/actions/action-registry.h"
 #include "src/components/client-list.h"
 #include "src/components/focus.h"
+#include "src/core/wm-hub.h"
 #include "src/xcb/xcb-handler.h"
 #include "test-registry.h"
 #include "test-target-client.h"
 #include "test-wm.h"
-#include "wm-hub.h"
 
 /*
  * Event tracking state for focus tests

@@ -9,18 +9,18 @@
 #
 src/components/connection-sm.c 0.0
 src/components/monitor-manager.c 22.7
-wm-xcb.c 30.8
+src/core/wm-xcb.c 30.8
 src/components/pertag.c 33.7
-wm-states.c 36.7
+src/core/wm-states.c 36.7
 src/sm/sm-instance.c 41.8
 src/components/ewmh-desktop.c 43.7
 src/components/keybinding.c 47.0
-config.c 47.8
+src/config/config.c 47.8
 src/actions/terminal.c 51.4
 src/actions/keybinding-binding.c 53.7
 src/components/fullscreen.c 54.2
 src/actions/action-registry.c 57.7
-wm-xcb-ewmh.c 60.6
+src/core/wm-xcb-ewmh.c 60.6
 src/components/floating.c 63.7
 src/components/tiling.c 63.9
 src/sm/sm-template.c 64.9
@@ -32,9 +32,9 @@ src/sm/sm-registry.c 71.3
 src/components/focus.c 71.8
 src/components/tag-manager.c 72.0
 src/target/client.c 75.2
-wm-log.c 77.0
-wm-signals.c 78.0
-wm-components.c 78.8
-config-file.c 84.7
-wm-hub.c 87.9
+src/core/wm-log.c 77.0
+src/core/wm-signals.c 78.0
+src/core/wm-components.c 78.8
+src/config/config-file.c 84.7
+src/core/wm-hub.c 87.9
 src/xcb/xcb-handler.c 92.8

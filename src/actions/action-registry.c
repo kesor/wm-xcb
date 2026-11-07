@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "wm-log.h"
+#include "src/core/wm-log.h"
 
 /*
  * Action storage - extra slot for NULL terminator
