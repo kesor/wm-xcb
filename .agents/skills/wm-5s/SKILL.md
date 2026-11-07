@@ -127,7 +127,7 @@ homes:
 - **a deterministic check**: a gate covers it, in `lefthook.yml` and
   `.github/workflows/quality.yml`, or
 - **a general rule** says what to do, a statement of the class, in `AGENTS.md`,
-  `docs/QUALITY.md`, or `docs/TESTING.md`, or
+  a skill, `docs/QUALITY.md`, or `docs/TESTING.md`, or
 - **nothing**: no command can catch it and no general statement would have caught
   the class. Say in the bead that both questions failed, add no gate and
   no rule, and close it. A rule written here anyway would name one incident, and
