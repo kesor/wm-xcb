@@ -66,11 +66,27 @@ static bool static_init_done = false;
  *
  * One entry per notification, not one per window: two changes in a row are two
  * reads, and the later answer must not be applied before the earlier one.
+ * `generation` is the fullscreen machine's generation when the read was queued.
+ * A local write bumps that counter; a reply from an older value is not applied.
  */
 typedef struct FullscreenStateRead {
   xcb_get_property_cookie_t cookie;
   xcb_window_t              window;
+  uint32_t                  generation;
 } FullscreenStateRead;
+
+/*
+ * One counter per fullscreen machine, stored as the machine's owned data.
+ *
+ * A local write bumps it. A queued read stores the value it saw. A reply from
+ * an older value is the property as it was before that write, and applying it
+ * puts the machine back. The reply path's own raw write does not bump: two
+ * notifications queued at the same value are two reads, and the later one
+ * still has to be applied.
+ */
+typedef struct FullscreenGeneration {
+  uint32_t value;
+} FullscreenGeneration;
 
 static FullscreenStateRead* state_reads        = NULL;
 static size_t               state_read_count   = 0;
@@ -298,11 +314,21 @@ fullscreen_get_sm(Client* c)
     cached_fullscreen_template = tmpl;
   }
 
+  FullscreenGeneration* gen = calloc(1, sizeof *gen);
+  if (gen == NULL) {
+    LOG_ERROR("Failed to allocate the fullscreen generation for client window=%u",
+              c->window);
+    return NULL;
+  }
+
   sm = sm_create(c, tmpl, fullscreen_sm_emit, c);
   if (sm == NULL) {
     LOG_ERROR("Failed to create fullscreen SM instance for client");
+    free(gen);
     return NULL;
   }
+
+  sm_set_owned_data(sm, gen, free);
 
   /* Store in client */
   if (!client_set_sm(c, FULLSCREEN_COMPONENT_NAME, sm)) {
@@ -313,6 +339,42 @@ fullscreen_get_sm(Client* c)
 
   LOG_DEBUG("Created fullscreen SM for client window=%u", c->window);
   return sm;
+}
+
+/*
+ * The generation a queued read should store. A machine that does not exist yet
+ * has not had a local write, so it is the starting value the first write bumps.
+ */
+static uint32_t
+fullscreen_generation_current(Client* c)
+{
+  if (c == NULL)
+    return 0;
+
+  StateMachine* sm = client_get_sm(c, FULLSCREEN_COMPONENT_NAME);
+  if (sm == NULL)
+    return 0;
+
+  FullscreenGeneration* gen = sm_get_data(sm);
+  return gen == NULL ? 0 : gen->value;
+}
+
+/*
+ * A local write happened. A reply queued before this carries the property from
+ * before the write, and applying it would put that older state back.
+ */
+static void
+fullscreen_generation_bump(Client* c)
+{
+  StateMachine*         sm  = fullscreen_get_sm(c);
+  FullscreenGeneration* gen = sm == NULL ? NULL : sm_get_data(sm);
+  if (gen == NULL) {
+    LOG_ERROR("fullscreen: local write on window %u has no generation, an in-flight reply can overwrite it",
+              c == NULL ? 0 : c->window);
+    return;
+  }
+
+  gen->value++;
 }
 
 /*
@@ -348,8 +410,9 @@ fullscreen_get_state(Client* c)
 }
 
 /*
- * Set fullscreen state directly (for raw_write from listeners).
- * Does not run guards - use for authoritative external state changes.
+ * Set fullscreen state directly. No guards: the caller is stating the state,
+ * not requesting it. The call is a local write, so a reply queued before it
+ * is not applied.
  */
 void
 fullscreen_set_state(Client* c, FullscreenState state)
@@ -364,6 +427,7 @@ fullscreen_set_state(Client* c, FullscreenState state)
   }
 
   sm_raw_write(sm, state);
+  fullscreen_generation_bump(c);
 }
 
 /*
@@ -442,6 +506,8 @@ fullscreen_executor(struct HubRequest* req)
     return;
   }
 
+  fullscreen_generation_bump(c);
+
   LOG_DEBUG("fullscreen_executor: toggled fullscreen for client window=%u to state=%u",
             c->window, target);
 }
@@ -493,7 +559,8 @@ fullscreen_sync_from_state_reply(xcb_window_t window, xcb_get_property_reply_t* 
 
   FullscreenState current = (FullscreenState) sm_get_state(sm);
 
-  /* Sync if different - external change happened */
+  /* Not a local write: bumping would drop a later reply queued at this
+     generation before either answer arrived. */
   if (is_fullscreen && current == FULLSCREEN_STATE_WINDOWED) {
     LOG_DEBUG("fullscreen listener: external fullscreen change detected, syncing SM");
     sm_raw_write(sm, FULLSCREEN_STATE_FULLSCREEN);
@@ -511,7 +578,22 @@ fullscreen_sync_from_state_reply(xcb_window_t window, xcb_get_property_reply_t* 
  * the time this runs when the two notifications arrived in one batch, and
  * applying the newer one first leaves the state machine on the older reply. A
  * reply that has not arrived stops the walk: the ones after it are later.
+ *
+ * A reply whose generation is behind the machine's is freed and not applied.
+ * A local write bumped the machine while that read was in flight, and the
+ * reply carries the property from before the write. The walk continues: a
+ * later read may have been queued after the write.
  */
+static bool
+fullscreen_state_read_is_stale(xcb_window_t window, uint32_t queued)
+{
+  Client* c = client_get_by_window(window);
+  if (c == NULL)
+    return false;
+
+  return queued < fullscreen_generation_current(c);
+}
+
 size_t
 fullscreen_state_read_drain(FullscreenStateReadArrived arrived,
                             FullscreenStateReadApply   apply,
@@ -530,6 +612,11 @@ fullscreen_state_read_drain(FullscreenStateReadArrived arrived,
        that entry has to stay behind the ones still in flight. */
     state_read_count--;
     memmove(state_reads, state_reads + 1, state_read_count * sizeof *state_reads);
+
+    if (fullscreen_state_read_is_stale(head.window, head.generation)) {
+      free(reply);
+      continue;
+    }
 
     apply(userdata, head.window, reply);
     applied++;
@@ -609,13 +696,22 @@ fullscreen_state_read_queue_add(xcb_get_property_cookie_t cookie, xcb_window_t w
   if (!fullscreen_state_read_queue_ensure())
     return false;
 
-  state_reads[state_read_count].cookie = cookie;
-  state_reads[state_read_count].window = window;
+  state_reads[state_read_count].cookie     = cookie;
+  state_reads[state_read_count].window     = window;
+  state_reads[state_read_count].generation = fullscreen_generation_current(
+      client_get_by_window(window));
   state_read_count++;
   return true;
 }
 
 #ifdef WM_HUB_TESTING
+void
+fullscreen_state_reply_apply_for_tests(xcb_window_t window, void* reply)
+{
+  if (reply != NULL)
+    fullscreen_sync_from_state_reply(window, reply);
+}
+
 bool
 fullscreen_state_read_queue_push_for_tests(xcb_get_property_cookie_t cookie, xcb_window_t window)
 {
