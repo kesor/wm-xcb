@@ -192,6 +192,30 @@ Neither is used for the gates, for three reasons:
 `scripts/run-hook.sh` keeps the decision in one place: lefthook if present,
 otherwise `nix develop --command lefthook`, otherwise a warning.
 
+## The path gate
+
+`scripts/check-paths.sh` fails when a tracked file names somebody's home
+directory or their personal source tree. This repository is public, so such a
+path is wrong for every other checkout, every worktree built elsewhere and every
+CI runner.
+
+What counts is a path that starts a field, not any text that contains one. The
+pattern lives in `scripts/lib/path-report.sh`, and it requires the character in
+front of a home to be the beginning of the line or one that cannot be part of a
+path segment. Without that, `/tmp/home/.config/wm/config` - a fake home a unit
+test builds for itself - read as somebody's home, the gate refused the commit,
+and the fix went into the fixture: the test renamed its own scratch directory to
+get the commit through, which is the gate deciding what a test may be called.
+The boundary keeps the fixture honest and still catches `/home/<user>/src`.
+
+The files that may spell a home path are listed in `PATH_SELF_FILES` in the
+library: the gate, the library and the test below, because writing the paths
+down is what they do. A real home path in any other file is still a finding.
+
+The verdict is in the library, so `tests/x/test-117-path-report.sh` feeds it
+recorded `git grep` hits and pins both answers: a fixture under /tmp passes, a
+home at the start of a field fails, and the tree as committed names no home.
+
 ## The async baseline
 
 `scripts/check-async.sh` fails on a blocking call unless it is waived or listed
