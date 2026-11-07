@@ -766,6 +766,24 @@ client_request_size_hints(Client* c)
 }
 
 bool
+client_size_hints_equal(const ClientSizeHints* a, const ClientSizeHints* b)
+{
+  if (a == NULL || b == NULL)
+    return a == b;
+
+  return a->min_width == b->min_width && a->min_height == b->min_height &&
+         a->max_width == b->max_width && a->max_height == b->max_height &&
+         a->base_width == b->base_width && a->base_height == b->base_height &&
+         a->inc_width == b->inc_width && a->inc_height == b->inc_height;
+}
+
+bool
+client_is_normal_hints_atom(xcb_atom_t atom)
+{
+  return atom != XCB_ATOM_NONE && atom == wm_normal_hints_atom;
+}
+
+bool
 client_poll_size_hints(Client* c)
 {
   if (c == NULL || !c->size_hints_pending)
@@ -789,18 +807,20 @@ client_poll_size_hints(Client* c)
 
   xcb_get_property_reply_t* reply = (xcb_get_property_reply_t*) raw_reply;
   ClientSizeHints           parsed;
-  bool                      constrained = false;
+  bool                      have = false;
 
-  if (reply != NULL && error == NULL && reply->format == 32) {
-    uint32_t count = (uint32_t) (xcb_get_property_value_length(reply) / (int) sizeof(uint32_t));
+  if (reply != NULL && error == NULL) {
+    if (reply->format == 0) {
+      /* Format 0 is the server saying the property is not there: the client
+       * removed the hints, so it has no constraints any more. Keeping the old
+       * ones would hold the window at a minimum it no longer asks for. */
+      memset(&parsed, 0, sizeof(parsed));
+      have = true;
+    } else if (reply->format == 32) {
+      uint32_t count = (uint32_t) (xcb_get_property_value_length(reply) / (int) sizeof(uint32_t));
 
-    if (client_size_hints_from_property(
-            (const int32_t*) xcb_get_property_value(reply), count, &parsed)) {
-      client_set_size_hints(c, &parsed);
-      constrained = parsed.min_width != 0 || parsed.min_height != 0 ||
-                    parsed.max_width != 0 || parsed.max_height != 0 ||
-                    parsed.base_width != 0 || parsed.base_height != 0 ||
-                    parsed.inc_width != 0 || parsed.inc_height != 0;
+      have = client_size_hints_from_property(
+          (const int32_t*) xcb_get_property_value(reply), count, &parsed);
     }
   } else if (error != NULL) {
     LOG_DEBUG("WM_NORMAL_HINTS read failed for window %u", c->window);
@@ -809,7 +829,12 @@ client_poll_size_hints(Client* c)
   free(error);
   free(reply);
 
-  return constrained;
+  if (!have)
+    return false;
+
+  bool changed = !client_size_hints_equal(&c->size_hints, &parsed);
+  client_set_size_hints(c, &parsed);
+  return changed;
 }
 
 /* One dimension against the client's hints. */

@@ -161,6 +161,11 @@ client_list_component_init(void)
       base,
       client_list_on_unmap_notify);
 
+  result |= xcb_handler_register(
+      XCB_PROPERTY_NOTIFY,
+      base,
+      client_list_on_property_notify);
+
   if (result != 0) {
     LOG_ERROR("Failed to register some XCB handlers for client list component");
     /* Continue anyway - partial registration is recoverable */
@@ -291,7 +296,8 @@ client_list_on_destroy_notify(void* event)
  * focus handler cannot resolve a client from it.
  *
  * Property change is how the fullscreen component learns that a client, or
- * another program acting for it, changed _NET_WM_STATE: a window sends no
+ * another program acting for it, changed _NET_WM_STATE, and how the client list
+ * learns that a client rewrote its WM_NORMAL_HINTS: a window sends no
  * PropertyNotify unless someone selected it, and an event mask belongs to one
  * window, so there is no other place to ask for it.
  */
@@ -428,6 +434,33 @@ client_list_on_unmap_notify(void* event)
   client_list_request_tile(client_get_monitor(c));
 
   LOG_DEBUG("Client unmanaged: window=%u", e->window);
+}
+
+/*
+ * Handle XCB_PROPERTY_NOTIFY for a managed window.
+ *
+ * A client that changes its minimum or maximum size while running writes
+ * WM_NORMAL_HINTS again, and that is the only notice the WM gets of it. The
+ * read is deferred: a handler may not wait on a reply, so this sends the
+ * request and client_list_poll_size_hints() lays the window out again when the
+ * answer arrives and the constraints are not the ones it was tiled to.
+ */
+void
+client_list_on_property_notify(void* event)
+{
+  xcb_property_notify_event_t* e = (xcb_property_notify_event_t*) event;
+
+  if (!client_is_normal_hints_atom(e->atom))
+    return;
+
+  /* A window the WM does not manage is not laid out by it, so reading the
+   * hints would cost a round trip nobody acts on. */
+  Client* c = client_get_by_window(e->window);
+  if (c == NULL || !client_is_managed(c))
+    return;
+
+  LOG_DEBUG("WM_NORMAL_HINTS changed on window=%u, re-reading", e->window);
+  client_request_size_hints(c);
 }
 
 /*

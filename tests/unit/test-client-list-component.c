@@ -52,6 +52,7 @@ test_client_list_component_init(void)
   assert(xcb_handler_count_for_type(XCB_DESTROY_NOTIFY) >= 1);
   assert(xcb_handler_count_for_type(XCB_MAP_REQUEST) >= 1);
   assert(xcb_handler_count_for_type(XCB_UNMAP_NOTIFY) >= 1);
+  assert(xcb_handler_count_for_type(XCB_PROPERTY_NOTIFY) >= 1);
 
   /* Should have registered with hub */
   HubComponent* comp = hub_get_component_by_name(CLIENT_LIST_COMPONENT_NAME);
@@ -85,6 +86,7 @@ test_client_list_component_shutdown(void)
   assert(xcb_handler_count_for_type(XCB_DESTROY_NOTIFY) == 0);
   assert(xcb_handler_count_for_type(XCB_MAP_REQUEST) == 0);
   assert(xcb_handler_count_for_type(XCB_UNMAP_NOTIFY) == 0);
+  assert(xcb_handler_count_for_type(XCB_PROPERTY_NOTIFY) == 0);
 
   /* Should be uninitialized */
   assert(client_list_component_is_initialized() == false);
@@ -843,6 +845,57 @@ test_client_adopts_components_on_creation(void)
 }
 
 /*
+ * The property a client rewrites when its size constraints change.
+ *
+ * A PropertyNotify for any other property has to leave the client alone: the
+ * WM reads _NET_WM_STATE and the hints off the same event type, and a handler
+ * that answered everything would re-read the hints on every one of them.
+ * Without an X connection the atom was never interned, so the second half -
+ * that WM_NORMAL_HINTS is recognised and re-read - is the seam test
+ * test-31-size-hints-changed.sh, which needs the server that owns the atom.
+ */
+void
+test_property_notify_ignores_other_properties(void)
+{
+  LOG_CLEAN("== Testing PROPERTY_NOTIFY ignores a property that is not WM_NORMAL_HINTS");
+
+  hub_init();
+  xcb_handler_init();
+  client_list_component_init();
+
+  xcb_create_notify_event_t create_event = {
+    .response_type = 16, /* XCB_CREATE_NOTIFY */
+    .window        = 800,
+  };
+  xcb_handler_dispatch(&create_event);
+
+  Client* c = client_get_by_window(800);
+  assert(c != NULL);
+  client_set_managed(c, true);
+
+  xcb_property_notify_event_t title_event = {
+    .response_type = 28, /* XCB_PROPERTY_NOTIFY */
+    .window        = 800,
+    .atom          = 39, /* any atom: no connection interned the real ones */
+    .state         = XCB_PROPERTY_NEW_VALUE,
+  };
+  xcb_handler_dispatch(&title_event);
+
+  assert(c->size_hints_pending == false);
+  assert(c->size_hints.min_width == 0);
+
+  /* A change to a window the WM never managed is not the WM's to lay out. */
+  title_event.window = 801;
+  xcb_handler_dispatch(&title_event);
+
+  assert(client_get_by_window(801) == NULL);
+
+  client_list_component_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+}
+
+/*
  * Test shutdown with clients still in list
  */
 void
@@ -884,6 +937,7 @@ TEST_GROUP(ClientListComponent, {
   test_destroy_notify_destroys_client();
   test_map_request_manages_client();
   test_managed_event_mask_covers_the_readers();
+  test_property_notify_ignores_other_properties();
   test_map_request_sets_border_width();
   test_map_request_creates_client_if_not_exists();
   test_unmap_notify_unmanages_client();

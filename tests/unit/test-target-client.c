@@ -745,6 +745,66 @@ test_client_size_hints_without_connection(void)
 }
 
 /*
+ * Test the constraint comparison the reader uses to decide on a re-layout
+ *
+ * The WM reads the hints twice: once when a client is managed and again every
+ * time the client rewrites WM_NORMAL_HINTS. A reply that names the constraints
+ * the client already had must not rearrange the screen, and one that drops a
+ * minimum must, so the comparison covers both directions rather than only the
+ * case where something is set.
+ */
+void
+test_client_size_hints_equal(void)
+{
+  LOG_CLEAN("== Testing the size hint comparison");
+
+  ClientSizeHints none;
+  memset(&none, 0, sizeof(none));
+
+  ClientSizeHints same;
+  memset(&same, 0, sizeof(same));
+
+  assert(client_size_hints_equal(&none, &same) == true);
+
+  ClientSizeHints minimum = none;
+  minimum.min_width       = 320;
+  minimum.min_height      = 200;
+  assert(client_size_hints_equal(&none, &minimum) == false);
+  assert(client_size_hints_equal(&minimum, &minimum) == true);
+
+  /* A client that drops the minimum it had is a change too: the window is
+   * still tiled to the size the old minimum forced. */
+  assert(client_size_hints_equal(&minimum, &none) == false);
+
+  ClientSizeHints incremented = minimum;
+  incremented.inc_width       = 8;
+  incremented.inc_height      = 6;
+  assert(client_size_hints_equal(&minimum, &incremented) == false);
+
+  assert(client_size_hints_equal(NULL, NULL) == true);
+  assert(client_size_hints_equal(&none, NULL) == false);
+}
+
+/*
+ * Test the WM_NORMAL_HINTS atom is only the one that was interned
+ *
+ * A unit test has no X connection, so nothing was interned and every atom is
+ * a stranger: the handler must not treat a PropertyNotify as a hint change on
+ * the strength of a number that means nothing in this connection.
+ */
+void
+test_client_normal_hints_atom_without_connection(void)
+{
+  LOG_CLEAN("== Testing the WM_NORMAL_HINTS atom without an X connection");
+
+  client_atoms_init();
+
+  assert(client_is_normal_hints_atom(XCB_ATOM_NONE) == false);
+  assert(client_is_normal_hints_atom(XCB_ATOM_WM_NAME) == false);
+  assert(client_is_normal_hints_atom(1) == false);
+}
+
+/*
  * Test client with monitor association
  *
  * A new client belongs to the selected monitor. Its tags stay empty here:
@@ -864,6 +924,8 @@ TEST_GROUP(ClientTarget, {
   test_client_size_hints_parse();
   test_client_apply_size_hints();
   test_client_size_hints_without_connection();
+  test_client_size_hints_equal();
+  test_client_normal_hints_atom_without_connection();
   test_client_without_monitor();
   test_client_monitor_association();
   test_client_monitor_selection_and_fallback();
