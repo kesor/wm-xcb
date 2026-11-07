@@ -33,6 +33,13 @@ pre-commit:
       run: ./scripts/check-paths.sh
       fail_text: "A committed file names a home directory. Use a repo-relative path or <placeholder>."
 
+    # The root is an index: build files, documentation entry points and the
+    # directories that group the code. A source file there belongs to no group,
+    # so a reader has to open the Makefile to learn what it is.
+    root:
+      run: ./scripts/check-root.sh
+      fail_text: "A tracked file sits at the repository root outside the allowlist. Move a source file under src/, or add the new kind of root entry to scripts/lib/root-report.sh in the commit that introduces it."
+
     # CI is this file run from a workflow, so a workflow that does not parse
     # removes every gate at once and says nothing. A worker cannot push to see
     # the run, so the check has to happen here.

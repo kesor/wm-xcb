@@ -109,6 +109,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | unit | `scripts/check-unit.sh` | the unit suite across hub, state machines, targets, components. The gate captures the run and prints its log only when it fails: a passing suite is a single summary line and lefthook prints the verdict and the duration as its own summary, so attaching the log to every commit spends the reader's attention on a step that passed. A run whose summary line is missing, or whose summary counts a failure, fails the gate whatever make exited with. `DEBUG` and `SANITIZE` select the variant, and the pass line names the one make built, so the debug gate's suite cannot pass as release |
 | coverage | `scripts/check-coverage.sh` | no production source file is below its line floor in `tests/quality/coverage-baseline.txt`, and no production source file is missing one. Files under `tests/` are printed and carry no floor: a helper's error return is only reachable by breaking the environment |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
+| root | `scripts/check-root.sh` | every tracked root entry is on the allowlist in `scripts/lib/root-report.sh`: the build files, the documentation entry points and the directories that group the code. A source file at the top level belongs to no group, and the next one would have to guess; it fails the commit instead. The list comes from git's index, so an untracked scratch file is not a finding and a file being committed is |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
 | private state | `scripts/check-private-state.sh` | no component can assign a machine-tracked field: every fixture under `tests/compile-fail/` that assigns one fails to compile, and the same fixture built through its accessor succeeds, so a refusal is told apart from a broken include path |
@@ -386,6 +387,7 @@ scripts/check-build-variants.sh   # release, sanitize and debug builds in one tr
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
 scripts/check-fakes.sh      # every stand-in names an installed program and cites a line of it
 scripts/check-bead-descriptions.sh   # every bead description is still there
+scripts/check-root.sh       # every tracked root entry is on the allowlist
 scripts/check-orphan-sources.sh   # every tracked source is in the build
 scripts/check-private-state.sh   # a component cannot assign a machine-tracked field
 ```
