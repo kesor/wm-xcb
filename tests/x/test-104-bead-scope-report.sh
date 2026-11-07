@@ -21,7 +21,9 @@
 #     ls-files cannot root and the deletion list can;
 #   - a path no commit ever tracked, which is a bead asking for a new file as
 #     far as the text can tell, and answers the same "cannot tell" without
-#     sending the caller to look for a replacement;
+#     sending the caller to look for a replacement; it may also be a file
+#     another bead delivered under another name, so the verdict says to grep for
+#     the behaviour before writing it;
 #   - a branch name, a ref, and the fragments a glob leaves, none of which is a
 #     path in this tree and none of which may turn the answer into "cannot
 #     tell";
@@ -175,6 +177,7 @@ check_eq "a path this tree deleted is not an answer" 2 "$?"
 check_eq "and the path is named" 1 "$(grep -c 'GONE     scripts/review-agent.sh' "$LAST")"
 check_eq "and the commit that deleted it is named" 1 "$(grep -c 'deleted by 61b23' "$LAST")"
 check_eq "and the directory that is still tracked is named" 1 "$(grep -c 'scripts/ is still tracked, so look there for what replaced it' "$LAST")"
+check_eq "and a deleted path gets no advice about a sibling bead" 0 "$(grep -c 'another bead may have delivered it under' "$LAST")"
 check_eq "and it does not answer that the work is here" 0 "$(grep -c 'so its work is in this worktree' "$LAST")"
 
 # Two tokens, one path: the full path and the bare name are one finding, for the
@@ -205,6 +208,9 @@ bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$HARNESS" "$DELETED" 
 check_eq "a file no commit ever tracked is not an answer either" 2 "$?"
 check_eq "and the path is named" 1 "$(grep -c 'GONE     scripts/check-widget.sh' "$LAST")"
 check_eq "and it says a new file reads the same" 1 "$(grep -c 'may be asking for a new file' "$LAST")"
+check_eq "and says another bead may have delivered the behaviour under another name" 1 "$(grep -c 'another bead may have delivered it under' "$LAST")"
+check_eq "and says the bead's text is what needs correcting" 1 "$(grep -c "bead's text is what needs correcting" "$LAST")"
+check_eq "and the verdict says a stale name reads as a missing file" 1 "$(grep -c "makes the bead's text stale and the file not missing" "$LAST")"
 check_eq "and the tracked directory is named" 1 "$(grep -c 'scripts/ is still tracked$' "$LAST")"
 check_eq "and it does not send the caller looking for a replacement" 0 "$(grep -c 'look there for what replaced it' "$LAST")"
 

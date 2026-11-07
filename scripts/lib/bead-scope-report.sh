@@ -348,6 +348,8 @@ bead_scope_verify() {
       printf '           deleted by %s\n' "$why"
     else
       echo "           no commit in this history deleted it, so the bead may be asking for a new file"
+      echo "           grep for the behaviour first: another bead may have delivered it under"
+      echo "           another name, and then the bead's text is what needs correcting"
     fi
     if [ -z "$dir" ]; then
       continue
@@ -377,7 +379,9 @@ bead_scope_verify() {
   echo "whether the work is here. A deleted path means the bead was written against a"
   echo "tree that had it: do the work where the code lives now, or say in the bead"
   echo "comment why it should not be done. A path no commit deleted may be a file the"
-  echo "bead asks you to add. Return 2: the caller looks, because neither reading is"
-  echo "an answer to what is in this worktree."
+  echo "bead asks you to add, and it may be one another bead delivered under another"
+  echo "name, which makes the bead's text stale and the file not missing: grep for the"
+  echo "behaviour first. Return 2: the caller looks, because neither reading is an"
+  echo "answer to what is in this worktree."
   return 2
 }
