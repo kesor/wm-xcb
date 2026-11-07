@@ -189,8 +189,12 @@ Then work through the list:
    call.
 4. Run the gates: `make test`, `make test-x`, `make check-async`,
    `scripts/format-check.sh`. Fix causes, not symptoms.
-5. Commit one topic: subject says what changed, body says why. Leave the bead
-   in_progress and say in the final message what is done; the merge closes it.
+5. Commit one topic: subject says what changed, body says why. Before you do,
+   `rg` the sentence you changed: it is often printed by the script's own header
+   (`--help`), repeated in the skill step that teaches it, and pinned by a test.
+   Updating one copy and leaving the others is the doc-drift mistake in
+   AGENTS.md, and the reviewer pays for it. Leave the bead in_progress and say
+   in the final message what is done; the merge closes it.
 
 ## Writing one bead
 
