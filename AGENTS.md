@@ -151,13 +151,14 @@ A worker never pushes, merges, or closes its own bead. The commits stay on
 ### One instruction surface
 
 `AGENTS.md` is the only file here that tells an agent how to work. `bd setup`
-writes a second one for a coding agent: `.codex/config.toml` and
-`.codex/hooks.json` in this tree, `.cursor/rules/beads.mdc` before them. The
-generated copy was written by another version of the CLI at another time, so the
-two drift, and a session that loads the generated one reads its git policy
-instead of this repository's. Do not run `bd setup` for a coding agent here.
-`scripts/check-root.sh` fails a commit that tracks `.codex/` again, because its
-entry is off the root allowlist.
+writes a second one for a coding agent, in two places: `.codex/config.toml` and
+`.codex/hooks.json` (`.cursor/rules/beads.mdc` before them), whose hooks run
+`bd codex-hook` so every session starts with `bd prime`'s own close protocol and
+git policy; and a `BEGIN BEADS CODEX SETUP` block appended to `AGENTS.md`
+itself, beside the tracked beads block at the end. `scripts/check-root.sh`
+refuses the first, because `.codex` is off the root allowlist. It cannot see the
+second, because `AGENTS.md` is on that allowlist, so the rule is the only guard.
+Do not run `bd setup` for a coding agent here.
 
 ---
 
