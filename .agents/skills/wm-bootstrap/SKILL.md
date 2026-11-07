@@ -177,8 +177,10 @@ Then work through the list:
    had the file does not read as work you can do here. Read that commit and the
    code that replaced the file, then do the work where the code lives now, or
    say in the bead comment why it should not be done. A path no commit deleted
-   is a bead asking for a new file as far as the text can tell, which is why the
-   answer is "cannot tell" rather than either verdict.
+   may be a file the bead asks to add, or one another bead delivered under
+   another name. The verdict says to grep for the behaviour first; a delivery
+   under another name makes the bead's text stale, and correcting that text is
+   the rule in AGENTS.md, "Working on a Bead". The answer stays "cannot tell".
 2. If the change is observable through X, write or extend a `tests/x/test-*.sh`
    first; use `require_visible` for preconditions so a test cannot pass because
    the window was never there.

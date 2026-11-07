@@ -140,6 +140,16 @@ A bead that lists seam cases names the test file for each one, or says "no test
 yet" after `grep -l` in `tests/x/`. Before the first edit, comment which of
 those cases already have a file. The work is the cases with no file.
 
+A bead's text outlives the tree it was written against. When work another bead
+delivers replaces what this bead names, or a commit makes one of its criteria
+impossible, the session that makes it stale corrects the bead's description or
+criteria in the same session and names the commit or the file that took its
+place. A comment is not a correction: `bd show` prints the description and the
+criteria above the comments, so the next worker and then the reviewer each
+decide again whether the bead has work. Where the session may not write the
+bead's text, its comment says what the text should say, and the final message
+repeats it for the session that closes the bead.
+
 `bd edit` opens an editor and blocks an agent. Never use it.
 
 One bead per branch is the usual case, named `work/<bead-id>`. Several beads
