@@ -274,6 +274,14 @@ The fullscreen component keeps that queue, and `fullscreen_state_read_drain()`
 takes the reply source as a callback so a unit test drives the walk with two
 replies and no server.
 
+A read stores the fullscreen machine's generation at the moment it was queued.
+A keybinding transition and `fullscreen_set_state()` bump that generation. A
+reply whose stored generation is behind the machine's is freed and not applied,
+so a keybinding that landed during the round trip is not overwritten by the
+property as it was before the keybinding. A reply the component itself applies
+does not bump the generation: two notifications queued before either answer
+arrives are still both applied, in order.
+
 `poll(2)` reports the socket, not libxcb's own queue. libxcb reads ahead during
 a reply wait (the property and atom queries at startup) and during `xcb_flush()`,
 so an event can sit in that queue with nothing left to read on the socket. The
