@@ -21,7 +21,9 @@
  * Events Emitted:
  * - EVT_CLIENT_CREATED - emitted after client creation
  * - EVT_CLIENT_DESTROYED - emitted after client destruction
- * - EVT_CLIENT_MANAGED - emitted after the client's window is mapped
+ * - EVT_CLIENT_MANAGED - emitted when the client becomes managed. The window
+ *   may still be unmapped: a client whose tags are not on the view is managed
+ *   without a map, and this event still fires
  * - EVT_CLIENT_UNMANAGED - emitted when client is unmanaged
  *
  * Requests Sent:
@@ -137,7 +139,8 @@ void client_list_on_destroy_notify(void* event);
 /*
  * Handle XCB_MAP_REQUEST event.
  * Manages the window: adds it to the client list, sets its border and
- * WM_STATE=Normal, and maps it.
+ * WM_STATE=Normal, and maps it when its tags are on the current view. A
+ * client whose tags are not on the view stays managed and unmapped.
  */
 void client_list_on_map_request(void* event);
 
