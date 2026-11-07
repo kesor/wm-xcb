@@ -147,11 +147,11 @@ and the answers give a finding one of three homes, never a fourth:
    refuses. Either way, prove it by removing the exact thing it must catch, once
    per shape it must catch. `DESIGN.md` section 10 has the three levels.
 2. **A general rule** when no command can catch it, but a general statement
-   would have caught the class: a line in `AGENTS.md`, a skill, or
-   `docs/QUALITY.md`, placed where the work happens. The statement, not the
-   incident — "a mutation is restored from a copy" outlives the run that produced
-   it, "do not use `git checkout --` here" does not. Undocumented conventions do
-   not survive a session.
+   would have caught the class: a line in `AGENTS.md`, a skill,
+   `docs/QUALITY.md`, or `docs/TESTING.md`, placed where the work happens. The
+   statement, not the incident — "a mutation is restored from a copy" outlives
+   the run that produced it, "do not use `git checkout --` here" does not.
+   Undocumented conventions do not survive a session.
 3. **Nothing** when neither holds: no command can catch it, and no general
    statement would have caught the class. One line in the summary, no edit, and
    no bead. A rule written for it anyway would name one incident, and the next
