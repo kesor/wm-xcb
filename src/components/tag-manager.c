@@ -2,7 +2,8 @@
  * Tag Manager Component Implementation
  *
  * Handles tag view state for monitors.
- * - Executor handles REQ_TAG_VIEW, REQ_TAG_TOGGLE, REQ_TAG_CLIENT_TOGGLE
+ * - Executor handles REQ_TAG_VIEW, REQ_TAG_TOGGLE, REQ_TAG_CLIENT_TOGGLE, and
+ *   answers REQ_CLIENT_VISIBLE, the manage path's question about a window
  * - Uses TagViewSM to track visible tag bitmask
  * - On tag change: shows/hides clients based on tag membership
  * - Emits EVT_TAG_CHANGED event
@@ -68,6 +69,7 @@ static TagManagerComponent tag_manager_component_instance = {
           REQ_TAG_VIEW,
           REQ_TAG_TOGGLE,
           REQ_TAG_CLIENT_TOGGLE,
+          REQ_CLIENT_VISIBLE,
           0,
       },
            .accepted_target_names = (const char*[]) { "monitor", NULL },
@@ -360,6 +362,49 @@ tag_manager_is_client_visible(Monitor* m, Client* c)
 
   /* Client is visible if any of its tags overlap with visible tags */
   return (c->tags & visible_tags) != 0;
+}
+
+/*
+ * Answer REQ_CLIENT_VISIBLE for one client: should its window be on screen.
+ *
+ * The client list asks this before it maps a window it has just taken over,
+ * because a client can carry tags that the view is not on - the view moved
+ * after its tags were set, or a component set them. A client with no tags yet
+ * is the one the manage event is about to give the view's tags to, so it
+ * belongs on screen exactly when that view is not empty.
+ *
+ * `data` is the caller's bool, holding the answer to use when nobody handles
+ * the request. It is left alone for a target that is not a client on a monitor,
+ * which is the same as not answering at all.
+ */
+static void
+tag_manager_answer_visible(TargetID target, void* data)
+{
+  if (data == NULL)
+    return;
+
+  HubTarget* t = hub_get_target_by_id(target);
+  if (t == NULL || t->type_id != hub_get_target_type_id_by_name("client"))
+    return;
+
+  Client*  c = (Client*) t;
+  Monitor* m = client_get_monitor(c);
+  if (m == NULL)
+    return;
+
+  uint32_t visible_tags = tag_manager_get_visible_tags(m);
+  bool     visible;
+
+  if (c->tags == 0)
+    visible = visible_tags != 0;
+  else
+    visible = tag_manager_is_client_visible(m, c);
+
+  if (!visible)
+    LOG_INFO("client %u stays off screen: tags=0x%x, visible=0x%x",
+             c->window, c->tags, visible_tags);
+
+  *(bool*) data = visible;
 }
 
 /*
@@ -698,12 +743,17 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
 }
 
 /*
- * Give a newly managed client the tags of the view it appeared on.
+ * Give a client with no tags the tags of the view it appeared on.
  *
  * Client creation leaves tags empty because the visible mask lives in this
  * component's state machine. The manage event is where the two meet, so a
  * window that maps while another tag is viewed joins that tag instead of the
  * one that was visible when the monitor was created.
+ *
+ * Only a client with no tags is given some. A client that already carries tags
+ * was put on them by the user, and a window its client withdrew and mapped
+ * again has to come back on those tags rather than on whichever tag happens to
+ * be viewed when it returns.
  */
 static void
 tag_manager_on_client_managed(Event e)
@@ -714,6 +764,9 @@ tag_manager_on_client_managed(Event e)
 
   Monitor* m = client_get_monitor(c);
   if (m == NULL)
+    return;
+
+  if (c->tags != 0)
     return;
 
   uint32_t visible_tags = tag_manager_get_visible_tags(m);
@@ -798,6 +851,9 @@ tag_manager_executor(struct HubRequest* req)
     break;
   case REQ_TAG_CLIENT_TOGGLE:
     tag_manager_handle_client_tag_toggle(req->type, req->target, req->data);
+    break;
+  case REQ_CLIENT_VISIBLE:
+    tag_manager_answer_visible(req->target, req->data);
     break;
   default:
     LOG_DEBUG("Tag manager: unhandled request type %u", req->type);

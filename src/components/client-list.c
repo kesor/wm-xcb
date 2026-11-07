@@ -308,17 +308,20 @@ client_list_managed_event_mask(void)
 }
 
 /*
- * Put a window the WM has taken over on screen: give it the border, tell other
- * clients it is managed through WM_STATE, and map it.
+ * Put a window the WM has taken over into the state every managed window is in:
+ * the border width the layout subtracts, the event mask the focus and
+ * fullscreen components read, and WM_STATE, which tells other clients the WM
+ * manages the window.
  *
- * Geometry and stacking belong to the layout component; X places a newly
- * mapped window on top of its siblings, which is the order tiling wants.
+ * Whether the window is on screen is a separate question with its own answer: a
+ * managed client is unmapped while the view is on another tag and stays managed
+ * all the same.
  *
  * Without an X connection (unit tests) there is nothing to send, so the server
  * calls are skipped and only the model changes.
  */
 static void
-client_list_map_client(Client* c)
+client_list_prepare_client(Client* c)
 {
   /* The border width has to be a 4-byte value: xcb_configure_window() takes the
    * value list as CARD32 and copies one per set mask bit, so a uint16_t here
@@ -336,13 +339,32 @@ client_list_map_client(Client* c)
 
   if (!client_set_wm_state(c->window, CLIENT_WM_STATE_NORMAL))
     LOG_WARN("WM_STATE atom missing, window %u stays unmarked in X", c->window);
+}
 
-  client_show(c->window);
+/*
+ * Ask whether this client's tags are on screen.
+ *
+ * The tags a client belongs to and the view they are compared with are the tag
+ * manager's to keep, so this asks instead of deciding, and the router answers
+ * before the call returns. A tree with no component handling the request leaves
+ * the answer as it was initialised, and the window is mapped: this component
+ * did that for every window before there was a tag manager, and still does when
+ * there is none.
+ */
+static bool
+client_list_belongs_on_screen(Client* c)
+{
+  bool visible = true;
+
+  hub_send_request_data(REQ_CLIENT_VISIBLE, c->target.id, &visible);
+
+  return visible;
 }
 
 /*
  * Handle XCB_MAP_REQUEST event.
- * Manages the window (adds it to the client list) and maps it.
+ * Manages the window (adds it to the client list), and maps it when its tags are
+ * on screen.
  */
 void
 client_list_on_map_request(void* event)
@@ -367,8 +389,18 @@ client_list_on_map_request(void* event)
    * the window is already where the WM put it. */
   if (!client_is_managed(c)) {
     client_set_managed(c, true);
-    client_list_map_client(c);
-    client_set_mapped(c, true);
+    client_list_prepare_client(c);
+
+    /* A window whose tags are not on the current view is managed but not
+     * mapped, and the tag manager maps it when a tag it is on is shown. Mapping
+     * it here and letting the next view change hide it puts a window on screen
+     * on a tag its own tags say it is not on, and nothing takes it off screen
+     * until someone switches the view. */
+    if (client_list_belongs_on_screen(c)) {
+      client_show(c->window);
+      client_set_mapped(c, true);
+      LOG_DEBUG("Mapped client %u", c->window);
+    }
 
     /* Ask for the size hints before the tile request. The reply is read one
      * loop iteration later, and the layout it triggers then is the one that

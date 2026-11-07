@@ -675,6 +675,152 @@ test_tag_manager_starts_with_the_wm(void)
   hub_shutdown();
 }
 
+/*
+ * The manage path asks whether a window belongs on screen before it maps it. A
+ * client can carry tags the view is not on - the view moved after its tags were
+ * set - so the answer is not "a client is always on screen". A client with no
+ * tags yet is the one the manage event gives the view's tags to, so it belongs
+ * on screen exactly when that view is not empty.
+ */
+void
+test_tag_manager_answers_which_clients_are_on_screen(void)
+{
+  LOG_CLEAN("== Testing the tag manager answers whether a client is on screen");
+
+  hub_init();
+  tag_list_init();
+  monitor_list_init();
+  client_list_init();
+  action_registry_init();
+  tag_manager_component_init();
+
+  Monitor* m = monitor_create(950);
+  assert_or_abort(m != NULL);
+  tag_manager_on_adopt(&m->target);
+
+  Client* c = client_create(951);
+  assert_or_abort(c != NULL);
+  client_set_monitor(c, m);
+  client_set_managed(c, true);
+
+  /* Tag 1 is shown, and a client with no tags yet takes that tag. */
+  bool visible = false;
+  hub_send_request_data(REQ_CLIENT_VISIBLE, c->target.id, &visible);
+  assert(visible == true);
+
+  /* A client is on screen when one of its own tags is. */
+  client_set_tags(c, TAG_MASK(1)); /* tag 2, while the view is on tag 1 */
+  visible = false;
+  hub_send_request_data(REQ_CLIENT_VISIBLE, c->target.id, &visible);
+  assert(visible == false);
+
+  uint32_t tag = 2;
+  hub_send_request_data(REQ_TAG_VIEW, m->target.id, &tag);
+  visible = false;
+  hub_send_request_data(REQ_CLIENT_VISIBLE, c->target.id, &visible);
+  assert(visible == true);
+
+  /* Toggling the last visible tag off asks for no client on screen. */
+  hub_send_request_data(REQ_TAG_TOGGLE, m->target.id, &tag);
+  assert(tag_manager_get_visible_tags(m) == 0);
+  visible = true;
+  hub_send_request_data(REQ_CLIENT_VISIBLE, c->target.id, &visible);
+  assert(visible == false);
+
+  /* Untagged, with nothing visible to take a tag from. */
+  Client* untagged = client_create(952);
+  assert_or_abort(untagged != NULL);
+  client_set_monitor(untagged, m);
+  client_set_managed(untagged, true);
+  assert(untagged->tags == 0);
+  visible = true;
+  hub_send_request_data(REQ_CLIENT_VISIBLE, untagged->target.id, &visible);
+  assert(visible == false);
+
+  /* A client on no monitor is not this component's to judge, and neither is a
+   * target that is not a client: the answer the caller came with stays. */
+  Client* loose = client_create(953);
+  assert_or_abort(loose != NULL);
+  client_set_tags(loose, TAG_MASK(0));
+  client_set_monitor(loose, NULL);
+  visible = true;
+  hub_send_request_data(REQ_CLIENT_VISIBLE, loose->target.id, &visible);
+  assert(visible == true);
+
+  visible = true;
+  hub_send_request_data(REQ_CLIENT_VISIBLE, m->target.id, &visible);
+  assert(visible == true);
+
+  /* Cleanup */
+  client_destroy(loose);
+  client_destroy(untagged);
+  client_destroy(c);
+  monitor_destroy(m);
+  client_list_shutdown();
+  monitor_list_shutdown();
+  tag_list_shutdown();
+  tag_manager_component_shutdown();
+  action_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * A client that already carries tags keeps them when it is managed again.
+ *
+ * Only a client with no tags takes the view's: a window whose client withdrew
+ * it and mapped it again has to come back on the tags the user put it on, not
+ * on whichever tag happens to be viewed when it returns. Without that, no
+ * client is ever managed while carrying tags the view is not on, and the manage
+ * path's question about one can never be answered no.
+ */
+void
+test_tag_manager_keeps_the_tags_a_remapped_client_has(void)
+{
+  LOG_CLEAN("== Testing a remapped client keeps the tags it already has");
+
+  hub_init();
+  tag_list_init();
+  monitor_list_init();
+  client_list_init();
+  action_registry_init();
+  tag_manager_component_init();
+
+  Monitor* m = monitor_create(970);
+  assert_or_abort(m != NULL);
+  tag_manager_on_adopt(&m->target);
+
+  Client* c = client_create(971);
+  assert_or_abort(c != NULL);
+  client_set_monitor(c, m);
+  assert(c->tags == 0);
+
+  /* A new client takes the view's tags. */
+  client_set_managed(c, true);
+  hub_emit(EVT_CLIENT_MANAGED, c->target.id, NULL);
+  assert(c->tags == TAG_MASK(0));
+
+  /* The user moves it to tag 3, then the view moves to tag 5. */
+  client_set_tags(c, TAG_MASK(2));
+  uint32_t tag = 5;
+  hub_send_request_data(REQ_TAG_VIEW, m->target.id, &tag);
+
+  /* The client withdraws and maps its window again. */
+  client_set_managed(c, false);
+  client_set_managed(c, true);
+  hub_emit(EVT_CLIENT_MANAGED, c->target.id, NULL);
+  assert(c->tags == TAG_MASK(2));
+
+  /* Cleanup */
+  client_destroy(c);
+  monitor_destroy(m);
+  client_list_shutdown();
+  monitor_list_shutdown();
+  tag_list_shutdown();
+  tag_manager_component_shutdown();
+  action_registry_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(TagManager, {
   test_tag_manager_init_shutdown();
   test_tag_manager_receives_tag_view_requests();
@@ -688,5 +834,7 @@ TEST_GROUP(TagManager, {
   test_tag_manager_view_and_toggle_actions();
   test_tag_manager_client_move_action();
   test_tag_manager_new_client_takes_the_view_tags();
+  test_tag_manager_answers_which_clients_are_on_screen();
+  test_tag_manager_keeps_the_tags_a_remapped_client_has();
   test_tag_manager_starts_with_the_wm();
 });

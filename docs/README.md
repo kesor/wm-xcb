@@ -93,13 +93,16 @@ Short version:
   suite passes.
 - **Works against X:** connecting, taking substructure redirect, RandR monitor
   discovery, tracking windows as `Client` targets, mapping a window on
-  `MapRequest` with a border and `WM_STATE=Normal`, adopting the windows that
+  `MapRequest` with a border and `WM_STATE=Normal` when its tags are on the
+  current view - a window whose tags the view is not on stays managed and
+  unmapped, and the tag that shows it maps it - adopting the windows that
   were already on the display when the WM started, through that same map path,
   so they are tiled and tracked too (an override-redirect window, or one its
   client left unmapped, is skipped), attaching every new client to the selected
-  monitor and giving a newly managed client the tags of the view it appeared
-  on, tiling that monitor's visible clients when a window is managed or
-  unmanaged so that each client's border
+  monitor and giving a client that has no tags yet the tags of the view it
+  appeared on, keeping the tags a client already has when its client withdraws
+  the window and maps it again, tiling that monitor's visible clients when a
+  window is managed or unmanaged so that each client's border
   falls inside the area it was given - neighbours touch, and a client alone on
   the monitor fills it - and `MOD+f` makes the focused client fullscreen as
   both the user and the client can see it: its window covers the monitor with
