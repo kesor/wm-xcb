@@ -148,6 +148,17 @@ A worker never pushes, merges, or closes its own bead. The commits stay on
 `work/<bead-id>`, and a review decides what happens to them: see
 `.agents/skills/wm-review/SKILL.md`.
 
+### One instruction surface
+
+`AGENTS.md` is the only file here that tells an agent how to work. `bd setup`
+writes a second one for a coding agent: `.codex/config.toml` and
+`.codex/hooks.json` in this tree, `.cursor/rules/beads.mdc` before them. The
+generated copy was written by another version of the CLI at another time, so the
+two drift, and a session that loads the generated one reads its git policy
+instead of this repository's. Do not run `bd setup` for a coding agent here.
+`scripts/check-root.sh` fails a commit that tracks `.codex/` again, because its
+entry is off the root allowlist.
+
 ---
 
 ## Implementation Rules
