@@ -28,8 +28,9 @@
 # here" for both sends the worker to resurrect a file its own history removed.
 # So a token this tree does not carry is a finding too: the path, the deletion
 # commit when git records one, and whether the directory that held it is still
-# here. That answer is "cannot tell", not "here" and not "not here": a bead
-# asking for a new file looks the same from the text, and the caller looks.
+# here. That answer is "cannot tell", not "here" and not "not here": a new file
+# looks the same from the text as one another bead delivered under another name,
+# so the verdict says to grep for the behaviour first, and the caller looks.
 
 # bead_scope_harness_dir <repo-root>
 #   The harness checkout beside the main checkout. Three levels up from a
@@ -227,8 +228,9 @@ bead_scope_deleted_for() {
 #   `work/<bead-id>`, `origin/master` and the `tests/x/test-` a glob leaves
 #   behind out of the answer. A directory the tree deleted entirely is absent
 #   from the file list; the deletion list is what says it was here. The commit
-#   column is empty when no commit deleted the path: that is a bead asking for
-#   a new file as far as the text can tell, and the text cannot tell.
+#   column is empty when no commit deleted the path: the text cannot tell a new
+#   file from one another bead delivered under another name, so the verdict
+#   says to grep for the behaviour first.
 bead_scope_find() {
   local bead=$1 comments=$2 repo=$3 harness=$4 deleted=$5
   local text tok name what hit rest part matched path commit

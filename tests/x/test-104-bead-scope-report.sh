@@ -344,4 +344,28 @@ if command -v bd >/dev/null 2>&1; then
   check_eq "a missing harness is reported on stderr" 1 "$(grep -c 'no harness checkout' "$DIR/err.txt")"
 fi
 
+# The printed verdict says to grep before writing a never-tracked path. A worker
+# reads two other texts first: the wrapper's --help, and the procedure in the
+# bootstrap skill. Either one still saying the path is only a new file sends
+# the worker to write it, which is the reading the verdict exists to stop. The
+# report's own header is the third copy, and a reader who trusts it restores
+# the old reading.
+help=$("$ROOT_DIR/scripts/bead-scope.sh" --help)
+check_eq "the help text says to grep for the behaviour first" 1 \
+  "$(printf '%s\n' "$help" | grep -c 'grep for the behaviour')"
+check_eq "the help text does not say a missing path is only a new file" 0 \
+  "$(printf '%s\n' "$help" | grep -c 'is a bead asking for a new file')"
+
+proc="$ROOT_DIR/.agents/skills/wm-bootstrap/SKILL.md"
+check_eq "the worker procedure says to grep for the behaviour first" 1 \
+  "$(grep -c 'grep for the behaviour' "$proc")"
+check_eq "the worker procedure does not say a missing path is only a new file" 0 \
+  "$(grep -c 'asking for a new file as far as the text can tell' "$proc")"
+
+lib="$ROOT_DIR/scripts/lib/bead-scope-report.sh"
+check_eq "the report's own description does not say a missing path is only a new file" 0 \
+  "$(grep -c 'a new file as far as the text can tell' "$lib")"
+check_eq "and it does not stop at the caller looking" 0 \
+  "$(grep -c 'asking for a new file looks the same from the text, and the caller looks' "$lib")"
+
 finish

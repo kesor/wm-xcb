@@ -26,10 +26,11 @@
 # session when it goes unanswered: a bead names files, and a bead written months
 # ago can name one this tree deleted. Each path the text names is checked against
 # the tracked files and against the history, and one that is gone is printed with
-# the commit that removed it. The answer to that is "cannot tell" - the same text
-# is a bead asking for a new file - so it is exit 2, the same as a read that
-# failed, and never the "workable here" that would send a worker to resurrect
-# what the tree removed on purpose.
+# the commit that removed it. The answer to that is "cannot tell": the same text
+# may be a file the bead asks to add, or one another bead delivered under another
+# name, so the verdict says to grep for the behaviour first. It is exit 2, the
+# same as a read that failed, and never the "workable here" that would send a
+# worker to resurrect what the tree removed on purpose.
 #
 # Exit status: 0 no token names the harness and every file-shaped token whose
 # first component this tree tracks, or once tracked, is still here. 3 the text
