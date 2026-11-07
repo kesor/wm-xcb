@@ -13,8 +13,8 @@
 #   - a directory a test builds for itself, which is not a home;
 #   - a home directory or a personal source tree, which starts a field.
 #
-# The paths below are written out because this file is one of the two the gate
-# searches past: spelling a home path is what it is here to do.
+# The paths below are written out because this file is one of the files the
+# gate searches past: spelling a home path is what it is here to do.
 source "$(dirname "$0")/lib.sh"
 # shellcheck source=../../scripts/lib/path-report.sh
 . "$ROOT_DIR/scripts/lib/path-report.sh"
@@ -57,8 +57,8 @@ check_eq "and the count is in the summary" 1 "$(grep -c 'check-paths: 5 line(s) 
 check_eq "and the fix says what to write instead" 1 \
   "$(grep -c 'Use a path relative to the repository, or a placeholder like <path-to-repo>' "$LAST")"
 
-# The boundary is in front of every alternative, so each of these fails on its
-# own line rather than riding on /home/.
+# A home path is a finding wherever its field starts, at the beginning of the
+# line or after a quote, and one inside a longer segment is not a home at all.
 printf 'a.c:1: setenv("HOME", "/home/someone/wm", 1);\n' >"$HITS"
 path_verify "$HITS" check-paths >"$LAST" 2>&1
 check_eq "a home path in a string literal is a finding" 1 "$?"

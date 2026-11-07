@@ -199,14 +199,14 @@ directory or their personal source tree. This repository is public, so such a
 path is wrong for every other checkout, every worktree built elsewhere and every
 CI runner.
 
-What counts is a path that starts a field, not any text that contains one. The
-pattern lives in `scripts/lib/path-report.sh`, and it requires the character in
-front of a home to be the beginning of the line or one that cannot be part of a
-path segment. Without that, `/tmp/home/.config/wm/config` - a fake home a unit
-test builds for itself - read as somebody's home, the gate refused the commit,
-and the fix went into the fixture: the test renamed its own scratch directory to
-get the commit through, which is the gate deciding what a test may be called.
-The boundary keeps the fixture honest and still catches `/home/<user>/src`.
+What counts is a path that starts a field. The pattern lives in
+`scripts/lib/path-report.sh`, and it requires the character in front of a home to
+be the beginning of the line or one that cannot be part of a path segment.
+Without that, `/tmp/home/.config/wm/config` - a fake home a unit test builds for
+itself - read as somebody's home, the gate refused the commit, and the fix went
+into the fixture: the test renamed its own scratch directory to get the commit
+through, which is the gate deciding what a test may be called. The boundary
+keeps the fixture honest and still catches `/home/<user>/src`.
 
 The files that may spell a home path are listed in `PATH_SELF_FILES` in the
 library: the gate, the library and the test below, because writing the paths

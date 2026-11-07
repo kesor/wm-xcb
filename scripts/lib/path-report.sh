@@ -6,25 +6,25 @@
 # tests/x/test-117-path-report.sh, which feeds it recorded hits so both answers
 # are pinned without a dirty tree.
 #
-# The question is not "does this text contain /home/<name>/" but "does a path
-# start there". A test builds a fake home to run against, and a fixture under
-# /tmp/home read as somebody's home: the gate failed the commit, and the author
-# renamed the fixture to get past it. That made the gate decide what a test may
-# call its own scratch directory, and the cheap answer was to weaken the
-# fixture. The field boundary below is the distinction the gate wants: a home
-# directory starts a field, so the character in front of it is either the
-# beginning of the line or one that cannot be part of a path segment. /tmp/home
-# does not start a field; /home/someone does.
+# The question is where a path starts, not whether its text appears somewhere in
+# a line: a home path is one that starts a field. A test builds a fake home to
+# run against, and a fixture under /tmp/home read as somebody's home: the gate
+# failed the commit, and the author renamed the fixture to get past it. That made
+# the gate decide what a test may call its own scratch directory, and the cheap
+# answer was to weaken the fixture. The field boundary below is the distinction
+# the gate wants: a home directory starts a field, so the character in front of
+# it is either the beginning of the line or one that cannot be part of a path
+# segment. /tmp/home does not start a field; /home/someone does.
 
 # A home directory or a personal source tree, at the start of a field. The
 # alternatives are inside the boundary group rather than repeated in front of
 # it, so a new one is added in one place.
 PATH_PATTERN='(^|[^A-Za-z0-9._-])(/home/[A-Za-z0-9._-]+/|/Users/[A-Za-z0-9._-]+/|[Cc]:\\Users\\|~/src/|~/suckless/)'
 
-# The files that have to spell the pattern above and the paths it looks for, so
-# the gate searches past itself: this library writes the home paths down, the
-# gate names this library, and the test that pins both answers has to write the
-# paths it feeds. A real home path in any other file is still a finding.
+# The files that spell the pattern above, or write a home path down to check it,
+# so the gate searches past itself: this library holds the pattern, the gate
+# names this library, and the test that pins both answers writes the paths it
+# feeds. A real home path in any other file is still a finding.
 PATH_SELF_FILES=(
   scripts/check-paths.sh
   scripts/lib/path-report.sh
