@@ -374,7 +374,12 @@ each refusal is pinned with no tracker involved.
 ## Adding a gate
 
 1. Write the check as a script under `scripts/` that exits non-zero on failure
-   and prints `file:line` or the failing thing. No network, no model.
+   and prints `file:line` or the failing thing. No network, no model. Every
+   command the gate runs must come from the dev shell's `buildInputs`: `nix
+   develop` keeps the caller's `PATH`, so a tool installed in your profile passes
+   locally and the GitHub runner, which has only the shell, reports `command not
+   found` as the defect the gate was meant to find. Add the tool to `flake.nix`
+   in the same commit as the gate that names it.
 2. Add it to the right layer in `lefthook.yml` with a `fail_text` that says what
    to do about it, then prove it fires: `lefthook run pre-commit --command
    <name> --force --no-auto-install`. Without `--force`, a command with a `glob`
