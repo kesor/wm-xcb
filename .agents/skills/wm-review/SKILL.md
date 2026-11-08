@@ -211,8 +211,12 @@ status.
 
 ## After a fix
 
-Your commit is a normal commit: the pre-push gates run on it, and the human merge
-is still the human's. Do not merge, push, rebase, amend, or close or reopen a
+Your commit is a normal commit and the pre-push gates run on it. Under
+`worker.py drive` and `worker.py auto` there is no person between your verdict
+and the merge: an approved branch is merged as soon as those gates pass, so a
+`review:` commit lands on your own approval and no second reader sees it. Name
+the sha it produced and what it changed in the verdict, because that comment is
+the only record of it. Do not merge, push, rebase, amend, or close or reopen a
 bead. If the author has to act on a finding, `worker.py resume <bead>` starts
 them again with `bd comments` in front of them, which is the only reliable way
 findings reach the model that wrote the branch.
