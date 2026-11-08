@@ -108,6 +108,7 @@
               lefthook
               actionlint # scripts/check-workflow.sh parses .github/workflows/
               shellcheck # scripts/check-shellcheck.sh; its baseline is pinned to this version
+              ripgrep # the commands docs/TESTING.md prints begin with rg; scripts/check-doc-commands.sh runs them
             ];
           };
         };
