@@ -136,11 +136,12 @@ measured=$(clang-tidy -p . \
   LC_ALL=C sort)
 
 if [ -z "$measured" ]; then
-  # clang-tidy reads a header that is not the file it was handed as non-user
-  # code and reports nothing in it, so a commit that touches only headers
-  # measures nothing. Failing it sent workers to --update-baseline with the
-  # wrong cause. The guard is for the other case: a .c that produced no
-  # measurement is a broken compile database, not a pass.
+  # A commit that touches only headers measures nothing when clang-tidy reports
+  # no function and every file is a header. Failing that case sent workers to
+  # --update-baseline with the wrong cause. The guard is for the other case: a
+  # .c that produced no measurement is a broken compile database, not a pass.
+  # A function defined in a header is absent from the report for a .c file that
+  # includes it; clang-tidy treats that header as non-user code.
   if printf '%s\n' "${files[@]}" | grep -qv '\.h$'; then
     echo "check-complexity: clang-tidy reported nothing; the check or the database is wrong" >&2
     exit 1

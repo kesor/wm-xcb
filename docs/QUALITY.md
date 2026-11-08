@@ -496,13 +496,15 @@ getopt loop taken out measures `main` at 24, still over the floor, so the entry
 is needed either way. clang-tidy charges a `switch` once and a `case` label
 nothing, so a table of flags is not what makes that number.
 
-A set of headers alone passes without a measurement: clang-tidy treats a header
-other than the file it was handed as non-user code and reports nothing in it, so
-there is nothing for this gate to compare, and a commit that only edits a comment
-in a header is not a complexity change. The "clang-tidy reported nothing" failure
-stays for a `.c` file that produced no measurement, which means the compile
-database is broken rather than the code simple. A function defined in a header is
-not measured for the same reason, so it never gets an entry.
+A set of headers alone passes without a measurement. The gate runs clang-tidy
+on the files it was handed; when that reports no function and every file is a
+header, there is nothing to compare, and a commit that only edits a header is
+not a complexity change. The "clang-tidy reported nothing" failure stays for a
+`.c` file that produced no measurement, which means the compile database is
+broken rather than the code simple. A function defined in a header is absent
+from the report for a `.c` file that includes it. clang-tidy treats a header
+other than the file it was handed as non-user code, so that function never gets
+an entry.
 
 A file under `tests/` is not measured. clang-tidy charges each `ASSERT`'s
 `if`/`else` as a decision, so a test body's number is its assertion count, and

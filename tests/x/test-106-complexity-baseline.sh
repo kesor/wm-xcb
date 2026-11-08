@@ -23,9 +23,11 @@ printf -- '-I.\n' >"$DIR/compile_flags.txt"
 # The gate asks clang-tidy for two things: its version, and one line per function
 # at or above the threshold. The stand-in answers both from a table keyed by the
 # file it was asked about, which makes "what was measured" something the test
-# controls. empty.c reports nothing on purpose: that is the broken-tool case the
-# guard exists for. main.c and the tool both define main, which is the pair the
-# file key has to tell apart.
+# controls. It prints that path made absolute: clang-tidy prints the path it was
+# handed, rewritten through the compile database, and a relative echo leaves the
+# root-prefix strip untested. empty.c reports nothing on purpose: that is the
+# broken-tool case the guard exists for. main.c and the tool both define main,
+# which is the pair the file key has to tell apart.
 cat >"$DIR/bin/clang-tidy" <<'STUB'
 #!/usr/bin/env bash
 if [ "$1" = "--version" ]; then
@@ -33,18 +35,19 @@ if [ "$1" = "--version" ]; then
   exit 0
 fi
 for arg in "$@"; do
+  loc="$(pwd)/$arg"
   case $arg in
     one.c)
-      echo "$arg:1:1: warning: function 'alpha' has cognitive complexity of 20 [a]"
-      echo "$arg:2:1: warning: function 'beta' has cognitive complexity of 12 [a]"
+      echo "$loc:1:1: warning: function 'alpha' has cognitive complexity of 20 [a]"
+      echo "$loc:2:1: warning: function 'beta' has cognitive complexity of 12 [a]"
       ;;
-    two.c) echo "$arg:1:1: warning: function 'gamma' has cognitive complexity of 30 [a]" ;;
-    three.c) echo "$arg:1:1: warning: function 'delta' has cognitive complexity of 40 [a]" ;;
-    small.c) echo "$arg:1:1: warning: function 'tiny' has cognitive complexity of 3 [a]" ;;
-    main.c) echo "$arg:1:1: warning: function 'main' has cognitive complexity of 20 [a]" ;;
-    tools/other.c) echo "$arg:1:1: warning: function 'main' has cognitive complexity of 20 [a]" ;;
-    tools/tool.c) echo "$arg:1:1: warning: function 'main' has cognitive complexity of 33 [a]" ;;
-    tests/unit/*.c) echo "$arg:1:1: warning: function 'test_many_assertions' has cognitive complexity of 40 [a]" ;;
+    two.c) echo "$loc:1:1: warning: function 'gamma' has cognitive complexity of 30 [a]" ;;
+    three.c) echo "$loc:1:1: warning: function 'delta' has cognitive complexity of 40 [a]" ;;
+    small.c) echo "$loc:1:1: warning: function 'tiny' has cognitive complexity of 3 [a]" ;;
+    main.c) echo "$loc:1:1: warning: function 'main' has cognitive complexity of 20 [a]" ;;
+    tools/other.c) echo "$loc:1:1: warning: function 'main' has cognitive complexity of 20 [a]" ;;
+    tools/tool.c) echo "$loc:1:1: warning: function 'main' has cognitive complexity of 33 [a]" ;;
+    tests/unit/*.c) echo "$loc:1:1: warning: function 'test_many_assertions' has cognitive complexity of 40 [a]" ;;
     *) : ;;
   esac
 done
@@ -175,7 +178,7 @@ check_eq "and measures the build's source list" 2 \
 check_eq "and records the tool in that list" 1 \
   "$(grep -c '^tools/tool.c main 33$' "$BASELINE")"
 check_eq "and gives the test source in it no entry" 0 \
-  "$(grep -c '^test_many_assertions' "$BASELINE")"
+  "$(grep -c '^tests/unit/skip.c test_many_assertions 40$' "$BASELINE")"
 check_eq "and keeps the entry for a file it did not measure" 1 \
   "$(grep -c '^nine.c kept 14$' "$BASELINE")"
 
