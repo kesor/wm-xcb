@@ -255,8 +255,8 @@ A run started from it therefore needs no make first, and a missing build
 product cannot arrive as a refusal or as a new seam failure.
 
 `tests/x/lib.sh` has the helpers: `spawn_client`, `wait_viewable`,
-`require_visible`, `rect_of`, `overlap_pairs`, `focused_window`, `press`,
-`root_prop`, and the `check_*` assertions.
+`wait_hidden`, `require_visible`, `rect_of`, `overlap_pairs`, `focused_window`,
+`press`, `root_prop`, and the `check_*` assertions.
 
 `spawn_client` fails the file it is called from when xclient comes back with
 fewer window ids than it was asked for, and the failure's text starts with
@@ -338,7 +338,10 @@ stricter. The remaining known failures, as of the last refresh:
 Write a test so that it cannot pass for the wrong reason: a precondition such as
 "the window is visible before I press the key" uses `require_visible`, which
 stops the test, not `check_eq`, which would let a later "the window is gone now"
-pass because it was never there.
+pass because it was never there. `wait_viewable` refuses a count below 1 for the
+same reason: "at least 0 are viewable" holds before the helper looks, so an
+assertion built on it passed while the windows were still on screen. A test that
+waits for a window to leave the screen uses `wait_hidden`, which polls for none.
 
 These files start their own display, because the condition they check cannot
 be produced once the WM is already up: `test-86-queued-event.sh`,

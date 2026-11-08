@@ -186,10 +186,42 @@ count_viewable() {
 
 # wait_viewable <count> [timeout_ms] - returns 0 when at least <count> of this
 # test's windows are viewable.
+#
+# A count below 1 is refused rather than answered: "at least 0" holds before the
+# loop looks, so it used to return at once, and the assertion a caller built on
+# it passed while the windows were still on screen. Waiting for no window is
+# wait_hidden. The refusal goes to fd 3, the same channel the spawn failure
+# uses, because a caller may have discarded this function's stdout and run.sh
+# counts FAIL lines rather than exit statuses.
 wait_viewable() {
-  local want=$1 timeout=${2:-2000} waited=0
+  local want=${1:-0} timeout=${2:-2000} waited=0
+  case $want in
+    '' | *[!0-9]* | 0)
+      {
+        fail "wait_viewable: '$want' is not a positive count; at least 0 matches before the first look, so nothing would be waited for. Use wait_hidden for 'none is viewable'"
+        finish
+      } >&3
+      exit 1
+      ;;
+  esac
   while [ "$waited" -lt "$timeout" ]; do
     if [ "$(count_viewable)" -ge "$want" ]; then
+      return 0
+    fi
+    sleep 0.02
+    waited=$((waited + 20))
+  done
+  return 1
+}
+
+# wait_hidden [timeout_ms] - returns 0 once none of this test's windows is
+# viewable. A test that asserts a window left the screen needs this: it has to
+# wait for the WM to answer, and it must not read "not hidden" as "already
+# gone".
+wait_hidden() {
+  local timeout=${1:-2000} waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    if [ "$(count_viewable)" -eq 0 ]; then
       return 0
     fi
     sleep 0.02
