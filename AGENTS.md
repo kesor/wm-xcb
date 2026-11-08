@@ -347,7 +347,9 @@ void test_my_component_request(void) {
 A new check is proven by removing the exact thing it must catch, once per shape
 it must catch: for a table walker, one row per shape — a plain row, a self-loop,
 a row with a guard, a row with no event. A mutation that exercised a shape the
-check already handled proves nothing about the one it does not.
+check already handled proves nothing about the one it does not. Run the proof
+after the last edit to the test: a count taken before the test changed is the
+previous test's count, and the comment that quotes it is wrong.
 
 ### 6. Dangling Pointers / Use-After-Free (8+ occurrences)
 - **Symptom**: Using a pointer after the object it points to has been freed
