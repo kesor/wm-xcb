@@ -160,6 +160,11 @@ or
 Changes requested before merge at 4f6a1c2.
 ```
 
+Write that line as the comment's first line and do not prefix it with
+`VERDICT:`. `worker.py` posts the round's `VERDICT:` marker itself, from the
+first verdict line this round added, so a prefixed line leaves two identical
+markers for one round and makes it read as two.
+
 Then the findings, worst first, then what you checked and what you did not.
 
 - Name the file and the symbol, not a line number: `client_list_map_client()`,
