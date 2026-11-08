@@ -473,21 +473,36 @@ with no argument runs 20 seconds per harness.
 
 **Complexity.** `scripts/check-complexity.sh` runs clang-tidy's
 cognitive-complexity check over the production sources and compares the number
-with `tests/quality/complexity-baseline.txt`, which lists `<function> <number>`
-for everything at 11 or above. A function above its number fails, and so does one
-at or above the floor with no entry: a new god-function arrives with somebody
-deciding the number is acceptable. It writes its own compile database from
-`compile_flags.txt` rather than calling `make compile-commands`, which does a
-full clean build.
+with `tests/quality/complexity-baseline.txt`, which lists
+`<file> <function> <number>` for everything at 11 or above. A function above its
+number fails, and so does one at or above the floor with no entry: a new
+god-function arrives with somebody deciding the number is acceptable. It writes
+its own compile database from `compile_flags.txt` rather than calling `make
+compile-commands`, which does a full clean build.
 
-A set of headers alone passes without a measurement: clang-tidy measures
-nothing in a header it is handed directly, so there is nothing for this gate to
-compare, and a commit that only edits a comment in a header is not a complexity
-change. The "clang-tidy reported nothing" failure stays for a `.c` file that
-produced no measurement, which means the compile database is broken rather than
-the code simple. A function defined in a header, such as
-`config_wire_keybindings` in `src/config/config.wm.def.h`, is therefore not measured
-either.
+The file is part of the key. Keyed by the function name alone, one file's `main`
+exempts another file's up to the same number: the entry was added for the file
+somebody measured, and it silently covered a function nobody had looked at. With
+both parts in the key, a function the baseline does not name in that file fails
+whether or not another file has an entry for the same name.
+
+With no file arguments the gate measures `make -s print-built-src`: every source
+the Makefile compiles, the tools included. `make -s print-src` is not that list,
+and the hook hands the gate the files a commit stages. Neither one holds a file
+nobody touched, so a function that has been over the floor since before the gate
+learned it failed the first commit that edited its file, reading as that commit's
+doing. `tools/xclient.c`'s `main` is at 33 and has an entry: a copy with the
+getopt loop taken out measures `main` at 24, still over the floor, so the entry
+is needed either way. clang-tidy charges a `switch` once and a `case` label
+nothing, so a table of flags is not what makes that number.
+
+A set of headers alone passes without a measurement: clang-tidy counts a header
+that is not the file it was handed as non-user code and reports nothing in it, so
+there is nothing for this gate to compare, and a commit that only edits a comment
+in a header is not a complexity change. The "clang-tidy reported nothing" failure
+stays for a `.c` file that produced no measurement, which means the compile
+database is broken rather than the code simple. A function defined in a header is
+not measured for the same reason, so it never gets an entry.
 
 A file under `tests/` is not measured. clang-tidy charges each `ASSERT`'s
 `if`/`else` as a decision, so a test body's number is its assertion count, and
@@ -497,7 +512,10 @@ for the same reason: a number nobody can act on teaches people to edit the
 baseline by hand instead. `--update-baseline` merges what it measured into the
 entries already recorded rather than rewriting the file, so running it for the
 files a commit changes keeps the rest; an entry goes only when that function was
-measured again and fell below the floor.
+measured again and fell below the floor. A baseline still carrying the old
+`<function> <number>` lines is refused rather than merged: merged, those lines
+have no number and leave the file, which is the silent wipe the merge exists to
+prevent. Key them by file first.
 
 In CI the job runs it with `--advisory`, and the reason is in wm-9n0.30: the same
 commit and the same clang-tidy reported `mod_key_name` at 14 on the author's

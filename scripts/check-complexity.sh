@@ -9,15 +9,24 @@
 # A function at 45 is one where a missing branch is invisible and a wrong one is
 # easy to write.
 #
-# clang-tidy's readability-function-cognitive-complexity reports a function name
-# and a number, so the baseline is a list of names rather than of line numbers
-# that move under every edit. The check needs a compile database; when the tree
-# has none, this builds one.
+# clang-tidy's readability-function-cognitive-complexity reports the file a
+# function was measured in, its name and a number, so a baseline entry is a path,
+# a name and a number rather than a line number that moves under every edit. The
+# file is part of the key: keyed by name alone, one file's `main` exempts every
+# other file's up to the same number, and the entry that made one commit pass hid
+# the function that made the next one fail. The check needs a compile database;
+# when the tree has none, this builds one.
 #
 # A function above its recorded number fails, and a function at or above the
 # floor with no entry fails, so a new one cannot arrive unnoticed. --update
 # merges the measured numbers into the baseline; say in the commit why a number
 # went up.
+#
+# With no file arguments the gate measures every source the Makefile compiles,
+# from `make -s print-built-src`. A list of the files a commit stages is what the
+# hook hands it, and that list never holds a file nobody edited: a function that
+# has been over the floor since before the gate learned it fails the first commit
+# that touches its file, and reads as that commit's doing.
 #
 # A file under tests/ is not measured. clang-tidy charges each ASSERT's if/else
 # as a decision, so a test body's number is its assertion count, and the remedy
@@ -60,7 +69,10 @@ TOOL=$(clang-tidy --version 2>/dev/null | sed -n 's/^ *LLVM version \(.*\)/\1/p'
 TOOL=${TOOL:-unknown}
 
 if [ "${#files[@]}" -eq 0 ]; then
-  mapfile -t files < <(make -s print-src | tr ' ' '\n' | grep -vE '(^|/)wm\.c$' | grep -v '^$')
+  # wm.c is here like everything else. It used to be dropped because its main
+  # would have collided with the name-only entry the tool's main had taken;
+  # an entry names the file now, so two mains are two entries.
+  mapfile -t files < <(make -s print-built-src | tr ' ' '\n' | grep -v '^$')
 fi
 
 skipped_tests=0
@@ -104,21 +116,31 @@ with open(os.path.join(root, "compile_commands.json"), "w") as fh:
     json.dump(entries, fh)
 PY
 
+# The path clang-tidy prints is the one it was handed, made absolute through
+# the compile database. The baseline is read from a checkout that may sit
+# anywhere, so the root prefix comes off and what is left is repo-relative.
+# LC_ALL=C, because the order the entries are written in is committed: a
+# locale-aware sort puts `config.c` before `config-file.c` on one machine and
+# after it on another, so the same update produces a reordered diff.
 measured=$(clang-tidy -p . \
   --checks="-*,readability-function-cognitive-complexity" \
   --config="{CheckOptions: {readability-function-cognitive-complexity.Threshold: 1}}" \
   "${files[@]}" 2>/dev/null |
-  grep -oE "function '[^']+' has cognitive complexity of [0-9]+" |
-  sed -E "s/function '([^']+)' has cognitive complexity of ([0-9]+)/\1 \2/" |
-  sort)
+  sed -nE "s|^(.*):[0-9]+:[0-9]+: warning: function '([^']+)' has cognitive complexity of ([0-9]+).*|\1\t\2\t\3|p" |
+  awk -F'\t' -v root="$ROOT_DIR/" '{
+    path = $1
+    if (index(path, root) == 1)
+      path = substr(path, length(root) + 1)
+    print path, $2, $3
+  }' |
+  LC_ALL=C sort)
 
 if [ -z "$measured" ]; then
-  # clang-tidy measures nothing in a header it is handed directly, so a commit
-  # that touches only headers measures nothing. Failing it sent workers to
-  # --update-baseline with the wrong cause. The guard is for the other case: a
-  # .c that produced no measurement is a broken compile database, not a pass.
-  # The message says "not measured", not "no function body": config.wm.def.h
-  # defines config_wire_keybindings and is still skipped, so a body can be here.
+  # clang-tidy reads a header that is not the file it was handed as non-user
+  # code and reports nothing in it, so a commit that touches only headers
+  # measures nothing. Failing it sent workers to --update-baseline with the
+  # wrong cause. The guard is for the other case: a .c that produced no
+  # measurement is a broken compile database, not a pass.
   if printf '%s\n' "${files[@]}" | grep -qv '\.h$'; then
     echo "check-complexity: clang-tidy reported nothing; the check or the database is wrong" >&2
     exit 1
@@ -134,14 +156,26 @@ if [ "$UPDATE" -eq 1 ]; then
   # production entries went, and the next push failed on all of them. An entry
   # whose function was measured and is now below the floor is dropped, so a
   # split shows.
-  previous=$(awk '!/^#/ && NF { print $1, $2 }' "$BASELINE" 2>/dev/null)
+  #
+  # A line with two fields is an entry from before the key carried the file, and
+  # merged here it would take an empty number and go. That is the silent wipe
+  # this block exists to prevent, so it is refused by name instead.
+  legacy=$(awk '!/^#/ && NF && NF != 3 { print; exit }' "$BASELINE" 2>/dev/null)
+  if [ -n "$legacy" ]; then
+    echo "check-complexity: $BASELINE has an entry that is not '<file> <function> <number>': $legacy" >&2
+    echo "check-complexity: key it by the file the function is measured in before running --update-baseline" >&2
+    exit 1
+  fi
+  previous=$(awk '!/^#/ && NF { print $1, $2, $3 }' "$BASELINE" 2>/dev/null)
   merged=$({
     printf '%s\n' "$previous"
     printf '%s\n' "$measured"
-  } | awk -v floor="$FLOOR" '!/^#/ && NF { value[$1] = $2 } END { for (n in value) if (value[n] >= floor) print n, value[n] }' | sort)
+  } | awk -v floor="$FLOOR" '!/^#/ && NF { value[$1 " " $2] = $3 } END { for (k in value) if (value[k] >= floor) print k, value[k] }' | LC_ALL=C sort)
   {
     echo "# Cognitive complexity per function, from clang-tidy $TOOL."
     echo "# Written by scripts/check-complexity.sh --update-baseline."
+    echo "# Each entry is '<file> <function> <number>'. The file is the one the"
+    echo "# function was measured in, so one file's entry never covers another's."
     echo "# Functions below $FLOOR are not listed. A function above its number fails"
     echo "# the gate; a function at or above $FLOOR with no entry fails it too, which"
     echo "# is the moment somebody decides the number is acceptable."
@@ -150,7 +184,7 @@ if [ "$UPDATE" -eq 1 ]; then
     echo "# count, and no split of a test keeps the assertions."
     printf '%s\n' "$merged"
   } >"$BASELINE"
-  echo "check-complexity: wrote $(awk -v f="$FLOOR" '!/^#/ && $2>=f' "$BASELINE" | wc -l) entries to $BASELINE, $(printf '%s\n' "$measured" | awk -v f="$FLOOR" '$2>=f' | wc -l) measured in this run"
+  echo "check-complexity: wrote $(awk -v f="$FLOOR" '!/^#/ && $3>=f' "$BASELINE" | wc -l) entries to $BASELINE, $(printf '%s\n' "$measured" | awk -v f="$FLOOR" '$3>=f' | wc -l) measured in this run"
   exit 0
 fi
 
@@ -165,16 +199,16 @@ if [ -n "$recorded_tool" ] && [ "$recorded_tool" != "$TOOL" ]; then
 fi
 
 problems=0
-while read -r name value; do
-  [ -z "${name:-}" ] && continue
-  case $name in \#*) continue ;; esac
+while read -r path name value; do
+  [ -z "${path:-}" ] && continue
+  case $path in \#*) continue ;; esac
   [ "${value:-0}" -ge "$FLOOR" ] || continue
-  recorded=$(awk -v n="$name" '$1 == n { print $2 }' "$BASELINE")
+  recorded=$(awk -v p="$path" -v n="$name" '$1 == p && $2 == n { print $3 }' "$BASELINE")
   if [ -z "$recorded" ]; then
-    echo "check-complexity: $name is at $value and has no baseline entry (floor $FLOOR)" >&2
+    echo "check-complexity: $path: $name is at $value and has no baseline entry (floor $FLOOR)" >&2
     problems=$((problems + 1))
   elif [ "$value" -gt "$recorded" ]; then
-    echo "check-complexity: $name went from $recorded to $value" >&2
+    echo "check-complexity: $path: $name went from $recorded to $value" >&2
     problems=$((problems + 1))
   fi
 done <<<"$measured"
