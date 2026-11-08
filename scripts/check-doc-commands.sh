@@ -23,8 +23,13 @@
 #     in this tree holds program output and C, and running that is a guess.
 #   - Only a line that is one simple command: no pipe, `;`, `&&`, `&`,
 #     redirection, `$(...)`, backtick or continuation. A gate reports an exit
-#     status, and a compound line has more than one.
+#     status, and a compound line has more than one. A `|`, `<` or `\` inside
+#     quotes is the program's argument, not shell syntax, and the line is run.
+#     A backtick or `$(` inside double quotes is still shell syntax.
 #   - Not a line carrying <placeholder>, which the reader substitutes.
+#   - The command's standard input is closed. This loop's standard input is the
+#     list of candidates still to run; a command that reads it consumes the next
+#     candidate and the gate reports that command's exit instead.
 #   - Only a first word that reads and exits: rg, grep, `man -w`, or one of the
 #     git subverbs in GIT_READ_ONLY below. The rest of this tree's documented
 #     commands start a session, build, mutate the tree or take minutes (`make
@@ -33,7 +38,8 @@
 #   - Not a command naming a variable this shell does not have. $LIBXCB_SRC is
 #     the dev shell's, so a run outside the shell re-enters it the way
 #     scripts/run-hook.sh does. A variable nothing sets is printed with the
-#     command it left unrun, rather than run against a path that collapsed.
+#     command it left unrun, rather than run against a path that collapsed. A
+#     `$name` inside single quotes is the program's argument, not an expansion.
 #
 # A command that exits non-zero fails the check. It is printed with its
 # document, its line and its output; empty output is printed as the exit status
@@ -127,6 +133,52 @@ doc_candidates() {
       return line
     }
 
+    # 1 when the line is more than one command. A `|` inside quotes is the
+    # program argument: skipping the line would leave that command unchecked,
+    # which is the failure this gate exists to catch. A backtick or `$(` still
+    # counts inside double quotes, because the shell runs it there.
+    function shell_meta(line,   i, n, c, sq, dq) {
+      n = length(line)
+      sq = 0
+      dq = 0
+      for (i = 1; i <= n; i++) {
+        c = substr(line, i, 1)
+        if (sq) {
+          if (c == "\047") sq = 0
+          continue
+        }
+        if (dq) {
+          if (c == "\\") {
+            i++
+            continue
+          }
+          if (c == "\"") {
+            dq = 0
+            continue
+          }
+          if (c == "`") return 1
+          if (c == "$" && substr(line, i + 1, 1) == "(") return 1
+          continue
+        }
+        if (c == "\\") {
+          if (i == n) return 1
+          i++
+          continue
+        }
+        if (c == "\047") {
+          sq = 1
+          continue
+        }
+        if (c == "\"") {
+          dq = 1
+          continue
+        }
+        if (c == "|" || c == "&" || c == ";" || c == "<" || c == ">" || c == "`") return 1
+        if (c == "$" && substr(line, i + 1, 1) == "(") return 1
+      }
+      return 0
+    }
+
     function listed(word, list,   n, i, parts) {
       n = split(list, parts, " ")
       for (i = 1; i <= n; i++) if (parts[i] == word) return 1
@@ -147,8 +199,7 @@ doc_candidates() {
     {
       cmd = trim(unquoted($0))
       if (cmd == "") next
-      if (cmd ~ /[|&;<>`\\]/) next
-      if (cmd ~ /[$][(]/) next
+      if (shell_meta(cmd)) next
       split(cmd, w, /[ \t]+/)
       if (w[1] ~ /=/) next
       if (w[1] == "git") {
@@ -164,15 +215,76 @@ doc_candidates() {
   ' "$1"
 }
 
-# doc_unset_vars <command> - the variable names it expands that this shell does
-# not have. A command the gate cannot run the way its reader would is reported
-# with the variable that stopped it.
+# doc_unset_vars <command> - the variable names the shell would expand that
+# this shell does not have. A `$name` inside single quotes is the program's
+# argument, not an expansion; treating it as unset would skip a command the
+# reader would run.
 doc_unset_vars() {
   local name
   printf '%s\n' "$1" |
-    grep -oE '[$][{]?[A-Za-z_][A-Za-z0-9_]*[}]?' |
-    sed 's/[$]//g; s/[{]//g; s/[}]//g' |
+    awk '
+      function emit(line,   i, n, c, sq, dq, name, j) {
+        n = length(line)
+        i = 1
+        sq = 0
+        dq = 0
+        while (i <= n) {
+          c = substr(line, i, 1)
+          if (sq) {
+            if (c == "\047") sq = 0
+            i++
+            continue
+          }
+          if (c == "\\") {
+            i += 2
+            continue
+          }
+          if (dq && c == "\"") {
+            dq = 0
+            i++
+            continue
+          }
+          if (!dq && c == "\047") {
+            sq = 1
+            i++
+            continue
+          }
+          if (!dq && c == "\"") {
+            dq = 1
+            i++
+            continue
+          }
+          if (c == "$") {
+            c = substr(line, i + 1, 1)
+            if (c == "{") {
+              name = ""
+              j = i + 2
+              if (substr(line, j, 1) ~ /[A-Za-z_]/) {
+                while (j <= n && substr(line, j, 1) ~ /[A-Za-z0-9_]/) {
+                  name = name substr(line, j, 1)
+                  j++
+                }
+                if (substr(line, j, 1) == "}") print name
+              }
+            } else if (c ~ /[A-Za-z_]/) {
+              name = ""
+              j = i + 1
+              while (j <= n && substr(line, j, 1) ~ /[A-Za-z0-9_]/) {
+                name = name substr(line, j, 1)
+                j++
+              }
+              print name
+              i = j
+              continue
+            }
+          }
+          i++
+        }
+      }
+      { emit($0) }
+    ' |
     while IFS= read -r name; do
+      [ -n "$name" ] || continue
       [ -n "${!name:-}" ] || printf '%s\n' "$name"
     done
 }
@@ -194,7 +306,7 @@ for f in "${DOCS[@]}"; do
     cmd=${entry#*$'\t'}
     contributed=1
 
-    unset_vars=$(doc_unset_vars "$cmd")
+    unset_vars=$(doc_unset_vars "$cmd" | sort -u)
     if [ -n "$unset_vars" ]; then
       UNRUN=$((UNRUN + 1))
       printf '  NOT RUN  %s:%s\n' "$f" "$lineno"
@@ -204,7 +316,9 @@ for f in "${DOCS[@]}"; do
       continue
     fi
 
-    output=$(eval "$cmd" 2>&1)
+    # The while loop's stdin is the candidate list. A command that reads stdin
+    # would consume the next candidate and the gate would report that exit.
+    output=$(eval "$cmd" </dev/null 2>&1)
     status=$?
     if [ "$status" -eq 0 ]; then
       RAN=$((RAN + 1))

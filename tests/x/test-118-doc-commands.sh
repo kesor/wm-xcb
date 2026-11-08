@@ -30,11 +30,15 @@ check_eq "the tree as committed passes the check" 0 "$status"
 check_eq "it names docs/TESTING.md, where the rg commands are" 1 "$(grep -c 'docs/TESTING.md' "$out")"
 check_eq "it says how many documents it read" 1 "$(grep -c 'document(s) read' "$out")"
 
-# $LIBXCB_SRC comes from the dev shell. A suite run outside it would leave this
-# command unrun, and the assertions below would pass on a document the gate
-# never executed. Point it at a directory that does not exist when it is
-# missing, so what is pinned is the verdict and not the shell around it.
-export LIBXCB_SRC="${LIBXCB_SRC:-$DIR/no-libxcb-source}"
+# "printed nothing" needs the file to exist and not contain the pattern. The
+# dev shell's libxcb tree does. A missing path makes rg print an error, and the
+# assertion below would fail for the shell rather than the verdict. An empty
+# file is that shape when the tree is not there.
+if [ ! -f "${LIBXCB_SRC:-}/src/xcb_out.c" ]; then
+  mkdir -p "$DIR/libxcb-fixture/src"
+  : >"$DIR/libxcb-fixture/src/xcb_out.c"
+  export LIBXCB_SRC="$DIR/libxcb-fixture"
+fi
 
 # The command the defect printed, in the shape a document writes it.
 BAD="$DIR/bad.md"
@@ -105,5 +109,88 @@ check_eq "it is printed as not run, with the variable named" 1 \
   "$(grep -c 'LIBXCB_SRC is not set' "$DIR/unset.txt")"
 check_eq "and the command itself is printed beside it" 1 \
   "$(grep -cF "rg -n 'REQUEST_CHECKED' \"\$LIBXCB_SRC/src/xcb_out.c\"" "$DIR/unset.txt")"
+
+# A `|` inside the pattern is the pattern, not a pipe. Skipping the line leaves
+# the command unchecked, which is the failure this gate exists to catch.
+cat >"$DIR/quoted-pipe.md" <<'EOF'
+```bash
+rg -n 'REQUEST_CHECKED|NO_SUCH_MACRO_ZZZ' "$LIBXCB_SRC/src/xcb_out.c"
+```
+EOF
+out="$DIR/quoted-pipe.txt"
+"$GATE" "$DIR/quoted-pipe.md" >"$out" 2>&1
+status=$?
+check_eq "a quoted alternation that matches nothing fails the check" 1 "$status"
+check_eq "and the command is printed, not skipped" 1 \
+  "$(grep -cF "rg -n 'REQUEST_CHECKED|NO_SUCH_MACRO_ZZZ'" "$out")"
+
+cat >"$DIR/dq-pipe.md" <<'EOF'
+```bash
+rg -n "REQUEST_CHECKED|NO_SUCH_MACRO_ZZZ" "$LIBXCB_SRC/src/xcb_out.c"
+```
+EOF
+"$GATE" "$DIR/dq-pipe.md" >"$DIR/dq-pipe.txt" 2>&1
+status=$?
+check_eq "a double-quoted alternation is run too" 1 "$status"
+
+cat >"$DIR/quoted-bs.md" <<'EOF'
+```bash
+rg -n 'REQUEST_CHECKED\.nope' "$LIBXCB_SRC/src/xcb_out.c"
+```
+EOF
+"$GATE" "$DIR/quoted-bs.md" >"$DIR/quoted-bs.txt" 2>&1
+status=$?
+check_eq "a backslash inside the pattern is not a continuation" 1 "$status"
+
+# An unquoted pipe is still two commands. The right-hand side must not run.
+PIPE_STAMP="$DIR/pipe-stamp"
+cat >"$DIR/pipe.md" <<EOF
+\`\`\`bash
+rg -n nosuch /dev/null | touch "$PIPE_STAMP"
+\`\`\`
+EOF
+"$GATE" "$DIR/pipe.md" >"$DIR/pipe.txt" 2>&1
+status=$?
+check_eq "an unquoted pipe is not run" 0 "$status"
+check_eq "and its right-hand side did not run" 0 "$([ -e "$PIPE_STAMP" ] && echo 1 || echo 0)"
+
+# A `$(...)` inside double quotes is still shell syntax. The gate must not run it.
+SUB_STAMP="$DIR/sub-stamp"
+cat >"$DIR/sub.md" <<EOF
+\`\`\`bash
+rg -n "\$(touch "$SUB_STAMP")" /dev/null
+\`\`\`
+EOF
+"$GATE" "$DIR/sub.md" >"$DIR/sub.txt" 2>&1
+status=$?
+check_eq "a double-quoted command substitution is not run" 0 "$status"
+check_eq "and it did not run: the stamp is absent" 0 "$([ -e "$SUB_STAMP" ] && echo 1 || echo 0)"
+
+# The loop's stdin is the candidate list. A command that reads it consumes the
+# next line, and a failing command behind it never runs.
+cat >"$DIR/steal.md" <<'EOF'
+```bash
+grep REQUEST_CHECKED
+rg -n 'REQUEST_CHECKED' "$LIBXCB_SRC/src/xcb_out.c"
+```
+EOF
+"$GATE" "$DIR/steal.md" >"$DIR/steal.txt" 2>&1
+status=$?
+check_eq "a command that reads stdin does not hide the next one" 1 "$status"
+check_eq "the swallowed command is still printed" 1 \
+  "$(grep -cF "rg -n 'REQUEST_CHECKED' \"\$LIBXCB_SRC/src/xcb_out.c\"" "$DIR/steal.txt")"
+
+# A `$name` inside single quotes is the pattern, not an expansion. Reporting it
+# as unset skips a command the reader would run.
+cat >"$DIR/sq-var.md" <<'EOF'
+```bash
+rg -n '$NO_SUCH_VAR_ZZZ' "$LIBXCB_SRC/src/xcb_out.c"
+```
+EOF
+env -u NO_SUCH_VAR_ZZZ WM_DOC_COMMANDS_IN_SHELL=1 "$GATE" "$DIR/sq-var.md" >"$DIR/sq-var.txt" 2>&1
+status=$?
+check_eq "a single-quoted \$name is run, not skipped" 1 "$status"
+check_eq "and it is not reported as a variable this shell lacks" 0 \
+  "$(grep -c 'NO_SUCH_VAR_ZZZ is not set' "$DIR/sq-var.txt")"
 
 finish
