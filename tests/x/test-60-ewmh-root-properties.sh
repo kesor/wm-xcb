@@ -98,15 +98,7 @@ else
   fail "a _NET_CURRENT_DESKTOP request left the desktop at $(root_value _NET_CURRENT_DESKTOP)"
 fi
 
-hidden=0
-for _ in $(seq 1 100); do
-  if [ "$(count_viewable)" = "0" ]; then
-    hidden=1
-    break
-  fi
-  sleep 0.02
-done
-if [ "$hidden" = "1" ]; then
+if wait_hidden 2000; then
   pass "the tag the desktop switched away from is off screen"
 else
   fail "a client is still viewable after the desktop switch"
