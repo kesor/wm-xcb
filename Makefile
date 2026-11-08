@@ -216,6 +216,14 @@ hooks:
 print-src:
 	@echo $(SRC)
 
+# Everything the build compiles from C, for the complexity gate: the WM's own
+# list plus the tools. print-src stays the WM's list because check-async reads
+# it, and a tool's event loop is its own - a wait there is what the tool does,
+# not a defect in the WM. The tools are globbed rather than listed, so one
+# added with a rule of its own is measured without an edit here.
+print-built-src:
+	@echo $(SRC) $(wildcard tools/*.c)
+
 print-test-src:
 	@echo $(TEST_SRC)
 
@@ -296,4 +304,4 @@ container-run:
 container-clean:
 	docker rmi $(NAME)
 
-.PHONY: all clean test test-x check-async print-src print-test-src hooks test-standalone test-sm-standalone coverage complexity fuzz check format tidy probe tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE
+.PHONY: all clean test test-x check-async print-src print-built-src print-test-src hooks test-standalone test-sm-standalone coverage complexity fuzz check format tidy probe tools/xclient tools/xcb-ewmh-delay.so container-build container-run container-test container-clean FORCE
