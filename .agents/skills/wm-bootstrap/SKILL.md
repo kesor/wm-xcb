@@ -274,7 +274,9 @@ Two things it cannot decide for you:
   serialised dispatch costs ten minutes (the harness's `PROCESS.md`, "Stagger,
   and check the overlap first").
 - **Review.** Workers commit to `work/<bead-id>` and never push, merge, or close
-  a bead. Merging is a human decision.
+  a bead. The loop merges: under `worker.py drive` and `worker.py auto` an
+  approved branch is merged as soon as the pre-push gates pass, so no person
+  stands between a verdict and the merge.
 
 ## Friction is a bug in the harness
 
