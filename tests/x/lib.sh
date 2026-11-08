@@ -189,21 +189,25 @@ count_viewable() {
 #
 # A count below 1 is refused rather than answered: "at least 0" holds before the
 # loop looks, so it used to return at once, and the assertion a caller built on
-# it passed while the windows were still on screen. Waiting for no window is
+# it passed while the windows were still on screen. A string of zeros is zero
+# to that comparison, not only the spelling "0". Waiting for no window is
 # wait_hidden. The refusal goes to fd 3, the same channel the spawn failure
 # uses, because a caller may have discarded this function's stdout and run.sh
 # counts FAIL lines rather than exit statuses.
 wait_viewable() {
   local want=${1:-0} timeout=${2:-2000} waited=0
+  local refuse=0
   case $want in
-    '' | *[!0-9]* | 0)
-      {
-        fail "wait_viewable: '$want' is not a positive count; at least 0 matches before the first look, so nothing would be waited for. Use wait_hidden for 'none is viewable'"
-        finish
-      } >&3
-      exit 1
-      ;;
+    '' | *[!0-9]* | 0) refuse=1 ;;
+    *) [ "$((10#$want))" -eq 0 ] && refuse=1 ;;
   esac
+  if [ "$refuse" -eq 1 ]; then
+    {
+      fail "wait_viewable: '$want' is not a positive count; at least 0 matches before the first look, so nothing would be waited for. Use wait_hidden for 'none is viewable'"
+      finish
+    } >&3
+    exit 1
+  fi
   while [ "$waited" -lt "$timeout" ]; do
     if [ "$(count_viewable)" -ge "$want" ]; then
       return 0
@@ -215,9 +219,9 @@ wait_viewable() {
 }
 
 # wait_hidden [timeout_ms] - returns 0 once none of this test's windows is
-# viewable. A test that asserts a window left the screen needs this: it has to
-# wait for the WM to answer, and it must not read "not hidden" as "already
-# gone".
+# viewable, including when the count is already zero. A test that asserts a
+# window left the screen has to have seen it first (require_visible); this
+# helper only waits for the count to reach zero.
 wait_hidden() {
   local timeout=${1:-2000} waited=0
   while [ "$waited" -lt "$timeout" ]; do
