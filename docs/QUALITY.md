@@ -496,8 +496,8 @@ getopt loop taken out measures `main` at 24, still over the floor, so the entry
 is needed either way. clang-tidy charges a `switch` once and a `case` label
 nothing, so a table of flags is not what makes that number.
 
-A set of headers alone passes without a measurement: clang-tidy counts a header
-that is not the file it was handed as non-user code and reports nothing in it, so
+A set of headers alone passes without a measurement: clang-tidy treats a header
+other than the file it was handed as non-user code and reports nothing in it, so
 there is nothing for this gate to compare, and a commit that only edits a comment
 in a header is not a complexity change. The "clang-tidy reported nothing" failure
 stays for a `.c` file that produced no measurement, which means the compile
