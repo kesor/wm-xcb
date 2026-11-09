@@ -39,7 +39,8 @@
 # bd whose list output stopped carrying the field.
 #
 # Exit status: 0 when every baselined issue still carries its acceptance text
-# and every other live issue has criteria, 1 otherwise.
+# and every live issue either has criteria or is recorded in the missing
+# baseline, 1 otherwise.
 
 set -uo pipefail
 
