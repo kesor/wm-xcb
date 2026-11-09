@@ -8,13 +8,11 @@
 # protected list: deleting the line by hand leaves that text unprotected,
 # so a wipe of it can be recorded here as debt and the gate will pass.
 wm-dfg.228
-wm-dfg.227
 wm-jpo.7
 wm-dfg.221
 wm-dfg.217
 wm-dfg.215
 wm-jpo.4
-wm-jpo.3
 wm-jpo.1
 wm-jpo
 wm-dfg.205
