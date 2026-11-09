@@ -105,6 +105,17 @@ pre-commit:
       run: ./scripts/check-bead-acceptance.sh
       fail_text: "A beads issue lost the acceptance criteria a baseline says it had, or a live issue has none and no baseline records it: an empty --acceptance prints 'Updated issue' and exits 0. The text before a wipe is in 'bd history <id> --events', under Old:; a bead deliberately left without criteria is recorded by scripts/check-bead-acceptance.sh --update-baseline."
 
+    # The flag above catches the bead after it exists. This catches the recipe
+    # that made it: a document showing `bd create` without --acceptance teaches
+    # the write the gate refuses, and bd's own skill template is one of those
+    # documents. The glob is markdown because a create command reaches a worker
+    # through a document, and the script itself so a change to the rule runs the
+    # rule.
+    bead-create:
+      glob: ["*.md", "scripts/check-bead-create-recipe.sh"]
+      run: ./scripts/check-bead-create-recipe.sh
+      fail_text: "A document shows a `bd create` with no --acceptance, so the bead it files fails the acceptance gate at the next commit. Add the flag, with what a command will show when the work is done."
+
     docs:
       glob: "*.md"
       run: ./scripts/check-docs.sh
@@ -202,6 +213,10 @@ pre-push:
     bead-acceptance:
       run: ./scripts/check-bead-acceptance.sh
       fail_text: "A beads issue lost the acceptance criteria a baseline says it had, or a live issue has none and no baseline records it: an empty --acceptance prints 'Updated issue' and exits 0."
+
+    bead-create:
+      run: ./scripts/check-bead-create-recipe.sh
+      fail_text: "A document shows a `bd create` with no --acceptance, so the bead it files fails the acceptance gate at the next commit."
 
     docs:
       run: ./scripts/check-docs.sh
