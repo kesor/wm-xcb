@@ -214,6 +214,12 @@ The second form is also a test, which is the bar: a criterion no command can
 check does not say what done looks like. A number the bead sets on purpose stays
 - an exit status, a latency budget, a limit.
 
+The criterion is part of the create, not something a later reader adds:
+`bd create ... --acceptance "..."`. `scripts/check-bead-acceptance.sh` fails the
+next commit on a live bead with none that
+`tests/quality/bead-acceptance-missing-baseline.txt` does not record as debt, and
+the create is the only write a worker may make to that field.
+
 A bead that lists seam cases names the test file for each one, or says "no test
 yet" after `grep -l` in `tests/x/`. A case with neither sends the worker to
 re-read and re-run a test that already exists.
