@@ -24,6 +24,11 @@
 #   - a live issue with no criteria that no baseline records, which is the bead
 #     a worker planned from its description;
 #   - a closed issue with none, which is history rather than work;
+#   - a recorded issue that has gained criteria, whose text nothing protects yet,
+#     and a recorded issue that closed or left the tracker, which protects
+#     nothing;
+#   - a protected issue that lost its text while --update-baseline runs, which
+#     must refuse rather than move the bead into the list that accepts it;
 #   - a file that is not an issue list, which is a broken read.
 source "$(dirname "$0")/lib.sh"
 # shellcheck source=../../scripts/lib/bead-acceptance-report.sh
@@ -230,13 +235,25 @@ bead_acceptance_verify_missing "$LIVE" "$MISSING" check-bead-acceptance >"$LAST"
 check_eq "a recorded live bead passes" 0 "$?"
 check_eq "and the pass line counts them" 1 "$(grep -c '4 live issue(s) have no acceptance criteria, all recorded in' "$LAST")"
 
-# An entry whose bead gained criteria is stale: the generator would not write it
-# now. Reported, not failed - the protected baseline holds that text from here.
+# An entry whose bead gained criteria is not harmless: the protected baseline
+# does not carry that text, so until the update moves the id across, a wipe of it
+# would read as recorded debt and pass. The gate fails and says which command
+# moves it.
 printf 'wm-b1\nwm-b2\nwm-b3\nwm-b4\nwm-b6\n' >"$MISSING"
 bead_acceptance_verify_missing "$LIVE" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
-check_eq "a stale entry passes" 0 "$?"
-check_eq "and is reported as stale" 1 "$(grep -c '1 recorded issue(s) are stale' "$LAST")"
-check_eq "and names the file the update drops it from" 1 "$(grep -c -- "--update-baseline drops them from $MISSING" "$LAST")"
+check_eq "a recorded bead that gained criteria fails" 1 "$?"
+check_eq "and is named as unprotected" 1 "$(grep -c 'CRITERIA NOW  wm-b1 (open) has criteria' "$LAST")"
+check_eq "and the failure says the update moves it" 1 "$(grep -c 'update moves them into the protected baseline' "$LAST")"
+check_eq "and that both baselines are staged" 1 "$(grep -c 'Stage both tracked baselines' "$LAST")"
+check_eq "and the still-empty recorded bead is not a failure" 0 "$(grep -c 'NO CRITERIA  wm-b6' "$LAST")"
+
+# An entry that protects nothing - the bead closed, or left the tracker - is
+# dropped by the update rather than failed: the stale hint names the file.
+printf 'wm-b5\nwm-b9\nwm-b2\nwm-b3\nwm-b4\nwm-b6\n' >"$MISSING"
+bead_acceptance_verify_missing "$LIVE" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "a closed entry and a gone entry pass" 0 "$?"
+check_eq "and are reported as stale" 1 "$(grep -c '2 recorded issue(s) closed or left the tracker' "$LAST")"
+check_eq "and names the file the update drops them from" 1 "$(grep -c -- "--update-baseline drops them from $MISSING" "$LAST")"
 
 # A list of closed beads only is a clean answer, not a silent one.
 CLOSED_ONLY="$DIR/closed-only.json"
@@ -261,14 +278,114 @@ check_eq "and the generator line names the command" 1 \
 bead_acceptance_verify_missing "$LIVE" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
 check_eq "a list written from the tracker accepts that tracker" 0 "$?"
 
-# Both files are read by the one gate, and both halves run whatever the first
-# answers: one commit can wipe a bead and create one, and the reader should not
-# learn about the second at the next commit.
-check_eq "the gate names the missing baseline as a tracked file" 1 \
-  "$(grep -c '^MISSING_BASELINE=.*tests/quality/bead-acceptance-missing-baseline.txt' "$ROOT_DIR/scripts/check-bead-acceptance.sh")"
-check_eq "the gate runs the missing half on the tracker" 1 \
-  "$(grep -c "bead_acceptance_verify_missing \"\$ISSUES\" \"\$MISSING_BASELINE\"" "$ROOT_DIR/scripts/check-bead-acceptance.sh")"
-check_eq "and the update writes both lists" 1 \
-  "$(grep -c "bead_acceptance_write_missing_baseline \"\$MISSING_BASELINE\" \"\$ISSUES\"" "$ROOT_DIR/scripts/check-bead-acceptance.sh")"
+# The protected generator must not be a way out of a wipe. An id it protects that
+# still exists and carries no text is the change the gate exists to catch, and
+# regenerating over it would move the bead into the missing list and turn the
+# gate green. An id the tracker no longer carries is dropped: that is the one
+# repair the command has to be able to make.
+PROTECTED="$DIR/protected-baseline.txt"
+printf '# Protected.\nwm-b1\nwm-b2\nwm-b9\n' >"$PROTECTED"
+bead_acceptance_write_baseline "$PROTECTED" "$LIVE" check-bead-acceptance >"$LAST" 2>&1
+check_eq "the generator refuses over a wipe" 1 "$?"
+check_eq "and names the id it would have dropped" 1 "$(grep -c 'WOULD DROP  wm-b2' "$LAST")"
+check_eq "and says the text is in the history" 1 "$(grep -c "bd history <id> --events', under Old:" "$LAST")"
+check_eq "and says nothing was written" 1 "$(grep -c '^Nothing was written.$' "$LAST")"
+check_eq "and the file is unchanged" 'wm-b1 wm-b2 wm-b9' "$(grep -v '^#' "$PROTECTED" | tr '\n' ' ' | sed 's/ $//')"
+
+printf '# Protected.\nwm-a1\nwm-a9\nwm-a2\n' >"$PROTECTED"
+bead_acceptance_write_baseline "$PROTECTED" "$KEPT" check-bead-acceptance >"$LAST" 2>&1
+check_eq "an id the tracker no longer carries is dropped" 0 "$?"
+check_eq "and the surviving ids are the ones with text" 'wm-a1 wm-a2' "$(grep -v '^#' "$PROTECTED" | tr '\n' ' ' | sed 's/ $//')"
+
+# --- the two shapes the review found, end to end ----------------------------
+#
+# A recorded bead that gains criteria must not be able to lose them without the
+# gate failing, and the update is what makes that true: after it runs, the id is
+# in the protected list, so a wipe is named there.
+SEQ="$DIR/sequence"
+mkdir -p "$SEQ"
+SEQ_PROTECTED="$SEQ/protected.txt"
+SEQ_MISSING="$SEQ/missing.txt"
+printf '# Protected.\nwm-c1\n' >"$SEQ_PROTECTED"
+printf '# Recorded.\nwm-c2\n' >"$SEQ_MISSING"
+GAINED="$DIR/gained.json"
+cat >"$GAINED" <<'EOF'
+[
+  {"id": "wm-c1", "status": "open", "title": "protected", "acceptance_criteria": "tiled"},
+  {"id": "wm-c2", "status": "open", "title": "was recorded as having none", "acceptance_criteria": "tiled too"}
+]
+EOF
+bead_acceptance_verify_missing "$GAINED" "$SEQ_MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "a gained criterion fails before the update" 1 "$?"
+bead_acceptance_write_baseline "$SEQ_PROTECTED" "$GAINED" check-bead-acceptance >/dev/null 2>&1
+bead_acceptance_write_missing_baseline "$SEQ_MISSING" "$GAINED"
+check_eq "the update moves the id into the protected list" 'wm-c1 wm-c2' \
+  "$(grep -v '^#' "$SEQ_PROTECTED" | tr '\n' ' ' | sed 's/ $//')"
+check_eq "and out of the missing one" '' "$(grep -v '^#' "$SEQ_MISSING")"
+bead_acceptance_verify_missing "$GAINED" "$SEQ_MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "and the gate is green afterwards" 0 "$?"
+
+WIPED_BACK="$DIR/wiped-back.json"
+cat >"$WIPED_BACK" <<'EOF'
+[
+  {"id": "wm-c1", "status": "open", "title": "protected", "acceptance_criteria": "tiled"},
+  {"id": "wm-c2", "status": "open", "title": "was recorded as having none"}
+]
+EOF
+bead_acceptance_verify "$WIPED_BACK" "$SEQ_PROTECTED" check-bead-acceptance >"$LAST" 2>&1
+check_eq "the gained criterion is now protected from a wipe" 1 "$?"
+check_eq "and the wipe is named" 1 "$(grep -c 'NO ACCEPTANCE  wm-c2 (open) was recorded as having none' "$LAST")"
+
+# --- the gate itself, end to end --------------------------------------------
+#
+# The wrapper is what decides that one run carries both verdicts, so it is run
+# rather than grepped: a first half that fails must not stop the second naming
+# the bead it found. It reads the tracker, so it is run against a copy of the
+# two files and a stand-in bd that answers with a recorded list.
+WRAP="$DIR/wrap"
+rm -rf "$WRAP"
+mkdir -p "$WRAP/scripts/lib" "$WRAP/tests/quality" "$DIR/bin"
+cp "$ROOT_DIR/scripts/check-bead-acceptance.sh" "$WRAP/scripts/"
+cp "$ROOT_DIR/scripts/lib/bead-acceptance-report.sh" "$WRAP/scripts/lib/"
+cat >"$DIR/bin/bd" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  list*) cat "$STUB_ISSUES" ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$DIR/bin/bd"
+
+# wm-w1 is protected and gone from the tracker, so the first half fails; wm-w2 is
+# live with no criteria and in no baseline, so the second fails too.
+WRAP_ISSUES="$DIR/wrap-issues.json"
+cat >"$WRAP_ISSUES" <<'EOF'
+[
+  {"id": "wm-w2", "status": "open", "title": "created with none"},
+  {"id": "wm-w3", "status": "open", "title": "protected", "acceptance_criteria": "tiled"}
+]
+EOF
+printf '# Protected.\nwm-w1\nwm-w3\n' >"$WRAP/tests/quality/bead-acceptance-baseline.txt"
+printf '# Recorded.\n' >"$WRAP/tests/quality/bead-acceptance-missing-baseline.txt"
+STUB_ISSUES="$WRAP_ISSUES" PATH="$DIR/bin:$PATH" "$WRAP/scripts/check-bead-acceptance.sh" >"$LAST" 2>&1
+check_eq "one run fails on the wiped and the new bead" 1 "$?"
+check_eq "the wiped bead is named" 1 "$(grep -c 'NOT IN THE TRACKER  wm-w1' "$LAST")"
+check_eq "and the new bead is named in the same run" 1 "$(grep -c 'NO CRITERIA  wm-w2 (open)' "$LAST")"
+
+# The same wrapper, with the update: a protected bead that still exists and lost
+# its text stops the run, and neither tracked file is rewritten.
+WRAP_WIPED="$DIR/wrap-wiped.json"
+cat >"$WRAP_WIPED" <<'EOF'
+[
+  {"id": "wm-w3", "status": "open", "title": "protected"},
+  {"id": "wm-w4", "status": "open", "title": "new bead with none"}
+]
+EOF
+printf '# Protected.\nwm-w3\n' >"$WRAP/tests/quality/bead-acceptance-baseline.txt"
+STUB_ISSUES="$WRAP_WIPED" PATH="$DIR/bin:$PATH" "$WRAP/scripts/check-bead-acceptance.sh" --update-baseline >"$LAST" 2>&1
+check_eq "the update refuses over a wipe" 1 "$?"
+check_eq "and names the id it would have dropped" 1 "$(grep -c 'WOULD DROP  wm-w3' "$LAST")"
+check_eq "and leaves the protected list as it was" 'wm-w3' "$(grep -v '^#' "$WRAP/tests/quality/bead-acceptance-baseline.txt")"
+check_eq "and writes no missing list" '' "$(grep -v '^#' "$WRAP/tests/quality/bead-acceptance-missing-baseline.txt")"
 
 finish

@@ -22,9 +22,14 @@
 #     the live issues that had none when the second half landed. An issue
 #     missing from here that carries no criteria fails the commit: a bead
 #     written without them leaves the worker, and the review, nothing to check
-#     done against, and nothing else in the tree looks at that field.
+#     done against, and nothing else in the tree looks at that field. An entry
+#     whose bead has since gained criteria fails too, until the update moves it
+#     into the protected list, because until then nothing protects that text.
 #
-# --update-baseline writes both, from the same read of the tracker.
+# --update-baseline writes both, from the same read of the tracker, and refuses
+# when the protected list holds an id that still exists with no text: that is a
+# wipe, and regenerating over it is moving the bead the gate is failing on into
+# the list that accepts it.
 #
 # The list comes from the tracker, so the check skips cleanly where there is no
 # database (CI, a fresh clone), the same way scripts/check-bead-descriptions.sh
@@ -104,7 +109,11 @@ fi
 . "$ROOT_DIR/scripts/lib/bead-acceptance-report.sh"
 
 if [ "$UPDATE" -eq 1 ]; then
-  bead_acceptance_write_baseline "$BASELINE" "$ISSUES"
+  # The missing list is written only after the protected one, so a wipe refuses
+  # the whole update instead of leaving the two files describing different trees.
+  if ! bead_acceptance_write_baseline "$BASELINE" "$ISSUES" check-bead-acceptance; then
+    exit 1
+  fi
   bead_acceptance_write_missing_baseline "$MISSING_BASELINE" "$ISSUES"
   echo "check-bead-acceptance: wrote $BASELINE and $MISSING_BASELINE from the tracker; read them before committing"
   exit 0

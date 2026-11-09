@@ -8,6 +8,9 @@
 # bd omits the field when it is empty, so a wipe and a bead that never
 # had acceptance criteria are the same output; this list is the record of
 # which is which. Regenerate it after a bead gains acceptance criteria.
+# An id that still exists with no text is a wipe: the command refuses to
+# regenerate until the text is back, so this list only shrinks when an id
+# leaves the tracker.
 wm-46k.33
 wm-46k.32
 wm-46k.31
