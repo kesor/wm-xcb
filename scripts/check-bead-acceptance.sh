@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# check-bead-acceptance.sh - fail when acceptance criteria a baseline lists are gone.
+# check-bead-acceptance.sh - fail when criteria a baseline lists are gone, or a
+# live bead has none at all.
 #
 # Usage: scripts/check-bead-acceptance.sh [--update-baseline] [-v|--verbose]
 #
@@ -11,10 +12,24 @@
 # refuse an empty body with, so the erasure is silent on the way in as well.
 #
 # bd omits the key when the field is empty, so the tracker output cannot tell a
-# wipe from a bead that never had acceptance criteria. The baseline in
-# tests/quality/ holds the ids that had text when the gate landed, and that is
-# what this protects: one of those with empty text, whitespace only, or missing
-# from the list entirely fails the commit and is named.
+# wipe from a bead that never had acceptance criteria, and the two need separate
+# baselines:
+#
+#   tests/quality/bead-acceptance-baseline.txt
+#     the ids that had text when the gate landed. One of those with empty text,
+#     whitespace only, or missing from the list entirely fails the commit.
+#   tests/quality/bead-acceptance-missing-baseline.txt
+#     the live issues that had none when the second half landed. An issue
+#     missing from here that carries no criteria fails the commit: a bead
+#     written without them leaves the worker, and the review, nothing to check
+#     done against, and nothing else in the tree looks at that field. An entry
+#     whose bead has since gained criteria fails too, until the update moves it
+#     into the protected list, because until then nothing protects that text.
+#
+# --update-baseline writes both, from the same read of the tracker, and refuses
+# when the protected list holds an id that still exists with no text: that is a
+# wipe, and regenerating over it is moving the bead the gate is failing on into
+# the list that accepts it.
 #
 # The list comes from the tracker, so the check skips cleanly where there is no
 # database (CI, a fresh clone), the same way scripts/check-bead-descriptions.sh
@@ -23,8 +38,9 @@
 # a worktree usually has only the tracker, and the export is the fallback for a
 # bd whose list output stopped carrying the field.
 #
-# Exit status: 0 when every baselined issue still carries its acceptance text, 1
-# otherwise.
+# Exit status: 0 when every baselined issue still carries its acceptance text
+# and every live issue either has criteria or is recorded in the missing
+# baseline, 1 otherwise.
 
 set -uo pipefail
 
@@ -32,6 +48,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR" || exit 1
 
 BASELINE="$ROOT_DIR/tests/quality/bead-acceptance-baseline.txt"
+MISSING_BASELINE="$ROOT_DIR/tests/quality/bead-acceptance-missing-baseline.txt"
 VERBOSE=0
 UPDATE=0
 for arg in "$@"; do
@@ -93,10 +110,20 @@ fi
 . "$ROOT_DIR/scripts/lib/bead-acceptance-report.sh"
 
 if [ "$UPDATE" -eq 1 ]; then
-  bead_acceptance_write_baseline "$BASELINE" "$ISSUES"
-  echo "check-bead-acceptance: wrote $BASELINE from the tracker; read it before committing"
+  # The missing list is written only after the protected one, so a wipe refuses
+  # the whole update instead of leaving the two files describing different trees.
+  if ! bead_acceptance_write_baseline "$BASELINE" "$ISSUES" check-bead-acceptance; then
+    exit 1
+  fi
+  bead_acceptance_write_missing_baseline "$MISSING_BASELINE" "$ISSUES"
+  echo "check-bead-acceptance: wrote $BASELINE and $MISSING_BASELINE from the tracker; read them before committing"
   exit 0
 fi
 
-BEAD_ACCEPTANCE_VERBOSE=$VERBOSE
-bead_acceptance_verify "$ISSUES" "$BASELINE" check-bead-acceptance
+# Both halves run whatever the first answers: a commit that wipes one bead's
+# criteria and creates another without any is one reader paying for one commit,
+# and the second FAIL line is what says so.
+STATUS=0
+BEAD_ACCEPTANCE_VERBOSE=$VERBOSE bead_acceptance_verify "$ISSUES" "$BASELINE" check-bead-acceptance || STATUS=1
+BEAD_ACCEPTANCE_VERBOSE=$VERBOSE bead_acceptance_verify_missing "$ISSUES" "$MISSING_BASELINE" check-bead-acceptance || STATUS=1
+exit "$STATUS"

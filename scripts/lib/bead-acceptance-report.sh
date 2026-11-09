@@ -1,11 +1,18 @@
 # shellcheck shell=bash
 #
 # lib/bead-acceptance-report.sh - judge a list of issues for acceptance criteria
-# that went missing.
+# that went missing, and for issues that never had any.
 #
 # Sourced by scripts/check-bead-acceptance.sh, which reads the list from the
 # tracker, and by tests/x/test-110-bead-acceptance-report.sh, which feeds this
 # recorded JSON instead of needing a database.
+#
+# It answers two questions, and each has a baseline of its own because they are
+# not the same question. `bead_acceptance_verify` asks whether a bead that had
+# criteria still has them, and tests/quality/bead-acceptance-baseline.txt is the
+# record of which did. `bead_acceptance_verify_missing` asks whether a live bead
+# has any at all, and tests/quality/bead-acceptance-missing-baseline.txt is the
+# debt that existed when that question started being asked.
 #
 # `bd update <id> --acceptance ""` prints "Updated issue" and exits 0, and so
 # does `--acceptance "$(...)"` when the substitution produced nothing. Unlike
@@ -28,12 +35,64 @@ bead_acceptance_with_text() {
     | @tsv' "$1"
 }
 
-# bead_acceptance_write_baseline <baseline> <issues-json>
-#   Records every issue that has acceptance text now. The list is not debt the
-#   way the description baseline is: a bead missing from it is simply not
-#   checked, so run the update when a bead gains criteria.
+# bead_acceptance_without_text <issues-json>
+#   The same row for every issue that is still live and whose criteria carry no
+#   text, where live is anything but closed: the criteria a closed bead never
+#   had are history, and a commit that has work to make is not the place to
+#   argue with history.
+bead_acceptance_without_text() {
+  jq -r '.[]
+    | select((.status // "open") != "closed")
+    | select(((.acceptance_criteria // "") | test("\\S")) | not)
+    | [.id, (.status // "?"), ((.title // "") | gsub("[\\t\\n]"; " "))]
+    | @tsv' "$1"
+}
+
+# bead_acceptance_write_baseline <baseline> <issues-json> <gate>
+#   Writes the ids that carry acceptance text now. Returns 1 and writes nothing
+#   when an id the file protects still exists in the tracker and currently
+#   carries no text: that is a wipe, and regenerating over it would move the bead
+#   into the missing baseline and turn the gate green on the one change it exists
+#   to catch. An id the tracker no longer carries is dropped, and that is the one
+#   repair this command has to be able to make.
 bead_acceptance_write_baseline() {
-  local baseline=$1 issues=$2
+  local baseline=$1 issues=$2 gate=$3
+  local -A protected=() exists=() text=()
+  local id line
+  if [ -f "$baseline" ]; then
+    while IFS= read -r line; do
+      case "$line" in '' | '#'*) continue ;; esac
+      protected["$line"]=1
+    done <"$baseline"
+  fi
+  while IFS= read -r id; do
+    [ -n "$id" ] && exists["$id"]=1
+  done < <(jq -r '.[].id' "$issues")
+  while IFS=$'\t' read -r id _; do
+    [ -n "$id" ] && text["$id"]=1
+  done < <(bead_acceptance_with_text "$issues")
+
+  local -a wiped=()
+  for id in "${!protected[@]}"; do
+    [ -n "${exists[$id]:-}" ] || continue
+    [ -n "${text[$id]:-}" ] && continue
+    wiped+=("$id")
+  done
+  if [ "${#wiped[@]}" -gt 0 ]; then
+    mapfile -t wiped < <(printf '%s\n' "${wiped[@]}" | sort)
+    for id in "${wiped[@]}"; do
+      printf '  WOULD DROP  %s\n' "$id"
+    done
+    echo "$gate: ${#wiped[@]} protected issue(s) still exist and carry no acceptance text."
+    echo "Regenerating the baseline over a wipe is what the baseline exists to prevent:"
+    echo "the id would move into the missing baseline and the gate would pass. The text"
+    echo "before the wipe is in 'bd history <id> --events', under Old:. Write it back,"
+    echo "which is the only write path --acceptance has:"
+    echo "  bd update <id> --acceptance 'text from bd history'"
+    echo "Nothing was written."
+    return 1
+  fi
+
   mkdir -p "$(dirname "$baseline")"
   {
     echo "# Beads issues whose acceptance criteria the check protects."
@@ -46,7 +105,33 @@ bead_acceptance_write_baseline() {
     echo "# bd omits the field when it is empty, so a wipe and a bead that never"
     echo "# had acceptance criteria are the same output; this list is the record of"
     echo "# which is which. Regenerate it after a bead gains acceptance criteria."
+    echo "# An id that still exists with no text is a wipe: the command refuses to"
+    echo "# regenerate until the text is back, so this list only shrinks when an id"
+    echo "# leaves the tracker."
     bead_acceptance_with_text "$issues" | cut -f1
+  } >"$baseline"
+}
+
+# bead_acceptance_write_missing_baseline <baseline> <issues-json>
+#   Records every live issue that carries no acceptance criteria now. bd writes
+#   no key for the empty field, so an issue whose criteria were never written
+#   and one that lost them are the same output: without this list the first
+#   shape is invisible, and the worker plans a bead whose only record of done is
+#   its description.
+bead_acceptance_write_missing_baseline() {
+  local baseline=$1 issues=$2
+  mkdir -p "$(dirname "$baseline")"
+  {
+    echo "# Beads issues with no acceptance criteria, which the check accepts."
+    echo "#"
+    echo "# Generated by scripts/check-bead-acceptance.sh --update-baseline."
+    echo "#"
+    echo "# An issue missing from here that carries no criteria fails the gate."
+    echo "# An entry whose bead still has none does not fail. An entry whose bead"
+    echo "# has gained criteria fails until --update-baseline moves the id into the"
+    echo "# protected list: deleting the line by hand leaves that text unprotected,"
+    echo "# so a wipe of it can be recorded here as debt and the gate will pass."
+    bead_acceptance_without_text "$issues" | cut -f1
   } >"$baseline"
 }
 
@@ -170,5 +255,124 @@ bead_acceptance_verify() {
     echo "A baselined id the list does not carry is not a pass: read it with"
     echo "'bd show <id>', and --update-baseline when the id in the baseline is wrong."
   fi
+  return 1
+}
+
+# bead_acceptance_verify_missing <issues-json> <baseline> <gate>
+#   0 when every live issue carries acceptance criteria or is recorded in the
+#   baseline as one that has none, 1 when a live issue has none and nothing
+#   records it, or a recorded issue has gained criteria, printing which.
+bead_acceptance_verify_missing() {
+  local issues=$1 baseline=$2 gate=$3
+  local total
+
+  if ! total=$(jq -r 'if type == "array" then length else error("not an array") end' "$issues" 2>/dev/null); then
+    echo "$gate: $issues is not a JSON array of issues, so nothing was read"
+    return 1
+  fi
+
+  local -A known=() seen=() status_of=() title_of=() intact_of=()
+  local line
+  if [ -f "$baseline" ]; then
+    while IFS= read -r line; do
+      case "$line" in '' | '#'*) continue ;; esac
+      known["$line"]=1
+    done <"$baseline"
+  fi
+
+  local id status title
+  while IFS=$'\t' read -r id status title; do
+    [ -n "$id" ] || continue
+    status_of["$id"]=$status
+    title_of["$id"]=$title
+  done < <(jq -r '.[]
+    | [.id, (.status // "?"), ((.title // "") | gsub("[\\t\\n]"; " "))]
+    | @tsv' "$issues")
+  while IFS=$'\t' read -r id _; do
+    [ -n "$id" ] && intact_of["$id"]=1
+  done < <(bead_acceptance_with_text "$issues")
+
+  local -a without=()
+  mapfile -t without < <(bead_acceptance_without_text "$issues")
+
+  local new=0 id2
+  for line in "${without[@]}"; do
+    [ -n "$line" ] || continue
+    IFS=$'\t' read -r id status title <<<"$line"
+    seen["$id"]=1
+    if [ -n "${known[$id]:-}" ]; then
+      [ "${BEAD_ACCEPTANCE_VERBOSE:-0}" -eq 1 ] && printf '  recorded  %s\n' "$id"
+      continue
+    fi
+    new=$((new + 1))
+    printf '  NO CRITERIA  %s (%s) %s\n' "$id" "$status" "$title"
+  done
+
+  # An entry whose bead now carries criteria is not stale in the harmless sense:
+  # the protected baseline does not carry that text yet, so until the update
+  # moves the id across, a wipe of it would pass as recorded debt. An entry whose
+  # bead closed or left the tracker protects nothing and is dropped.
+  local -a promote=() stale=()
+  for id2 in "${!known[@]}"; do
+    [ -z "${seen[$id2]:-}" ] || continue
+    if [ -n "${intact_of[$id2]:-}" ] && [ "${status_of[$id2]:-closed}" != "closed" ]; then
+      promote+=("$id2")
+    else
+      stale+=("$id2")
+    fi
+  done
+  if [ "${#promote[@]}" -gt 0 ]; then
+    mapfile -t promote < <(printf '%s\n' "${promote[@]}" | sort)
+  fi
+  if [ "${#stale[@]}" -gt 0 ]; then
+    mapfile -t stale < <(printf '%s\n' "${stale[@]}" | sort)
+  fi
+
+  # The path is printed relative to the tree when it is inside it: a worker reads
+  # the gate's line to know which tracked file to stage, and an absolute path
+  # under a worktree is the same file with the checkout's name in front of it.
+  local shown=$baseline
+  if [ -n "${ROOT_DIR:-}" ]; then
+    shown=${baseline#"$ROOT_DIR"/}
+  fi
+  local stale_hint=""
+  if [ "${#stale[@]}" -gt 0 ]; then
+    stale_hint="$gate: ${#stale[@]} recorded issue(s) closed or left the tracker; scripts/check-bead-acceptance.sh --update-baseline drops them from $shown"
+  fi
+
+  if [ "$new" -eq 0 ] && [ "${#promote[@]}" -eq 0 ]; then
+    if [ "${#without[@]}" -eq 0 ]; then
+      echo "$gate: $total issue(s), every live one carrying acceptance criteria"
+    else
+      echo "$gate: ${#without[@]} live issue(s) have no acceptance criteria, all recorded in $shown"
+    fi
+    [ -n "$stale_hint" ] && echo "$stale_hint"
+    return 0
+  fi
+
+  for id in "${promote[@]}"; do
+    printf '  CRITERIA NOW  %s (%s) %s\n' "$id" "${status_of[$id]}" "${title_of[$id]}"
+  done
+  if [ "$new" -gt 0 ]; then
+    echo "$gate: $new live issue(s) carry no acceptance criteria, and no baseline records them."
+    echo "A bead written without them leaves the worker, and the review after it,"
+    echo "nothing to check done against: the worker plans from the description, and"
+    echo "this gate cannot tell that bead from one whose criteria were wiped, because"
+    echo "bd writes no key for an empty field. Write them, through the one write path"
+    echo "--acceptance has:"
+    echo "  bd update <id> --acceptance 'what done looks like'"
+    echo "A bead meant to stay without them is recorded deliberately by the update"
+    echo "that writes both baselines:"
+    echo "  scripts/check-bead-acceptance.sh --update-baseline"
+    echo "$shown is a tracked file to stage in the commit that created the bead."
+  fi
+  if [ "${#promote[@]}" -gt 0 ]; then
+    echo "$gate: ${#promote[@]} recorded issue(s) carry acceptance criteria now, so $shown"
+    echo "still calls them beads without any, and a wipe of that text would pass. The"
+    echo "update moves them into the protected baseline:"
+    echo "  scripts/check-bead-acceptance.sh --update-baseline"
+    echo "Stage both tracked baselines in the commit that wrote the criteria."
+  fi
+  [ -n "$stale_hint" ] && echo "$stale_hint"
   return 1
 }

@@ -98,10 +98,12 @@ pre-commit:
     # The same wipe on the other free-form field a rewrite goes through. There is
     # no stdin form for --acceptance, so nothing in bd refuses an empty value, and
     # bd omits the key when it is empty: only the baseline can tell a wipe from a
-    # bead that never had criteria.
+    # bead that never had criteria. That second shape is the other baseline's
+    # question - a live bead with no criteria is named where it is made, because
+    # bd create is not in this tree and cannot be made to refuse the field.
     bead-acceptance:
       run: ./scripts/check-bead-acceptance.sh
-      fail_text: "A beads issue lost the acceptance criteria a baseline says it had: an empty --acceptance prints 'Updated issue' and exits 0. The text before a wipe is in 'bd history <id> --events', under Old:."
+      fail_text: "A beads issue lost the acceptance criteria a baseline says it had, or a live issue has none and no baseline records it: an empty --acceptance prints 'Updated issue' and exits 0. The text before a wipe is in 'bd history <id> --events', under Old:; a bead deliberately left without criteria is recorded by scripts/check-bead-acceptance.sh --update-baseline."
 
     docs:
       glob: "*.md"
@@ -199,7 +201,7 @@ pre-push:
 
     bead-acceptance:
       run: ./scripts/check-bead-acceptance.sh
-      fail_text: "A beads issue lost the acceptance criteria a baseline says it had: an empty --acceptance prints 'Updated issue' and exits 0."
+      fail_text: "A beads issue lost the acceptance criteria a baseline says it had, or a live issue has none and no baseline records it: an empty --acceptance prints 'Updated issue' and exits 0."
 
     docs:
       run: ./scripts/check-docs.sh
