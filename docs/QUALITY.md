@@ -118,7 +118,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it. `--update-baseline` refuses to record an id the baseline does not already hold, because that entry would accept the finding |
 | bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text. The other half reads `tests/quality/bead-acceptance-missing-baseline.txt`: a live issue with no criteria that no baseline records fails the commit, so a bead written without them is named where it is made instead of leaving the worker to plan from the description, and a recorded issue that has gained criteria fails until it is protected too. `--update-baseline` refuses to regenerate over a protected id that still exists with no text |
-| bead create recipe | `scripts/check-bead-create-recipe.sh` | every `bd create` a tracked document shows carries `--acceptance`, read the way the shell reads it: a trailing backslash continues the command and so does a double-quoted argument left open. A recipe is a command that starts a line, or follows a backtick, with a flag or a quoted title after the name; a sentence about the command is not one, and neither is a reference to its help text. The acceptance gate refuses the bead a recipe files, and `.agents/skills/beads/SKILL.md` is written by `bd setup codex` from a template that has no flag |
+| bead create recipe | `scripts/check-bead-create-recipe.sh` | every `bd create` a tracked document shows carries `--acceptance` as the option, not as the word in a description or a comment, read the way the shell reads it: a trailing backslash continues the command, unless that backslash is escaped, and so does a quoted argument left open. A recipe is a command that starts a line, or follows a backtick, with a flag or a quoted title after the name; a sentence about the command is not one, and neither is a reference to its help text. The acceptance gate refuses the bead a recipe files, and `.agents/skills/beads/SKILL.md` is written by `bd setup codex` from a template that has no flag |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
@@ -423,15 +423,19 @@ that created the bead.
 this one refuses the recipe that files it, at the commit that teaches it.
 
 A shell command runs past the end of its line, so a recipe is read whole: a
-trailing backslash continues it, and so does a double-quoted argument left open,
-which is how a multi-line `--description` reads. Judging one line at a time
-would fail `.agents/skills/wm-5s/SKILL.md`, whose `--acceptance` sits further
-down its command than its `bd create`.
+trailing backslash continues it, unless that backslash is itself escaped, and so
+does a quoted argument left open, single or double, which is how a multi-line
+`--description` reads. Judging one line at a time would fail
+`.agents/skills/wm-5s/SKILL.md`, whose `--acceptance` sits further down its
+command than its `bd create`. A command still open at the end of the file is
+judged there; dropping it would report the file clean.
 
-A recipe is a command, not the words. `bd create` counts when it starts a line
-or follows a backtick, with a flag or a quoted title after the name, so the
-sentences in `AGENTS.md` and `docs/` that name the command without running it
-are not findings, and neither is `bd create --help`. The recipes are read from
+`--acceptance` counts when it is the option: a token of its own, or
+`--acceptance=...`. The word in a description, a comment, or a longer flag name
+does not. A recipe is a command, not the words. `bd create` counts when it
+starts a line or follows a backtick, with a flag or a quoted title after the
+name, so the sentences in `AGENTS.md` and `docs/` that name the command without
+running it are not findings, and neither is `bd create --help`. The recipes are read from
 the tracked markdown, because a create command reaches a worker through a
 document and not through code; `vendor/` and `docs/archive/` are skipped for the
 reason `scripts/check-docs.sh` skips them.

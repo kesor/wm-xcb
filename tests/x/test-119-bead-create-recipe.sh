@@ -9,9 +9,16 @@
 #
 #   - a recipe in a code block, with and without the flag;
 #   - a command that runs past its line, by a trailing backslash and by a
-#     double-quoted argument left open, where judging one line fails a recipe
-#     that carries the flag further down;
+#     quoted argument left open, where judging one line fails a recipe that
+#     carries the flag further down;
+#   - the word --acceptance in a description, a comment, or a longer flag name,
+#     which is not the option;
+#   - a single-quoted title, and a single-quoted argument left open;
+#   - a command still open at the end of its file, including one that the next
+#     file would otherwise swallow unjudged;
+#   - a trailing backslash that is escaped, which does not continue the command;
 #   - a sentence about the command, which is not a recipe;
+#   - a word after the name, which is not a recipe either;
 #   - a recipe written inside a sentence, in backticks, which is;
 #   - the tree as committed, which every worker copies from.
 source "$(dirname "$0")/lib.sh"
@@ -125,6 +132,118 @@ EOF
 )
 out=$(gate "$HELP")
 check_eq "a document that points at the help text is not a recipe" 0 "$?"
+
+# The word is not the option. A description, a comment, or a longer flag name
+# that contains the letters used to satisfy index() and leave the recipe clean.
+MENTIONED=$(doc mentioned.md <<'EOF'
+bd create "title" --description "the text mentions --acceptance but the flag is absent" --type=task
+EOF
+)
+out=$(gate "$MENTIONED")
+check_eq "the word in a description is not the option" 1 "$?"
+check_eq "and that recipe is named" 1 "$(printf '%s' "$out" | grep -c "NO ACCEPTANCE .*$MENTIONED:3")"
+
+COMMENTED=$(doc commented.md <<'EOF'
+bd create "title" --type=task --priority=2  # add --acceptance later
+EOF
+)
+out=$(gate "$COMMENTED")
+check_eq "the word in a comment is not the option" 1 "$?"
+
+LONGER=$(doc longer.md <<'EOF'
+bd create "title" --acceptance-criteria "done"
+EOF
+)
+out=$(gate "$LONGER")
+check_eq "a longer flag name is not the option" 1 "$?"
+
+BOTH=$(doc both.md <<'EOF'
+bd create "title" --description "mentions --acceptance in prose" --acceptance "the suite is green"
+EOF
+)
+out=$(gate "$BOTH")
+check_eq "a real option still counts when the description mentions the word" 0 "$?"
+
+EQUALS=$(doc equals.md <<'EOF'
+bd create "title" --acceptance="the suite is green"
+EOF
+)
+out=$(gate "$EQUALS")
+check_eq "the option written as --acceptance=value counts" 0 "$?"
+
+# A single-quoted title is a quoted title. The start test used to require a
+# double quote, so this recipe was invisible.
+SINGLE=$(doc single.md <<'EOF'
+bd create 'Try out Beads'
+EOF
+)
+out=$(gate "$SINGLE")
+check_eq "a single-quoted title with no option fails" 1 "$?"
+check_eq "and is reported on its line" 1 "$(printf '%s' "$out" | grep -c "NO ACCEPTANCE .*$SINGLE:3")"
+
+SINGLE_OK=$(doc single-ok.md <<'EOF'
+bd create 'Try out Beads' --acceptance 'bd list shows it'
+EOF
+)
+out=$(gate "$SINGLE_OK")
+check_eq "the same recipe with the option passes" 0 "$?"
+
+# The flag sits on the line that closes the single quote, so a line-at-a-time
+# read, or a quote tracker that only sees double quotes, reports a miss.
+SQWRAP=$(doc sqwrap.md <<'EOF'
+bd create --title 'friction' --description 'What I tried: one
+What happened: two' --acceptance 'the gate names the line'
+EOF
+)
+out=$(gate "$SQWRAP")
+check_eq "an open single quote carries the command onto the next line" 0 "$?"
+
+# Dropping a command that is still open at end of file reports the file clean.
+EOFWORD=$(doc eof-word.md <<'EOF'
+bd create "title" --description "still no --acceptance
+EOF
+)
+out=$(gate "$EOFWORD")
+check_eq "a command left open at end of file is still judged" 1 "$?"
+
+EOFBS=$(doc eof-bs.md <<'EOF'
+bd create "title" --type=task \
+EOF
+)
+out=$(gate "$EOFBS")
+check_eq "a trailing backslash at end of file does not drop the command" 1 "$?"
+
+OPEN=$(doc open-a.md <<'EOF'
+bd create "title" --description "unclosed
+EOF
+)
+OTHER=$(doc open-b.md <<'EOF'
+# a later file
+EOF
+)
+out=$("$GATE" "$OPEN" "$OTHER" 2>&1)
+check_eq "a command left open at the end of a file is judged before the next file" 1 "$?"
+check_eq "and the finding names the file that holds it" 1 \
+  "$(printf '%s' "$out" | grep -c "NO ACCEPTANCE .*$OPEN:3")"
+
+# Two trailing backslashes end the command. Continuing anyway swallows the next
+# recipe, and the option on the first line then hides the miss on the second.
+SLASH=$(doc slash.md <<'EOF'
+bd create "one" --acceptance "done" path\\
+bd create "two"
+EOF
+)
+out=$(gate "$SLASH")
+check_eq "an escaped trailing backslash does not swallow the next recipe" 1 "$?"
+check_eq "and the swallowed recipe is the one named" 1 \
+  "$(printf '%s' "$out" | grep -c "NO ACCEPTANCE .*$SLASH:4")"
+
+WORD=$(doc word.md <<'EOF'
+bd create something about the command
+EOF
+)
+out=$(gate "$WORD")
+check_eq "a word after the name is not a recipe" 0 "$?"
 
 # The tree as committed: every document a worker can copy from.
 out=$(cd "$ROOT_DIR" && "$GATE" 2>&1)
