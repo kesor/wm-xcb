@@ -72,14 +72,16 @@ Parent epic: `wm-dfg` ("Harness friction"). Verify with
 `bd list --type=epic | grep friction` if the id is not found.
 
 ```bash
-# is it already reported? `bd search` reads titles only, so grep the open
-# list, one distinctive term at a time. `bd search "lefthook PATH"` returns
-# nothing for a bead titled "lefthook missing from the worker shell".
-bd list --status=open --limit 0 | grep -i -e lefthook -e PATH
+# is it already reported? `bd search` reads titles and ids only, one term per
+# run, and stops at 50 results unless told --limit 0; the description needs
+# --desc-contains. Neither takes --status: --status=open drops in_progress.
+bd search lefthook --limit 0
+bd list --limit 0 --desc-contains lefthook
 
 bd create --type=chore --priority=1 --parent=wm-dfg --labels=friction \
   --no-inherit-labels \
   --title "friction(seiton): lefthook missing from the worker shell" \
+  --acceptance "lefthook run pre-commit passes in the worker shell, checked by a command listed in docs/QUALITY.md" \
   --description "What I tried: lefthook run pre-commit
 What happened: command not found
 What worked: nix develop --command lefthook run pre-commit
@@ -92,6 +94,14 @@ child, and `wm-dfg` carries `harness`, so a bead created without it is born
 labelled as a harness fix and the loop skips it without reading it. Add
 `--labels=friction,harness` yourself, and only when the fix is in the worker
 harness repository rather than this tree.
+
+`--acceptance` is not optional either. `scripts/check-bead-acceptance.sh` fails
+the next commit on any live bead with no acceptance criteria that
+`tests/quality/bead-acceptance-missing-baseline.txt` does not record as debt.
+The create is the only write a worker may make to a bead's fields, so a bead
+filed without this flag is debt from the moment it exists, and the two ways out
+it prints are the flag you skipped and adding it to the baseline. Write what a
+command will show when the finding is fixed.
 
 Title shape: `friction(<bucket>): <the thing>, <the symptom>`.
 Description: four lines — tried, happened, worked, cost — plus a suggested fix
@@ -107,8 +117,11 @@ commit and link the friction bead in the commit body.
 Do not file the same friction twice. Search first, and not with `bd search`: it
 matches titles only, so it misses a bead whose symptom is in its description.
 Grep the open list for each distinctive term of the finding -
-`bd list --status=open --limit 0 | grep -i -e <term> -e <term>` - and read the
-open `wm-dfg` beads. If an existing bead is open, add a comment with the new
+`bd search "<term>" --limit 0` for titles and ids, `bd list --limit 0
+--desc-contains "<term>"` for descriptions, one term per run - and read the
+open `wm-dfg` beads. Neither carries `--status`: `--status=open` is the stored
+status open and drops an in_progress bead, which is where the bead you would
+duplicate usually sits. If an existing bead is open, add a comment with the new
 data instead of creating another.
 
 ## Filing this yourself, from a worker
