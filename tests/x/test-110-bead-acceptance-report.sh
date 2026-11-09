@@ -6,6 +6,11 @@
 # also omits the key when the field is empty, so a wipe and a bead that never
 # had criteria are the same bytes, which is why the check is baseline-relative.
 #
+# The two shapes need two baselines and two questions, and this pins both: does
+# a bead that had criteria still have them, and does a live bead have any. The
+# second is the one a wiped field hides behind, because bd writes the same
+# output for both.
+#
 # The verdict is in scripts/lib/bead-acceptance-report.sh so this feeds it
 # recorded issue lists instead of needing a database. The shapes that matter are
 # the ones the command line lets through:
@@ -16,6 +21,9 @@
 #   - a baselined id missing from the list, so nothing about it was checked;
 #   - a list where no issue carries the key at all, which is the field missing
 #     from the output and not a bead losing its text;
+#   - a live issue with no criteria that no baseline records, which is the bead
+#     a worker planned from its description;
+#   - a closed issue with none, which is history rather than work;
 #   - a file that is not an issue list, which is a broken read.
 source "$(dirname "$0")/lib.sh"
 # shellcheck source=../../scripts/lib/bead-acceptance-report.sh
@@ -175,5 +183,92 @@ cat >"$TABBED" <<'EOF'
 EOF
 check_eq "a tab in a title stays in one field" 3 \
   "$(bead_acceptance_with_text "$TABBED" | awk -F'\t' '{print NF}')"
+
+# --- the other half: a bead that never had criteria -------------------------
+#
+# `bd create` is not in this tree and cannot be made to refuse the empty field,
+# so the gate is where the gap becomes visible: the commit after the bead is
+# created. bd writes no key for the empty field, so the wipe check above reports
+# these beads only when the list loses the field everywhere; this list is the
+# shape where one bead alone has none.
+MISSING="$DIR/missing-baseline.txt"
+LIVE="$DIR/live.json"
+cat >"$LIVE" <<'EOF'
+[
+  {"id": "wm-b1", "status": "open", "title": "has criteria", "acceptance_criteria": "the window is mapped"},
+  {"id": "wm-b2", "status": "open", "title": "never written"},
+  {"id": "wm-b3", "status": "in_progress", "title": "the value is null", "acceptance_criteria": null},
+  {"id": "wm-b4", "status": "blocked", "title": "erased with a space", "acceptance_criteria": "   "},
+  {"id": "wm-b5", "status": "closed", "title": "closed with none"},
+  {"id": "wm-b6", "status": "open", "title": "recorded as having none"}
+]
+EOF
+
+# wm-b6 is recorded and wm-b5 is closed: the first is debt the gate accepts, the
+# second is not work, so neither fails the run - wm-b5 is reported as a stale
+# entry instead, because the generator only records live beads. wm-b2, wm-b3 and
+# wm-b4 are the three ways a live bead ends up with no text.
+printf '# Recorded.\nwm-b5\nwm-b6\n' >"$MISSING"
+bead_acceptance_verify_missing "$LIVE" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "a live bead with no criteria fails" 1 "$?"
+check_eq "and the bead with no key is named" 1 "$(grep -c 'NO CRITERIA  wm-b2 (open) never written' "$LAST")"
+check_eq "a null value is named too" 1 "$(grep -c 'NO CRITERIA  wm-b3 (in_progress)' "$LAST")"
+check_eq "and whitespace only is named" 1 "$(grep -c 'NO CRITERIA  wm-b4 (blocked)' "$LAST")"
+check_eq "a recorded bead is not reported" 0 "$(grep -c 'NO CRITERIA  wm-b6' "$LAST")"
+check_eq "a closed bead with none is not reported" 0 "$(grep -c 'NO CRITERIA  wm-b5' "$LAST")"
+check_eq "and the bead with criteria is not reported" 0 "$(grep -c 'NO CRITERIA  wm-b1' "$LAST")"
+check_eq "the failure names the write path" 1 "$(grep -c "bd update <id> --acceptance 'what done looks like'" "$LAST")"
+check_eq "and the update that records the debt" 1 \
+  "$(grep -c '^  scripts/check-bead-acceptance.sh --update-baseline$' "$LAST")"
+check_eq "and the file that update writes" 1 "$(grep -c "$MISSING is a tracked file" "$LAST")"
+check_eq "a failing run counts the new beads" 1 "$(grep -c '3 live issue(s) carry no acceptance criteria, and no baseline records them' "$LAST")"
+
+# Every live bead without text recorded: the gate passes, and the pass line
+# counts the debt so a reader can watch it shrink.
+printf '# Recorded.\nwm-b2\nwm-b3\nwm-b4\nwm-b6\n' >"$MISSING"
+bead_acceptance_verify_missing "$LIVE" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "a recorded live bead passes" 0 "$?"
+check_eq "and the pass line counts them" 1 "$(grep -c '4 live issue(s) have no acceptance criteria, all recorded in' "$LAST")"
+
+# An entry whose bead gained criteria is stale: the generator would not write it
+# now. Reported, not failed - the protected baseline holds that text from here.
+printf 'wm-b1\nwm-b2\nwm-b3\nwm-b4\nwm-b6\n' >"$MISSING"
+bead_acceptance_verify_missing "$LIVE" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "a stale entry passes" 0 "$?"
+check_eq "and is reported as stale" 1 "$(grep -c '1 recorded issue(s) are stale' "$LAST")"
+check_eq "and names the file the update drops it from" 1 "$(grep -c -- "--update-baseline drops them from $MISSING" "$LAST")"
+
+# A list of closed beads only is a clean answer, not a silent one.
+CLOSED_ONLY="$DIR/closed-only.json"
+cat >"$CLOSED_ONLY" <<'EOF'
+[{"id": "wm-b5", "status": "closed", "title": "closed with none"}]
+EOF
+bead_acceptance_verify_missing "$CLOSED_ONLY" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "a closed bead with none passes" 0 "$?"
+check_eq "and the run says every live one has criteria" 1 "$(grep -c 'every live one carrying acceptance criteria' "$LAST")"
+
+bead_acceptance_verify_missing "$NOT_JSON" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "the missing half refuses a file that is not an issue list" 1 "$?"
+check_eq "and says nothing was read" 1 "$(grep -c 'so nothing was read' "$LAST")"
+
+# The generator writes the ids the gate then accepts, so --update-baseline
+# cannot produce a list the same run rejects.
+bead_acceptance_write_missing_baseline "$MISSING" "$LIVE"
+check_eq "the generator records one id per live issue with no criteria" 4 "$(grep -vc '^#' "$MISSING")"
+check_eq "and writes the recorded ids in order" 'wm-b2 wm-b3 wm-b4 wm-b6' "$(grep -v '^#' "$MISSING" | tr '\n' ' ' | sed 's/ $//')"
+check_eq "and the generator line names the command" 1 \
+  "$(grep -c '^# Generated by scripts/check-bead-acceptance.sh --update-baseline.$' "$MISSING")"
+bead_acceptance_verify_missing "$LIVE" "$MISSING" check-bead-acceptance >"$LAST" 2>&1
+check_eq "a list written from the tracker accepts that tracker" 0 "$?"
+
+# Both files are read by the one gate, and both halves run whatever the first
+# answers: one commit can wipe a bead and create one, and the reader should not
+# learn about the second at the next commit.
+check_eq "the gate names the missing baseline as a tracked file" 1 \
+  "$(grep -c '^MISSING_BASELINE=.*tests/quality/bead-acceptance-missing-baseline.txt' "$ROOT_DIR/scripts/check-bead-acceptance.sh")"
+check_eq "the gate runs the missing half on the tracker" 1 \
+  "$(grep -c "bead_acceptance_verify_missing \"\$ISSUES\" \"\$MISSING_BASELINE\"" "$ROOT_DIR/scripts/check-bead-acceptance.sh")"
+check_eq "and the update writes both lists" 1 \
+  "$(grep -c "bead_acceptance_write_missing_baseline \"\$MISSING_BASELINE\" \"\$ISSUES\"" "$ROOT_DIR/scripts/check-bead-acceptance.sh")"
 
 finish

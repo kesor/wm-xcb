@@ -117,7 +117,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, cites a line of that program on its third, is named after that program, and names one that is installed on `PATH` outside the fake directory. The check resolves that name to a path, requires a regular file, and looks for the cited line in it. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it |
-| bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text |
+| bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text. The other half reads `tests/quality/bead-acceptance-missing-baseline.txt`: a live issue with no criteria that no baseline records fails the commit, so a bead written without them is named where it is made instead of leaving the worker to plan from the description |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
@@ -370,6 +370,30 @@ and is where the gate can still see it on a `bd` whose list output dropped it.
 The verdict lives in `scripts/lib/bead-acceptance-report.sh`, and
 `tests/x/test-110-bead-acceptance-report.sh` feeds it recorded issue lists, so
 each refusal is pinned with no tracker involved.
+
+That baseline answers one question, whether a bead that had criteria still has
+them, and the empty field makes it blind to the other: a bead created with none
+at all reads exactly like a wiped one, so nothing named it, and the worker
+planned the bead from its description with no criterion to check done against.
+`bd create` is not in this tree and cannot be made to refuse the field, so the
+gate is where the gap becomes visible.
+
+## The bead-acceptance missing baseline
+
+`tests/quality/bead-acceptance-missing-baseline.txt` records the live issues
+that carried no acceptance criteria when that question started being asked. A
+live issue - anything but closed, because the criteria a closed bead never had
+are history rather than work - that has none and is not in the list fails the
+commit and is named. An entry does not fail: it is the debt the tree had, and
+the pass line counts it so a reader can watch it shrink. `--update-baseline`
+writes both lists from one read of the tracker, and an entry whose bead gained
+criteria, closed, or left the tracker is reported as stale rather than failed,
+because the protected baseline holds that bead's text from then on.
+
+The failure names the one write path `--acceptance` has, `bd update <id>
+--acceptance`, and the update that records a bead deliberately left without
+them. Both baselines are tracked files, so the update is staged in the commit
+that created the bead.
 
 ## Adding a gate
 
