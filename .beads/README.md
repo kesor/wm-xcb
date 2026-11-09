@@ -14,7 +14,7 @@ Beads is issue tracking that lives in your repo, making it perfect for AI coding
 
 ```bash
 # Create new issues
-bd create "Add user authentication"
+bd create "Add user authentication" --acceptance "a request with no session is refused"
 
 # View all issues
 bd list
@@ -67,7 +67,7 @@ curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/instal
 bd init
 
 # Create your first issue
-bd create "Try out Beads"
+bd create "Try out Beads" --acceptance "bd list shows the issue you created"
 ```
 
 ## Learn More

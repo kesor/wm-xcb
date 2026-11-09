@@ -118,6 +118,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it. `--update-baseline` refuses to record an id the baseline does not already hold, because that entry would accept the finding |
 | bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text. The other half reads `tests/quality/bead-acceptance-missing-baseline.txt`: a live issue with no criteria that no baseline records fails the commit, so a bead written without them is named where it is made instead of leaving the worker to plan from the description, and a recorded issue that has gained criteria fails until it is protected too. `--update-baseline` refuses to regenerate over a protected id that still exists with no text |
+| bead create recipe | `scripts/check-bead-create-recipe.sh` | every `bd create` a tracked document shows carries `--acceptance`, read the way the shell reads it: a trailing backslash continues the command and so does a double-quoted argument left open. A recipe is a command that starts a line, or follows a backtick, with a flag or a quoted title after the name; a sentence about the command is not one, and neither is a reference to its help text. The acceptance gate refuses the bead a recipe files, and `.agents/skills/beads/SKILL.md` is written by `bd setup codex` from a template that has no flag |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
@@ -415,6 +416,32 @@ The failure names the one write path `--acceptance` has, `bd update <id>
 them. Both baselines are tracked files, so the update is staged in the commit
 that created the bead.
 
+## The create recipe
+
+`scripts/check-bead-create-recipe.sh` fails when a tracked document shows a
+`bd create` with no `--acceptance`. The acceptance gate above refuses the bead;
+this one refuses the recipe that files it, at the commit that teaches it.
+
+A shell command runs past the end of its line, so a recipe is read whole: a
+trailing backslash continues it, and so does a double-quoted argument left open,
+which is how a multi-line `--description` reads. Judging one line at a time
+would fail `.agents/skills/wm-5s/SKILL.md`, whose `--acceptance` sits further
+down its command than its `bd create`.
+
+A recipe is a command, not the words. `bd create` counts when it starts a line
+or follows a backtick, with a flag or a quoted title after the name, so the
+sentences in `AGENTS.md` and `docs/` that name the command without running it
+are not findings, and neither is `bd create --help`. The recipes are read from
+the tracked markdown, because a create command reaches a worker through a
+document and not through code; `vendor/` and `docs/archive/` are skipped for the
+reason `scripts/check-docs.sh` skips them.
+
+`.agents/skills/beads/SKILL.md` is bd's own text, written by `bd setup codex`
+from a template that has no `--acceptance`. Nothing in this tree can make that
+command write the flag, so the gate is what puts it back in front of whoever
+runs the setup next: the edit lands in the same commit, and the gate names it
+when a later setup takes it out again.
+
 ## Adding a gate
 
 1. Write the check as a script under `scripts/` that exits non-zero on failure
@@ -464,6 +491,7 @@ scripts/check-build-variants.sh   # release, sanitize and debug builds in one tr
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
 scripts/check-fakes.sh      # every stand-in names an installed program and cites a line of it
 scripts/check-bead-descriptions.sh   # every bead description is still there
+scripts/check-bead-create-recipe.sh  # every create recipe a document shows carries --acceptance
 scripts/check-root.sh       # every tracked root entry is on the allowlist
 scripts/check-orphan-sources.sh   # every tracked source is in the build
 scripts/check-private-state.sh   # a component cannot assign a machine-tracked field
