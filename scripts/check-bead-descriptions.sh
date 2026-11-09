@@ -17,11 +17,15 @@
 #
 # The list comes from the tracker, so the check skips cleanly where there is no
 # database (CI, a fresh clone), the same way scripts/check-bead-refs.sh does.
-# tests/quality/bead-description-baseline.txt holds the issues that had no
-# description when the gate landed. It is empty: every issue had one, so an
-# empty description from now on is one that was lost or never written.
+# tests/quality/bead-description-baseline.txt holds the issues whose empty
+# description the gate accepts. It is empty: every issue had one when the gate
+# landed, so an empty description from now on is one that was lost or never
+# written. --update-baseline only drops the entries that are no longer needed;
+# it refuses to record a new one, because recording it is how the gate was
+# turned green over a wipe.
 #
-# Exit status: 0 when every issue carries a description, 1 otherwise.
+# Exit status: 0 when every issue carries a description, 1 otherwise, including
+# when --update-baseline refuses to record an empty one.
 
 set -uo pipefail
 
@@ -73,7 +77,9 @@ fi
 . "$ROOT_DIR/scripts/lib/bead-description-report.sh"
 
 if [ "$UPDATE" -eq 1 ]; then
-  bead_description_write_baseline "$BASELINE" "$ISSUES"
+  if ! bead_description_write_baseline "$BASELINE" "$ISSUES" check-bead-descriptions; then
+    exit 1
+  fi
   echo "check-bead-descriptions: wrote $BASELINE from the tracker; read it before committing"
   exit 0
 fi

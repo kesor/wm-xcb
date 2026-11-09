@@ -116,7 +116,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | sources | `scripts/check-orphan-sources.sh` | every tracked `.c` outside `tests/` and `tools/` is in `make -s print-src`, so the compiler and `check-async` see it |
 | fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, cites a line of that program on its third, is named after that program, and names one that is installed on `PATH` outside the fake directory. The check resolves that name to a path, requires a regular file, and looks for the cited line in it. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
-| bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it |
+| bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it. `--update-baseline` refuses to record an id the baseline does not already hold, because that entry would accept the finding |
 | bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text. The other half reads `tests/quality/bead-acceptance-missing-baseline.txt`: a live issue with no criteria that no baseline records fails the commit, so a bead written without them is named where it is made instead of leaving the worker to plan from the description, and a recorded issue that has gained criteria fails until it is protected too. `--update-baseline` refuses to regenerate over a protected id that still exists with no text |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
@@ -331,6 +331,15 @@ description, or one made only of whitespace, and
 without one. The list is empty and is meant to stay that way: every issue had a
 description when the gate landed, so an empty one from now on is a description
 that was lost or never written.
+
+`--update-baseline` only drops entries: an id whose description is back, and one
+the tracker no longer carries. It refuses to record an id the file does not
+already hold, because an entry says the gate accepts that bead without a
+description, which is the finding the gate names. Before that rule a wipe was one
+`--update-baseline` away from passing, since the command recorded the empty
+description the gate had just reported. The command prints the ids it would have
+recorded, where the text is in `bd history <id> --events`, and exits 1 without
+writing the file.
 
 The command it watches is `bd update <id> --description "$(...)"`. When the
 substitution produces nothing, `bd` writes the empty string, prints "Updated
