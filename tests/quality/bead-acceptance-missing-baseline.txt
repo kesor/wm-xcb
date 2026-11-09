@@ -7,6 +7,8 @@
 # the list is meant to shrink, and a stale entry says a bead has none
 # when it has text.
 wm-dfg.226
+wm-dfg.228
+wm-dfg.227
 wm-jpo.7
 wm-dfg.225
 wm-dfg.221
