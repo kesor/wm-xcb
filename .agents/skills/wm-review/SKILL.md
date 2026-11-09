@@ -72,6 +72,14 @@ run; if it says "docs updated", read the doc.
    the file you mutated is often one you are also fixing, and checkout restores
    the author's version and takes your fix with it. `cp f /tmp/f.ok` before the
    first mutation and copy it back, or commit the fix before you mutate.
+   **Read the check's repair path next**: the command it prints when it fails.
+   A baseline is written by that command or by a writer beside it, and a repair
+   that records the finding as accepted turns the check green over the thing it
+   exists to catch. Run the writer against a fixture where the defect is still
+   present and see whether it accepts it; a header, a comment or a usage line
+   that teaches the wipe is the same defect, because the next reader follows it.
+   Reproduce the whole sequence - fail, repair, green, defect still there - and
+   it is a P1.
 3. **A rule broken.** State machines own state; components do not call each
    other; nothing in the event loop blocks; new behaviour arrives as a
    registration. Each has a gate — run them: `make test`, `make check-async`,
