@@ -131,10 +131,18 @@ bd show <bead-id>               # description, acceptance criteria, blockers
 bd comments <bead-id>           # what an earlier review or attempt found
 bd update <bead-id> --claim     # take it, so the next session sees it is taken
 bd comment <bead-id> "..."      # what you found, for whoever continues
+bd create --title "..." --acceptance "..."  # a new bead, with what done looks like
 ```
 
 Read the comments before you plan. `bd show` prints them. An earlier review
 may have left the finding that changes the design.
+
+A bead is created with its acceptance criteria, not given them later. `bd create
+--acceptance` is the only write a worker may make to that field, and
+`scripts/check-bead-acceptance.sh` fails the next commit on a live bead that has
+none and no baseline records as debt. What a criterion names is
+`.agents/skills/wm-bootstrap/SKILL.md`, "Writing one bead"; the recipe for a
+friction bead is `.agents/skills/wm-5s/SKILL.md`, "How to file".
 
 A bead that lists seam cases names the test file for each one, or says "no test
 yet" after `grep -l` in `tests/x/`. Before the first edit, comment which of
