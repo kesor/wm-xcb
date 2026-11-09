@@ -119,6 +119,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it. `--update-baseline` refuses to record an id the baseline does not already hold, because that entry would accept the finding |
 | bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text. The other half reads `tests/quality/bead-acceptance-missing-baseline.txt`: a live issue with no criteria that no baseline records fails the commit, so a bead written without them is named where it is made instead of leaving the worker to plan from the description, and a recorded issue that has gained criteria fails until it is protected too. `--update-baseline` refuses to regenerate over a protected id that still exists with no text |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
+| document commands | `scripts/check-doc-commands.sh` | every read-only command a document prints in a fenced `bash`, `sh` or `shell` block exits 0: `rg`, `grep`, `man -w` and the read-only git subverbs the script lists. A command naming a variable this shell does not set is printed with the command beside it. A placeholder, a program outside the allowlist, or a line that is not one simple command is not run at all |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
@@ -219,6 +220,48 @@ The search is in the library too. Color is forced off, and binaries are read as
 text: a painted `file:line:` prefix makes the exemption miss, and git's
 binary-match line does not contain the pattern, so the re-check would call a
 hit a clean tree.
+
+## The document-command gate
+
+`scripts/check-doc-commands.sh` runs the commands the documents print, so one
+that answers nothing fails the commit that carries it. `docs/TESTING.md`
+pointed `rg` at `src/xcb_out.c` for a macro defined in `src/xcbext.h`: the
+command exited 1, printed nothing, and the document named a file that holds
+nothing of the kind. It stood until a reviewer read the libxcb headers by hand.
+The author had counted lines in the two files instead of running the command it
+wrote.
+
+Only a line inside a fenced `bash`, `sh` or `shell` block is read: an
+unlabelled fence in this tree holds program output and C. A line is run when it
+is one simple command - no pipe, `;`, `&&`, `&`, redirection, `$(...)`,
+backtick or continuation - carries no `<placeholder>`, and starts with a
+program that reads and exits: `rg`, `grep`, `man -w`, or one of the git subverbs
+the script lists. Inside quotes those characters are the program's argument,
+not a reason to skip the line, except a backtick or `$(...)` inside double
+quotes, which the shell still runs. The command's standard input is closed: the
+loop's input is the list of commands still to run, and a command that reads it
+would consume the next one and the gate would report the wrong exit. The rest of
+what this tree documents starts a session, builds, mutates the tree or takes
+minutes (`make format`, `--update-baseline`, `scripts/xephyr-test.sh`), and this
+gate runs on every commit.
+
+`$LIBXCB_SRC` is the dev shell's, so a run started outside that shell re-enters
+it the way `scripts/run-hook.sh` does. A command naming a variable nothing sets
+is printed with the command it left unrun, and does not fail the check: the gate
+says what it did not run rather than running it against a path that collapsed to
+`/src/...`.
+
+The allowlist is in the header of the script, and it is the whole of what the
+gate will execute: a document is committed code, and a line this gate runs is a
+line that runs on every commit in every checkout.
+
+Both directions are pinned by `tests/x/test-118-doc-commands.sh`, on documents
+written for the occasion. A command that exits non-zero fails the check and is
+printed with its document and line; deleting that line makes the same document
+pass. A command outside the allowlist, an unlabelled fence, and a variable this
+shell lacks are each left unrun, and the file the allowlisted-nothing command
+names is still there afterwards. A `|` inside the pattern is still run, and a
+command that reads standard input does not consume the next line.
 
 ## The async baseline
 
@@ -464,6 +507,7 @@ scripts/check-build-variants.sh   # release, sanitize and debug builds in one tr
 scripts/check-harness-variant.sh  # the harnesses run the variant they report
 scripts/check-fakes.sh      # every stand-in names an installed program and cites a line of it
 scripts/check-bead-descriptions.sh   # every bead description is still there
+scripts/check-doc-commands.sh   # the commands the documents print, run for real
 scripts/check-root.sh       # every tracked root entry is on the allowlist
 scripts/check-orphan-sources.sh   # every tracked source is in the build
 scripts/check-private-state.sh   # a component cannot assign a machine-tracked field

@@ -110,6 +110,15 @@ pre-commit:
       run: ./scripts/check-docs.sh
       fail_text: "A document cites a line number, duplicates a count, or claims a completion percentage. Name the symbol or the beads issue; let the command print the number."
 
+    # A document prints a command so the reader gets the answer without
+    # trusting the prose, and nothing ran those commands: docs/TESTING.md
+    # pointed rg at the libxcb file that does not hold the macro, so the reader
+    # got an exit 1 and an empty screen. No glob: a command in a document goes
+    # stale when the code moves, not when the document does.
+    doc-commands:
+      run: ./scripts/check-doc-commands.sh
+      fail_text: "A read-only command a document prints exits non-zero, so the reader gets no answer from it. Point it at the file that holds the symbol, or drop it."
+
     format:
       glob: "*.{c,h}"
       run: ./scripts/format-check.sh {staged_files}
@@ -206,6 +215,10 @@ pre-push:
     docs:
       run: ./scripts/check-docs.sh
       fail_text: "A document cites a line number, duplicates a count, or claims a completion percentage."
+
+    doc-commands:
+      run: ./scripts/check-doc-commands.sh
+      fail_text: "A read-only command a document prints exits non-zero: the document names a file or a symbol that is not there."
 
     format:
       run: ./scripts/format-check.sh
