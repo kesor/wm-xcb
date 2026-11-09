@@ -218,8 +218,7 @@ The criterion is part of the create, not something a later reader adds:
 `bd create ... --acceptance "..."`. `scripts/check-bead-acceptance.sh` fails the
 next commit on a live bead with none that
 `tests/quality/bead-acceptance-missing-baseline.txt` does not record as debt, and
-the create is the only write a worker may make to that field. A bead written
-without one is debt from the moment it exists.
+the create is the only write a worker may make to that field.
 
 A bead that lists seam cases names the test file for each one, or says "no test
 yet" after `grep -l` in `tests/x/`. A case with neither sends the worker to

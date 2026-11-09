@@ -137,7 +137,7 @@ bd create --title "..." --acceptance "..."  # a new bead, with what done looks l
 Read the comments before you plan. `bd show` prints them. An earlier review
 may have left the finding that changes the design.
 
-A bead is created with its acceptance criteria, not given them later. `bd create
+A bead is created with its acceptance criteria. `bd create
 --acceptance` is the only write a worker may make to that field, and
 `scripts/check-bead-acceptance.sh` fails the next commit on a live bead that has
 none and no baseline records as debt. What a criterion names is
