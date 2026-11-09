@@ -50,8 +50,14 @@ bd update <id> --claim
 4. Create durable follow-up work when implementation reveals new tasks:
 
 ```bash
-bd create "Short title" --description="Why this exists and what needs to be done" --type=task --priority=2
+bd create "Short title" --description="Why this exists and what needs to be done" --type=task --priority=2 --acceptance="What a command will show when the work is done"
 ```
+
+The create carries `--acceptance`, and the flag is the only write a worker makes
+to that field. `scripts/check-bead-acceptance.sh` fails the next commit on a
+live bead with no criteria that
+`tests/quality/bead-acceptance-missing-baseline.txt` does not record as debt, so
+a bead filed without the flag is debt from the moment it exists.
 
 5. Close completed work:
 
