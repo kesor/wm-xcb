@@ -105,6 +105,59 @@ Look for the load on a single actor:
 
 ---
 
+## Failure demand: the work that exists because the last one did not land
+
+The three Ms come from the factory, and a factory measures waste differently
+from a service: a part number repeats, so rework is visible per unit and a
+consumed container is refilled with an identical one. `DESIGN.md` section 9 says
+this loop has no part number - "the thousandth is as new as the first" - so every
+measure of waste that depends on repetition degrades here. Muda counts effort
+spent at a station. Goldratt counts what queues in front of a constraint. Neither
+asks **why the item arrived at all**.
+
+John Seddon's distinction is the one that answers it. **Demand** is what the
+customer asked for. **Failure demand** is demand the customer did not want to
+make: the call asking why the thing has not arrived, the second visit because the
+first one was wrong, the bead filed because the last fix was narrower than the
+defect. In service systems it is commonly a large share of the total, and it is
+the one number that tells you the system's design is producing your workload.
+
+It fits here for a reason no factory measure can match: it attributes an item by
+**provenance**, not by content. This cycle exists because that bead was rejected.
+This bead exists because that one was closed prematurely. That is a join between
+two rows the tracker already holds - `created_at` after `closed_at` on the same
+subject, a resume after a verdict, a re-dispatch after a park - so it survives
+the absence of part numbers.
+
+Measure two things and put them on the `demand:` line:
+
+- **the run's share**: `python3 worker.py metrics --since 48h` prints the number
+  of cycles beyond a bead's first, the share of all cycles they are, and which
+  ending each first attempt had. In the run that ended 2026-11-10 it was 60 of
+  139 cycles, 43%: 46 after a review sent the work back, 7 after a publish could
+  not prove itself, 4 after a timeout, 2 after a refused landing, 1 after a
+  failed cycle.
+- **the queue's share**: `python3 worker.py recurrence` prints how many open
+  friction beads repeat a bead closed before they were created. On 2026-11-10 it
+  was 12 of 53.
+
+Report it; do not target it directly. The cheapest way to lower failure demand is
+to park every item that fails once, and the number collapses while the customer
+gets nothing - the same argument as Goodhart's, applied to the one measure that
+looks most like a score. What you target is the **cap** that removes the repeat:
+two reviews that send it back and a person reads the verdicts, two publishes that
+cannot prove themselves and a person reads the merge, a bead too big to finish in
+a turn split before it starts. In the run above those three were 26 of the 60
+failure cycles, so the caps are worth more than any sentence written here.
+
+One more distinction worth keeping: **internal demand** is demand whose customer
+is the loop itself - a bead about the tracker, the briefs, the gates. On
+2026-11-10 it was 132 of 165 open beads, and that ratio is why two and a half days
+produced no `src/` commits. It is not waste in the muda sense: fixing the loop is
+real work. It is a measurement of who the loop is serving.
+
+---
+
 ## How to judge a run
 
 Read the transcript itself before the summary. `worker.py metrics` prints counts
@@ -115,7 +168,7 @@ reading summaries will find the thing only the log shows. (A CI job here reporte
 success in 0.03 seconds for months; the summary was green and the log had every
 command skipped.)
 
-Then fill this in before deciding anything. Six lines, no prose:
+Then fill this in before deciding anything. Seven lines, no prose:
 
 ```
 run:      <ids>            commits: N   rounds: R
@@ -123,6 +176,7 @@ cost:     worker Xcalls/Ys  review Xcalls/Ys  wall A->B
 muda:     <category>: <what, and what it cost>     (one line each, only real ones)
 mura:     <what varied against comparable runs>
 muri:     <who was overburdened, with the number>
+demand:   <what arrived, and how much of it arrived because something failed>
 value:    <defects found, beads closed, gates now running>
 ```
 

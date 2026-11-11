@@ -39,6 +39,16 @@ File a bead when any of these happens:
 Do **not** file: defects in the window manager itself (those are normal beads),
 and things the issue you are working on already covers.
 
+One more check before you file, and it is about who the finding serves. A finding
+about the tracker, the briefs, the recipes or the gates is **internal demand**:
+its customer is the loop, not the product. That is real work, and on 2026-11-10
+it was 132 of the 165 open beads - which is why two and a half days of it produced
+no commits to `src/`. So before filing one, ask what it unblocks: if the answer is
+another bead about filing beads, it is a comment on the oldest bead in its class,
+not a new id. `python3 worker.py recurrence` shows whether it repeats something
+already fixed; `python3 worker.py metrics` shows the run's failure-demand share,
+which is how much of the queue arrived because an earlier attempt did not land.
+
 ## Which 5S bucket
 
 The Japanese terms are the vocabulary; the practical rule is the last column.
