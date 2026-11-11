@@ -32,14 +32,21 @@
 # same as a read that failed, and never the "workable here" that would send a
 # worker to resurrect what the tree removed on purpose.
 #
+# The third answer is a bead that names the harness by word or by one of its
+# commands and no file. One such bead printed "nothing in its text names the
+# harness, so its work is in this worktree" and exited 0 while its whole fix was
+# `cmd_start` in the harness, and the worker then read the harness to find out.
+# The word and the `cmd_` names are read, and the answer is 2.
+#
 # Exit status: 0 no token names the harness and every file-shaped token whose
 # first component this tree tracks, or once tracked, is still here. 3 the text
-# names a harness path, 2 the question could not be answered: a broken read, or
-# a path this tree does not have. A bead can name a harness file
-# and still ask for a change here; the verdict says to land that part. A broken
-# read is 2 and not 0: an answer that says "workable here" because the tracker
-# could not be reached is worse than no answer, and a caller that only tests for
-# success would take it.
+# names a harness path, 2 the question could not be answered: a broken read, a
+# path this tree does not have, or a bead that talks about the harness
+# (`harness`, `cmd_start`) without naming a file in it. A bead can name a
+# harness file and still ask for a change here; the verdict says to land that
+# part. A broken read is 2 and not 0: an answer that says "workable here"
+# because the tracker could not be reached is worse than no answer, and a caller
+# that only tests for success would take it.
 
 set -uo pipefail
 

@@ -20,6 +20,18 @@
 # lists cannot: a name that belongs to the harness and has moved or been
 # deleted, which is how a stale bead description misleads a worker.
 #
+# A path is not the only way a bead names the harness. A fix there is often one
+# of its commands - `cmd_start`, `cmd_drop` - and the bead then says so in those
+# words and names no file, so the token scan finds nothing and the verdict reads
+# "its work is in this worktree": the answer that costs the session this command
+# exists to save. bead_scope_harness_words() reads the text for `harness` and
+# for a `cmd_` command, and the verdict then says it cannot tell, which is 2.
+# `worktree` is not one of the words: every bead here says "in this worktree",
+# and a rule that fired on it would answer "cannot tell" for most of the queue,
+# which says nothing at all. The word `harness` does fire on the few beads about
+# this tree's own seam harness, and that answer costs a look at the bead's text;
+# the 0 it replaces costs a read of the harness.
+#
 # The harness is only half of the question a worker asks. The other half is
 # whether the paths the bead names still exist here: a bead is written months
 # before it is picked up, and one that asks for changes to a file this tree
@@ -107,6 +119,24 @@ bead_scope_tokens() {
         if (tok ~ /\// || tok ~ /\.(py|sh|md|nix|toml|yml)$/) print tok
       }
     }' | sort -u
+}
+
+# bead_scope_harness_words <bead-json> <comments-json>
+#   The words in the text that name the harness rather than a file in it, sorted
+#   and unique: `harness`, and a command of the harness checkout, which it names
+#   `cmd_<verb>` (`cmd_start`, `cmd_drop`). No file in that checkout is a
+#   `cmd_` name and nothing in this repository is either, so the word is the
+#   command and not a guess.
+#
+#   This reads the text again instead of reusing bead_scope_tokens(): that
+#   tokeniser splits on everything but a path's characters, so `cmd_start`
+#   reaches it as `cmd` and `start`, and it keeps only a word with a `/` or a
+#   source extension.
+bead_scope_harness_words() {
+  bead_scope_text "$1" "$2" |
+    tr -c 'A-Za-z0-9_' '\n' |
+    awk 'tolower($0) == "harness" || tolower($0) ~ /^cmd_[a-z][a-z0-9_]*$/ { print tolower($0) }' |
+    sort -u
 }
 
 # bead_scope_resolve <token> <file-list>
@@ -307,16 +337,18 @@ bead_scope_has_kind() {
 
 # bead_scope_verify <bead-json> <comments-json> <repo-files> <harness-files>
 #                    <deleted-list>
-#   0 when no token names the harness and every path the bead names is in this
-#   tree, 3 when one names the harness, 2 when the tree does not carry a path
-#   it names. A bead can name a harness file and still ask for a change in this
-#   tree, so the harness verdict says to land that part; a path the tree lost is
-#   a different answer - the text cannot say whether the bead asks for the file
-#   back or for one that never existed - so it is 2, the same as a bead the
-#   tracker would not give up.
+#   0 when no token names the harness, the text does not talk about it, and
+#   every path the bead names is in this tree, 3 when a token names the harness,
+#   2 when the tree does not carry a path it names or the text names the harness
+#   as a word or a command and no file. A bead can name a harness file and still
+#   ask for a change in this tree, so the harness verdict says to land that part;
+#   a path the tree lost is a different answer - the text cannot say whether the
+#   bead asks for the file back or for one that never existed - so it is 2, the
+#   same as a bead the tracker would not give up, and the same as a bead whose
+#   fix is a harness command: neither names a file here to look at.
 bead_scope_verify() {
   local bead=$1 comments=$2 repo=$3 harness=$4 deleted=$5
-  local id status title found what why kind dir
+  local id status title found what why kind dir words
 
   IFS=$'\t' read -r id status title < <(
     jq -r '(if type == "array" then .[0] else . end)
@@ -329,6 +361,16 @@ bead_scope_verify() {
   found=$(bead_scope_find "$bead" "$comments" "$repo" "$harness" "$deleted")
 
   if [ -z "$found" ]; then
+    words=$(bead_scope_harness_words "$bead" "$comments" | paste -sd, -)
+    if [ -n "$words" ]; then
+      printf '%s: nothing in its text names a harness file, but it talks about the harness: %s.\n' \
+        "$id" "${words//,/ and }"
+      echo "A fix in the harness is a command and not a path, so the token scan has"
+      echo "nothing to resolve and this command cannot say whether the work is here."
+      echo "Read its comments for the file the fix is in: the part that is here is"
+      echo "landed here, the rest cannot be. Return 2, not the 0 that reads as yes."
+      return 2
+    fi
     printf '%s: nothing in its text names the harness or a path this tree has lost,\n' "$id"
     echo "so its work is in this worktree."
     return 0
