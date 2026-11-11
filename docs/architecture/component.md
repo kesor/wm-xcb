@@ -206,13 +206,17 @@ a violation: tiling reads the fullscreen and floating machines by name, and
 `docs/PHILOSOPHY.md` §2.1 says why that stays inside the rule.
 
 No gate reads the include lines under `src/components/` today, so review is the
-check. One screen shows every component include:
+check. Another component's header is written two ways, and a search for only
+the first misses the second:
 
 ```bash
-rg 'include "src/components/' src/components/
+rg -n '#include "[^"]*components/' src/components/
+rg -n '#include "[a-z0-9-]+\.h"' src/components/
 ```
 
-A hit whose path is not the including file's own header is the finding.
+A hit is a finding when the header belongs to another component. The including
+file's own header, and another file of the same component, are not. The first
+command does not match a bare name.
 
 ### A header says what a function does and who owns what it allocates
 

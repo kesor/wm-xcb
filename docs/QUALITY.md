@@ -467,7 +467,10 @@ when a later setup takes it out again.
    with a guard, a row with no event), and a mutation that exercised a shape the
    check already handled proves nothing about the one it does not. Run the proof
    after the last edit to the test: a count taken before the test changed is the
-   previous test's count, and a comment that quotes it is wrong.
+   previous test's count, and a comment that quotes it is wrong. No command
+   checks that the proof was run. The removal is a mutation the commit does not
+   contain, so a gate can see the check and cannot see that someone removed the
+   thing it catches.
 3. A hook gate needs no workflow edit. The `gates` job runs `lefthook run
    pre-push --force --no-auto-install`, so the command from step 2 runs in CI.
    Pasting that command into `.github/workflows/quality.yml` as well is a second

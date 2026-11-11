@@ -252,8 +252,10 @@ rule a command enforces is listed there and not repeated here: a second copy
 goes stale, and a reader cannot tell a stale copy from the rule.
 
 A rule no gate checks lives in the document or header where it applies, and
-says there why no command checks it. These are the rules no gate checks, and
-where each lives:
+says there why no command checks it. These had no gate, so they left this file
+for the place they apply. This is not every ungated rule: `docs/PHILOSOPHY.md`
+section 3 lists the commitments and where each is checked, and that table is
+not copied here. Delete a line below when a gate starts checking it.
 
 - Components never include or call another component, and a header says what a
   function does and who owns what it allocates: `docs/architecture/component.md`.
@@ -263,6 +265,9 @@ where each lives:
 - A document changes in the same commit as the behaviour it records, and an
   include is written from the repository root: `docs/QUALITY.md`, "Rules no gate
   checks".
+- A new component or feature has a test that fails when the behaviour is
+  absent: `docs/TESTING.md`, "Unit tests".
+- One `xcb_flush()` per loop iteration: `docs/PHILOSOPHY.md` section 3.
 - A new gate is proven by removing the exact thing it must catch, once per
   shape it must catch: `docs/QUALITY.md`, "Adding a gate".
 

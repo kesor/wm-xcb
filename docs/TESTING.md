@@ -119,6 +119,12 @@ Components are tested
 without an X server by calling their handlers with fabricated events and
 inspecting hub events; that is the pattern to copy for new components.
 
+A new component or feature is not done without a test that fails when the
+behaviour is absent. `scripts/check-test-src.sh` fails when a test file is left
+out of `TEST_SRC`. It cannot tell a component that has no test file from one
+that needs none, because that absence is not a shape a scan of `tests/` can
+see. No gate checks it. Review asks for the file.
+
 The commit and push gates run the same suite through `scripts/check-unit.sh`,
 which keeps the log to itself and prints it only when the run fails. Run
 `make test` by hand when you want the log of a passing run.
