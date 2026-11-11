@@ -18,6 +18,10 @@ this checkout (`../../../ai-workers-for-wm/` from a worktree). Read §1 and §2
 there once. This skill is the working short form, and it states each term's claim
 where the term first appears.
 
+The four rules say what to refuse. They do not say which station to work on.
+That is the next section, and it is the first thing to do before acting on any
+of the four.
+
 ## Where the rules come from
 
 Two factory systems are worth learning from, and copies of them have failed more
@@ -46,6 +50,34 @@ and the assumptions did not hold.
 The lesson, which is the whole reason this skill exists: **take the reasoning,
 then check the assumptions, then build the tools for this environment.** Copying
 the tools is the step that failed.
+
+## Which station to work on
+
+The constraint is the station that sets the rate of the whole route: the one
+that is longest and most often idle. Goldratt's five focusing steps reduce to
+four here, because the fifth — go back and refuse to let inertia become the
+constraint — is step 4 done again. Do them in order, and stop at the first one
+you cannot do.
+
+1. **Measure one item's chain.** Each station's time, in the route's order, for
+   one item through the lane you are judging. The measurement lives in
+   `DESIGN.md`, "The chain per item, measured", and only there. This file holds
+   the rule; copying a number out of that section makes a second snapshot, and
+   a snapshot copied forward is the drift that section warns about. Recompute
+   the table before acting on it, and say which window you read.
+2. **Name the station that is longest and most often idle.** That is the
+   constraint. Longest alone is not enough: a station that is long but never
+   waits has spare capacity, and the one that sits idle while work exists is
+   the one the route is losing time to.
+3. **Subordinate the rest of the route to keeping that station working.** Do
+   not optimize a station that is not the constraint: work done there does not
+   move the rate, and it lengthens the lead time of everything behind it. Do
+   not let the constraint wait: the queue the "waiting is a decision" rule
+   allows sits in front of this station and nowhere else.
+4. **Re-measure after a change, and say which station is the constraint now.**
+   A change that shortened a station may have moved the constraint to another
+   one, and the next change aimed at the old one is work on a station that is
+   no longer it. The new numbers go into `DESIGN.md`, not into this file.
 
 ## The four rules
 
