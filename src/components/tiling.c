@@ -15,12 +15,11 @@
 #include <string.h>
 
 #include "src/actions/action-registry.h"
-#include "src/components/floating.h"
-#include "src/components/fullscreen.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb.h"
 #include "src/sm/sm-instance.h"
+#include "src/sm/sm-names.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
 #include "src/target/client.h"

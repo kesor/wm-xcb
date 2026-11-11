@@ -49,8 +49,18 @@ typedef uint32_t TargetTypeId;
 /*
  * Request type constants
  * Used by components to handle requests via hub routing.
+ *
+ * A request is how one component asks another to act, so the constant a sender
+ * writes is declared here and not in the header of the component that answers
+ * it: including that header is the coupling docs/PHILOSOPHY.md section 2.1
+ * forbids. The tag view requests are answered by tag-manager and sent by
+ * ewmh-desktop, which is why they are part of this table.
  */
 enum {
+  REQ_TAG_VIEW          = 7, /* View a tag: data points at the tag number a user typed */
+  REQ_TAG_TOGGLE        = 8, /* Toggle a tag's visibility */
+  REQ_TAG_CLIENT_TOGGLE = 9, /* Move the target client to or from a tag */
+
   REQ_CLIENT_FULLSCREEN = 10,
   REQ_MONITOR_TILE      = 20,
   REQ_CLIENT_FLOAT      = 30,

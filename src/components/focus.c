@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/components/client-list.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb.h"

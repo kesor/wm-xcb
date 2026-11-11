@@ -29,32 +29,11 @@
 #include "src/core/wm-hub.h"
 #include "src/event-types.h"
 #include "src/sm/sm-instance.h"
+#include "src/sm/sm-names.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
-
-/*
- * Component name
- */
-#define FLOATING_COMPONENT_NAME "floating"
-
-/*
- * Floating State Machine states
- */
-typedef enum FloatingState {
-  FLOATING_STATE_TILED    = 0,
-  FLOATING_STATE_FLOATING = 1,
-} FloatingState;
-
-/*
- * Floating events emitted on state transitions
- */
-typedef enum FloatingEvent {
-  EVT_CLIENT_FLOATED  = EVT_FLOATING_BASE + 0,
-  EVT_CLIENT_TILED    = EVT_FLOATING_BASE + 1,
-  EVT_FLOATING_FAILED = EVT_FLOATING_BASE + 2,
-} FloatingEvent;
 
 /*
  * The geometry a client had when it left the layout.

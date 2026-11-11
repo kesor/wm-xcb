@@ -43,22 +43,6 @@ typedef struct StateMachine StateMachine;
 #define TAG_MANAGER_COMPONENT_NAME "tag-manager"
 
 /*
- * Tag Manager request types
- */
-enum TagManagerRequestType {
-  REQ_TAG_VIEW          = 7, /* View specific tag (1-9) */
-  REQ_TAG_TOGGLE        = 8, /* Toggle tag visibility */
-  REQ_TAG_CLIENT_TOGGLE = 9, /* Move current client to/from tag */
-};
-
-/*
- * Tag Manager event types
- */
-enum TagManagerEventType {
-  EVT_TAG_CHANGED = EVT_TAG_MANAGER_BASE + 0, /* Emitted when tag view state changes */
-};
-
-/*
  * Tag Manager SM states
  */
 enum TagViewState {

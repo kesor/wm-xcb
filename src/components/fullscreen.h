@@ -35,32 +35,11 @@
 #include "src/core/wm-hub.h"
 #include "src/event-types.h"
 #include "src/sm/sm-instance.h"
+#include "src/sm/sm-names.h"
 #include "src/sm/sm-registry.h"
 #include "src/sm/sm-template.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
-
-/*
- * Component name
- */
-#define FULLSCREEN_COMPONENT_NAME "fullscreen"
-
-/*
- * Fullscreen State Machine states
- */
-typedef enum FullscreenState {
-  FULLSCREEN_STATE_WINDOWED   = 0,
-  FULLSCREEN_STATE_FULLSCREEN = 1,
-} FullscreenState;
-
-/*
- * Fullscreen events emitted on state transitions
- */
-typedef enum FullscreenEvent {
-  EVT_FULLSCREEN_ENTERED = EVT_FULLSCREEN_BASE + 0,
-  EVT_FULLSCREEN_EXITED  = EVT_FULLSCREEN_BASE + 1,
-  EVT_FULLSCREEN_FAILED  = EVT_FULLSCREEN_BASE + 2,
-} FullscreenEvent;
 
 /*
  * Request types handled by this component

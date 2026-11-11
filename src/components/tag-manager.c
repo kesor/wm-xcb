@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "client-list.h"
 #include "src/actions/action-registry.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"

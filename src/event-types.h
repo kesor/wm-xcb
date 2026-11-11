@@ -49,6 +49,47 @@
 #define EVT_CONFIG_BASE       72
 #define EVT_CONFIG_LIMIT      80
 
+/*
+ * Event names that cross a component boundary
+ *
+ * A component declares its own event names in its own header. An event a
+ * second component subscribes to cannot be named that way: the subscriber
+ * would include the emitter's header, which docs/PHILOSOPHY.md section 2.1
+ * forbids and scripts/check-coupling.sh fails the build on. So a name another
+ * component has to spell is declared here, next to the range it belongs to.
+ *
+ * A name only the emitting component uses stays in that component's header:
+ * tiling's EVT_LAYOUT_CHANGED is in tiling.h, focus's EVT_CLIENT_FOCUSED in
+ * focus.h.
+ */
+
+/* client-list: hub_subscribe()d by focus, tag-manager and ewmh-desktop */
+enum ClientListEventType {
+  EVT_CLIENT_CREATED   = EVT_CLIENT_LIST_BASE + 0, /* Client was created and registered with hub */
+  EVT_CLIENT_DESTROYED = EVT_CLIENT_LIST_BASE + 1, /* Client was destroyed and unregistered with hub */
+  EVT_CLIENT_MANAGED   = EVT_CLIENT_LIST_BASE + 2, /* Client was added to the managed client list */
+  EVT_CLIENT_UNMANAGED = EVT_CLIENT_LIST_BASE + 3, /* Client was removed from the managed client list */
+};
+
+/* fullscreen: hub_subscribe()d by tiling */
+enum FullscreenEvent {
+  EVT_FULLSCREEN_ENTERED = EVT_FULLSCREEN_BASE + 0, /* Client entered fullscreen */
+  EVT_FULLSCREEN_EXITED  = EVT_FULLSCREEN_BASE + 1, /* Client left fullscreen */
+  EVT_FULLSCREEN_FAILED  = EVT_FULLSCREEN_BASE + 2, /* The request was refused */
+};
+
+/* tag-manager: hub_subscribe()d by ewmh-desktop */
+enum TagManagerEventType {
+  EVT_TAG_CHANGED = EVT_TAG_MANAGER_BASE + 0, /* Emitted when tag view state changes */
+};
+
+/* floating: hub_subscribe()d by tiling */
+enum FloatingEvent {
+  EVT_CLIENT_FLOATED  = EVT_FLOATING_BASE + 0, /* Client entered floating */
+  EVT_CLIENT_TILED    = EVT_FLOATING_BASE + 1, /* Client returned to the layout */
+  EVT_FLOATING_FAILED = EVT_FLOATING_BASE + 2, /* The request was refused */
+};
+
 _Static_assert(EVT_CLIENT_LIST_LIMIT <= EVT_FULLSCREEN_BASE, "client-list range overlaps fullscreen");
 _Static_assert(EVT_FULLSCREEN_LIMIT <= EVT_TAG_MANAGER_BASE, "fullscreen range overlaps tag-manager");
 _Static_assert(EVT_TAG_MANAGER_LIMIT <= EVT_FOCUS_BASE, "tag-manager range overlaps focus");

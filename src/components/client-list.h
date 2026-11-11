@@ -60,17 +60,6 @@
 #define CLIENT_LIST_COMPONENT_NAME "client-list"
 
 /*
- * Event types for client lifecycle
- * Components subscribe to these to react to client changes.
- */
-enum ClientListEventType {
-  EVT_CLIENT_CREATED   = EVT_CLIENT_LIST_BASE + 0, /* Client was created and registered with hub */
-  EVT_CLIENT_DESTROYED = EVT_CLIENT_LIST_BASE + 1, /* Client was destroyed and unregistered from hub */
-  EVT_CLIENT_MANAGED   = EVT_CLIENT_LIST_BASE + 2, /* Client was added to the managed client list */
-  EVT_CLIENT_UNMANAGED = EVT_CLIENT_LIST_BASE + 3, /* Client was removed from the managed client list */
-};
-
-/*
  * Client list component structure
  * Provides XCB event handlers and manages the global client list.
  *
