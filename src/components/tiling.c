@@ -821,7 +821,12 @@ tiling_component_init(void)
   tiling_component.base.executor = tiling_executor;
 
   /* Register with hub */
-  hub_register_component(&tiling_component.base);
+  if (hub_register_component(&tiling_component.base) != 0) {
+    sm_unregister_guard("tiling_guard_can_change_layout");
+    sm_unregister_action("tiling_action_on_layout_change");
+    tiling_component_reset();
+    return false;
+  }
 
   /* Cache the template for future monitors */
   cached_layout_template = layout_sm_template_create();

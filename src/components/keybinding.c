@@ -91,8 +91,14 @@ keybinding_init(void)
 
   LOG_DEBUG("Initializing keybinding component");
 
-  /* Register with hub */
-  hub_register_component(&keybinding_component);
+  /* Register with hub. `registered` stays true when the hub refuses a second
+   * init, which is the idempotent case; a refusal that leaves it false means
+   * no key reaches the WM, and the startup check in wm_components_init() is
+   * what keeps `initialized` false after this returns. */
+  if (hub_register_component(&keybinding_component) != 0 && !keybinding_component.registered) {
+    LOG_ERROR("Keybinding component did not register");
+    return;
+  }
 
   /* Initialize action registry (if not already initialized) */
   action_registry_init();

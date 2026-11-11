@@ -50,8 +50,7 @@ test_monitor_destroy_unadopts_before_freeing_machines(void)
   monitor_list_init();
 
   g_unadopt_seen_machine = NULL;
-  hub_register_component(&g_observer_component);
-  assert_or_abort(g_observer_component.registered == true);
+  assert_or_abort(hub_register_component(&g_observer_component) == 0);
 
   Monitor* m = monitor_create(121);
   assert_or_abort(m != NULL);
@@ -232,12 +231,10 @@ test_monitor_list_iteration(void)
   monitor_list_init();
 
   /* Create three monitors */
-  /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
   Monitor* m1 = monitor_create(100);
-  /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
   Monitor* m2 = monitor_create(200);
-  /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
   Monitor* m3 = monitor_create(300);
+  assert(m1 != NULL && m2 != NULL && m3 != NULL);
 
   /* Count monitors via iteration */
   uint32_t count = 0;
@@ -449,8 +446,7 @@ test_monitor_with_hub_integration(void)
     .registered            = false,
   };
 
-  hub_register_component(&test_component);
-  assert(test_component.registered == true);
+  assert(hub_register_component(&test_component) == 0);
 
   /* Create a monitor - it should be registered with hub */
   Monitor* m = monitor_create(100);

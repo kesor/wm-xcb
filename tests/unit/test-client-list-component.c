@@ -967,7 +967,7 @@ test_map_request_maps_only_a_client_on_screen(void)
   hub_init();
   xcb_handler_init();
   client_list_component_init();
-  hub_register_component(&visibility_stub);
+  assert(hub_register_component(&visibility_stub) == 0);
 
   xcb_map_request_event_t map_event = {
     .response_type = 20, /* XCB_MAP_REQUEST */

@@ -113,10 +113,10 @@ Components can register additional types at any time:
 HubTargetType* hub_register_target_type(const char* name, HubComponent* owner);
 ```
 
-When a component registers, its `accepted_target_names` are resolved to `HubTargetType*` pointers and stored in `accepted_targets`:
+When a component registers, its `accepted_target_names` are resolved to `HubTargetType*` pointers and stored in `accepted_targets`. The function returns 0 when the registry took the component and non-zero when it refused (a null pointer, a component already in the registry, or a full registry):
 
 ```c
-void hub_register_component(HubComponent* comp) {
+int hub_register_component(HubComponent* comp) {
   // ...
   /* Resolve accepted target type names to pointers */
   uint32_t accepted_count = 0;
@@ -125,12 +125,13 @@ void hub_register_component(HubComponent* comp) {
       accepted_count++;
     }
   }
-  
+
   /* Allocate and populate accepted_targets array */
   if (accepted_count > 0) {
     comp->accepted_targets = calloc(accepted_count + 1, sizeof(HubTargetType*));
     // ... resolve each name and store pointer
   }
+  return 0;
 }
 ```
 

@@ -88,10 +88,22 @@ static uint32_t   resolve_target_type_id(uint32_t legacy_id);
 static void
 clear_registry_state(void)
 {
+  /* A component's `registered` flag means "in this registry", so forgetting
+   * the registry has to clear it: hub_init() runs on the same components that
+   * a test or a session already registered, and a flag left standing makes the
+   * next hub_register_component() refuse a component the registry no longer
+   * holds. */
   for (uint32_t i = 0; i < component_count; i++) {
     if (components[i] != NULL) {
       free(components[i]->accepted_targets);
       components[i]->accepted_targets = NULL;
+      components[i]->registered       = false;
+    }
+  }
+
+  for (uint32_t i = 0; i < target_count; i++) {
+    if (targets[i] != NULL) {
+      targets[i]->registered = false;
     }
   }
 
@@ -259,22 +271,22 @@ resolve_target_type_id(uint32_t legacy_id)
   return TARGET_TYPE_INVALID;
 }
 
-void
+int
 hub_register_component(HubComponent* comp)
 {
   if (comp == NULL) {
     LOG_ERROR("Cannot register NULL component");
-    return;
+    return 1;
   }
 
   if (comp->registered) {
     LOG_ERROR("Component '%s' is already registered", comp->name);
-    return;
+    return 1;
   }
 
   if (component_count >= MAX_COMPONENTS) {
     LOG_ERROR("Maximum number of components reached (%d)", MAX_COMPONENTS);
-    return;
+    return 1;
   }
 
   /* Resolve accepted target type names to pointers */
@@ -323,6 +335,7 @@ hub_register_component(HubComponent* comp)
   component_add_to_request_type_index(comp);
 
   LOG_DEBUG("Registered component: %s", comp->name);
+  return 0;
 }
 
 /*
@@ -980,20 +993,8 @@ hub_shutdown(void)
   /* Clear routing indexes first */
   clear_routing_indexes();
 
-  /* Mark everything unregistered; clear_registry_state() frees the memory. */
-  for (uint32_t i = 0; i < component_count; i++) {
-    if (components[i] != NULL) {
-      components[i]->registered = false;
-    }
-  }
-
-  for (uint32_t i = 0; i < target_count; i++) {
-    if (targets[i] != NULL) {
-      targets[i]->registered = false;
-    }
-  }
-
-  /* Clear all registry state including indexes */
+  /* Clear all registry state including indexes. It marks the components and
+   * targets unregistered as it goes. */
   clear_registry_state();
 }
 

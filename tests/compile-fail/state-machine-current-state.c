@@ -8,7 +8,7 @@
 void
 probe(StateMachine* sm, uint32_t state)
 {
-#ifdef PRIVATE_STATE_CONTROL
+#ifdef REFUSAL_CONTROL
   sm_raw_write(sm, state);
 #else
   sm->current_state = state;

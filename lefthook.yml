@@ -53,15 +53,16 @@ pre-commit:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC, so its assertions never run."
 
-    # The single-writer rule is kept by the compiler, not by a reviewer: a
-    # component that assigns a machine-tracked field must not compile. Each
-    # fixture under tests/compile-fail/ is built twice, once through the
-    # accessor (must succeed) and once assigning the field (must fail), so a
+    # Two rules are kept by the compiler, not by a reviewer: a component that
+    # assigns a machine-tracked field must not compile, and a caller that drops
+    # hub_register_component()'s result must not compile either. Each fixture
+    # under tests/compile-fail/ is built twice, once as the code the rule
+    # allows (must succeed) and once as the code it refuses (must fail), so a
     # refusal is told apart from a broken include path.
-    private-state:
-      glob: ["*.{c,h}", "tests/compile-fail/*", "scripts/check-private-state.sh"]
-      run: ./scripts/check-private-state.sh
-      fail_text: "A machine-tracked value is writable from a component again. Move the definition out of the public header and expose an accessor."
+    compiler-refusals:
+      glob: ["*.{c,h}", "tests/compile-fail/*", "scripts/check-compiler-refusals.sh"]
+      run: ./scripts/check-compiler-refusals.sh
+      fail_text: "The compiler accepts something a rule refuses. A machine-tracked value is writable from a component, or hub_register_component()'s result can be dropped."
 
     # A .c file that is tracked but missing from SRC compiles nowhere, and
     # check-async scans the build's list, so a blocking call in it is invisible
@@ -190,9 +191,9 @@ pre-push:
       run: ./scripts/check-test-src.sh
       fail_text: "A test file is missing from TEST_SRC."
 
-    private-state:
-      run: ./scripts/check-private-state.sh
-      fail_text: "A machine-tracked value is writable from a component again. Move the definition out of the public header and expose an accessor."
+    compiler-refusals:
+      run: ./scripts/check-compiler-refusals.sh
+      fail_text: "The compiler accepts something a rule refuses. A machine-tracked value is writable from a component, or hub_register_component()'s result can be dropped."
 
     sources:
       run: ./scripts/check-orphan-sources.sh

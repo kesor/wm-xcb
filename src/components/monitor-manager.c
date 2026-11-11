@@ -107,8 +107,14 @@ monitor_manager_init(void)
 {
   LOG_INFO("Initializing monitor manager component");
 
-  /* Register with hub (idempotent - no-op if already registered) */
-  hub_register_component(&monitor_manager_component);
+  /* Register with hub. A second init finds the component already there, and
+   * that refusal is the idempotent case; one that leaves `registered` false
+   * means no monitor is created. */
+  if (hub_register_component(&monitor_manager_component) != 0 &&
+      !monitor_manager_component.registered) {
+    LOG_ERROR("Monitor manager did not register, so no monitor is created");
+    return;
+  }
 
   /* Register XCB handler for RandR notify events.
    *

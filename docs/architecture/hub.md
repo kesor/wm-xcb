@@ -54,11 +54,14 @@ The registry maintains:
 ### Component Registration
 
 ```c
-// Components register themselves at startup
-void hub_register_component(Component* comp) {
+// Components register themselves at startup. The return value says whether the
+// registry took the component: 0 when it did, non-zero when it refused, with the
+// reason logged.
+int hub_register_component(Component* comp) {
     // Add to components[]
     // Create index: by_name[comp->name] = comp
     // Create index: by_request_type[comp->requests[i]] = comp
+    return 0;
 }
 
 // Query: which component handles this request type?
@@ -371,8 +374,9 @@ typedef struct Event Event;
 void hub_init(void);
 void hub_shutdown(void);
 
-// Component registration
-void hub_register_component(Component* comp);
+// Component registration: 0 when the registry took the component, non-zero
+// when it refused. The result is not discardable.
+int hub_register_component(Component* comp) __attribute__((warn_unused_result));
 void hub_unregister_component(const char* name);
 
 // Target registration
@@ -409,11 +413,20 @@ Component** hub_get_components_for_target_type(TargetType type);
 // Initialization
 hub_init();
 
-// Register components (each component does this at init)
-hub_register_component(&fullscreen_component);
-hub_register_component(&floating_component);
-hub_register_component(&focus_component);
-hub_register_component(&urgency_component);
+// Register components (each component does this at init, and checks the result:
+// a component the hub refused receives no requests and adopts no targets)
+if (hub_register_component(&fullscreen_component) != 0) {
+    return false;
+}
+if (hub_register_component(&floating_component) != 0) {
+    return false;
+}
+if (hub_register_component(&focus_component) != 0) {
+    return false;
+}
+if (hub_register_component(&urgency_component) != 0) {
+    return false;
+}
 
 // client_create() registers the target, and that registration adopts.
 Client* c = client_create(window);

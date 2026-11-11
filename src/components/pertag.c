@@ -56,15 +56,13 @@ pertag_component_init(void)
     return;
   }
 
-  hub_register_component(&pertag_component);
-
-  /* Check if registration succeeded */
-  if (pertag_component.registered) {
-    initialized = true;
-    LOG_DEBUG("Pertag component registered with hub");
-  } else {
-    LOG_WARN("Pertag component registration failed");
+  if (hub_register_component(&pertag_component) != 0) {
+    LOG_WARN("Pertag component is not registered, so no monitor keeps per-tag state");
+    return;
   }
+
+  initialized = true;
+  LOG_DEBUG("Pertag component registered with hub");
 }
 
 /*
