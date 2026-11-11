@@ -1,6 +1,6 @@
 ---
 name: wm-line
-description: Decide what to optimize and what to refuse, using four rules — the route never changes, output cannot be counted, capacity is a choice, and waiting is a decision. Use when proposing a change to the loop, a new gate, a metric or a dashboard, a parallelism or batch policy, when weighing whether a technique borrowed from factory management, Lean or the theory of constraints applies here, or when a run produced a finding and the question is what to change rather than who was at fault.
+description: Decide what to optimize and what to refuse: first name the constraint station from one item's chain, then apply four rules — the route never changes, output cannot be counted, capacity is a choice, and waiting is a decision. Use when proposing a change to the loop, a new gate, a metric or a dashboard, a parallelism or batch policy, when weighing whether a technique borrowed from factory management, Lean or the theory of constraints applies here, or when a run produced a finding and the question is what to change rather than who was at fault.
 ---
 
 # What to optimize, and what to refuse
@@ -19,8 +19,8 @@ there once. This skill is the working short form, and it states each term's clai
 where the term first appears.
 
 The four rules say what to refuse. They do not say which station to work on.
-That is the next section, and it is the first thing to do before acting on any
-of the four.
+That is "Which station to work on" below, and it is the first thing to do
+before acting on any of the four.
 
 ## Where the rules come from
 
@@ -54,10 +54,14 @@ the tools is the step that failed.
 ## Which station to work on
 
 The constraint is the station that sets the rate of the whole route: the one
-that is longest and most often idle. Goldratt's five focusing steps reduce to
-four here, because the fifth — go back and refuse to let inertia become the
-constraint — is step 4 done again. Do them in order, and stop at the first one
-you cannot do.
+with the largest share of one item's chain. That is what `DESIGN.md`, "The
+chain per item, measured", reports, and what the harness names when it prints
+the chain. Goldratt's five focusing steps are identify, exploit, subordinate,
+elevate, and refuse inertia. This section is identify, subordinate, and the
+re-measure that catches a moved constraint or inertia. Exploit and elevate are
+the work done *on* the named station — the ordered list under that DESIGN.md
+section — not a second choice of which station to serve. Do the steps below in
+order, and stop at the first one you cannot do.
 
 1. **Measure one item's chain.** Each station's time, in the route's order, for
    one item through the lane you are judging. The measurement lives in
@@ -65,10 +69,11 @@ you cannot do.
    the rule; copying a number out of that section makes a second snapshot, and
    a snapshot copied forward is the drift that section warns about. Recompute
    the table before acting on it, and say which window you read.
-2. **Name the station that is longest and most often idle.** That is the
-   constraint. Longest alone is not enough: a station that is long but never
-   waits has spare capacity, and the one that sits idle while work exists is
-   the one the route is losing time to.
+2. **Name the station with the largest share.** That is the constraint.
+   Largest share is the same fact "waiting is a decision" calls the slowest
+   station. Do not read idleness as the signal: non-constraints sit idle
+   because they have spare capacity, and the constraint sitting idle while work
+   exists is the failure the next step exists to prevent, not how you find it.
 3. **Subordinate the rest of the route to keeping that station working.** Do
    not optimize a station that is not the constraint: work done there does not
    move the rate, and it lengthens the lead time of everything behind it. Do
