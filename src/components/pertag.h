@@ -23,8 +23,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../target/tag.h"
 #include "src/core/wm-hub.h"
+#include "src/target/tag.h"
 
 /*
  * Number of tags (matches TAG_NUM_TAGS)

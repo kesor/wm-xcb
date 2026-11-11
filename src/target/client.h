@@ -20,9 +20,9 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
-#include "../sm/sm-registry.h"
-#include "../sm/sm.h"
 #include "src/core/wm-hub.h"
+#include "src/sm/sm-registry.h"
+#include "src/sm/sm.h"
 
 /* Forward declaration */
 typedef struct Monitor Monitor;

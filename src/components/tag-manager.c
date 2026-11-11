@@ -13,16 +13,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../sm/sm-instance.h"
-#include "../sm/sm-registry.h"
-#include "../sm/sm-template.h"
-#include "../target/client.h"
-#include "../target/monitor.h"
-#include "../target/tag.h"
 #include "client-list.h"
 #include "src/actions/action-registry.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
+#include "src/sm/sm-instance.h"
+#include "src/sm/sm-registry.h"
+#include "src/sm/sm-template.h"
+#include "src/target/client.h"
+#include "src/target/monitor.h"
+#include "src/target/tag.h"
 #include "tag-manager.h"
 
 /*

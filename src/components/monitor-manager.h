@@ -11,8 +11,8 @@
 #ifndef _MONITOR_MANAGER_H_
 #define _MONITOR_MANAGER_H_
 
-#include "../xcb/xcb-handler.h"
 #include "src/core/wm-hub.h"
+#include "src/xcb/xcb-handler.h"
 
 /*
  * Monitor Manager Component

@@ -71,6 +71,15 @@ pre-commit:
       run: ./scripts/check-orphan-sources.sh
       fail_text: "A tracked .c file is in no build target, so the compiler and check-async both skip it. Add it to SRC, or delete it."
 
+    # The Makefile's -I. makes a header name from the repository root mean the
+    # same thing in every file. One that walks up compiles where the including
+    # file is today and breaks when that file moves, and the failure names the
+    # moved file rather than the include line nobody touched.
+    includes:
+      glob: "*.{c,h}"
+      run: ./scripts/check-includes.sh
+      fail_text: "An include walks up a directory. Write it from the repository root: #include \"src/core/wm-hub.h\"."
+
     # A stand-in answers every assertion a test asks it, so the program it names
     # is the one part of a test the suite cannot falsify. The gate resolves that
     # name on PATH, requires a file, and looks there for the line the stand-in
@@ -198,6 +207,12 @@ pre-push:
     sources:
       run: ./scripts/check-orphan-sources.sh
       fail_text: "A tracked .c file is in no build target, so the compiler and check-async both skip it."
+
+    # Same rule as the commit hook. The glob there makes a commit that stages no
+    # C file skip it, and the merge and CI run this list, not that one.
+    includes:
+      run: ./scripts/check-includes.sh
+      fail_text: "An include walks up a directory. Write it from the repository root: #include \"src/core/wm-hub.h\"."
 
     fakes:
       run: ./scripts/check-fakes.sh
