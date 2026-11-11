@@ -96,6 +96,17 @@ run; if it says "docs updated", read the doc.
    put in their final message.
 5. **Style, last.** Only where it hides a defect.
 
+The list is a floor, the least a review must answer. It says where to start and
+it says nothing about the change as a whole: whether it should exist, what it
+costs the person who runs it, and what the author chose not to build have no
+item here. Read the diff on its own first — what it does, what it leaves out,
+who it is for — and answer the list afterwards against that reading. A diff
+read through the list yields only what the list has room for. Name that
+remainder: a finding on none of the items is the one worth writing down, and a
+review that only answers the items has checked a list, not a change. The rule is
+DESIGN.md section 10a in the harness repository `ai-workers-for-wm/`, which
+this checkout does not carry.
+
 Not worth saying: the diff restated, praise, and anything the gates already
 enforce. If the only finding is formatting, the gates will have caught it.
 
