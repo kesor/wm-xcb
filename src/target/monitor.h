@@ -26,8 +26,8 @@
 #include <xcb/randr.h>
 #include <xcb/xcb.h>
 
-#include "../sm/sm.h"
 #include "src/core/wm-hub.h"
+#include "src/sm/sm.h"
 
 /*
  * Monitor structure

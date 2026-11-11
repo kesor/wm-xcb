@@ -10,13 +10,13 @@
 #include <string.h>
 #include <xcb/xcbext.h>
 
-#include "../sm/sm-registry.h"
-#include "../sm/sm.h"
 #include "client.h"
 #include "monitor.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb.h"
+#include "src/sm/sm-registry.h"
+#include "src/sm/sm.h"
 
 /*
  * Sentinel-based client list

@@ -262,9 +262,8 @@ not copied here. Delete a line below when a gate starts checking it.
 - A walk over the client list follows `client_get_next()` and saves the next
   pointer before a callback that may free the current client:
   `src/target/client.h`.
-- A document changes in the same commit as the behaviour it records, and an
-  include is written from the repository root: `docs/QUALITY.md`, "Rules no gate
-  checks".
+- A document changes in the same commit as the behaviour it records:
+  `docs/QUALITY.md`, "Rules no gate checks".
 - A new component or feature has a test that fails when the behaviour is
   absent: `docs/TESTING.md`, "Unit tests".
 - One `xcb_flush()` per loop iteration: `docs/PHILOSOPHY.md` section 3.
