@@ -132,7 +132,10 @@ client_list_component_init(void)
   LOG_DEBUG("Initializing client list component");
 
   /* Register with hub */
-  hub_register_component(client_list_component_base());
+  if (hub_register_component(client_list_component_base()) != 0) {
+    client_list_component_reset();
+    return false;
+  }
 
   /* Initialize the client list (from client.c) */
   client_list_init();

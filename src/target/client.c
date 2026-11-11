@@ -217,17 +217,6 @@ client_list_get_head(void)
 }
 
 /*
- * Get the last client in the list.
- */
-static Client*
-client_list_get_tail(void)
-{
-  if (client_sentinel.prev == &client_sentinel)
-    return NULL;
-  return client_sentinel.prev;
-}
-
-/*
  * Add a client to the list (inserts at the head, after sentinel).
  */
 static void

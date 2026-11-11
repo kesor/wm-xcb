@@ -209,7 +209,22 @@ void hub_send_request_data(RequestType type, TargetID target, void* data);
 void hub_send_request_with_cid(RequestType type, TargetID target, uint64_t correlation_id);
 
 /* Component registration */
-void          hub_register_component(HubComponent* comp);
+
+/*
+ * Add a component to the registry, the name index, the request index, and the
+ * adoption list.
+ *
+ * Returns 0 when the component is registered, non-zero when the hub refused it:
+ * a NULL pointer, a component already in the registry, or a full registry. The
+ * reason is logged here. A caller has to check the result, because a component
+ * that was refused receives no requests and adopts no targets, and nothing
+ * else in the WM notices until a user finds the feature missing.
+ *
+ * The result is deliberately not discardable: a bare
+ * `hub_register_component(&comp);` is a compiler diagnostic under -Wall, and
+ * tests/compile-fail/registration-result-ignored.c is what proves it.
+ */
+int           hub_register_component(HubComponent* comp) __attribute__((warn_unused_result));
 void          hub_unregister_component(const char* name);
 HubComponent* hub_get_component_by_name(const char* name);
 HubComponent* hub_get_component_by_request_type(RequestType type);

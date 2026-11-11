@@ -126,11 +126,11 @@ test_register_unregister_component(void)
   assert(test_fullscreen.registered == false);
   assert(hub_component_count() == 0);
 
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
   assert(test_fullscreen.registered == true);
   assert(hub_component_count() == 1);
 
-  hub_register_component(&test_focus);
+  assert(hub_register_component(&test_focus) == 0);
   assert(test_focus.registered == true);
   assert(hub_component_count() == 2);
 
@@ -150,7 +150,7 @@ test_register_null_component(void)
 {
   LOG_CLEAN("== Testing registration of NULL component");
   hub_init();
-  hub_register_component(NULL);
+  assert(hub_register_component(NULL) != 0);
   assert(hub_component_count() == 0);
   hub_shutdown();
 }
@@ -180,8 +180,8 @@ test_get_component_by_name(void)
   LOG_CLEAN("== Testing get component by name");
   hub_init();
 
-  hub_register_component(&test_fullscreen);
-  hub_register_component(&test_focus);
+  assert(hub_register_component(&test_fullscreen) == 0);
+  assert(hub_register_component(&test_focus) == 0);
 
   HubComponent* found = hub_get_component_by_name("fullscreen");
   assert(found == &test_fullscreen);
@@ -204,8 +204,8 @@ test_get_component_by_request_type(void)
   LOG_CLEAN("== Testing get component by request type");
   hub_init();
 
-  hub_register_component(&test_fullscreen);
-  hub_register_component(&test_focus);
+  assert(hub_register_component(&test_fullscreen) == 0);
+  assert(hub_register_component(&test_focus) == 0);
 
   /* Request type 1: fullscreen handles it, but focus was registered last
    * and also handles it, so focus wins (last registered wins) */
@@ -238,7 +238,7 @@ test_unregister_drops_the_last_request_handler(void)
   LOG_CLEAN("== Testing a request type loses its handler with the component");
   hub_init();
 
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
   assert(hub_get_component_by_request_type(1) == &test_fullscreen);
   assert(hub_get_component_by_request_type(2) == &test_fullscreen);
 
@@ -261,8 +261,8 @@ test_unregister_keeps_a_request_type_another_component_owns(void)
   LOG_CLEAN("== Testing unregistration leaves a request type to its current owner");
   hub_init();
 
-  hub_register_component(&test_fullscreen); /* request types 1 and 2 */
-  hub_register_component(&test_focus);      /* request types 1 and 3, and 1 is now focus's */
+  assert(hub_register_component(&test_fullscreen) == 0); /* request types 1 and 2 */
+  assert(hub_register_component(&test_focus) == 0);      /* request types 1 and 3, and 1 is now focus's */
 
   hub_unregister_component("fullscreen");
 
@@ -424,11 +424,12 @@ test_double_registration(void)
   LOG_CLEAN("== Testing double registration prevention");
   hub_init();
 
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
   assert(hub_component_count() == 1);
 
-  /* Try to register again - should be a no-op */
-  hub_register_component(&test_fullscreen);
+  /* The second registration is refused: the registry already holds it, and
+   * the refusal is what a caller has to notice. */
+  assert(hub_register_component(&test_fullscreen) != 0);
   assert(hub_component_count() == 1);
 
   hub_register_target(&test_client1);
@@ -441,13 +442,38 @@ test_double_registration(void)
   hub_shutdown();
 }
 
+/*
+ * Test: hub_init() forgets a registration the registry inherited, including the
+ * component's own flag. A test or a session that calls hub_init() twice without
+ * a shutdown in between otherwise finds the second registration refused for a
+ * component the registry no longer holds.
+ */
+void
+test_hub_init_forgets_the_registered_flag(void)
+{
+  LOG_CLEAN("== Testing hub_init() clears the registered flag it inherited");
+  hub_init();
+
+  assert(hub_register_component(&test_fullscreen) == 0);
+  assert(test_fullscreen.registered == true);
+
+  hub_init();
+
+  assert(hub_component_count() == 0);
+  assert(test_fullscreen.registered == false);
+  assert(hub_get_component_by_name("fullscreen") == NULL);
+  assert(hub_register_component(&test_fullscreen) == 0);
+
+  hub_shutdown();
+}
+
 void
 test_double_unregistration(void)
 {
   LOG_CLEAN("== Testing double unregistration prevention");
   hub_init();
 
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
   hub_unregister_component("fullscreen");
   assert(test_fullscreen.registered == false);
 
@@ -472,8 +498,8 @@ test_idempotent_shutdown(void)
   LOG_CLEAN("== Testing idempotent shutdown");
   hub_init();
 
-  hub_register_component(&test_fullscreen);
-  hub_register_component(&test_focus);
+  assert(hub_register_component(&test_fullscreen) == 0);
+  assert(hub_register_component(&test_focus) == 0);
   hub_register_target(&test_client1);
   hub_register_target(&test_monitor1);
 
@@ -497,7 +523,7 @@ test_shutdown_clears_indexes(void)
   LOG_CLEAN("== Testing shutdown clears lookup indexes");
 
   hub_init();
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
   hub_register_target(&test_client1);
 
   /* Verify lookups work */
@@ -526,7 +552,7 @@ test_shutdown_releases_registry_memory(void)
   LOG_CLEAN("== Testing shutdown releases the memory the registry allocated");
 
   hub_init();
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
   hub_register_target(&test_client1);
 
   assert(test_fullscreen.accepted_targets != NULL);
@@ -539,7 +565,7 @@ test_shutdown_releases_registry_memory(void)
 
   /* Re-register after shutdown and verify the array is rebuilt. */
   hub_init();
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
   assert(test_fullscreen.accepted_targets != NULL);
   assert(test_fullscreen.accepted_targets[0] == hub_get_target_type_by_name("client"));
   assert(test_fullscreen.accepted_targets[1] == NULL);
@@ -978,7 +1004,7 @@ test_routing_basic_request(void)
   LOG_CLEAN("== Testing basic request routing");
   hub_init();
 
-  hub_register_component(&routing_fullscreen);
+  assert(hub_register_component(&routing_fullscreen) == 0);
 
   executor_call_count = 0;
   hub_send_request(1, 100); /* Send request type 1 to target 100 */
@@ -996,7 +1022,7 @@ test_routing_target_id_passed(void)
   LOG_CLEAN("== Testing target ID is passed to executor");
   hub_init();
 
-  hub_register_component(&routing_focus);
+  assert(hub_register_component(&routing_focus) == 0);
 
   executor_call_count = 0;
   hub_send_request(3, 999);
@@ -1014,7 +1040,7 @@ test_routing_data_passed(void)
   LOG_CLEAN("== Testing request data is passed to executor");
   hub_init();
 
-  hub_register_component(&routing_fullscreen);
+  assert(hub_register_component(&routing_fullscreen) == 0);
 
   executor_call_count = 0;
   int test_data       = 42;
@@ -1032,7 +1058,7 @@ test_routing_correlation_id(void)
   LOG_CLEAN("== Testing correlation ID is passed to executor");
   hub_init();
 
-  hub_register_component(&routing_fullscreen);
+  assert(hub_register_component(&routing_fullscreen) == 0);
 
 
   executor_call_count = 0;
@@ -1050,10 +1076,10 @@ test_routing_to_correct_component(void)
   LOG_CLEAN("== Testing request routes to correct component");
   hub_init();
 
-  hub_register_component(&routing_fullscreen);
-  hub_register_component(&routing_focus);
+  assert(hub_register_component(&routing_fullscreen) == 0);
+  assert(hub_register_component(&routing_focus) == 0);
 
-  hub_register_component(&routing_monitor);
+  assert(hub_register_component(&routing_monitor) == 0);
 
   executor_call_count = 0;
   hub_send_request(3, 100);    /* Request type 3 - focus component */
@@ -1089,7 +1115,7 @@ test_routing_no_executor(void)
   LOG_CLEAN("== Testing routing to component without executor");
   hub_init();
 
-  hub_register_component(&routing_no_exec);
+  assert(hub_register_component(&routing_no_exec) == 0);
 
   executor_call_count = 0;
   hub_send_request(99, 100);
@@ -1106,8 +1132,8 @@ test_get_executor_for_request(void)
   hub_init();
 
 
-  hub_register_component(&routing_fullscreen);
-  hub_register_component(&routing_focus);
+  assert(hub_register_component(&routing_fullscreen) == 0);
+  assert(hub_register_component(&routing_focus) == 0);
 
   assert(hub_get_executor_for_request(1) == exec_fullscreen);
   assert(hub_get_executor_for_request(3) == exec_focus);
@@ -1122,7 +1148,7 @@ test_get_executor_after_unregister(void)
   LOG_CLEAN("== Testing get executor returns NULL after unregister");
   hub_init();
 
-  hub_register_component(&routing_fullscreen);
+  assert(hub_register_component(&routing_fullscreen) == 0);
   assert(hub_get_executor_for_request(1) == exec_fullscreen);
 
   hub_unregister_component("routing-fullscreen");
@@ -1139,7 +1165,7 @@ test_simple_request_flow(void)
   hub_init();
 
   /* Simulate: keybinding component sends REQ_CLIENT_FOCUS */
-  hub_register_component(&routing_focus);
+  assert(hub_register_component(&routing_focus) == 0);
 
   /* Simulate: user presses keybinding */
   executor_call_count = 0;
@@ -1158,7 +1184,7 @@ test_fullscreen_toggle_flow(void)
   LOG_CLEAN("== Testing fullscreen toggle flow");
   hub_init();
 
-  hub_register_component(&routing_fullscreen);
+  assert(hub_register_component(&routing_fullscreen) == 0);
 
   /* Toggle fullscreen on */
   executor_call_count = 0;
@@ -1194,9 +1220,9 @@ test_adoption_hooks_called_on_target_register(void)
   last_adopted_target = TARGET_ID_NONE;
 
   /* Register components FIRST so they're available when target is registered */
-  hub_register_component(&test_fullscreen);
-  hub_register_component(&test_focus);
-  hub_register_component(&test_monitor);
+  assert(hub_register_component(&test_fullscreen) == 0);
+  assert(hub_register_component(&test_focus) == 0);
+  assert(hub_register_component(&test_monitor) == 0);
 
   /* Register a client - should trigger on_adopt for client-compatible components */
   LOG_CLEAN("  Registering test_client1 (CLIENT)...");
@@ -1232,7 +1258,7 @@ test_adoption_only_for_compatible_targets(void)
   adopt_count_monitor = 0;
 
   /* Register only the client component */
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
 
 
   /* Register a client - should trigger adoption */
@@ -1256,7 +1282,7 @@ test_adoption_for_multiple_targets_of_same_type(void)
 
   adopt_count_client = 0;
 
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
 
 
   /* Register first client */
@@ -1284,7 +1310,7 @@ test_component_registered_after_target_is_not_adopted(void)
   hub_register_target(&test_client1);
   assert(adopt_count_client == 0);
 
-  hub_register_component(&test_fullscreen);
+  assert(hub_register_component(&test_fullscreen) == 0);
   assert(adopt_count_client == 0);
 
   /* Only a target registered after the component is adopted by it. */
@@ -1300,9 +1326,9 @@ test_get_components_for_target_type(void)
   LOG_CLEAN("== Testing hub_get_components_for_target_type");
   hub_init();
 
-  hub_register_component(&test_fullscreen);
-  hub_register_component(&test_focus);
-  hub_register_component(&test_monitor);
+  assert(hub_register_component(&test_fullscreen) == 0);
+  assert(hub_register_component(&test_focus) == 0);
+  assert(hub_register_component(&test_monitor) == 0);
 
   /* Get components for CLIENT type */
   HubComponent** client_comps = hub_get_components_for_target_type(hub_get_target_type_id_by_name("client"));
@@ -1349,9 +1375,9 @@ test_unadoption_hooks_called_on_target_unregister(void)
   unadopt_count_monitor = 0;
 
   /* Register components */
-  hub_register_component(&test_fullscreen);
-  hub_register_component(&test_focus);
-  hub_register_component(&test_monitor);
+  assert(hub_register_component(&test_fullscreen) == 0);
+  assert(hub_register_component(&test_focus) == 0);
+  assert(hub_register_component(&test_monitor) == 0);
 
   /* Register a client - adoption should happen */
   hub_register_target(&test_client1);
@@ -1401,6 +1427,7 @@ TEST_GROUP(HubRegistry, {
   test_get_target_by_id();
   test_get_targets_by_type();
   test_double_registration();
+  test_hub_init_forgets_the_registered_flag();
   test_double_unregistration();
   test_idempotent_shutdown();
   test_shutdown_clears_indexes();
@@ -1589,9 +1616,9 @@ test_components_for_target_type_name(void)
   LOG_CLEAN("== Testing hub_get_components_for_target_type_name");
   hub_init();
 
-  hub_register_component(&test_fullscreen);
-  hub_register_component(&test_focus);
-  hub_register_component(&test_monitor);
+  assert(hub_register_component(&test_fullscreen) == 0);
+  assert(hub_register_component(&test_focus) == 0);
+  assert(hub_register_component(&test_monitor) == 0);
 
   /* Get components for "client" type by name */
   HubComponent** client_comps = hub_get_components_for_target_type_name("client");
@@ -1633,7 +1660,7 @@ test_target_type_with_component_owner(void)
     .accepted_targets      = NULL,
     .registered            = false,
   };
-  hub_register_component(&owner_comp);
+  assert(hub_register_component(&owner_comp) == 0);
 
   HubTargetType* owned_type = hub_register_target_type("owned-type", &owner_comp);
   assert(owned_type != NULL);

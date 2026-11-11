@@ -454,10 +454,7 @@ floating_component_init(void)
     return false;
   }
 
-  hub_register_component(&floating_component.base);
-
-  if (hub_get_component_by_name(FLOATING_COMPONENT_NAME) == NULL) {
-    LOG_ERROR("Floating component registration was refused");
+  if (hub_register_component(&floating_component.base) != 0) {
     action_unregister(floating_action.name);
     sm_unregister_guard("floating_guard_can_float");
     sm_unregister_guard("floating_guard_can_tile");

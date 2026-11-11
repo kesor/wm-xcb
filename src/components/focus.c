@@ -826,7 +826,12 @@ focus_component_init(void)
   }
 
   /* Register with hub */
-  hub_register_component(&focus_component.base);
+  if (hub_register_component(&focus_component.base) != 0) {
+    sm_unregister_guard("focus_guard_can_focus");
+    sm_unregister_guard("focus_guard_can_unfocus");
+    focus_unregister_actions();
+    return false;
+  }
 
   focus_subscribe_events();
 

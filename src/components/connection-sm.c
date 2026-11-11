@@ -11,30 +11,6 @@
 #include "src/core/wm-log.h"
 
 /*
- * Guard functions
- *
- * Guard functions must match the SMGuardFn signature:
- * bool (*)(StateMachine* sm, void* data)
- */
-static bool
-guard_disconnect_allowed(StateMachine* sm, void* data)
-{
-  /* Always allow disconnect */
-  (void) sm;
-  (void) data;
-  return true;
-}
-
-static bool
-guard_connect_allowed(StateMachine* sm, void* data)
-{
-  /* Always allow connect/reconnect */
-  (void) sm;
-  (void) data;
-  return true;
-}
-
-/*
  * Template creation
  */
 SMTemplate*

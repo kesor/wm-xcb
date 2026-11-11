@@ -417,9 +417,7 @@ ewmh_desktop_component_init(void)
     ewmh_desktop_reset();
   }
 
-  hub_register_component(&ewmh_desktop_component.base);
-  if (hub_get_component_by_name(EWMH_DESKTOP_COMPONENT_NAME) == NULL) {
-    LOG_ERROR("ewmh-desktop: the hub refused the registration");
+  if (hub_register_component(&ewmh_desktop_component.base) != 0) {
     ewmh_desktop_reset();
     return false;
   }

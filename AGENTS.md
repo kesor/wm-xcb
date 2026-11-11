@@ -443,13 +443,13 @@ void client_set_title(Client* c, char* title);
 - **Fix**: Always verify registration and handle failures
 
 ```c
-// BAD
+// BAD: the result is not discardable. A bare call is a compiler diagnostic,
+// and the log line is a guess.
 hub_register_component(&comp);
-LOG_DEBUG("Component registered");  // May not be true!
+LOG_DEBUG("Component registered");
 
 // GOOD
-hub_register_component(&comp);
-if (!comp.registered) {
+if (hub_register_component(&comp) != 0) {
     LOG_ERROR("Component registration failed");
     return false;
 }
