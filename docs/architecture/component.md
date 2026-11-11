@@ -200,10 +200,14 @@ bus.
 
 `scripts/check-coupling.sh` fails the commit and the push on the include. It
 reads every `#include` under `src/components/` and judges the header by the
-file that includes it, in both forms the Makefile resolves: written from the
-repository root (`#include "src/components/focus.h"`) and by its bare name
-(`#include "focus.h"`). The including file's own header, and a header of the
-same component, pass; `keybindings.h` is the keybinding component's table.
+file that includes it. A quoted include is resolved two ways: the including
+file's directory first (`#include "focus.h"`, and `#include "./focus.h"` is
+the same header) and then the repository root via the Makefile's `-I.`
+(`#include "src/components/focus.h"`, including a `/./` in that path). Angle
+brackets skip the including file's directory, so `<focus.h>` is not a component
+header and `<src/components/focus.h>` is. The including file's own header, and
+a header of the same component, pass; `keybindings.h` is the keybinding
+component's table, and that pair is the only one whose names differ.
 
 A name both components spell moves to the header for what it is:
 `src/event-types.h` for an event a second component subscribes to,

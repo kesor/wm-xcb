@@ -10,7 +10,12 @@
 #     the bare name;
 #   - a header outside src/components/, and a system header, which are shared;
 #   - another component's header written from the repository root, by its bare
-#     name, and in angle brackets;
+#     name, with a ./ before that name, with a /./ in the path, and in angle
+#     brackets;
+#   - an angle-bracket bare name, which -I. does not resolve to a component
+#     header;
+#   - a name that differs from the including file's by a trailing s, which is
+#     another component unless the pair is keybindings.h and keybinding.h;
 #   - a search that did not run, which is not a clean tree;
 #   - the tree as committed, which has to pass its own gate.
 source "$(dirname "$0")/lib.sh"
@@ -76,6 +81,9 @@ EOF
 }
 coupling_case root-path src/components/tiling.c '#include "src/components/floating.h"'
 coupling_case angled src/components/tiling.c '#include <src/components/floating.h>'
+coupling_case dot-in-root-path src/components/tiling.c '#include "src/./components/floating.h"'
+coupling_case angled-dot-in-root-path src/components/tiling.c '#include <src/./components/floating.h>'
+coupling_case leading-dot-root-path src/components/tiling.c '#include "./src/components/floating.h"'
 
 # The bare name resolves from the including file's directory, so the header it
 # names has to be there for the include to build at all: the fixture carries
@@ -102,6 +110,62 @@ tracked_at "$R" src/components/tiling.c <<'EOF'
 EOF
 "$R/scripts/check-coupling.sh" >"$LAST" 2>&1
 check_eq "a quoted header outside src/components passes" 0 "$?"
+
+# "./focus.h" is the header next to the including file. The compiler finds it;
+# a gate that only matches a bare name or a src/components/ prefix does not.
+R=$(repo dot-slash)
+tracked_at "$R" src/components/focus.h <<'EOF'
+#include "src/core/wm-hub.h"
+EOF
+tracked_at "$R" src/components/tiling.c <<'EOF'
+#include "./focus.h"
+EOF
+"$R/scripts/check-coupling.sh" >"$LAST" 2>&1
+check_eq "dot-slash fails the gate" 1 "$?"
+check_eq "dot-slash is named by file and line" 1 \
+  "$(grep -c '^  OTHER COMPONENT  src/components/tiling.c:1:' "$LAST")"
+tracked_at "$R" src/components/tiling.c <<'EOF'
+#include "././focus.h"
+EOF
+"$R/scripts/check-coupling.sh" >"$LAST" 2>&1
+check_eq "repeated dot-slash fails the gate" 1 "$?"
+
+R=$(repo dot-own)
+tracked_at "$R" src/components/tiling.h <<'EOF'
+#include "src/core/wm-hub.h"
+EOF
+tracked_at "$R" src/components/tiling.c <<'EOF'
+#include "./tiling.h"
+EOF
+"$R/scripts/check-coupling.sh" >"$LAST" 2>&1
+check_eq "a component's own header written with ./ passes" 0 "$?"
+
+# Angle brackets do not search the including file's directory, and -I. is the
+# repository root, so <focus.h> is not src/components/focus.h. The gate that
+# judges it by the bare name fails a line the compiler does not resolve.
+R=$(repo angle-bare)
+tracked_at "$R" src/components/focus.h <<'EOF'
+#include "src/core/wm-hub.h"
+EOF
+tracked_at "$R" src/components/tiling.c <<'EOF'
+#include <focus.h>
+EOF
+"$R/scripts/check-coupling.sh" >"$LAST" 2>&1
+check_eq "an angle-bracket bare name is not a component header" 0 "$?"
+
+# keybindings.h including keybinding.h is the one same-component pair whose
+# names differ. A trailing s on any other name is a different component.
+R=$(repo trailing-s)
+tracked_at "$R" src/components/focus.h <<'EOF'
+#include "src/core/wm-hub.h"
+EOF
+tracked_at "$R" src/components/focuss.c <<'EOF'
+#include "focus.h"
+EOF
+"$R/scripts/check-coupling.sh" >"$LAST" 2>&1
+check_eq "a trailing s is another component" 1 "$?"
+check_eq "the trailing-s include is named" 1 \
+  "$(grep -c '^  OTHER COMPONENT  src/components/focuss.c:1:' "$LAST")"
 
 R=$(repo counts)
 tracked_at "$R" src/components/tiling.c <<'EOF'

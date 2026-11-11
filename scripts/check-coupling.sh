@@ -11,17 +11,19 @@
 # This is the device.
 #
 # A header is judged by the file that includes it. src/components/ is flat, so
-# the header's name is the component's name, and the include may be written two
-# ways: from the repository root (`#include "src/components/focus.h"`) or by its
-# bare name (`#include "focus.h"`), which the Makefile's -I. resolves from the
-# including file's directory. Both name another component's header, and a
-# search for one form misses the other.
+# the header's name is the component's name. A quoted include is resolved two
+# ways, and they are not the same mechanism: the including file's directory is
+# searched first, which is what `#include "focus.h"` and `#include "./focus.h"`
+# use, and the Makefile's -I. then searches the repository root, which is what
+# `#include "src/components/focus.h"` uses. A `/./` in that path is the same
+# header. Angle brackets skip the including file's directory, so `<focus.h>` is
+# not a component header and `<src/components/focus.h>` is.
 #
 # Not a finding: the including file's own header, and a header of the same
-# component. A component's files are named after it, with one exception in this
-# tree: keybindings.h is the keybinding component's user-editable table, and it
-# includes keybinding.h. A plural s is what separates them, so a name that
-# differs from the including file's by one trailing s is the same component.
+# component. A component's files are named after it. The one exception in this
+# tree is the pair keybindings.h and keybinding.h: keybindings.h is the
+# keybinding component's user-editable table. A trailing s on any other name is
+# a different component.
 #
 # Shared headers outside src/components/ are the answer, not a finding: the
 # event names in src/event-types.h, the requests in src/core/wm-hub.h, and the
@@ -60,10 +62,11 @@ HITS=$(mktemp "${TMPDIR:-/tmp}/coupling-hits.XXXXXX") || exit 1
 FINDINGS=$(mktemp "${TMPDIR:-/tmp}/coupling-findings.XXXXXX") || exit 1
 trap 'rm -f "$FILES" "$HITS" "$FINDINGS"' EXIT
 
-# The tracked component files are the set a bare include can name. A quoted
-# bare name that is not in it is not a component header, and neither is an
-# angle-bracket one: -I. puts the repository root on the system search path, not
-# src/components/, so `<stdint.h>` and `<focus.h>` are both system headers.
+# The tracked component files are the set a quoted bare include can name. A
+# quoted bare name that is not in it is not a component header. An angle-bracket
+# bare name is not one either: -I. puts the repository root on the search path,
+# not src/components/, so <stdint.h> and <focus.h> are both outside this tree.
+# <src/components/focus.h> is not: -I. finds that path.
 if ! git ls-files 'src/components/*.c' 'src/components/*.h' >"$FILES"; then
   echo "check-coupling: git ls-files failed, so the component files were not listed" >&2
   exit 1
@@ -101,8 +104,20 @@ awk '
     if (!match(hit, /include[[:space:]]*[<"][^">]+[">]/))
       next
     target = substr(hit, RSTART, RLENGTH)
+    angled = (target ~ /</)
     sub(/^include[[:space:]]*[<"]/, "", target)
     sub(/[">]$/, "", target)
+
+    # "./focus.h" is the header next to the including file, and
+    # "src/./components/focus.h" is the root-path form. Collapse those before
+    # judging, or both checks miss a header the compiler finds.
+    while (sub(/^\.\//, "", target)) {}
+    while (gsub(/\/\.\//, "/", target)) {}
+
+    # Angle brackets do not search the directory of the including file. -I. is
+    # the repository root, so <focus.h> is not a component header.
+    if (angled && target !~ /^src\/components\//)
+      next
 
     depth = split(target, part, "/")
     base  = part[depth]
@@ -118,7 +133,12 @@ awk '
     sub(/^.*\//, "", own)
     sub(/\.[ch]$/, "", own)
 
-    if (base == own || base == own "s" || own == base "s")
+    if (base == own)
+      next
+    # keybindings.h is the table for the keybinding component. The names differ
+    # by the plural s, and that pair is the only one this accepts.
+    if ((own == "keybindings" && base == "keybinding") ||
+        (own == "keybinding" && base == "keybindings"))
       next
 
     print hit

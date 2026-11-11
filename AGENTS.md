@@ -257,8 +257,9 @@ for the place they apply. This is not every ungated rule: `docs/PHILOSOPHY.md`
 section 3 lists the commitments and where each is checked, and that table is
 not copied here. Delete a line below when a gate starts checking it.
 
-- Components never include or call another component, and a header says what a
-  function does and who owns what it allocates: `docs/architecture/component.md`.
+- A component calls another through a declaration written beside the call, and
+  a header says what a function does and who owns what it allocates:
+  `docs/architecture/component.md`.
 - A walk over the client list follows `client_get_next()` and saves the next
   pointer before a callback that may free the current client:
   `src/target/client.h`.
