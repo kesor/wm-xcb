@@ -191,32 +191,38 @@ void config_init(void) {
 
 ---
 
-## Rules no gate checks
-
-Two rules here are checked by review, not by a command. Each says why that
-is, and what a violation looks like.
-
-### A component does not reach another component
+## A component does not reach another component
 
 A component never includes another component's header and never calls its
 functions. It sends a request through `hub_send_request()` and subscribes to
 events through `hub_subscribe()`; the hub owns the registry, the router and the
-bus. Reading a state machine another component stored on the same target is not
-a violation: tiling reads the fullscreen and floating machines by name, and
-`docs/PHILOSOPHY.md` §2.1 says why that stays inside the rule.
+bus.
 
-No gate reads the include lines under `src/components/` today, so review is the
-check. Another component's header is written two ways, and a search for only
-the first misses the second:
+`scripts/check-coupling.sh` fails the commit and the push on the include. It
+reads every `#include` under `src/components/` and judges the header by the
+file that includes it, in both forms the Makefile resolves: written from the
+repository root (`#include "src/components/focus.h"`) and by its bare name
+(`#include "focus.h"`). The including file's own header, and a header of the
+same component, pass; `keybindings.h` is the keybinding component's table.
 
-```bash
-rg -n '#include "[^"]*components/' src/components/
-rg -n '#include "[a-z0-9-]+\.h"' src/components/
-```
+A name both components spell moves to the header for what it is:
+`src/event-types.h` for an event a second component subscribes to,
+`src/core/wm-hub.h` for a request it sends, and `src/sm/sm-names.h` for a
+machine it reads. A name only the component that owns it uses stays in that
+component's header.
 
-A hit is a finding when the header belongs to another component. The including
-file's own header, and another file of the same component, are not. The first
-command does not match a bare name.
+Reading a state machine another component stored on the same target is not a
+violation: tiling reads the fullscreen and floating machines by name, and
+`docs/PHILOSOPHY.md` §2.1 says why that stays inside the rule. What the include
+cannot express is still review's: a call reached through a declaration written
+by hand instead of a header.
+
+---
+
+## Rules no gate checks
+
+One rule here is checked by review, not by a command. It says why that is, and
+what a violation looks like.
 
 ### A header says what a function does and who owns what it allocates
 

@@ -80,6 +80,16 @@ pre-commit:
       run: ./scripts/check-includes.sh
       fail_text: "An include walks up a directory. Write it from the repository root: #include \"src/core/wm-hub.h\"."
 
+    # docs/PHILOSOPHY.md section 2.1: a component never includes another
+    # component's header. The compiler accepts the include, so two components
+    # that call each other build and the rule was the reviewer's to keep. The
+    # names both sides need live in src/event-types.h, src/core/wm-hub.h and
+    # src/sm/sm-names.h, and the include is what this refuses.
+    coupling:
+      glob: "*.{c,h}"
+      run: ./scripts/check-coupling.sh
+      fail_text: "A component includes another component's header. Send the request through the hub, subscribe to the event, or move the shared name into a header under src/."
+
     # A stand-in answers every assertion a test asks it, so the program it names
     # is the one part of a test the suite cannot falsify. The gate resolves that
     # name on PATH, requires a file, and looks there for the line the stand-in
@@ -213,6 +223,12 @@ pre-push:
     includes:
       run: ./scripts/check-includes.sh
       fail_text: "An include walks up a directory. Write it from the repository root: #include \"src/core/wm-hub.h\"."
+
+    # Same rule as the commit hook. The commit hook's glob skips it on a commit
+    # that stages no C file, and the merge and CI run this list, not that one.
+    coupling:
+      run: ./scripts/check-coupling.sh
+      fail_text: "A component includes another component's header. Send the request through the hub, subscribe to the event, or move the shared name into a header under src/."
 
     fakes:
       run: ./scripts/check-fakes.sh
