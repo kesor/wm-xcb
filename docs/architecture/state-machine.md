@@ -86,9 +86,9 @@ because the definition is in a header no component includes.
 | `StateMachine.current_state` | `sm_raw_write()`, `sm_transition()` | `sm-instance.h` declares the type only; the definition is in `sm-instance-internal.h` |
 | `ClientState.managed`, `.urgent`, `.mapped` | `client_set_managed()`, `client_set_urgent()`, `client_set_mapped()` | `client.h` declares the type and a pointer to it; the definition is in `client.c` |
 
-`scripts/check-private-state.sh` compiles every fixture under `tests/compile-fail/`
-twice: with `-DPRIVATE_STATE_CONTROL` through the accessor, which must succeed, and
-without it assigning the field, which must not compile. The control build is what
+`scripts/check-compiler-refusals.sh` compiles every fixture under `tests/compile-fail/`
+twice: with `-DREFUSAL_CONTROL` as the code the rule allows, which must succeed, and
+without it as the code it refuses, which must not compile. The control build is what
 tells a refusal from a fixture that fails because an include path moved. The
 fixtures include the public headers only. A file that includes
 `sm-instance-internal.h` can assign `current_state`. A file that includes

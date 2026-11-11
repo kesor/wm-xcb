@@ -50,8 +50,7 @@ test_monitor_destroy_unadopts_before_freeing_machines(void)
   monitor_list_init();
 
   g_unadopt_seen_machine = NULL;
-  hub_register_component(&g_observer_component);
-  assert_or_abort(g_observer_component.registered == true);
+  assert_or_abort(hub_register_component(&g_observer_component) == 0);
 
   Monitor* m = monitor_create(121);
   assert_or_abort(m != NULL);
@@ -449,8 +448,7 @@ test_monitor_with_hub_integration(void)
     .registered            = false,
   };
 
-  hub_register_component(&test_component);
-  assert(test_component.registered == true);
+  assert(hub_register_component(&test_component) == 0);
 
   /* Create a monitor - it should be registered with hub */
   Monitor* m = monitor_create(100);

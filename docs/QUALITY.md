@@ -112,7 +112,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | root | `scripts/check-root.sh` | every tracked root entry is on the allowlist in `scripts/lib/root-report.sh`: the build files, the documentation entry points and the directories that group the code. A source file at the top level belongs to no group, and the next one would have to guess; it fails the commit and the push instead. The list comes from git's index, so an untracked scratch file is not a finding and a file being committed is a finding. |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
-| private state | `scripts/check-private-state.sh` | no component can assign a machine-tracked field: every fixture under `tests/compile-fail/` that assigns one fails to compile, and the same fixture built through its accessor succeeds, so a refusal is told apart from a broken include path |
+| compiler refusals | `scripts/check-compiler-refusals.sh` | no component can assign a machine-tracked field, and no caller can drop the result of `hub_register_component()`: every fixture under `tests/compile-fail/` is built twice, the version a rule allows has to compile and the version it refuses has to fail, so a refusal is told apart from a broken include path |
 | sources | `scripts/check-orphan-sources.sh` | every tracked `.c` outside `tests/` and `tools/` is in `make -s print-src`, so the compiler and `check-async` see it |
 | fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, cites a line of that program on its third, is named after that program, and names one that is installed on `PATH` outside the fake directory. The check resolves that name to a path, requires a regular file, and looks for the cited line in it. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
@@ -498,7 +498,7 @@ scripts/check-bead-descriptions.sh   # every bead description is still there
 scripts/check-bead-create-recipe.sh  # every create recipe a document shows carries --acceptance
 scripts/check-root.sh       # every tracked root entry is on the allowlist
 scripts/check-orphan-sources.sh   # every tracked source is in the build
-scripts/check-private-state.sh   # a component cannot assign a machine-tracked field
+scripts/check-compiler-refusals.sh   # the compiler refuses a tracked-field write and a dropped registration result
 ```
 
 Pass `--no-auto-install` to a by-hand `lefthook run`: the hook wrapper passes it,

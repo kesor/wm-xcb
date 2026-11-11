@@ -8,7 +8,7 @@
 void
 probe(Client* c, bool shown)
 {
-#ifdef PRIVATE_STATE_CONTROL
+#ifdef REFUSAL_CONTROL
   client_set_mapped(c, shown);
 #else
   c->tracked->mapped = shown;

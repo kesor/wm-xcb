@@ -29,9 +29,14 @@ typedef struct KeyBinding KeyBinding;
  *
  * State machine transitions for mouse/keyboard interactions.
  * This defines how the window manager reacts to user input.
+ *
+ * Read by src/core/wm-states.c. config.c includes this header for the window
+ * rules and never walks this table, so the definition is marked unused: without
+ * that, the debug build reports it as a dead variable in config.c's translation
+ * unit.
  */
 
-static struct StateTransition transitions[] = {
+static struct StateTransition transitions[] __attribute__((unused)) = {
   /* hover window type , combination of buttons and keys , event type , state to move from , state to move into */
   { WndTypeClient, EventTypeBtnPress,   KeyShift, 1, 0,    STATE_IDLE,          STATE_WINDOW_MOVE   },
   { WndTypeClient, EventTypeBtnRelease, KeyNone,  1, 0,    STATE_WINDOW_MOVE,   STATE_IDLE          },

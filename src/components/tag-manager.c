@@ -894,7 +894,10 @@ tag_manager_component_init(void)
     return false;
 
   /* Register with hub */
-  hub_register_component(tag_manager_component());
+  if (hub_register_component(tag_manager_component()) != 0) {
+    tag_manager_unregister_actions();
+    return false;
+  }
 
   /* Subscribe to events we care about */
   hub_subscribe(EVT_CLIENT_MANAGED, tag_manager_listener, NULL);

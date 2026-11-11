@@ -850,7 +850,14 @@ fullscreen_component_init(void)
   }
 
   /* Register with hub */
-  hub_register_component(&fullscreen_component.base);
+  if (hub_register_component(&fullscreen_component.base) != 0) {
+    sm_unregister_guard("fs_guard_can_fullscreen");
+    sm_unregister_guard("fs_guard_can_unfullscreen");
+    sm_unregister_action("fs_action_enter_fullscreen");
+    sm_unregister_action("fs_action_exit_fullscreen");
+    action_unregister(fullscreen_action.name);
+    return false;
+  }
 
   /* Register XCB handler for PROPERTY_NOTIFY */
   int result = xcb_handler_register(
