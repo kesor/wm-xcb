@@ -171,16 +171,18 @@ Then work through the list:
    harness has; the command prints the paths. Say in a bd comment which part is
    in this tree and which is not, do the part that is here, and stop on the rest.
    Reading the harness to confirm the paths is the cost that command exists to
-   remove. Exit 2 means it cannot answer: the tracker could not be read, or the
-   bead names a path this tree does not carry. A `GONE` line is that path with
-   the commit that deleted it, so a bead written months ago against a tree that
-   had the file does not read as work you can do here. Read that commit and the
-   code that replaced the file, then do the work where the code lives now, or
-   say in the bead comment why it should not be done. A path no commit deleted
-   may be a file the bead asks to add, or one another bead delivered under
-   another name. The verdict says to grep for the behaviour first; a delivery
-   under another name makes the bead's text stale, and correcting that text is
-   the rule in AGENTS.md, "Working on a Bead". The answer stays "cannot tell".
+   remove. Exit 2 means it cannot answer: the tracker could not be read, the
+   bead names a path this tree does not carry, or it talks about the harness
+   (`harness`, `cmd_start`) without naming a file in it. A `GONE` line is that
+   path with the commit that deleted it, so a bead written months ago against a
+   tree that had the file does not read as work you can do here. Read that
+   commit and the code that replaced the file, then do the work where the code
+   lives now, or say in the bead comment why it should not be done. A path no
+   commit deleted may be a file the bead asks to add, or one another bead
+   delivered under another name. The verdict says to grep for the behaviour
+   first; a delivery under another name makes the bead's text stale, and
+   correcting that text is the rule in AGENTS.md, "Working on a Bead". The
+   answer stays "cannot tell".
 2. If the change is observable through X, write or extend a `tests/x/test-*.sh`
    first; use `require_visible` for preconditions so a test cannot pass because
    the window was never there.
@@ -367,11 +369,16 @@ beads in your final message. This is how the traps below stop being traps.
   comments, names the paths it found outside, and exits 3. Then write one bd
   comment saying which part of the work is in this tree and which is not, do the
   part that is here, and stop. The search for the harness file is what costs a
-  session; the command is one call. A description written before the harness
-  moved still names a file it no longer has, and the command says which. The
-  same command checks the other half: a path this tree deleted is a `GONE` line
-  with the commit that removed it, and exit 2. Beads are written months before
-  they are picked up, so the file a bead names may have gone from either tree.
+  session; the command is one call. A bead that names the harness by word or by
+  a `cmd_` command and no file is exit 2, not 3. That word also matches this
+  tree's own seam harness, so read the bead and land the part whose file is
+  here; do not read the harness to find a command the text did not name a file
+  for. A description written before
+  the harness moved still names a file it no longer has, and the command says
+  which. The same command checks the other half: a path this tree deleted is a
+  `GONE` line with the commit that removed it, and exit 2. Beads are written
+  months before they are picked up, so the file a bead names may have gone from
+  either tree.
 - **Do not push, and do not rewrite published history,** unless asked.
 
 ## Definition of done
