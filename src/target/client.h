@@ -250,7 +250,18 @@ void client_destroy_by_window(xcb_window_t window);
 Client* client_get_by_window(xcb_window_t window);
 
 /*
- * Get the next client in the list.
+ * Get the next client in the list, or NULL at the end.
+ *
+ * The list is circular around a sentinel: the last client's next points at the
+ * sentinel, not at NULL. A loop that follows c->next until NULL never ends.
+ * A walk stops at the sentinel, or calls this, which returns NULL there.
+ * client_foreach() stops at the sentinel and saves the next pointer before its
+ * callback. A callback that may destroy the current client leaves the pointer
+ * it held dangling, so save the next one before the callback.
+ *
+ * No gate checks the walk. A loop that follows c->next until NULL compiles and
+ * never ends, and the sanitizer gates see a use after free only when a test
+ * reaches that path.
  */
 Client* client_get_next(const Client* c);
 

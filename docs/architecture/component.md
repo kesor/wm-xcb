@@ -191,6 +191,48 @@ void config_init(void) {
 
 ---
 
+## Rules no gate checks
+
+Two rules here are checked by review, not by a command. Each says why that
+is, and what a violation looks like.
+
+### A component does not reach another component
+
+A component never includes another component's header and never calls its
+functions. It sends a request through `hub_send_request()` and subscribes to
+events through `hub_subscribe()`; the hub owns the registry, the router and the
+bus. Reading a state machine another component stored on the same target is not
+a violation: tiling reads the fullscreen and floating machines by name, and
+`docs/PHILOSOPHY.md` §2.1 says why that stays inside the rule.
+
+No gate reads the include lines under `src/components/` today, so review is the
+check. Another component's header is written two ways, and a search for only
+the first misses the second:
+
+```bash
+rg -n '#include "[^"]*components/' src/components/
+rg -n '#include "[a-z0-9-]+\.h"' src/components/
+```
+
+A hit is a finding when the header belongs to another component. The including
+file's own header, and another file of the same component, are not. The first
+command does not match a bare name.
+
+### A header says what a function does and who owns what it allocates
+
+A function that stores a pointer, takes ownership of a buffer, or returns
+allocated memory says so in the comment next to its declaration: what the
+caller may free, what it must not, and what the function leaves allocated when
+it fails. The implementation matches that sentence, and a change to either
+updates both in the same commit.
+
+No gate reads a comment. `scripts/check-compiler-refusals.sh` covers the part a
+compiler can see — a machine-tracked field or a dropped registration result —
+and the sanitizer gates catch a leak a test reaches. Ownership is prose, so a
+reviewer is what checks it.
+
+---
+
 ## Lifecycle
 
 ```

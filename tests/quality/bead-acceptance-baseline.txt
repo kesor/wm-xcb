@@ -181,3 +181,5 @@ wm-9n0.8
 wm-utz.5
 wm-m9n.5
 wm-rh6.4
+wm-jpo.4
+wm-utz.17

@@ -192,7 +192,7 @@ names each rule below, what a violation looks like, and how to check it.
 | A component's registration is checked | 2.4 | `scripts/check-compiler-refusals.sh` refuses the dropped call in `tests/compile-fail/registration-result-ignored.c`. A caller in the tree that drops the result warns, and the build still succeeds, so that call is still review |
 | No `_reply()` in a handler or action | 2.3 | `scripts/check-async.sh`, and review for a reply reached through a helper |
 | No blocking call in the loop: `poll`/`wait_for_event` only | 2.3 | `scripts/check-async.sh` (the calls) and `scripts/perf-test.sh` (idle CPU, which is what a spin costs) |
-| One flush per loop iteration | 2.3 | review |
+| One flush per loop iteration | 2.3 | review. No script counts the calls: startup and the loop both call `xcb_flush()`, and a count cannot tell them apart |
 | Every request has a failure event | 2.2 | review: a request with only a success path is incomplete |
 | New behaviour is a registration, not an edit (see §2.4 test) | 2.4 | review |
 | Event ids come from the shared registry, never a fresh local enum | two components that share a value receive each other's events | `src/event-types.h`, `tests/unit/test-event-types.c` |

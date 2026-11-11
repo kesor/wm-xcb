@@ -285,6 +285,13 @@ Two things it cannot decide for you:
   between a verdict and the merge. `worker.py auto` without `--merge` does not
   merge; an approval is left for `worker.py merge`.
 
+A run in flight is not garbage. Before closing a tmux window, `tmux
+capture-pane` it to see whether the agent is still producing output; before
+removing a worktree, `git status` it, because the worktree holds the only copy
+of an agent's progress. `inbox` shows what is still in flight. No gate checks
+either one: the window is a process and the worktree is outside the tracked
+files, so the check is the person closing them.
+
 ## Friction is a bug in the harness
 
 When a command, gate, documented step or tool does not work first time and you

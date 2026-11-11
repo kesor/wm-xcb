@@ -461,6 +461,16 @@ when a later setup takes it out again.
    is skipped when no staged file matches, and lefthook answers the skipped job
    with `no job matching <name> found`, which reads as a gate that is not wired
    at all.
+
+   Prove it by removing the exact thing it must catch, once per shape it must
+   catch: a table walker needs a row per shape (a plain row, a self-loop, a row
+   with a guard, a row with no event), and a mutation that exercised a shape the
+   check already handled proves nothing about the one it does not. Run the proof
+   after the last edit to the test: a count taken before the test changed is the
+   previous test's count, and a comment that quotes it is wrong. No command
+   checks that the proof was run. The removal is a mutation the commit does not
+   contain, so a gate can see the check and cannot see that someone removed the
+   thing it catches.
 3. A hook gate needs no workflow edit. The `gates` job runs `lefthook run
    pre-push --force --no-auto-install`, so the command from step 2 runs in CI.
    Pasting that command into `.github/workflows/quality.yml` as well is a second
@@ -525,6 +535,21 @@ prints a block offering to reset it, which would undo `make hooks`.
   a bead comment. Never a `lefthook.yml` job.
 - **Coverage percentages.** Not until the seam tests pass, otherwise the number
   measures the wrong thing.
+
+## Rules no gate checks
+
+These are rules, not preferences. Each says why no command checks it, and a
+reviewer is what enforces it. When one becomes expressible as a command, the
+gate's row in the table above replaces the entry here.
+
+- **A document changes in the same commit as the behaviour it records.**
+  `scripts/check-docs.sh` reads the shape of a citation — a line number, a
+  count, a percentage — and cannot tell whether the sentence around it is still
+  true.
+- **An include is written from the repository root.** The Makefile's `-I.`
+  resolves `#include "src/core/wm-hub.h"`; a relative include that walks up a
+  directory resolves from wherever the file happens to sit, so it compiles until
+  the file moves and then breaks. No script reads the include lines today.
 
 ## Coverage and fuzzing
 
