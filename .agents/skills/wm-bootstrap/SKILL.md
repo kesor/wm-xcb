@@ -280,7 +280,12 @@ Two things it cannot decide for you:
   otherwise stops on a rebase conflict that a person resolves by hand, which
   puts an unreviewed edit on a branch the reviewer already approved. A
   serialised dispatch costs ten minutes (the harness's `PROCESS.md`, "Stagger,
-  and check the overlap first").
+  and check the overlap first"). A file the tool prints, or a shared component,
+  still means serialise. An empty intersection does not show the beads are
+  disjoint. The file list, the empty intersection and the shared component are
+  a hint, not a permission to dispatch the pair together. The ways two beads
+  can overlap are an open set, so those readings are a floor. The rule is the
+  harness repository's DESIGN.md section 10a.
 - **Review.** Workers commit to `work/<bead-id>` and never push, merge, or close
   a bead. Under `worker.py drive` and `worker.py auto --merge` an approved
   branch is merged as soon as the pre-push gates pass, so no person stands
