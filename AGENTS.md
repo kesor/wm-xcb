@@ -244,270 +244,31 @@ build, the seam harness, the sanitizer runs, and the performance measurement.
 
 ---
 
-## ⚠️ TOP REPEATED MISTAKES (Read Before Starting)
+## What is checked, and where a rule lives
 
-These issues have appeared repeatedly across the merged pull requests:
+`scripts/gate-list.sh` prints every gate each hook runs, read out of
+`lefthook.yml`, and `docs/QUALITY.md` has a row per gate saying what it proves. A
+rule a command enforces is listed there and not repeated here: a second copy
+goes stale, and a reader cannot tell a stale copy from the rule.
 
-### 1. Documentation Out of Sync with Code (25+ occurrences)
-- **Symptom**: Comments/headers describe behavior that doesn't match implementation
-- **Fix**: Update documentation in the SAME commit that changes behavior
+A rule no gate checks lives in the document or header where it applies, and
+says there why no command checks it. These are the rules no gate checks, and
+where each lives:
 
-```c
-// BAD: Documentation says X but code does Y
-/**
- * Resizes the widget to fit its contents
- */
-void widget_set_size(Widget* w, int size) {
-    // Actually ignores size parameter
-    (void)size;
-}
-
-// GOOD: Documentation matches what the code actually does
-/**
- * Sets the widget's minimum size (may be ignored if greater than max)
- */
-void widget_set_size(Widget* w, int size);
-```
-
-### 2. Memory Leaks (15+ occurrences)
-- **Symptom**: Allocated memory not freed, especially in shutdown/error paths
-- **Fix**: Track ownership, free in all code paths. Document who owns the memory.
-
-```c
-// BAD: Leaks on error path AND on success path
-void component_init(void) {
-    Data* data = malloc(sizeof(Data));
-    if (something_fails) return;  // LEAK!
-    // Also: data leaked on shutdown if not freed
-}
-
-// GOOD: Document ownership and free on all exits
-// Ownership: component owns 'data', caller must not free
-void component_init(void) {
-    Data* data = malloc(sizeof(Data));
-    if (data == NULL) {
-        LOG_ERROR("Failed to allocate data");
-        return false;
-    }
-    // ... use data ...
-    // On shutdown or error: free(data)
-}
-
-// GOOD: Ownership transferred to caller or stored
-void component_init(Data** out_data) {
-    Data* data = malloc(sizeof(Data));
-    if (data == NULL) return false;
-    // Ownership transferred to caller
-    *out_data = data;
-    return true;
-}
-```
-
-### 3. Component Coupling Violations (12+ occurrences)
-- **Symptom**: Components calling each other directly instead of through Hub
-- **Fix**: All inter-component communication goes through hub_send_request() or hub_emit()
-
-```c
-// BAD: Direct coupling
-void component_a_action(void) {
-    component_b_do_something();  // NO!
-}
-
-// GOOD: Go through Hub
-void component_a_action(void) {
-    hub_send_request(REQ_COMPONENT_B_DO_SOMETHING, target_id);
-}
-```
-
-### 4. State Machine Pattern Violations (10+ occurrences)
-- **Symptom**: Bypassing SM for state changes, using wrong write type
-- **Fix**: State changes always go through SM (raw_write for hardware, transition for requests)
-
-```c
-// BAD: Direct state modification
-void on_configure(void) {
-    client->fullscreen = true;  // NO!
-}
-
-// GOOD: Go through SM
-void on_configure(void) {
-    sm_raw_write(client->fullscreen_sm, FULLSCREEN_ENTERED);
-}
-```
-
-### 5. Missing Test Coverage (8+ occurrences)
-- **Symptom**: New components/features without unit tests
-- **Fix**: Add tests BEFORE considering implementation done
-
-```c
-// REQUIRED: Test file for every new component
-// test-wm-mycomponent.c
-void test_my_component_init(void) {
-    assert(my_component_init() == true);
-    assert(my_component.registered == true);
-}
-void test_my_component_request(void) {
-    hub_send_request(REQ_MY_ACTION, some_target);
-    // assert expected state changes
-}
-```
-
-A new check is proven by removing the exact thing it must catch, once per shape
-it must catch: for a table walker, one row per shape — a plain row, a self-loop,
-a row with a guard, a row with no event. A mutation that exercised a shape the
-check already handled proves nothing about the one it does not. Run the proof
-after the last edit to the test: a count taken before the test changed is the
-previous test's count, and the comment that quotes it is wrong.
-
-### 6. Dangling Pointers / Use-After-Free (8+ occurrences)
-- **Symptom**: Using a pointer after the object it points to has been freed
-- **Fix**: Snapshot pointers before callbacks that may free, null after free, check NULL before use
-
-```c
-// BAD: Iterator pointer invalidated by callback
-for (Client* c = client_list_get_head(); c != NULL; c = client_get_next(c)) {
-    callback(c);  // May free c!
-    // c is now dangling
-}
-
-// GOOD: Snapshot next before callback
-for (Client* c = client_list_get_head(); c != NULL;) {
-    Client* next = client_get_next(c);
-    callback(c);
-    c = next;
-}
-```
-
-The walk goes through `client_get_next()`, never `c->next`. The client list is
-circular around a sentinel: the last client's `next` points at the sentinel, not
-at NULL, so a loop that follows `c->next` until NULL never ends.
-
-```c
-// GOOD: Null pointer after free
-void cleanup(Component* comp) {
-    if (comp->data != NULL) {
-        free(comp->data);
-        comp->data = NULL;  // Prevent dangling use
-    }
-}
-```
-
-### 7. Include Path Inconsistency (6+ occurrences)
-- **Symptom**: Using relative paths (`../../src/core/wm-hub.h`) instead of a path from the repository root
-- **Fix**: Use an include the root `-I.` resolves (`#include "src/core/wm-hub.h"`)
-
-```c
-// BAD
-#include "../../src/core/wm-hub.h"
-
-// GOOD (matches rest of codebase)
-#include "src/core/wm-hub.h"
-```
-
-### 8. Event Type Collisions (4+ occurrences)
-- **Symptom**: Two components using the same event ID, so each receives the other's events, or an id past the event bus table, which is dropped
-- **Fix**: Take the component's range from `src/event-types.h`. Do not pick a fresh number.
-
-```c
-// BAD: a fresh number can land on another component's event
-enum ComponentEvents {
-    EVT_TAG_CHANGED = 20,
-};
-
-// GOOD: start from the range this component owns
-enum ComponentEvents {
-    EVT_TAG_CHANGED = EVT_TAG_MANAGER_BASE + 0,
-};
-```
-
-`hub_emit()` logs an error and drops a value at or above `HUB_MAX_EVENT_TYPES`. `tests/unit/test-event-types.c` fails when two listed constants share a value or a constant leaves its range. A new constant has to be added to that list, or the test does not see it.
-
-### 9. API Contract Violations (6+ occurrences)
-- **Symptom**: Functions don't do what comments say, ownership unclear
-- **Fix**: Document ownership semantics, match implementation to docs
-
-```c
-// BAD: Ownership unclear
-void client_set_title(Client* c, char* title);
-
-// GOOD: Clear ownership semantics
-/**
- * Sets client title.
- * Takes ownership of `title` - caller must not free after call.
- */
-void client_set_title(Client* c, char* title);
-```
-
-### 10. Registration Without Verification (5+ occurrences)
-- **Symptom**: Call hub_register_*() but don't check if it succeeded
-- **Fix**: Always verify registration and handle failures
-
-```c
-// BAD: the result is not discardable. A bare call is a compiler diagnostic,
-// and the log line is a guess.
-hub_register_component(&comp);
-LOG_DEBUG("Component registered");
-
-// GOOD
-if (hub_register_component(&comp) != 0) {
-    LOG_ERROR("Component registration failed");
-    return false;
-}
-```
-
-### 11. Blocking the event loop
-
-- **Symptom**: the WM stops responding to keys while something else happens; idle CPU is 100%
-- **Fix**: nothing in the loop may wait. No `xcb_*_reply()` inside a handler or
-  action, no `waitpid()`/`read()` on a child from a callback, one flush per
-  iteration, and the loop blocks in `poll()` or `xcb_wait_for_event()`
-
-```c
-// BAD: a keybinding that runs dmenu freezes the whole WM until dmenu exits
-bool launcher_action_launch(ActionInvocation* inv) {
-    read(pipefd[0], cmd, sizeof(cmd) - 1);   // blocks the event loop
-    waitpid(pid, &status, 0);                // blocks again
-}
-
-// GOOD: fork, return immediately, handle the result when it arrives
-spawn_async(argv, on_launcher_done);         // completion arrives as an event
-```
-
-```c
-// BAD: the loop spins, burning a core while nothing happens
-while (running) handle_xcb_events();         // xcb_poll_for_event() returns NULL at once
-
-// GOOD: block until there is something to do
-while (running) { event = xcb_wait_for_event(dpy); dispatch(event); }
-```
-
-### 12. State changed outside a state machine
-
-- **Symptom**: the WM and the X server disagree, or a subscriber never hears
-  about a change that happened
-- **Fix**: every tracked value changes through `sm_raw_write()` (reality) or
-  `sm_transition()` (intent), and every transition emits exactly one event
-
-```c
-// BAD
-void on_configure(Client* c) { c->fullscreen = true; }
-
-// GOOD
-void on_configure(Client* c) { sm_raw_write(client_get_sm(c, "fullscreen"), FULLSCREEN_STATE_ENTERED); }
-```
-
-### 13. A quality check that only ran once
-
-- **Symptom**: someone ran a clever grep, a scan, or a manual review, found a
-  problem, fixed it, and the check never ran again
-- **Fix**: turn it into a gate. A script under `scripts/` that exits non-zero,
-  listed in `lefthook.yml` and in `.github/workflows/quality.yml`, documented in
-  `docs/QUALITY.md`. Gates are deterministic commands; an LLM review is a second
-  opinion, not a gate.
+- Components never include or call another component, and a header says what a
+  function does and who owns what it allocates: `docs/architecture/component.md`.
+- A walk over the client list follows `client_get_next()` and saves the next
+  pointer before a callback that may free the current client:
+  `src/target/client.h`.
+- A document changes in the same commit as the behaviour it records, and an
+  include is written from the repository root: `docs/QUALITY.md`, "Rules no gate
+  checks".
+- A new gate is proven by removing the exact thing it must catch, once per
+  shape it must catch: `docs/QUALITY.md`, "Adding a gate".
 
 ---
 
-### Passing a long message
+## Passing a long message
 
 A commit body or a bead comment with more than a line in it goes through stdin,
 not through an argument: quoting and newlines survive that way, and a stray
@@ -579,38 +340,6 @@ label `friction`.
 
 *For architectural questions, refer to `docs/architecture/`*
 *For implementation guidance, refer to `docs/IMPLEMENTATION-ROADMAP.md`*
-
----
-
-## Lessons Learned (IMPORTANT)
-
-### NEVER Kill Active Sessions
-
-Before killing tmux sessions or windows, CHECK if an agent is actively working:
-- `tmux list-windows` — see all windows
-- `tmux capture-pane` — check if an agent is processing
-- If uncertain, ASK the user first
-
-### Worktrees Are Precious
-
-Worktrees contain agent progress. Before removing or cleaning:
-- Check `git status` — are there uncommitted changes?
-- Check if agent is using the worktree
-- If agent is working, DO NOT delete the worktree
-
-### Overlapping Beads
-
-Two beads that touch the same files conflict at the second merge: the merge
-stops on a hand resolution that puts an unreviewed edit on a branch a reviewer
-already approved. Which beads overlap, and what to do about it, is the
-"Spawning workers" section of `.agents/skills/wm-bootstrap/SKILL.md`. The rule
-lives there and not here: the copy that stood in this file read "nothing
-shared, run them together", and that sentence dispatched three beads in parallel
-whose branches shared four files.
-
----
-
-*These lessons are here because future sessions will have no memory of past mistakes.*
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:46cd31e7 -->
 ## Beads Issue Tracker
