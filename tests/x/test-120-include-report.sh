@@ -11,6 +11,8 @@
 #   - a quoted include that walks up, an angle-bracket one, one indented inside
 #     an #if, and one that walks up in the middle of its path;
 #   - a comment that spells the shape, which the gate judges as text;
+#   - a NUL in the file, which makes git grep call it binary and, without -a,
+#     print "Binary file <path> matches" instead of the include line;
 #   - a ../ after the closing quote, which is not the included header's path;
 #   - a search that did not run, which is not a clean tree;
 #   - the tree as committed, which has to pass its own gate.
@@ -68,6 +70,17 @@ walk_case angled src/components/tiling.c '#include <../core/wm-hub.h>'
 walk_case indented src/components/tiling.c '  #include "../sm/sm.h"'
 walk_case mid-path src/core/wm-hub.c '#include "src/sm/../../core/wm-log.h"'
 walk_case commented src/core/wm-hub.c '/* never #include "../core/wm-log.h" */'
+
+# The include is on its own line. The NUL is what makes git call the file binary,
+# so the gate has to ask for the line (-a) rather than the binary summary.
+R=$(repo binary)
+mkdir -p "$R/src"
+printf '#include "../core/wm-hub.h"\n\0\n' >"$R/src/t.c"
+git -C "$R" add -A
+"$R/scripts/check-includes.sh" >"$LAST" 2>&1
+check_eq "a walking include in a file git calls binary fails the gate" 1 "$?"
+check_eq "and the file is named, not reported as a binary match" 1 \
+  "$(grep -c '^  RELATIVE INCLUDE  src/t.c:1:' "$LAST")"
 
 R=$(repo counts)
 source_at "$R" src/core/wm-hub.c '#include "../core/wm-log.h"'

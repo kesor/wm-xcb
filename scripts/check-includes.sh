@@ -49,8 +49,11 @@ HITS=$(mktemp "${TMPDIR:-/tmp}/include-hits.XXXXXX") || exit 1
 trap 'rm -f "$HITS"' EXIT
 
 # color.ui forced off so the finding it prints is a line a reader can grep for
-# and paste, not one wrapped in paint codes.
-git -c color.ui=false grep -nE "$PATTERN" -- '*.c' '*.h' >"$HITS" 2>/dev/null
+# and paste, not one wrapped in paint codes. -a is required: without it a NUL in
+# the file makes git grep print "Binary file <path> matches" and exit 0. That
+# line does not contain the pattern, so the re-check below counts nothing and
+# the gate exits 0 over the include it found.
+git -c color.ui=false grep -a -nE "$PATTERN" -- '*.c' '*.h' >"$HITS" 2>/dev/null
 case $? in
   0 | 1) ;;
   *)
