@@ -10,10 +10,11 @@
 # fails and the command is printed, and deleting that line from the same
 # document makes it pass again. It also pins what the gate leaves alone - a
 # line whose program is not on the read-only allowlist, a fence with no shell
-# label, and a command naming a variable this shell does not set - because a
-# gate that starts running `make format` or a session script would make every
-# commit slower and less reproducible, and one that silently skips a command
-# names nothing at all.
+# label, a command naming a variable this shell does not set, a command naming
+# the gate's own $1, and a command whose arguments hand the allowlisted program
+# another one to run - because a gate that starts running `make format` or a
+# session script would make every commit slower and less reproducible, and one
+# that silently skips a command names nothing at all.
 source "$(dirname "$0")/lib.sh"
 
 DIR="$TMPDIR_SEAM/doc-commands"
@@ -84,6 +85,107 @@ EOF
 status=$?
 check_eq "a command outside the read-only allowlist passes the check" 0 "$status"
 check_eq "and it did not run: the file it names is still there" 1 "$([ -e "$STAMP" ] && echo 1 || echo 0)"
+
+# A program on the allowlist reads what it is pointed at and exits, unless an
+# argument hands it another program to run: rg --pre, git grep
+# --open-files-in-pager, git --ext-diff. The gate may skip such a line or fail
+# it; what it may not do is run it. The wrapper leaves a stamp when it runs at
+# all, so every case below can tell "did not run" from "ran and did not
+# matter".
+PRE_STAMP="$DIR/pre-stamp"
+cat >"$DIR/wrapper" <<EOF
+#!/bin/sh
+touch "$PRE_STAMP"
+cat "\$1"
+EOF
+chmod +x "$DIR/wrapper"
+
+"$DIR/wrapper" /dev/null
+check_eq "the wrapper leaves its stamp when something runs it" 1 \
+  "$([ -e "$PRE_STAMP" ] && echo 1 || echo 0)"
+rm -f "$PRE_STAMP"
+
+# unrun_case <name> - the document on stdin passes the check, its command is
+# printed as not run, and the wrapper's stamp is still absent afterwards.
+unrun_case() {
+  local name=$1 doc="$DIR/$1.md" status
+  cat >"$doc"
+  "$GATE" "$doc" >"$DIR/$1.txt" 2>&1
+  status=$?
+  check_eq "$name: the check passes" 0 "$status"
+  check_eq "$name: the command is printed as not run" 1 \
+    "$(grep -c 'another program' "$DIR/$1.txt")"
+  check_eq "$name: the program it named did not run" 0 \
+    "$([ -e "$PRE_STAMP" ] && echo 1 || echo 0)"
+}
+
+unrun_case pre-separate <<EOF
+\`\`\`bash
+rg --pre "$DIR/wrapper" pattern .
+\`\`\`
+EOF
+
+unrun_case pre-equals <<EOF
+\`\`\`bash
+rg --pre="$DIR/wrapper" pattern .
+\`\`\`
+EOF
+
+# The shell removes the quotes before rg sees the argument, so quoting the flag
+# does not make it the pattern.
+unrun_case pre-quoted <<EOF
+\`\`\`bash
+rg "--pre=$DIR/wrapper" pattern .
+\`\`\`
+EOF
+
+unrun_case pager-long <<EOF
+\`\`\`bash
+git grep --open-files-in-pager="$DIR/wrapper" pattern
+\`\`\`
+EOF
+
+unrun_case pager-short <<EOF
+\`\`\`bash
+git grep -O"$DIR/wrapper" pattern
+\`\`\`
+EOF
+
+unrun_case ext-diff <<'EOF'
+```bash
+git log --ext-diff
+```
+EOF
+
+# $1 is the gate's own first argument. The hook passes none, where set -u makes
+# the line an error; a by-hand run passes a document, and the same line then
+# searches that document and can exit 0. Neither is the document's reader.
+cat >"$DIR/positional.md" <<'EOF'
+```bash
+rg -n REQUEST_CHECKED "$1"
+```
+EOF
+"$GATE" "$DIR/positional.md" >"$DIR/positional.txt" 2>&1
+status=$?
+param="\$1"
+check_eq "a command naming the gate's own \$1 does not fail the check" 0 "$status"
+check_eq "it is printed as not run, with the parameter named" 1 \
+  "$(grep -cF "$param is a parameter of this gate" "$DIR/positional.txt")"
+
+# A scanner that fails leaves the document unchecked. Reporting that as a pass
+# is the defect this gate exists to catch, one level down.
+mkdir -p "$DIR/bin"
+cat >"$DIR/bin/awk" <<'EOF'
+#!/bin/sh
+exit 2
+EOF
+chmod +x "$DIR/bin/awk"
+env WM_DOC_COMMANDS_IN_SHELL=1 PATH="$DIR/bin:$PATH" "$GATE" "$GOOD" \
+  >"$DIR/scanner.txt" 2>&1
+status=$?
+check_eq "a scanner that fails fails the check" 1 "$status"
+check_eq "and it says the file was not checked" 1 \
+  "$(grep -c 'is not a pass' "$DIR/scanner.txt")"
 
 # An unlabelled fence holds program output and C in this tree, so it is not read
 # as a command. A label a document forgets is a command this gate does not see,

@@ -123,7 +123,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text. The other half reads `tests/quality/bead-acceptance-missing-baseline.txt`: a live issue with no criteria that no baseline records fails the commit, so a bead written without them is named where it is made instead of leaving the worker to plan from the description, and a recorded issue that has gained criteria fails until it is protected too. `--update-baseline` refuses to regenerate over a protected id that still exists with no text. Writing a bead and writing its criteria are one subject, size included: a criterion names what one sitting can finish, and a bead that is more than that is split before it is picked up, as `.agents/skills/wm-bootstrap/SKILL.md` says under "Writing one bead" |
 | bead create recipe | `scripts/check-bead-create-recipe.sh` | every `bd create` a tracked document shows carries `--acceptance` as the option, not as the word in a description or a comment, read the way the shell reads it: a trailing backslash continues the command, unless that backslash is escaped, and so does a quoted argument left open. A recipe is a command that starts a line, or follows a backtick, with a flag or a quoted title after the name; a sentence about the command is not one, and neither is a reference to its help text. The acceptance gate refuses the bead a recipe files, and `.agents/skills/beads/SKILL.md` is written by `bd setup codex` from a template that has no flag |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
-| document commands | `scripts/check-doc-commands.sh` | every read-only command a document prints in a fenced `bash`, `sh` or `shell` block exits 0: `rg`, `grep`, `man -w` and the read-only git subverbs the script lists. A command naming a variable this shell does not set is printed with the command beside it. A placeholder, a program outside the allowlist, or a line that is not one simple command is not run at all |
+| document commands | `scripts/check-doc-commands.sh` | every read-only command a document prints in a fenced `bash`, `sh` or `shell` block exits 0: `rg`, `grep`, `man -w` and the read-only git subverbs the script lists. A command naming a variable this shell does not set is printed with the command beside it. A placeholder, a program outside the allowlist, or a line that is not one simple command is not run at all, and neither is a line whose arguments name another program for the allowlisted one to run (`rg --pre`, `git grep --open-files-in-pager`, `git --ext-diff`) or that names a parameter of the gate's own command line |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
@@ -259,13 +259,33 @@ The allowlist is in the header of the script, and it is the whole of what the
 gate will execute: a document is committed code, and a line this gate runs is a
 line that runs on every commit in every checkout.
 
+An allowlisted program reads what it is pointed at and exits only while no
+argument hands it another program. `rg --pre <program>` runs that program over
+every file rg reads, and `git grep --open-files-in-pager=<program>` runs it on
+the match; `git --ext-diff` runs `$GIT_EXTERNAL_DIFF`. A line carrying one of
+those is printed as not run, and the quoting a document writes it in does not
+change that: the shell removes the quotes before rg sees the argument, so
+`rg "--pre=/tmp/x"` is the same flag.
+
+`$1` and the other parameters belong to the gate's own command line, not to the
+document's reader. The hook runs the gate with no arguments, where `set -u`
+makes `"$1"` an error, and a by-hand run passes a document, so the same line
+then searches that document and can exit 0. A line naming one is printed as not
+run, like a variable this shell lacks.
+
+A scanner that fails leaves the document unchecked, so the gate exits 1 and
+says the run is not a pass. A gate whose awk fails and whose verdict is "no
+command printed anything wrong" is the defect it exists to catch, one level
+down.
+
 Both directions are pinned by `tests/x/test-121-doc-commands.sh`, on documents
 written for the occasion. A command that exits non-zero fails the check and is
 printed with its document and line; deleting that line makes the same document
-pass. A command outside the allowlist, an unlabelled fence, and a variable this
-shell lacks are each left unrun, and the file the allowlisted-nothing command
-names is still there afterwards. A `|` inside the pattern is still run, and a
-command that reads standard input does not consume the next line.
+pass. A command outside the allowlist, an unlabelled fence, a variable this
+shell lacks, the gate's own `$1`, and each program-naming flag above are left
+unrun, with a wrapper's stamp absent afterwards; a scanner stubbed to fail makes
+the gate exit 1. A `|` inside the pattern is still run, and a command that reads
+standard input does not consume the next line.
 
 ## The async baseline
 

@@ -35,11 +35,21 @@
 #     commands start a session, build, mutate the tree or take minutes (`make
 #     format`, `--update-baseline`, `scripts/xephyr-test.sh`), and a gate runs on
 #     every commit.
+#   - Not a line whose arguments hand that program another one to run: rg
+#     --pre, git grep --open-files-in-pager, git's --ext-diff, which runs
+#     $GIT_EXTERNAL_DIFF. Those programs read and exit only while no argument
+#     names a program, and a gate that runs a document's program is a gate with
+#     an arbitrary command in it.
 #   - Not a command naming a variable this shell does not have. $LIBXCB_SRC is
 #     the dev shell's, so a run outside the shell re-enters it the way
 #     scripts/run-hook.sh does. A variable nothing sets is printed with the
 #     command it left unrun, rather than run against a path that collapsed. A
 #     `$name` inside single quotes is the program's argument, not an expansion.
+#   - Not a command naming $1 or another parameter of the gate's own command
+#     line. The hook runs this script with no arguments, where `set -u` makes
+#     "$1" an error; a by-hand run passes a document, and the same line then
+#     searches that document and can exit 0. The document's reader has a
+#     different command line from either.
 #
 # A command that exits non-zero fails the check. It is printed with its
 # document, its line and its output; empty output is printed as the exit status
@@ -185,6 +195,31 @@ doc_candidates() {
       return 0
     }
 
+    # The shell removes its quotes before the program sees them, so a quoted
+    # `--pre=/tmp/x` reaches rg as that flag: the word is unquoted the way the
+    # shell would before the flag is recognised.
+    function unquote(s,   i, c, out) {
+      out = ""
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (c != "\047" && c != "\"") out = out c
+      }
+      return out
+    }
+
+    # 1 when an argument hands the allowlisted program another one to run.
+    function runs_program(w, nw,   i, verb, arg) {
+      verb = (w[1] == "git") ? w[2] : ""
+      for (i = 2; i <= nw; i++) {
+        arg = unquote(w[i])
+        if (w[1] == "rg" && (arg == "--pre" || arg ~ /^--pre=/)) return 1
+        if (verb == "grep" && (arg == "-O" || arg ~ /^-O./ ||
+            arg == "--open-files-in-pager" || arg ~ /^--open-files-in-pager=/)) return 1
+        if (w[1] == "git" && arg == "--ext-diff") return 1
+      }
+      return 0
+    }
+
     /^[ \t]*```/ {
       if (fenced) { fenced = 0; next }
       info = $0
@@ -200,7 +235,7 @@ doc_candidates() {
       cmd = trim(unquoted($0))
       if (cmd == "") next
       if (shell_meta(cmd)) next
-      split(cmd, w, /[ \t]+/)
+      nw = split(cmd, w, /[ \t]+/)
       if (w[1] ~ /=/) next
       if (w[1] == "git") {
         if (w[2] == "" || w[2] ~ /^-/) next
@@ -210,17 +245,20 @@ doc_candidates() {
       } else if (!listed(w[1], read_only)) {
         next
       }
-      printf "%d\t%s\n", NR, cmd
+      reason = ""
+      if (runs_program(w, nw)) reason = "program"
+      printf "%d\t%s\t%s\n", NR, reason, cmd
     }
   ' "$1"
 }
 
-# doc_unset_vars <command> - the variable names the shell would expand that
-# this shell does not have. A `$name` inside single quotes is the program's
-# argument, not an expansion; treating it as unset would skip a command the
-# reader would run.
-doc_unset_vars() {
-  local name
+# doc_missing <command> - one line per token the gate cannot resolve, as
+# `var:NAME` for a variable this shell does not set and `param:$1` for a
+# parameter of the gate's own command line. A `$name` inside single quotes is
+# the program's argument, not an expansion; treating it as unset would skip a
+# command the reader would run.
+doc_missing() {
+  local name ref
   printf '%s\n' "$1" |
     awk '
       function emit(line,   i, n, c, sq, dq, name, j) {
@@ -264,7 +302,10 @@ doc_unset_vars() {
                   name = name substr(line, j, 1)
                   j++
                 }
-                if (substr(line, j, 1) == "}") print name
+                if (substr(line, j, 1) == "}") print "var:" name
+              } else if (substr(line, j, 1) ~ /[0-9@*#?!$-]/ &&
+                substr(line, j + 1, 1) == "}") {
+                print "param:$" substr(line, j, 1)
               }
             } else if (c ~ /[A-Za-z_]/) {
               name = ""
@@ -273,8 +314,12 @@ doc_unset_vars() {
                 name = name substr(line, j, 1)
                 j++
               }
-              print name
+              print "var:" name
               i = j
+              continue
+            } else if (c ~ /[0-9@*#?!$-]/) {
+              print "param:$" c
+              i += 2
               continue
             }
           }
@@ -283,9 +328,15 @@ doc_unset_vars() {
       }
       { emit($0) }
     ' |
-    while IFS= read -r name; do
-      [ -n "$name" ] || continue
-      [ -n "${!name:-}" ] || printf '%s\n' "$name"
+    while IFS= read -r ref; do
+      [ -n "$ref" ] || continue
+      case "$ref" in
+        param:*) printf '%s\n' "$ref" ;;
+        var:*)
+          name=${ref#var:}
+          [ -n "${!name:-}" ] || printf '%s\n' "$ref"
+          ;;
+      esac
     done
 }
 
@@ -300,19 +351,48 @@ for f in "${DOCS[@]}"; do
   read_docs=$((read_docs + 1))
   contributed=0
 
+  candidates=$(doc_candidates "$f") || {
+    echo "check-doc-commands: could not read $f for commands."
+    echo "The scanner that finds them failed, so nothing in this file was checked"
+    echo "and this run is not a pass."
+    exit 1
+  }
+
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
     lineno=${entry%%$'\t'*}
+    entry=${entry#*$'\t'}
+    reason=${entry%%$'\t'*}
     cmd=${entry#*$'\t'}
     contributed=1
 
-    unset_vars=$(doc_unset_vars "$cmd" | sort -u)
-    if [ -n "$unset_vars" ]; then
+    if [ "$reason" = "program" ]; then
       UNRUN=$((UNRUN + 1))
       printf '  NOT RUN  %s:%s\n' "$f" "$lineno"
       printf '           %s\n' "$cmd"
-      printf '           %s is not set, and nothing in this shell sets it\n' \
-        "$(printf '%s' "$unset_vars" | tr '\n' ' ' | sed 's/ $//')"
+      printf '           an argument names another program for %s to run, and\n' "${cmd%% *}"
+      printf '           this gate runs only the command itself\n'
+      continue
+    fi
+
+    missing=$(doc_missing "$cmd" | sort -u)
+    if [ -n "$missing" ]; then
+      UNRUN=$((UNRUN + 1))
+      printf '  NOT RUN  %s:%s\n' "$f" "$lineno"
+      printf '           %s\n' "$cmd"
+      while IFS= read -r ref; do
+        case "$ref" in
+          param:*)
+            printf '           %s is a parameter of this gate'\''s command line, and\n' \
+              "${ref#param:}"
+            printf '           the document'\''s reader has a different one\n'
+            ;;
+          var:*)
+            printf '           %s is not set, and nothing in this shell sets it\n' \
+              "\$${ref#var:}"
+            ;;
+        esac
+      done <<<"$missing"
       continue
     fi
 
@@ -333,7 +413,7 @@ for f in "${DOCS[@]}"; do
     else
       printf '           exit %s, and it printed nothing\n' "$status"
     fi
-  done < <(doc_candidates "$f")
+  done <<<"$candidates"
 
   if [ "$contributed" -eq 1 ]; then
     DOCS_WITH_COMMANDS+=("$f")
@@ -357,7 +437,7 @@ fi
 
 summary="check-doc-commands: $RAN command(s) ran clean"
 if [ "$UNRUN" -gt 0 ]; then
-  summary="$summary, $UNRUN not run for a variable this shell does not set"
+  summary="$summary, $UNRUN left unrun and printed above"
 fi
 if [ "${#DOCS_WITH_COMMANDS[@]}" -gt 0 ]; then
   list=$(printf '%s\n' "${DOCS_WITH_COMMANDS[@]}" | paste -sd, - | sed 's/,/, /g')
