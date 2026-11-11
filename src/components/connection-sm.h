@@ -14,8 +14,8 @@
 
 #include <stdint.h>
 
-#include "../event-types.h"
-#include "../sm/sm-template.h"
+#include "src/event-types.h"
+#include "src/sm/sm-template.h"
 
 /*
  * Connection State Machine states
