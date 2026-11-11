@@ -129,9 +129,9 @@ bead_scope_tokens() {
 #   command and not a guess.
 #
 #   This reads the text again instead of reusing bead_scope_tokens(): that
-#   tokeniser splits on everything but a path's characters, so `cmd_start`
-#   reaches it as `cmd` and `start`, and it keeps only a word with a `/` or a
-#   source extension.
+#   tokeniser keeps underscore, so `cmd_start` is one token, then drops it,
+#   because it keeps only a word with a `/` or a source extension. `harness`
+#   is dropped the same way.
 bead_scope_harness_words() {
   bead_scope_text "$1" "$2" |
     tr -c 'A-Za-z0-9_' '\n' |
@@ -365,10 +365,11 @@ bead_scope_verify() {
     if [ -n "$words" ]; then
       printf '%s: nothing in its text names a harness file, but it talks about the harness: %s.\n' \
         "$id" "${words//,/ and }"
-      echo "A fix in the harness is a command and not a path, so the token scan has"
-      echo "nothing to resolve and this command cannot say whether the work is here."
-      echo "Read its comments for the file the fix is in: the part that is here is"
-      echo "landed here, the rest cannot be. Return 2, not the 0 that reads as yes."
+      echo "The token scan keeps a path, not the word or a cmd_ command, so this"
+      echo "command cannot say whether the work is here."
+      echo "Read the bead for the file the fix is in. Land the part whose file is"
+      echo "here. A cmd_ name with no file here is not this tree's work. Return 2,"
+      echo "not the 0 that reads as yes."
       return 2
     fi
     printf '%s: nothing in its text names the harness or a path this tree has lost,\n' "$id"

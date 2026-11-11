@@ -172,11 +172,14 @@ bead_scope_verify "$DIR/bead.json" "$no_comments" "$REPO" "$DIR/harness-empty.tx
 check_eq "a wpy path fails without a harness checkout" 3 "$?"
 check_eq "and the path is still named" 1 "$(grep -c 'OUTSIDE  wpy/commands/publish.py' "$LAST")"
 
-# The harness named without a path. The fix is one of its commands, so the text
-# says `cmd_start` and "the harness" and never a file, and the token scan finds
-# nothing: the verdict read "its work is in this worktree", and the worker read
-# the harness to find out. This is the text the tool was tried on, with the
-# checkout it was written against gone from the file list.
+# The harness named without a path. The text says `cmd_start` and "the harness"
+# and never a file, and the token scan finds nothing: the verdict read "its work
+# is in this worktree", and the worker read the harness to find out. This is a
+# recording of that text, not the text: the comment that names the command also
+# names a live tracker id, and a script that contains one fails
+# scripts/check-bead-refs.sh. The paths it names are in the repo fixture above
+# so they are not GONE findings; the word check is what answers. The harness
+# file list is empty, which is the checkout the tool was tried against.
 cat >"$DIR/bead.json" <<'EOF'
 [{"id": "wm-b21", "status": "in_progress", "title": "the worktree is reset while the agent is already reading it",
   "description": "What I tried: read the files wm-b21 names in .worktrees/wm-b21 (git log showed HEAD e37b7, work/wm-b21 at that commit)\nWhat happened: scripts/check-async.sh and scripts/lib/async-scan.sh had changed content, and the draft I had written into scripts/lib/async-scan.sh was gone.\nWhat worked: re-reading every file the issue names and redoing the draft against the new tree.\nSuggested fix: make worktree prep finish before the agent's first tool call, and log the reset with the target sha."}]
@@ -189,7 +192,11 @@ check_eq "the harness named by word and command is not an answer" 2 "$?"
 check_eq "and the words that named it are printed" 1 "$(grep -c 'talks about the harness: cmd_start and harness' "$LAST")"
 check_eq "and it does not answer that the work is here" 0 "$(grep -c 'so its work is in this worktree' "$LAST")"
 check_eq "and it says it cannot tell" 1 "$(grep -c 'cannot say whether the work is here' "$LAST")"
-check_eq "and it sends the reader to the comments, not to the harness" 1 "$(grep -c 'Read its comments for the file the fix is in' "$LAST")"
+check_eq "and it sends the reader to the bead, not to the harness" 1 "$(grep -c 'Read the bead for the file the fix is in' "$LAST")"
+check_eq "and it does not say the fix is a harness command" 0 \
+  "$(grep -c 'A fix in the harness is a command' "$LAST")"
+check_eq "and a command with no file here is not this tree's work" 1 \
+  "$(grep -c 'A cmd_ name with no file here is not this tree'"'"'s work' "$LAST")"
 
 # Either half names the harness on its own: a bead that says "the harness" and
 # no command, and one that names a command and never the word. Both name the
@@ -409,6 +416,10 @@ check_eq "the worker procedure says to grep for the behaviour first" 1 \
   "$(grep -c 'grep for the behaviour' "$proc")"
 check_eq "the worker procedure does not say a missing path is only a new file" 0 \
   "$(grep -c 'asking for a new file as far as the text can tell' "$proc")"
+check_eq "the worker procedure does not say the fix is a harness command" 0 \
+  "$(grep -c 'the fix is a command there' "$proc")"
+check_eq "the worker procedure says the word also matches this tree" 1 \
+  "$(grep -c 'own seam harness' "$proc")"
 
 lib="$ROOT_DIR/scripts/lib/bead-scope-report.sh"
 check_eq "the report's own description does not say a missing path is only a new file" 0 \

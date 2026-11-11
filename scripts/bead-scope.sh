@@ -38,11 +38,12 @@
 # `cmd_start` in the harness, and the worker then read the harness to find out.
 # The word and the `cmd_` names are read, and the answer is 2.
 #
-# Exit status: 0 no token names the harness and every file-shaped token whose
-# first component this tree tracks, or once tracked, is still here. 3 the text
-# names a harness path, 2 the question could not be answered: a broken read, a
-# path this tree does not have, or a bead that talks about the harness
-# (`harness`, `cmd_start`) without naming a file in it. A bead can name a
+# Exit status: 0 no token names the harness, the text does not name it by the
+# word or by a cmd_ command, and every file-shaped token whose first component
+# this tree tracks, or once tracked, is still here. 3 the text names a harness
+# path, 2 the question could not be answered: a broken read, a path this tree
+# does not have, or a bead that talks about the harness (`harness`, `cmd_start`)
+# without naming a file in it. A bead can name a
 # harness file and still ask for a change here; the verdict says to land that
 # part. A broken read is 2 and not 0: an answer that says "workable here"
 # because the tracker could not be reached is worse than no answer, and a caller

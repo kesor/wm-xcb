@@ -370,8 +370,10 @@ beads in your final message. This is how the traps below stop being traps.
   comment saying which part of the work is in this tree and which is not, do the
   part that is here, and stop. The search for the harness file is what costs a
   session; the command is one call. A bead that names the harness by word or by
-  a `cmd_` command and no file is exit 2, not 3: the fix is a command there, so
-  read the bead's comments for the file it is in. A description written before
+  a `cmd_` command and no file is exit 2, not 3. That word also matches this
+  tree's own seam harness, so read the bead and land the part whose file is
+  here; do not read the harness to find a command the text did not name a file
+  for. A description written before
   the harness moved still names a file it no longer has, and the command says
   which. The same command checks the other half: a path this tree deleted is a
   `GONE` line with the commit that removed it, and exit 2. Beads are written
