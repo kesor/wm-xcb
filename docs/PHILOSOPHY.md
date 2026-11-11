@@ -189,7 +189,7 @@ names each rule below, what a violation looks like, and how to check it.
 |------|-----|---------------------|
 | No component calls another component | 2.1 | review, by a person or an agent: `.agents/skills/wm-review/SKILL.md` |
 | No state assignment outside `sm_raw_write` / `sm_transition` | 2.2 | `scripts/check-compiler-refusals.sh` refuses the assignments in `tests/compile-fail/`. A tracked field with no fixture there is still review |
-| A component's registration is checked | 2.4 | `scripts/check-compiler-refusals.sh` refuses a `hub_register_component()` call that drops the result |
+| A component's registration is checked | 2.4 | `scripts/check-compiler-refusals.sh` refuses the dropped call in `tests/compile-fail/registration-result-ignored.c`. A caller in the tree that drops the result warns, and the build still succeeds, so that call is still review |
 | No `_reply()` in a handler or action | 2.3 | `scripts/check-async.sh`, and review for a reply reached through a helper |
 | No blocking call in the loop: `poll`/`wait_for_event` only | 2.3 | `scripts/check-async.sh` (the calls) and `scripts/perf-test.sh` (idle CPU, which is what a spin costs) |
 | One flush per loop iteration | 2.3 | review |
