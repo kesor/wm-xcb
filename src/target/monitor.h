@@ -169,6 +169,10 @@ void monitor_get_geometry(const Monitor* m, int16_t* x, int16_t* y, uint16_t* wi
  * Data is stored by name - components retrieve it later via monitor_get_sm().
  *
  * Example: pertag stores Pertag* as monitor_set_sm(m, "pertag", (SM*)pt)
+ *
+ * The machine stored under "pertag" is a plain allocation, not a
+ * StateMachine, so the monitor free()s that slot where it sm_destroy()s any
+ * other.
  */
 
 /*
@@ -182,11 +186,20 @@ StateMachine* monitor_get_sm(Monitor* m, const char* sm_name);
 /*
  * Set component data for this monitor.
  * Used by components to attach their data (e.g., Pertag*, layout state, etc.).
+ * The name is copied; the monitor keeps the copy.
  *
- * If sm is NULL, removes any existing entry for that name.
+ * A successful call takes ownership of `sm`: the monitor destroys it when
+ * another machine is set under the same name, and when the monitor itself is
+ * destroyed.
  *
- * Returns true on success, false on failure (OOM).
- * On failure, the caller should free the data to avoid leaks.
+ * Passing NULL destroys the machine stored under `sm_name` and removes its
+ * entry, so monitor_get_sm() returns NULL for that name afterwards. Removing a
+ * name that holds nothing is not an error.
+ *
+ * Returns true on success, false when the monitor or the name is NULL, when
+ * the table could not grow, or when the name could not be copied. A failed
+ * call stores nothing and leaves the machine the caller passed still the
+ * caller's, to destroy or free the way a successful call would have.
  */
 bool monitor_set_sm(Monitor* m, const char* sm_name, StateMachine* sm);
 

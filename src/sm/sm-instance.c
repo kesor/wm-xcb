@@ -374,13 +374,31 @@ sm_set_emitter(StateMachine* sm, EventEmitter emit, void* emit_userdata)
   sm->emit_userdata = emit_userdata;
 }
 
+/*
+ * Replace the instance data and the destructor that owns it.
+ *
+ * A machine owns one datum at a time, so the destructor already installed runs
+ * before the new data takes its place. Overwriting data_free without running it
+ * dropped the destructor and leaked what it was installed to free. The same
+ * pointer is left alone: freeing it here and storing it again would hand the
+ * machine a freed pointer.
+ */
+static void
+sm_install_data(StateMachine* sm, void* data, SMDataFree free_fn)
+{
+  if (sm->data_free != NULL && sm->data != NULL && sm->data != data) {
+    sm->data_free(sm->data);
+  }
+  sm->data      = data;
+  sm->data_free = free_fn;
+}
+
 void
 sm_set_data(StateMachine* sm, void* data)
 {
   if (sm == NULL)
     return;
-  sm->data      = data;
-  sm->data_free = NULL;
+  sm_install_data(sm, data, NULL);
 }
 
 void
@@ -388,6 +406,5 @@ sm_set_owned_data(StateMachine* sm, void* data, SMDataFree free_fn)
 {
   if (sm == NULL)
     return;
-  sm->data      = data;
-  sm->data_free = free_fn;
+  sm_install_data(sm, data, free_fn);
 }

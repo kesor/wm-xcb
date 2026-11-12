@@ -20,6 +20,7 @@ void test_monitor_double_create(void);
 void test_monitor_null_destroy(void);
 void test_monitor_with_hub_integration(void);
 void test_monitor_set_sm_null_removes_entry(void);
+void test_monitor_set_sm_null_destroys_stored_machine(void);
 void test_monitor_destroy_unadopts_before_freeing_machines(void);
 
 #endif /* _TEST_WM_MONITOR_H_ */
