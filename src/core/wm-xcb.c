@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <xcb/errors.h>
 #include <xcb/xcb.h>
-#include <xcb/xinput.h>
 
 #include "src/components/client-list.h"
 #include "src/core/wm-log.h"
@@ -106,30 +105,6 @@ get_root_window(xcb_connection_t* dpy, xcb_window_t* root)
 }
 
 void
-setup_xinput_initialize()
-{
-  xcb_input_xi_query_version_cookie_t xi_cookie = xcb_input_xi_query_version_unchecked(dpy, XCB_INPUT_MAJOR_VERSION, XCB_INPUT_MINOR_VERSION);
-  /* allow-blocking: startup, the event loop has not started yet */
-  xcb_input_xi_query_version_reply_t* xi_reply = xcb_input_xi_query_version_reply(dpy, xi_cookie, NULL);
-  LOG_DEBUG("XInput version: %d.%d", xi_reply->major_version, xi_reply->minor_version);
-  free(xi_reply);
-}
-
-void
-setup_xinput_events()
-{
-  struct {
-    xcb_input_event_mask_t    head;
-    xcb_input_xi_event_mask_t mask;
-  } mask;
-  mask.head.deviceid = XCB_INPUT_DEVICE_ALL;
-  mask.head.mask_len = sizeof(mask.mask) / sizeof(uint32_t);
-  mask.mask          = (xcb_input_xi_event_mask_t) (0U | XCB_INPUT_XI_EVENT_MASK_BUTTON_PRESS | XCB_INPUT_XI_EVENT_MASK_BUTTON_RELEASE | XCB_INPUT_XI_EVENT_MASK_DEVICE_CHANGED | XCB_INPUT_XI_EVENT_MASK_HIERARCHY | XCB_INPUT_XI_EVENT_MASK_KEY_PRESS | XCB_INPUT_XI_EVENT_MASK_KEY_RELEASE | XCB_INPUT_XI_EVENT_MASK_PROPERTY | XCB_INPUT_MOTION | XCB_INPUT_ENTER | XCB_INPUT_LEAVE | XCB_INPUT_FOCUS_IN | XCB_INPUT_FOCUS_OUT | XCB_INPUT_RAW_KEY_PRESS | XCB_INPUT_RAW_KEY_RELEASE | XCB_INPUT_RAW_BUTTON_PRESS | XCB_INPUT_RAW_BUTTON_RELEASE | XCB_INPUT_RAW_MOTION | XCB_INPUT_TOUCH_BEGIN | XCB_INPUT_TOUCH_UPDATE | XCB_INPUT_TOUCH_END | XCB_INPUT_TOUCH_OWNERSHIP | XCB_INPUT_RAW_TOUCH_BEGIN | XCB_INPUT_RAW_TOUCH_UPDATE | XCB_INPUT_RAW_TOUCH_END);    // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
-
-  xcb_input_xi_select_events(dpy, root, 1, &mask.head);
-}
-
-void
 check_no_running_wm()
 {
   xcb_void_cookie_t wm_cookie = xcb_change_window_attributes_checked(dpy, root, XCB_CW_EVENT_MASK, (uint32_t[]) { XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT });
@@ -160,9 +135,12 @@ setup_xcb()
   if (!running)
     return;
 
-  setup_xinput_initialize();
-  setup_xinput_events();
-
+  /* The root selects core events only. An XI2 mask selected here would deliver
+     a second copy of every pointer and key event, and nothing in the WM reads
+     XCB_GE_GENERIC, so a component that wants XI2 events registers that
+     handler and selects its mask in the same place. No seam test can hold this
+     down: XIGetSelectedEvents answers for the client that asks, so another
+     connection cannot see the WM's selection. */
   values[0] = 0x00ffffff;    // "any" event (first 24 bits flipped on)
 
   const static uint32_t mask = XCB_CW_EVENT_MASK;

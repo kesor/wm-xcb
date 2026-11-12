@@ -104,6 +104,14 @@ raw `response_type`, so a component that handles an extension event registers
 under the number `xcb_get_extension_data()` reports for its connection, and one
 registration covers every subCode.
 
+XInput 2 is the exception to that numbering. Every XI2 event arrives as
+`XCB_GE_GENERIC` (35), with the XI2 type in the event's own `event_type` field, so
+one registration under 35 is where a component that wants XI2 events starts.
+No component does: the root window selects the core event mask only, because an
+XI2 mask delivers a second copy of every pointer and key event and nothing
+reads it. `setup_xcb()` in `src/core/wm-xcb.c` says what a component that wants
+XI2 has to add, and why no seam test can observe the selection either way.
+
 ---
 
 ## Handler → Component Decision
