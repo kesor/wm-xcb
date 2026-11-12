@@ -15,8 +15,8 @@
 # coverage at all while looking correct. That is why the binary at the root is
 # checked for ASan symbols and not only for a zero exit status.
 #
-# The builds print a screenful of -Wpedantic warnings from the debug variant,
-# so their output goes to a log that is printed only when a step fails.
+# The builds print a screenful of compiler command lines, so their output goes
+# to a log that is printed only when a step fails.
 #
 # Exit status: 0 when every alternation builds and leaves its own binary, 1
 # otherwise.

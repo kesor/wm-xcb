@@ -7,9 +7,9 @@
 # gate that builds the tree from scratch, which is what catches a missing
 # dependency edge.
 #
-# Nothing here prints on a pass. A debug build is noisy by nature - 13 warnings
-# the -pedantic flag is there to find - and printing them on every push buried
-# the one that mattered and made a green gate look red.
+# Nothing here prints on a pass. A debug build is noisy by nature - every
+# compiler line names the libxcb-errors include path - and printing it on every
+# push buried the line that mattered and made a green gate look red.
 #
 # Exit status: 0 when the build, the suite and the final release build pass.
 
