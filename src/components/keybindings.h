@@ -17,7 +17,7 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
-#include "keybinding.h"
+#include "src/components/keybinding.h"
 
 /*
  * Common modifier definitions

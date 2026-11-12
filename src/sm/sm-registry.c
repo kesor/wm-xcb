@@ -1,10 +1,10 @@
-#include "sm-registry.h"
+#include "src/sm/sm-registry.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-#include "sm-instance.h"
 #include "src/core/wm-log.h"
+#include "src/sm/sm-instance.h"
 
 /* Registry entry - uses separate typed function pointer fields to avoid
  * casting between function pointers and data pointers (UB in standard C) */

@@ -8,7 +8,7 @@
 
 #include <stdlib.h>
 
-#include "client-list.h"
+#include "src/components/client-list.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb.h"
 #include "src/target/monitor.h"

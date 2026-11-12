@@ -13,7 +13,7 @@
 
 #include "src/core/wm-log.h"
 
-#include "test-registry.h"
+#include "tests/unit/test-registry.h"
 
 /*
  * Test: logger flushes the stream it wrote to

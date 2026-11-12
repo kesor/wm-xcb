@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "action-registry.h"
+#include "src/actions/action-registry.h"
 #include "src/event-types.h"
 
 /*

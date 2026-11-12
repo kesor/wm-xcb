@@ -5,14 +5,14 @@
  * to action names. The bindings can be registered at runtime.
  */
 
-#include "keybinding-binding.h"
+#include "src/actions/keybinding-binding.h"
 
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "action-registry.h"
+#include "src/actions/action-registry.h"
 #include "src/core/wm-log.h"
 
 /*

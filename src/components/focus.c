@@ -28,8 +28,8 @@
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
 
-#include "focus.h"
 #include "src/actions/action-registry.h"
+#include "src/components/focus.h"
 
 /*
  * Cached FocusSM template - created once at init, reused for all clients.

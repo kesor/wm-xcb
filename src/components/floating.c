@@ -17,8 +17,8 @@
 
 #include <stdlib.h>
 
-#include "floating.h"
 #include "src/actions/action-registry.h"
+#include "src/components/floating.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/sm/sm-instance.h"

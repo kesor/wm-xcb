@@ -16,8 +16,8 @@
 
 #include "src/core/wm-xcb-ewmh.h"
 
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Test: destruct releases the per-screen lists init_atoms allocated

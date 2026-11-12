@@ -11,9 +11,9 @@
 #include "src/components/focus.h"
 #include "src/core/wm-hub.h"
 #include "src/xcb/xcb-handler.h"
-#include "test-registry.h"
-#include "test-target-client.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-target-client.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Event tracking state for focus tests

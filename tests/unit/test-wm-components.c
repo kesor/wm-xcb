@@ -26,8 +26,8 @@
 #include "src/core/wm-components.h"
 #include "src/core/wm-hub.h"
 #include "src/xcb/xcb-handler.h"
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Test: every module on the startup list comes up.

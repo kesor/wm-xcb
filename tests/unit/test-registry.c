@@ -6,7 +6,7 @@
  *
  * Usage:
  *   // In any test file (e.g., test-wm-window-list.c)
- *   #include "test-registry.h"
+ *   #include "tests/unit/test-registry.h"
  *
  *   TEST_GROUP(WindowList, {
  *     test_add_remove();
@@ -15,23 +15,23 @@
  *   });
  */
 
-#include "test-registry.h"
+#include "tests/unit/test-registry.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 /*
  * Include all test headers to register their test groups
  */
-#include "test-client-list-component.h"
-#include "test-focus-component.h"
-#include "test-launcher.h"
-#include "test-target-client.h"
-#include "test-terminal.h"
-#include "test-wm-hub.h"
-#include "test-wm-monitor-manager.h"
-#include "test-wm-monitor.h"
-#include "test-wm-xcb-handler.h"
-#include "test-wm.h"
+#include "tests/unit/test-client-list-component.h"
+#include "tests/unit/test-focus-component.h"
+#include "tests/unit/test-launcher.h"
+#include "tests/unit/test-target-client.h"
+#include "tests/unit/test-terminal.h"
+#include "tests/unit/test-wm-hub.h"
+#include "tests/unit/test-wm-monitor-manager.h"
+#include "tests/unit/test-wm-monitor.h"
+#include "tests/unit/test-wm-xcb-handler.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Registry linked list

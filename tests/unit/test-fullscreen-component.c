@@ -6,7 +6,7 @@
  * client's fullscreen state machine.
  */
 
-#include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
+#include "tests/unit/test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +19,7 @@
 #include "src/core/wm-xcb-ewmh.h"
 #include "src/sm/sm-registry.h"
 #include "src/xcb/xcb-handler.h"
-#include "test-wm.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Test: fullscreen.toggle is registered against the focused client.
