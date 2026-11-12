@@ -135,12 +135,15 @@ setup_xcb()
   if (!running)
     return;
 
-  /* The root selects core events only. An XI2 mask selected here would deliver
-     a second copy of every pointer and key event, and nothing in the WM reads
-     XCB_GE_GENERIC, so a component that wants XI2 events registers that
-     handler and selects its mask in the same place. No seam test can hold this
-     down: XIGetSelectedEvents answers for the client that asks, so another
-     connection cannot see the WM's selection. */
+  /* The root selects core events only. Nothing reads XCB_GE_GENERIC, so an
+     XI2 mask selected here is dropped. On Xorg 21.1.24 an XI2 button or key
+     mask on the same window replaces the core button or key event for this
+     client. A GrabKey with owner_events set,
+     which is how keybinding_grab_keys() grabs, still delivers its core
+     KeyPress beside the XI2 event. A component that wants XI2 events registers
+     a handler for XCB_GE_GENERIC and selects its mask in that same place. No
+     seam test can hold the selection down: XIGetSelectedEvents answers for the
+     client that asks, so another connection cannot see it. */
   values[0] = 0x00ffffff;    // "any" event (first 24 bits flipped on)
 
   const static uint32_t mask = XCB_CW_EVENT_MASK;
