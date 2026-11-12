@@ -76,8 +76,9 @@ void tag_destroy(Tag* t);
  */
 
 /*
- * Initialize the global tag list with default tags (0-8).
- * Called at startup.
+ * Initialize the global tag list with default tags (0-8), named from the
+ * loaded configuration. The tag-manager component calls this at startup and
+ * owns the list it creates.
  */
 void tag_list_init(void);
 

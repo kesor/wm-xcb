@@ -2,6 +2,8 @@
  * Tag Manager Component
  *
  * Handles tag view state for monitors. This component:
+ * - Creates the nine Tag targets at startup, and destroys them at shutdown
+ * - Renames the tags from EVT_CONFIG_RELOADED, so a reload reaches them
  * - Registers REQ_TAG_VIEW and REQ_TAG_TOGGLE requests
  * - Answers REQ_CLIENT_VISIBLE, the manage path's question about one client
  * - Manages the TagViewSM state machine for monitors
@@ -93,12 +95,12 @@ bool tag_manager_component_is_initialized(void);
 
 /*
  * Initialize the tag manager component.
- * Registers with hub and sets up request handlers.
+ * Registers with hub, sets up request handlers, and creates the nine tags.
  */
 bool tag_manager_component_init(void);
 
 /*
- * Shutdown the tag manager component.
+ * Shutdown the tag manager component, destroying the tags it created.
  */
 void tag_manager_component_shutdown(void);
 
