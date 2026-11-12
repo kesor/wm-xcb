@@ -152,6 +152,75 @@ test_config_file_parses_bindings(void)
   unlink(path);
 }
 
+/*
+ * The file may name more bindings than the compiled set wires, and every line
+ * it names has to reach the table. 40 is more than the compiled set holds and
+ * well inside both limits, so nothing is refused here; the wiring those lines
+ * go through needs a keymap and is tests/x/test-58-bind-table-capacity.sh.
+ */
+void
+test_config_file_keeps_more_binds_than_the_compiled_set(void)
+{
+  LOG_CLEAN("== Testing a file with more bind lines than the compiled set");
+
+  static const char* const modifiers[] = { "Mod", "Mod+Shift", "Ctrl+Mod", "Mod+Alt" };
+  char                     path[256];
+  char                     text[8192];
+  size_t                   used = 0;
+
+  /* Four sets of F1 to F12: 48 chords, of which the first 40 are used. */
+  for (int i = 0; i < 40; i++) {
+    int written = snprintf(text + used, sizeof text - used, "bind %s+F%d tag-manager.view 2\n",
+                           modifiers[i / 12], (i % 12) + 1);
+
+    assert(written > 0 && (size_t) written < sizeof text - used);
+    used += (size_t) written;
+  }
+
+  if (!write_config(path, sizeof path, text)) {
+    assert(0 && "cannot write a temporary config file");
+    return;
+  }
+
+  ConfigFile* cf = config_file_load(path);
+
+  assert(cf != NULL && cf->found);
+  assert(cf->error_count == 0);
+  assert(cf->bind_count == 40);
+  assert(cf->binds[39].line == 40);
+  assert(cf->binds[39].modifiers == (XCB_MOD_MASK_4 | XCB_MOD_MASK_1));
+  assert(cf->binds[39].keysym == XK_F4);
+
+  config_file_free(cf);
+  unlink(path);
+
+  /* One line past what the parser keeps is refused with its number, which is
+   * what keeps a file of any length from loading more lines than the table can
+   * hold. The count of the lines it keeps is the assert above, at the limit. */
+  used = 0;
+  for (int i = 0; i < CONFIG_FILE_MAX_BINDS + 1; i++) {
+    int written = snprintf(text + used, sizeof text - used,
+                           "bind Mod+F1 tag-manager.view 2\n");
+
+    assert(written > 0 && (size_t) written < sizeof text - used);
+    used += (size_t) written;
+  }
+
+  if (!write_config(path, sizeof path, text)) {
+    assert(0 && "cannot write a temporary config file");
+    return;
+  }
+
+  cf = config_file_load(path);
+  assert(cf != NULL && cf->bind_count == CONFIG_FILE_MAX_BINDS);
+  assert(cf->error_count == 1);
+  assert(cf->errors[0].line == CONFIG_FILE_MAX_BINDS + 1);
+  assert(strstr(cf->errors[0].text, "bindings") != NULL);
+
+  config_file_free(cf);
+  unlink(path);
+}
+
 void
 test_config_file_reports_the_line(void)
 {
@@ -655,6 +724,7 @@ test_config_reload_without_a_file_restores_the_compiled_rules(void)
 TEST_GROUP(ConfigFile, {
   test_config_file_missing();
   test_config_file_parses_bindings();
+  test_config_file_keeps_more_binds_than_the_compiled_set();
   test_config_file_reports_the_line();
   test_config_file_parses_float_rules();
   test_config_file_splits_fields();

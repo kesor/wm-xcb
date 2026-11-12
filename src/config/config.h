@@ -65,8 +65,12 @@ bool config_reload(void);
  * Initialize the configuration system.
  * This wires keybindings from the config file, or from config.wm.def.h when the
  * file named no binding.
+ *
+ * Returns how many of the file's bind lines reached the binding table. Zero
+ * means the compiled bindings are what is in the table: the file named none, or
+ * none of the ones it named could be used.
  */
-void config_init(void);
+uint32_t config_init(void);
 
 /*
  * Free the configuration file read by config_load_runtime().

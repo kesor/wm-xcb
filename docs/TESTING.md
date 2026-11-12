@@ -351,7 +351,8 @@ waits for a window to leave the screen uses `wait_hidden`, which polls for none.
 
 These files start their own display, because the condition they check cannot
 be produced once the WM is already up: `test-86-queued-event.sh`,
-`test-88-adopt-existing-windows.sh`, and `test-54-config-file-binding.sh`.
+`test-88-adopt-existing-windows.sh`, `test-54-config-file-binding.sh` and
+`test-58-bind-table-capacity.sh`.
 `test-102-probe-shape.sh` starts one too, by running `tests/x/probe.sh`, so the
 probe does not take the display the suite is using. `test-56-terminal-default.sh`
 starts one for a different reason: it hands the WM a `PATH` of its own, so the
@@ -371,6 +372,14 @@ reject, and starts the WM with it. It asserts the file's keys change the view,
 that a compiled key (`MOD+2`) no longer does, and that the WM log reports the
 rejected line once by line number. Then it restarts the WM with no file and
 asserts `MOD+2` works again, which is the fallback.
+
+`test-58-bind-table-capacity.sh` also starts a bare Xvfb, because the binding
+table is filled at startup: it writes more bind lines than
+`src/config/config.wm.def.h` wires, presses the first and the last chord, and
+asserts the WM logged no refused line. It then reloads the same file and asserts
+the reload says every line reached the table, and reloads an edit whose last line
+repeats line 1's chord and asserts the report names that line and the chord it
+collides with.
 
 `test-55-randr-relayout.sh` uses the shared session but changes its screen: it
 switches the nested output to the largest mode narrower than the current one and

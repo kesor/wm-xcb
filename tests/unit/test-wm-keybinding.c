@@ -502,9 +502,9 @@ test_keybinding_validate_bindings(void)
   keybinding_binding_init();
 
   assert(action_register(&known_action));
-  assert(keybinding_binding_register(XCB_MOD_MASK_4, 41, "known.action"));
+  assert(keybinding_binding_register(XCB_MOD_MASK_4, 41, "known.action") == KEYBINDING_REGISTERED);
   assert(keybinding_binding_register(
-      XCB_MOD_MASK_4 | XCB_MOD_MASK_SHIFT, 38, "missing.action"));
+             XCB_MOD_MASK_4 | XCB_MOD_MASK_SHIFT, 38, "missing.action") == KEYBINDING_REGISTERED);
 
   uint32_t unresolved = 0;
   char     log[4096];
@@ -528,6 +528,50 @@ test_keybinding_validate_bindings(void)
   action_registry_shutdown();
 }
 
+/*
+ * Test: a refusal says which one it is.
+ *
+ * A chord the table already holds and a table with no slot left read the same
+ * to a caller that only gets a yes or no, and they need different fixes: one
+ * line of the file repeated, or more lines than the table holds. This pins the
+ * two apart, and that a full table is what the limit says it is rather than the
+ * first refusal that comes along.
+ */
+void
+test_keybinding_register_reasons(void)
+{
+  LOG_CLEAN("== Testing a refused binding says which refusal it was");
+
+  action_registry_init();
+  keybinding_binding_init();
+
+  assert(keybinding_binding_register(XCB_MOD_MASK_4, 41, "fullscreen.toggle") == KEYBINDING_REGISTERED);
+  assert(keybinding_binding_register(XCB_MOD_MASK_4, 41, "monitor.tile") == KEYBINDING_ALREADY_BOUND);
+
+  /* Keycodes past what any keyboard reports, so every slot fills without a
+   * repeat: the table stores them and looks them up, and nothing here asks the
+   * server about them. */
+  for (uint32_t i = 1; i < KEYBINDING_MAX_BINDINGS; i++) {
+    assert(keybinding_binding_register(
+               XCB_MOD_MASK_4, (xcb_keycode_t) (1000 + i), "tag-manager.view") == KEYBINDING_REGISTERED);
+  }
+  assert(keybinding_binding_get_count() == KEYBINDING_MAX_BINDINGS);
+
+  assert(keybinding_binding_register(
+             XCB_MOD_MASK_4, (xcb_keycode_t) (1000 + KEYBINDING_MAX_BINDINGS), "tag-manager.view") == KEYBINDING_TABLE_FULL);
+  assert(keybinding_binding_register_with_arg(
+             XCB_MOD_MASK_SHIFT, (xcb_keycode_t) 41, "tag-manager.view", 2) == KEYBINDING_TABLE_FULL);
+
+  /* The table is unchanged by a refusal: the count is still the limit, and the
+   * chord that asked is still absent. */
+  assert(keybinding_binding_get_count() == KEYBINDING_MAX_BINDINGS);
+  assert(keybinding_binding_lookup(XCB_MOD_MASK_4, (xcb_keycode_t) 41) != NULL);
+  assert(keybinding_binding_lookup(XCB_MOD_MASK_SHIFT, (xcb_keycode_t) 41) == NULL);
+
+  keybinding_binding_shutdown();
+  action_registry_shutdown();
+}
+
 TEST_GROUP(KeybindingComponent, {
   test_keybinding_component_registration();
   test_keybinding_lookup_exact();
@@ -542,4 +586,5 @@ TEST_GROUP(KeybindingComponent, {
   test_keybinding_no_executor();
   test_keybinding_wired_actions_resolve();
   test_keybinding_validate_bindings();
+  test_keybinding_register_reasons();
 });

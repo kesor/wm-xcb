@@ -67,14 +67,33 @@ void keybinding_binding_shutdown(void);
 void keybinding_binding_clear(void);
 
 /*
+ * Why a registration was refused.
+ *
+ * The table knows the reason, the caller knows where the chord came from - a
+ * file line with its number, a compiled default - so the caller writes the
+ * message and this says which one it is writing. The two refusals a
+ * configuration reaches need different fixes: a chord already in the table is
+ * a line the file repeated, and a full table is a file with more lines than the
+ * table holds.
+ */
+typedef enum KeybindingRegisterResult {
+  KEYBINDING_REGISTERED = 0, /* the binding is in the table */
+  KEYBINDING_ALREADY_BOUND,  /* the same chord is in the table; nothing was added */
+  KEYBINDING_TABLE_FULL,     /* KEYBINDING_MAX_BINDINGS bindings are already in it */
+  KEYBINDING_REFUSED,        /* unusable action name, no memory, or no table to add to */
+} KeybindingRegisterResult;
+
+/*
  * Register a keybinding with an action.
  *
  * @param modifiers  XCB modifier mask (e.g., XCB_MOD_MASK_4)
  * @param keycode    X11 keycode (e.g., 41 for 'f')
  * @param action     Action name to invoke (e.g., "fullscreen.toggle")
- * @return           true on success, false on failure
+ * @return           KEYBINDING_REGISTERED, or why it was refused
  */
-bool keybinding_binding_register(uint32_t modifiers, xcb_keycode_t keycode, const char* action);
+KeybindingRegisterResult keybinding_binding_register(uint32_t      modifiers,
+                                                     xcb_keycode_t keycode,
+                                                     const char*   action);
 
 /*
  * Register a keybinding with an action and integer argument.
@@ -83,12 +102,12 @@ bool keybinding_binding_register(uint32_t modifiers, xcb_keycode_t keycode, cons
  * @param keycode    X11 keycode
  * @param action     Action name to invoke
  * @param arg        Integer argument to pass to action
- * @return           true on success, false on failure
+ * @return           KEYBINDING_REGISTERED, or why it was refused
  */
-bool keybinding_binding_register_with_arg(uint32_t      modifiers,
-                                          xcb_keycode_t keycode,
-                                          const char*   action,
-                                          uint32_t      arg);
+KeybindingRegisterResult keybinding_binding_register_with_arg(uint32_t      modifiers,
+                                                              xcb_keycode_t keycode,
+                                                              const char*   action,
+                                                              uint32_t      arg);
 
 /*
  * Unregister a keybinding by modifiers and keycode.

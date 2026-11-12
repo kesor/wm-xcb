@@ -107,7 +107,7 @@ keybinding_init(void)
   keybinding_binding_init();
 
   /* Initialize config (which wires keybindings) */
-  config_init();
+  (void) config_init();
 
   /* The grabs need dpy and root from setup_xcb(), and the bindings wired just
    * above: main() sets up X before it starts the components. Read the modifier
