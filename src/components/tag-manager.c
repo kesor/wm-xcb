@@ -43,6 +43,23 @@ enum {
  */
 static SMTemplate* cached_tag_view_template = NULL;
 
+static SMTemplate* tag_view_sm_template_create(void);
+
+/*
+ * The init and the on-demand accessor build through this pointer, so a test can
+ * hand them a creator that returns NULL and prove what a refused table does.
+ * Production leaves it at the real creator.
+ */
+static SMTemplate* (*tag_view_template_create)(void) = tag_view_sm_template_create;
+
+#ifdef WM_HUB_TESTING
+void
+tag_manager_component_set_template_creator_for_tests(SMTemplate* (*creator)(void) )
+{
+  tag_view_template_create = creator != NULL ? creator : tag_view_sm_template_create;
+}
+#endif
+
 /*
  * Internal event tracking for testing
  */
@@ -254,7 +271,7 @@ tag_manager_get_view_sm(Monitor* m)
   /* Use cached template if available */
   SMTemplate* tmpl = cached_tag_view_template;
   if (tmpl == NULL) {
-    tmpl = tag_view_sm_template_create();
+    tmpl = tag_view_template_create();
     if (tmpl == NULL) {
       LOG_ERROR("Failed to create tag-view SM template");
       return NULL;
@@ -903,7 +920,14 @@ tag_manager_component_init(void)
   hub_subscribe(EVT_CLIENT_MANAGED, tag_manager_listener, NULL);
 
   /* Cache the template */
-  cached_tag_view_template = tag_view_sm_template_create();
+  cached_tag_view_template = tag_view_template_create();
+  if (cached_tag_view_template == NULL) {
+    LOG_ERROR("Failed to create the tag-view SM template; tag manager not initialized");
+    hub_unsubscribe(EVT_CLIENT_MANAGED, tag_manager_listener);
+    hub_unregister_component(TAG_MANAGER_COMPONENT_NAME);
+    tag_manager_unregister_actions();
+    return false;
+  }
 
   tag_manager_component_instance.initialized = true;
   LOG_DEBUG("Tag manager component initialized successfully");

@@ -129,6 +129,15 @@ void focus_component_shutdown(void);
  */
 SMTemplate* focus_sm_template_create(void);
 
+#ifdef WM_HUB_TESTING
+/*
+ * Replace the creator the init and the on-demand accessor call. NULL restores
+ * the real one. A test passes a creator that returns NULL to prove the
+ * component refuses to come up when its template cannot be built.
+ */
+void focus_component_set_template_creator_for_tests(SMTemplate* (*creator)(void) );
+#endif
+
 /*
  * State Machine Accessors
  * These functions manage SM instances for clients.
