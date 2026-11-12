@@ -144,6 +144,10 @@ none and no baseline records as debt. What a criterion names is
 `.agents/skills/wm-bootstrap/SKILL.md`, "Writing one bead"; the recipe for a
 friction bead is `.agents/skills/wm-5s/SKILL.md`, "How to file".
 
+A bead is one sitting. When it is not, split it: create one child per part with
+the acceptance criterion that part can meet; comment on the original saying what
+it was split into; and take one part. Do not do a third of each.
+
 A bead that lists seam cases names the test file for each one, or says "no test
 yet" after `grep -l` in `tests/x/`. Before the first edit, comment which of
 those cases already have a file. The work is the cases with no file.

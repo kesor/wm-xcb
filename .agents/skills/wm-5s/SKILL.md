@@ -113,6 +113,14 @@ filed without this flag is debt from the moment it exists, and the two ways out
 it prints are the flag you skipped and adding it to the baseline. Write what a
 command will show when the finding is fixed.
 
+A finding whose fix is several components, or several unrelated files, is
+several beads: each says why it is one part of a bigger thing, so a reader of
+one sees what the rest of them are.
+
+A bead is one sitting. When it is not, split it: create one child per part with
+the acceptance criterion that part can meet; comment on the original saying what
+it was split into; and take one part. Do not do a third of each.
+
 Title shape: `friction(<bucket>): <the thing>, <the symptom>`.
 Description: four lines — tried, happened, worked, cost — plus a suggested fix
 if you have one. Paste the exact command; paraphrase loses the detail that makes
