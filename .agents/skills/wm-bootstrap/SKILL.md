@@ -141,6 +141,10 @@ task. `bd edit` opens an editor and blocks an agent — never use it.
 
 ## Implementing one bead
 
+Judge the size before anything else: a bead that is not one sitting is split
+before you plan it, the way "Writing one bead" says, because a turn spent
+finding out that the bead was three beads finishes none of them.
+
 Before the first edit, answer these. They are the questions the review will
 ask, and a wrong answer costs a rewrite instead of a paragraph:
 
@@ -226,6 +230,10 @@ The criterion is part of the create, not something a later reader adds:
 next commit on a live bead with none that
 `tests/quality/bead-acceptance-missing-baseline.txt` does not record as debt, and
 the create is the only write a worker may make to that field.
+
+A bead is one sitting. When it is not, split it: create one child per part with
+the acceptance criterion that part can meet; comment on the original saying what
+it was split into; and take one part. Do not do a third of each.
 
 A bead that lists seam cases names the test file for each one, or says "no test
 yet" after `grep -l` in `tests/x/`. A case with neither sends the worker to
