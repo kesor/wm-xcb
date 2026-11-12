@@ -41,13 +41,14 @@ wm is no better today: gaps and borders are still compiled into `src/config/conf
 and `src/config/config.wm.def.h`. Keybindings, float rules and tag names come from a text
 file (`docs/configuration.md`), and a binding that names an action nobody
 registered is reported once at startup with its key and the action name. The
-float rules and the tag names are read and kept, and nothing consults them yet.
-So this is a goal with a status column, not a claim.
+float rules are read and kept, and nothing consults them yet. A `tags` line
+names the nine tags the WM creates at startup; nothing draws the names yet, so
+the user does not see them. So this is a goal with a status column, not a claim.
 
 | Goal | Status |
 |------|-------------------|
 | No config file needed: defaults that work out of the box | kept (2026-11-06) for the terminal: `terminal.spawn` runs the first of `$TERMINAL`, `x-terminal-emulator`, `alacritty`, `kitty`, `foot`, `urxvt`, `st` and `xterm` that is installed, so `MOD+Return` starts a terminal on a machine that has one, and a start with no config file and a terminal installed prints no `ERROR` line |
-| Change keybindings, rules, and tag names in a text file, no rebuild | partly kept: a `bind` line changes which action a key invokes without a rebuild; `float` and `tags` lines are read, but the manage path never asks the float rules and nothing creates the tag list at startup |
+| Change keybindings, rules, and tag names in a text file, no rebuild | partly kept: a `bind` line changes which action a key invokes without a rebuild; a `tags` line names the tags the WM creates at startup and a reload renames them, but nothing draws a tag name yet; `float` lines are read, and the manage path never asks them |
 | Reload that file without restarting | kept (2026-11-06): SIGHUP rereads the file the WM started with; a line the parser rejects leaves the running configuration in place and prints one error |
 | A wrong line in that file says what is wrong, once, at startup | partly kept: a line the parser cannot read is reported with its path and line number, and a binding to an action nobody registered is reported once with its key and the action name |
 | Every feature a dwm patch provides is a config toggle here | not kept |

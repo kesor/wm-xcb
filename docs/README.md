@@ -139,8 +139,12 @@ Short version:
   rules and the tag names come from the edit, the keys are grabbed again, and
   every client keeps its tags, focus and geometry. A file with a line the parser
   rejects changes nothing and prints one error naming that line.
-  The tag-manager and tiling components start before monitor discovery, so
-  every monitor is adopted with a tag-view and a layout state machine, and
+  The nine tags exist from startup: the tag-manager component creates them from
+  the config file's names and registers each with the hub, so `tag_get_name()`
+  answers the name the file gave a tag, and a `kill -HUP` renames them where
+  they stand. The tag-manager and tiling components start before monitor
+  discovery, so every monitor is adopted with a tag-view and a layout state
+  machine, and
   `tag-manager.view`, `tag-manager.toggle`, and `tag-manager.client-move` are
   in the registry. A unit test runs the startup order and fails if a component
   that adopts a monitor registers after the monitor manager. The components

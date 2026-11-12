@@ -40,7 +40,6 @@ test_every_wired_module_starts(void)
   hub_init();
   sm_registry_init();
   xcb_handler_init();
-  tag_list_init();
   monitor_list_init();
   /* A group that ran before this one can leave the action registry up, and
    * fullscreen would then register its action whatever order it runs in. main()
@@ -64,6 +63,13 @@ test_every_wired_module_starts(void)
    * check only means something after this sequence. Nothing in the compiled
    * configuration may name an action that is still missing. */
   assert(keybinding_validate_bindings() == 0);
+
+  /* The nine tags are the startup's own work: no caller creates them, because
+   * the config file's names have to reach a tag that exists before the first
+   * client does. */
+  assert(tag_get_by_index(0) != NULL);
+  assert(tag_get_by_index(TAG_NUM_TAGS - 1) != NULL);
+  assert(tag_get_by_id(tag_get_id_by_index(0)) == tag_get_by_index(0));
 
   /* The focus component is the one this list was added for: its ENTER/LEAVE
    * handlers are registered inside focus_component_init(), so a startup that
@@ -91,7 +97,7 @@ test_every_wired_module_starts(void)
   }
 
   monitor_list_shutdown();
-  tag_list_shutdown();
+  assert(tag_get_by_index(0) == NULL);
   xcb_handler_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -116,7 +122,6 @@ test_monitor_components_register_before_the_monitor_manager(void)
   hub_init();
   sm_registry_init();
   xcb_handler_init();
-  tag_list_init();
   monitor_list_init();
   action_registry_shutdown();
 
@@ -143,7 +148,6 @@ test_monitor_components_register_before_the_monitor_manager(void)
   wm_components_shutdown();
 
   monitor_list_shutdown();
-  tag_list_shutdown();
   xcb_handler_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
