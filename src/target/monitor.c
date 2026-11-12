@@ -533,10 +533,10 @@ monitor_get_sm(Monitor* m, const char* sm_name)
  * entry, so monitor_get_sm() returns NULL for that name afterwards. Removing a
  * name that holds nothing is not an error.
  *
- * Returns true on success, false when the monitor or the name is NULL, or when
- * the table could not grow. A failed call stores nothing and leaves the machine
- * the caller passed still the caller's, to destroy or free the way a successful
- * call would have.
+ * Returns true on success, false when the monitor or the name is NULL, when
+ * the table could not grow, or when the name could not be copied. A failed
+ * call stores nothing and leaves the machine the caller passed still the
+ * caller's, to destroy or free the way a successful call would have.
  */
 bool
 monitor_set_sm(Monitor* m, const char* sm_name, StateMachine* sm)

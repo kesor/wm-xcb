@@ -73,11 +73,12 @@ What a component can read, it reads through the accessors:
 A machine holds one datum at a time. `sm_set_data()` records that the caller
 keeps ownership and frees the data; `sm_set_owned_data()` records that the
 machine frees it, through the destructor it is given. Either call replaces what
-the previous one installed, and when the data being replaced came with a
-destructor, that destructor runs before the new data is stored. So the call
-that hands data over does not have to read back what was there first, and
-nothing leaks when a component switches a machine from owned data to borrowed
-data or the other way.
+the previous one installed. When that datum came with a destructor and the new
+pointer is a different one, the destructor runs before the new data is stored.
+Passing the pointer the machine already holds only changes the destructor, so
+the data is not freed. Switching from owned data to borrowed data does not
+require reading the old pointer back: the destructor already ran. Switching
+the other way leaves the borrowed pointer with the caller, who still frees it.
 
 A guard or an action that needs a value the accessors do not expose is a reason
 to add an accessor, not to include the internal header from a component.
