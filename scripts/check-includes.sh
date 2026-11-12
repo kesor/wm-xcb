@@ -19,17 +19,25 @@
 #   how a system header is written, `#include <stdio.h>` names no repository
 #   path, and there is no root-relative spelling for it to be missing.
 #
+#   vendor/ is not read for that second shape. Those headers are third-party
+#   and are compiled through their own include root
+#   (`-Ivendor/libxcb-errors/include`, included as `<xcb/errors.h>`). A sibling
+#   quoted name resolves there. The root-relative spelling the failure line
+#   prints resolves only through `-I.` and fails that compile. A walk up is
+#   still a finding under vendor/: `../` leaves that include root the same way.
+#
 # Nothing failed when the next one landed, so this does.
 #
 # The line is judged as text, the way scripts/check-paths.sh judges a path: a
 # comment that spells the shape is a finding too, and the fix is the same one
 # character cheaper than explaining why the comment needs it.
 #
-# Exit status: 0 when every quoted include in the tracked .c and .h files names
-# a header by its path in the tree and no include walks up a directory, 1
-# otherwise. `git grep`'s 1 is "no match", which is the answer this gate wants;
-# anything above it is a search that did not run, and an empty result read as a
-# clean tree is the one verdict a gate must never give.
+# Exit status: 0 when every quoted include in the tracked .c and .h files
+# outside vendor/ names a header by its path in the tree and no include walks
+# up a directory, 1 otherwise. `git grep`'s 1 is "no match", which is the
+# answer this gate wants; anything above it is a search that did not run, and
+# an empty result read as a clean tree is the one verdict a gate must never
+# give.
 
 set -uo pipefail
 
@@ -69,14 +77,26 @@ trap 'rm -f "$HITS"' EXIT
 # the file makes git grep print "Binary file <path> matches" and exit 0. That
 # line does not contain either pattern, so the re-check below counts nothing and
 # the gate exits 0 over the include it found.
-git -c color.ui=false grep -a -nE -e "$WALKS_UP" -e "$BARE_NAME" -- '*.c' '*.h' >"$HITS" 2>/dev/null
-case $? in
-  0 | 1) ;;
-  *)
-    echo "check-includes: git grep failed, so no tracked file was searched" >&2
-    exit 1
-    ;;
-esac
+#
+# vendor/ is excluded from the bare-name search only. The reason is the header
+# comment above: a sibling quoted name resolves through that directory's own
+# -I, and a walk up still has to fail there.
+search_includes() {
+  local status
+  git -c color.ui=false grep -a -nE -e "$1" -- "${@:2}" >>"$HITS" 2>/dev/null
+  status=$?
+  case "$status" in
+    0 | 1) return 0 ;;
+    *)
+      echo "check-includes: git grep failed, so no tracked file was searched" >&2
+      exit 1
+      ;;
+  esac
+}
+
+: >"$HITS"
+search_includes "$WALKS_UP" '*.c' '*.h'
+search_includes "$BARE_NAME" '*.c' '*.h' ':!vendor'
 
 FOUND=0
 # shape <pattern> <label> - prints the hits that match one shape, under the
@@ -95,7 +115,7 @@ shape "$BARE_NAME" "NO DIRECTORY"
 
 if [ "$FOUND" -eq 0 ]; then
   [ "$VERBOSE" -eq 1 ] &&
-    echo "check-includes: every include in $(git ls-files '*.c' '*.h' | wc -l) tracked source file(s) is written from the repository root"
+    echo "check-includes: every include outside vendor/ in $(git ls-files '*.c' '*.h' ':!vendor' | wc -l) tracked source file(s) is written from the repository root"
   exit 0
 fi
 

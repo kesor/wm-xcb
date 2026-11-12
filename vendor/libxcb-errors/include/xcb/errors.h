@@ -26,7 +26,7 @@
  * authorization from the authors.
  */
 
-#include "vendor/libxcb-errors/include/xcb/xcb_errors.h"
+#include "xcb_errors.h"
 
 struct static_extension_info_t {
 	uint16_t num_minor;

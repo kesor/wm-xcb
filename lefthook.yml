@@ -75,7 +75,9 @@ pre-commit:
     # same thing in every file. A path that walks up, or a bare header name,
     # compiles where the including file is today and breaks when that file
     # moves, and the failure names the moved file rather than the include line
-    # nobody touched.
+    # nobody touched. vendor/ is exempt from the bare-name half: those headers
+    # are compiled through their own -I root, and a sibling name is the spelling
+    # that resolves there. A walk up is still a finding.
     includes:
       glob: "*.{c,h}"
       run: ./scripts/check-includes.sh

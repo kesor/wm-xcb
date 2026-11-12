@@ -11,10 +11,12 @@
 #   - an include written from the repository root, an angle-bracket system
 #     header, which has no directory and is not a repository path, and the
 #     angle-bracket form of a project header;
-#   - a quoted include that walks up, an angle-bracket one, one indented inside
-#     an #if, and one that walks up in the middle of its path;
+#   - a quoted include that walks up, an angle-bracket one, one indented, and
+#     one that walks up in the middle of its path;
 #   - a quoted include whose name is a bare header file, which is the other half
 #     of the same rule, alone and indented;
+#   - a bare name under vendor/, which is not a finding, and a walk up there,
+#     which still is: those headers are compiled through their own include root;
 #   - a comment that spells either shape, which the gate judges as text;
 #   - a NUL in the file, which makes git grep call it binary and, without -a,
 #     print "Binary file <path> matches" instead of the include line;
@@ -59,7 +61,7 @@ check_eq "the root form and an angle-bracket header pass" 0 "$?"
 check_eq "and nothing is printed" 0 "$(output_lines "$LAST")"
 "$R/scripts/check-includes.sh" --verbose >"$LAST" 2>&1
 check_eq "the verbose pass line counts the files it searched" 1 \
-  "$(grep -c 'check-includes: every include in 3 tracked source file(s) is written from the repository root' "$LAST")"
+  "$(grep -c 'check-includes: every include outside vendor/ in 3 tracked source file(s) is written from the repository root' "$LAST")"
 
 # One at a time, so a pattern that only handles the first shape fails here
 # rather than at somebody's move. The label in the output names which shape it
@@ -80,6 +82,22 @@ bad_case commented WALKS\ UP src/core/wm-hub.c '/* never #include "../core/wm-lo
 bad_case bare NO\ DIRECTORY src/components/tiling.c '#include "tiling.h"'
 bad_case bare-indented NO\ DIRECTORY src/components/tiling.c '  #include "tiling.h"'
 bad_case bare-commented NO\ DIRECTORY src/core/wm-hub.c '/* never #include "wm-hub.h" */'
+
+# vendor/ is third-party and is included through its own -I root. A sibling
+# quoted name resolves there; the root-relative spelling the gate prints does
+# not. A walk up still leaves that root, so it is still a finding. One case
+# each, so an exclusion that drops vendor/ from both searches fails here.
+R=$(repo vendor-bare)
+source_at "$R" vendor/libxcb-errors/include/xcb/errors.h '#include "xcb_errors.h"'
+"$R/scripts/check-includes.sh" >"$LAST" 2>&1
+check_eq "a bare include under vendor/ passes" 0 "$?"
+check_eq "and nothing is printed for it" 0 "$(output_lines "$LAST")"
+R=$(repo vendor-walk)
+source_at "$R" vendor/libxcb-errors/include/xcb/errors.h '#include "../xcb_errors.h"'
+"$R/scripts/check-includes.sh" >"$LAST" 2>&1
+check_eq "a walk up under vendor/ still fails" 1 "$?"
+check_eq "and it is named as a walk up" 1 \
+  "$(grep -c '^  WALKS UP  vendor/libxcb-errors/include/xcb/errors.h:1:' "$LAST")"
 
 # The include is on its own line. The NUL is what makes git call the file binary,
 # so the gate has to ask for the line (-a) rather than the binary summary.
@@ -139,6 +157,15 @@ check_eq "and says no file was searched" 1 \
 # run the push list, not the commit one.
 "$ROOT_DIR/scripts/check-includes.sh" >"$LAST" 2>&1
 check_eq "this tree's includes are written from the root" 0 "$?"
+
+# The header -Ivendor/libxcb-errors/include finds as <xcb/errors.h>. -I. is not
+# on this command: a root-relative quoted include compiles only with that flag
+# and fails here, which is why the bare-name check does not read vendor/.
+read -r -a xcb_cflags <<<"$(pkg-config --cflags xcb)"
+gcc "${xcb_cflags[@]}" -I"$ROOT_DIR/vendor/libxcb-errors/include" -fsyntax-only -xc - >"$LAST" 2>&1 <<'EOF'
+#include <xcb/errors.h>
+EOF
+check_eq "vendored errors.h resolves through its own include root" 0 "$?"
 check_eq "the commit hook runs the include gate" 1 \
   "$("$ROOT_DIR/scripts/gate-list.sh" pre-commit | grep -cx '  includes')"
 check_eq "the push hook runs the include gate" 1 \
