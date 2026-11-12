@@ -512,7 +512,7 @@ TAG_KEY(XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 17, "tag-manager.toggle", 8);
 TAG_KEY(XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_4, 18, "tag-manager.toggle", 9);
 
 /*
- * Client-tag toggle: Mod+Shift+Alt+1 through Mod+Shift+Alt+9
+ * Client-tag move: Mod+Shift+Alt+1 through Mod+Shift+Alt+9
  */
 TAG_KEY(XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 10, "tag-manager.client-move", 1);
 TAG_KEY(XCB_MOD_MASK_SHIFT | XCB_MOD_MASK_5 | XCB_MOD_MASK_4, 11, "tag-manager.client-move", 2);

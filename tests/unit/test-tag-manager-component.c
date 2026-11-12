@@ -280,13 +280,14 @@ test_tag_manager_updates_client_visibility(void)
 }
 
 /*
- * Test: tag_manager_client_tag_toggle
- * Tests moving focused client to/from tag.
+ * Test: tag_manager_client_move
+ * Moving the focused client to a tag replaces its tag set, so it leaves the
+ * view it was on and lands on exactly the named tag.
  */
 void
-test_tag_manager_client_tag_toggle(void)
+test_tag_manager_client_move(void)
 {
-  LOG_CLEAN("== Testing tag manager client tag toggle");
+  LOG_CLEAN("== Testing tag manager client move");
 
   hub_init();
   tag_list_init();
@@ -309,27 +310,24 @@ test_tag_manager_client_tag_toggle(void)
   client_set_managed(c, true);
   client_set_monitor(c, m);
 
-  /* Set initial tag membership */
-  client_set_tags(c, TAG_MASK(0));
+  /* Start on two tags so a move has to replace the set, not add to it. */
+  client_set_tags(c, TAG_MASK(0) | TAG_MASK(2));
 
   /* Focus the client */
   focus_set_state(c, FOCUS_STATE_FOCUSED);
 
-  /* Toggle client to tag 2 (index 1) */
+  /* Move the client to tag 2 (index 1) */
   uint32_t tag = 2;
-  hub_send_request_data(REQ_TAG_CLIENT_TOGGLE, c->target.id, &tag);
+  hub_send_request_data(REQ_TAG_CLIENT_MOVE, c->target.id, &tag);
 
-  /* Verify tag was added to client */
-  assert((c->tags & TAG_MASK(0)) != 0); /* Tag 1 still there */
-  assert((c->tags & TAG_MASK(1)) != 0); /* Tag 2 added */
+  /* The old tags are gone: the client is on tag 2 alone. */
+  assert(c->tags == TAG_MASK(1));
 
-  /* Toggle tag 1 off client */
-  tag = 1;
-  hub_send_request_data(REQ_TAG_CLIENT_TOGGLE, c->target.id, &tag);
+  /* Moving again replaces the mask again rather than adding a third tag. */
+  tag = 3;
+  hub_send_request_data(REQ_TAG_CLIENT_MOVE, c->target.id, &tag);
 
-  /* Verify tag was removed */
-  assert((c->tags & TAG_MASK(0)) == 0); /* Tag 1 removed */
-  assert((c->tags & TAG_MASK(1)) != 0); /* Tag 2 still there */
+  assert(c->tags == TAG_MASK(2));
 
   /* Cleanup */
   focus_component_shutdown();
@@ -559,13 +557,14 @@ test_tag_manager_client_move_action(void)
   focus_set_state(c, FOCUS_STATE_FOCUSED);
   assert(c->tags == TAG_MASK(0));
 
-  /* Tag 1 is the visible one, so moving the client there again hides it. */
+  /* Tag 1 is the visible one. Moving the client to tag 2 takes it off the
+   * view, and the mask holds that one tag rather than both. */
   ActionInvocation inv = {
     .target = TARGET_ID_NONE,
-    .data   = (void*) (uintptr_t) 1,
+    .data   = (void*) (uintptr_t) 2,
   };
   assert(action_invoke("tag-manager.client-move", &inv) == true);
-  assert(c->tags == 0);
+  assert(c->tags == TAG_MASK(1));
   assert(client_is_mapped(c) == false);
 
   tag_manager_component_shutdown();
@@ -870,7 +869,7 @@ TEST_GROUP(TagManager, {
   test_tag_manager_receives_tag_toggle_requests();
   test_tag_manager_emits_events();
   test_tag_manager_updates_client_visibility();
-  test_tag_manager_client_tag_toggle();
+  test_tag_manager_client_move();
   test_tag_manager_with_multiple_monitors();
   test_tag_manager_invalid_tag_index();
   test_tag_manager_actions_registered();

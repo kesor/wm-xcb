@@ -38,10 +38,10 @@ void test_tag_manager_emits_events(void);
 void test_tag_manager_updates_client_visibility(void);
 
 /*
- * Test: tag_manager_client_tag_toggle
- * Tests moving focused client to/from tag.
+ * Test: tag_manager_client_move
+ * Tests that moving a client to a tag replaces its tag set.
  */
-void test_tag_manager_client_tag_toggle(void);
+void test_tag_manager_client_move(void);
 
 /*
  * Test: tag_manager_with_multiple_monitors

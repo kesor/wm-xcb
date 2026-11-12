@@ -2,7 +2,7 @@
  * Tag Manager Component Implementation
  *
  * Handles tag view state for monitors.
- * - Executor handles REQ_TAG_VIEW, REQ_TAG_TOGGLE, REQ_TAG_CLIENT_TOGGLE, and
+ * - Executor handles REQ_TAG_VIEW, REQ_TAG_TOGGLE, REQ_TAG_CLIENT_MOVE, and
  *   answers REQ_CLIENT_VISIBLE, the manage path's question about a window
  * - Uses TagViewSM to track visible tag bitmask
  * - On tag change: shows/hides clients based on tag membership
@@ -85,7 +85,7 @@ static TagManagerComponent tag_manager_component_instance = {
            .requests = (RequestType[]) {
           REQ_TAG_VIEW,
           REQ_TAG_TOGGLE,
-          REQ_TAG_CLIENT_TOGGLE,
+          REQ_TAG_CLIENT_MOVE,
           REQ_CLIENT_VISIBLE,
           0,
       },
@@ -522,7 +522,7 @@ tag_manager_action_client_move(ActionInvocation* inv)
   if (inv == NULL || !tag_manager_action_tag(inv, &tag))
     return false;
 
-  hub_send_request_data(REQ_TAG_CLIENT_TOGGLE, inv->target, &tag);
+  hub_send_request_data(REQ_TAG_CLIENT_MOVE, inv->target, &tag);
   return true;
 }
 
@@ -695,11 +695,17 @@ tag_manager_handle_toggle_request(RequestType type, TargetID target, void* data)
 }
 
 /*
- * Handle REQ_TAG_CLIENT_TOGGLE - move current client to/from tag
+ * Handle REQ_TAG_CLIENT_MOVE - put the focused client on the named tag alone.
  * data: pointer to uint32_t tag index (1-9)
+ *
+ * A move replaces the client's tag set, the way dwm's tag function does. A
+ * toggle cannot express the action: flipping one bit leaves the client on the
+ * view it was already on when the named tag is one it already has, and the
+ * keybinding says the client moves. Putting a client on several tags at once
+ * is a different action, and no binding asks for it.
  */
 void
-tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* data)
+tag_manager_handle_client_move(RequestType type, TargetID target, void* data)
 {
   (void) type;
   (void) target;
@@ -710,7 +716,7 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
   c = focus_get_focused_client();
 
   if (c == NULL) {
-    LOG_DEBUG("Tag client toggle: no focused client");
+    LOG_DEBUG("Tag client move: no focused client");
     return;
   }
 
@@ -722,20 +728,15 @@ tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* da
 
   /* Convert to valid range */
   if (tag_index < 1 || tag_index > TAG_NUM_TAGS) {
-    LOG_DEBUG("Tag client toggle: invalid tag index %u", tag_index);
+    LOG_DEBUG("Tag client move: invalid tag index %u", tag_index);
     return;
   }
 
   tag_index = tag_index - 1; /* Convert to 0-based */
 
-  /* Toggle the tag on the client */
-  if (client_has_tag(c, tag_index)) {
-    client_remove_tag(c, tag_index);
-  } else {
-    client_add_tag(c, tag_index);
-  }
+  client_set_tags(c, TAG_MASK(tag_index));
 
-  LOG_DEBUG("Tag client toggle: client=%u, new_tags=0x%x", c->window, c->tags);
+  LOG_DEBUG("Tag client move: client=%u, new_tags=0x%x", c->window, c->tags);
 
   /* Update visibility for the client */
   /* Get the client's monitor */
@@ -866,8 +867,8 @@ tag_manager_executor(struct HubRequest* req)
   case REQ_TAG_TOGGLE:
     tag_manager_handle_toggle_request(req->type, req->target, req->data);
     break;
-  case REQ_TAG_CLIENT_TOGGLE:
-    tag_manager_handle_client_tag_toggle(req->type, req->target, req->data);
+  case REQ_TAG_CLIENT_MOVE:
+    tag_manager_handle_client_move(req->type, req->target, req->data);
     break;
   case REQ_CLIENT_VISIBLE:
     tag_manager_answer_visible(req->target, req->data);

@@ -390,8 +390,8 @@ test_client_tag_move_triggers_tiling(void)
   assert(second->height == TEST_MONITOR_HEIGHT / 2);
 
   focus_set_state(third, FOCUS_STATE_FOCUSED);
-  uint32_t tag = 1;
-  hub_send_request_data(REQ_TAG_CLIENT_TOGGLE, third->target.id, &tag);
+  uint32_t tag = 2;
+  hub_send_request_data(REQ_TAG_CLIENT_MOVE, third->target.id, &tag);
 
   assert(client_is_mapped(third) == false);
   assert(second->height == TEST_MONITOR_HEIGHT);
