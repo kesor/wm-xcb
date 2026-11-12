@@ -31,6 +31,13 @@
 # wipe, and regenerating over it is moving the bead the gate is failing on into
 # the list that accepts it.
 #
+# Both files are snapshots of the whole tracker, so two branches that
+# regenerate them conflict on every rebase. That conflict is between two
+# snapshots, not between two changes: on a rebased branch, run
+# --update-baseline and stage the result. Keeping one side's lines leaves a
+# snapshot missing ids the other side had, and the next branch that
+# regenerates it meets the same conflict.
+#
 # The list comes from the tracker, so the check skips cleanly where there is no
 # database (CI, a fresh clone), the same way scripts/check-bead-descriptions.sh
 # does. When the tracker list carries no acceptance_criteria key at all, the
