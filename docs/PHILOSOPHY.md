@@ -16,14 +16,14 @@ code disagree, the code is wrong and the rule stands.*
 
 These are the promises. Each is testable, and each has a current status, because
 a promise the code does not keep is a defect list, not marketing. A date in a
-status cell is the day that row was last checked; the rows were checked on
-different days, so each one carries its own.
+status cell is the day that row was last checked. The rows are not all checked
+on the same day, so a date stays in its cell instead of the header.
 
 | Promise | What it means for the person using the WM | Status |
 |---------|-------------------------------------------|-------------------|
 | **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | kept for new windows: mapped, tiled, and placed on `MapRequest` |
 | **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop the loop from running | kept (2026-11-04): the loop keeps running while dmenu is open, and no handler or action waits for the server (2.3). While the prompt is up, dmenu holds the keyboard grab itself, so the keys go to it |
-| **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | kept (2026-11-12): every binding from the config file, or from `src/config/config.wm.def.h` when the file names none, is grabbed on the root window with the CapsLock and NumLock variants of its mask and grabbed again on `MappingNotify`, so a press reaches its action whatever window has focus, which `tests/x/test-50-tag-switch-keybinding.sh` and `tests/x/test-45-key-grab.sh` press against a live WM; a binding whose action nobody registered is reported once at startup and the key does nothing |
+| **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | kept (2026-11-12): the bindings the table holds come from the config file when it names one this keyboard can use, and from `src/config/config.wm.def.h` otherwise. Each is grabbed on the root window with the CapsLock and NumLock variants of its mask, and grabbed again on `MappingNotify`, so a press reaches its action whatever window has focus. `tests/x/test-50-tag-switch-keybinding.sh` and `tests/x/test-45-key-grab.sh` press a grabbed key against a live WM. A binding whose action nobody registered is reported once at startup and the key does nothing |
 | **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: the unit suite covers the model, `make test-x` covers the X seam and still fails there |
 | **The WM can explain itself** | current state and recent transitions can be dumped and read | not kept: `LOG_DEBUG` only, no state dump or event trace |
 
