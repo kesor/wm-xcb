@@ -38,8 +38,8 @@ mkdir -p "$OUT"
 # config_file_load`) while every other gate passed. wm.c is the event loop.
 mapfile -t SOURCES < <(make -s print-src | tr ' ' '\n' | grep -vE '(^|/)wm\.c$' | grep -v '^$')
 
-read -r -a PKG_CFLAGS <<<"$(pkg-config --cflags xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms)"
-read -r -a PKG_LIBS <<<"$(pkg-config --libs xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms)"
+read -r -a PKG_CFLAGS <<<"$(pkg-config --cflags xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-keysyms)"
+read -r -a PKG_LIBS <<<"$(pkg-config --libs xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-keysyms)"
 
 SANITIZE=(-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer)
 CFLAGS=(

@@ -20,7 +20,7 @@ make                  # builds ./wm
 ```
 
 Outside the dev shell, install what `PKGLIST` in the Makefile asks `pkg-config`
-for — `xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms` — plus
+for — `xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-keysyms` — plus
 gcc, make and pkg-config.
 
 | Target | What it does |

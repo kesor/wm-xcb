@@ -104,6 +104,15 @@ raw `response_type`, so a component that handles an extension event registers
 under the number `xcb_get_extension_data()` reports for its connection, and one
 registration covers every subCode.
 
+XInput 2 is the exception to that numbering. Every XI2 event arrives as
+`XCB_GE_GENERIC` (35), with the XI2 type in the event's own `event_type` field, so
+one registration under 35 is where a component that wants XI2 events starts.
+No component does. The root window selects the core event mask only, because
+nothing reads `XCB_GE_GENERIC`. On Xorg 21.1.24 an XI2 button or key mask on
+the same window replaces core button and key events for the client that
+selected both. `setup_xcb()` in `src/core/wm-xcb.c` records that, what a
+component has to add, and why no seam test can observe the selection.
+
 ---
 
 ## Handler → Component Decision
