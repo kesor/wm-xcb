@@ -218,7 +218,7 @@ config_reload(void)
   config_release_file();
   runtime_config = fresh;
   config_apply_runtime();
-  config_init();
+  uint32_t wired = config_init();
 
   /* The subscribers take the new chords and the new tag names before the line
    * that says the reload applied, so a user who acts on that line does not
@@ -229,7 +229,7 @@ config_reload(void)
     LOG_INFO("config %s: no readable file; the compiled configuration applies", runtime_path);
   } else {
     LOG_INFO("config %s: reloaded %u binding(s), %u float rule(s)%s",
-             runtime_path, fresh->bind_count, fresh->float_rule_count,
+             runtime_path, wired, fresh->float_rule_count,
              fresh->tags_set ? ", tag names" : "");
   }
 
@@ -290,8 +290,10 @@ binding_keycode(xcb_key_symbols_t* symbols, const ConfigBind* bind)
  * The table says why it refused a line and this says where the line is: the two
  * causes need different fixes, and a user reading a page of startup output
  * cannot tell them apart from one sentence.
+ *
+ * Returns how many of the file's lines reached the table.
  */
-static void
+static uint32_t
 config_wire_file_bindings(void)
 {
   xcb_key_symbols_t* symbols = config_key_symbols();
@@ -340,24 +342,26 @@ config_wire_file_bindings(void)
               runtime_path);
     config_wire_keybindings();
   }
+
+  return bound;
 }
 
 /*
  * Initialize the configuration system.
  * This wires keybindings from the config file, or from config.wm.def.h when the
- * file named none.
+ * file named none, and answers with how many of the file's lines were used.
  */
-void
+uint32_t
 config_init(void)
 {
   LOG_DEBUG("Initializing configuration");
 
   if (runtime_config == NULL || runtime_config->bind_count == 0) {
     config_wire_keybindings();
-    return;
+    return 0;
   }
 
-  config_wire_file_bindings();
+  return config_wire_file_bindings();
 }
 
 /*

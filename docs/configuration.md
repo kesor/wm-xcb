@@ -161,6 +161,9 @@ A reload that applies says what it took, on stdout:
 INFO:  config $HOME/.config/wm/config: reloaded N binding(s), N float rule(s), tag names
 ```
 
+The binding count is what reached the table, not what the file named: a bind line
+the table refused is reported in its own ERROR and is not counted here.
+
 Removing the file and sending SIGHUP brings the compiled configuration back. A
 file that cannot be read is treated the way it is at startup: the WM logs why
 and the compiled configuration applies.

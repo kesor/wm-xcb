@@ -14,6 +14,8 @@
 #     ERROR line at all, so no line was refused
 #   - the first line and the fortieth line each change the tag view, so the
 #     table holds both ends of the file and not just its beginning
+#   - a reload says how many of the file's bind lines reached the table, and it
+#     says all 40
 #   - a reload whose line 41 repeats line 1's chord is reported against line 41,
 #     with the cause that differs from a full table: the chord is already bound,
 #     and the message names the action it is bound to
@@ -129,6 +131,26 @@ if ! kill -0 "$AWM_PID" 2>/dev/null; then
 fi
 pass "the WM is running with the config file"
 
+# wait_for_log <fixed-text> <minimum-count> <what> - the reload is answered
+# asynchronously, so the line it prints is waited for rather than slept on.
+wait_for_log() {
+  local text=$1 want=$2 what=$3 waited=0 got=0
+
+  while [ "$waited" -lt 3000 ]; do
+    got=$(grep -cF "$text" "$WM_LOG_FILE" 2>/dev/null || true)
+    if [ "${got:-0}" -ge "$want" ]; then
+      pass "$what"
+      return 0
+    fi
+    sleep 0.05
+    waited=$((waited + 50))
+  done
+
+  fail "$what: '$text' is not in the log $want time(s)"
+  tail -n 15 "$WM_LOG_FILE" 2>/dev/null | sed 's/^/        /'
+  return 1
+}
+
 # press_until <key> <viewable-count> <what> - a synthetic press can be lost, and
 # a repeat of a key that already did its work changes no state.
 press_until() {
@@ -156,6 +178,12 @@ press_until super+F1 1 "the first bind line is bound: Mod+F1 switches back to ta
 check_eq "no bind line was refused" "0" \
   "$(grep -cF "ERROR: config $CONFIG:" "$WM_LOG_FILE" 2>/dev/null || true)"
 
+# The same 40 lines, read again: the count the reload prints is what reached the
+# table, so this is the assertion that all 40 are bound and none was dropped.
+kill -HUP "$AWM_PID" 2>/dev/null
+wait_for_log "INFO:  config $CONFIG: reloaded 40 binding(s)" 1 \
+  "the reload registers all 40 bind lines"
+
 # An edit that repeats line 1's chord: the reload has to say which line it
 # dropped and why, and that it is a chord already in the table rather than a
 # table with no room.
@@ -164,7 +192,8 @@ write_config "bind Mod+F1 tag-manager.view 2"
 check_eq "the edit names 41 bind lines" "41" "$(grep -c '^bind ' "$CONFIG")"
 
 kill -HUP "$AWM_PID" 2>/dev/null
-sleep 0.5
+wait_for_log "INFO:  config $CONFIG: reloaded 40 binding(s)" 2 \
+  "the reload of the longer edit answers that 40 of its lines reached the table"
 
 check_eq "the repeated chord is reported against the line that repeated it" "1" \
   "$(grep -cF "ERROR: config $CONFIG:41: cannot bind 'F1' to 'tag-manager.view'" \
