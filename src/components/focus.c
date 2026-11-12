@@ -38,6 +38,21 @@
 static SMTemplate* cached_focus_template = NULL;
 
 /*
+ * The init and the on-demand accessor build through this pointer, so a test can
+ * hand them a creator that returns NULL and prove what a refused table does.
+ * Production leaves it at the real creator.
+ */
+static SMTemplate* (*focus_template_create)(void) = focus_sm_template_create;
+
+#ifdef WM_HUB_TESTING
+void
+focus_component_set_template_creator_for_tests(SMTemplate* (*creator)(void) )
+{
+  focus_template_create = creator != NULL ? creator : focus_sm_template_create;
+}
+#endif
+
+/*
  * Global component instance
  */
 static FocusComponent focus_component = {
@@ -227,7 +242,7 @@ focus_get_sm(Client* c)
   /* Use cached template if available, otherwise create one */
   SMTemplate* tmpl = cached_focus_template;
   if (tmpl == NULL) {
-    tmpl = focus_sm_template_create();
+    tmpl = focus_template_create();
     if (tmpl == NULL) {
       LOG_ERROR("Failed to create focus SM template for client");
       return NULL;
@@ -864,7 +879,18 @@ focus_component_init(void)
   }
 
   /* Cache the template for future clients */
-  cached_focus_template = focus_sm_template_create();
+  cached_focus_template = focus_template_create();
+  if (cached_focus_template == NULL) {
+    LOG_ERROR("Failed to create the focus SM template; focus component not initialized");
+    xcb_handler_unregister_component(&focus_component.base);
+    focus_unsubscribe_events();
+    hub_unregister_component(FOCUS_COMPONENT_NAME);
+    sm_unregister_guard("focus_guard_can_focus");
+    sm_unregister_guard("focus_guard_can_unfocus");
+    focus_unregister_actions();
+    focus_component_reset();
+    return false;
+  }
 
   focus_component.initialized = true;
   LOG_DEBUG("Focus component initialized successfully");

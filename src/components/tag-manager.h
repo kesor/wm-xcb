@@ -36,6 +36,7 @@
 typedef struct Monitor      Monitor;
 typedef struct Client       Client;
 typedef struct StateMachine StateMachine;
+typedef struct SMTemplate   SMTemplate;
 
 /*
  * Tag Manager component name
@@ -106,6 +107,15 @@ void tag_manager_component_shutdown(void);
  * Creates the SM on first access (on-demand allocation).
  */
 StateMachine* tag_manager_get_view_sm(Monitor* m);
+
+#ifdef WM_HUB_TESTING
+/*
+ * Replace the creator the init and the on-demand accessor call. NULL restores
+ * the real one. A test passes a creator that returns NULL to prove the
+ * component refuses to come up when its template cannot be built.
+ */
+void tag_manager_component_set_template_creator_for_tests(SMTemplate* (*creator)(void) );
+#endif
 
 /*
  * Check if a client is visible based on its tags and the monitor's tag view.

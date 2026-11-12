@@ -821,6 +821,49 @@ test_tag_manager_keeps_the_tags_a_remapped_client_has(void)
   hub_shutdown();
 }
 
+/*
+ * A creator that returns NULL stands for a table the framework refused. The
+ * init has to stop instead of running with no machine for its monitors.
+ */
+static SMTemplate*
+refuse_tag_view_template_create(void)
+{
+  return NULL;
+}
+
+void
+test_tag_manager_init_fails_when_template_is_refused(void)
+{
+  LOG_CLEAN("== Testing tag manager init fails when its template is refused");
+
+  hub_init();
+  tag_list_init();
+  monitor_list_init();
+  action_registry_init();
+
+  tag_manager_component_set_template_creator_for_tests(refuse_tag_view_template_create);
+
+  assert(tag_manager_component_init() == false);
+  assert(tag_manager_component_is_initialized() == false);
+  assert(hub_get_component_by_name(TAG_MANAGER_COMPONENT_NAME) == NULL);
+  assert(action_exists("tag-manager.view") == false);
+  assert(action_exists("tag-manager.toggle") == false);
+  assert(action_exists("tag-manager.client-move") == false);
+
+  Monitor* m = monitor_create(1201);
+  assert_or_abort(m != NULL);
+  assert(tag_manager_get_view_sm(m) == NULL);
+  assert(monitor_get_sm(m, TAG_MANAGER_SM_NAME) == NULL);
+
+  tag_manager_component_set_template_creator_for_tests(NULL);
+  monitor_destroy(m);
+
+  action_registry_shutdown();
+  monitor_list_shutdown();
+  tag_list_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(TagManager, {
   test_tag_manager_init_shutdown();
   test_tag_manager_receives_tag_view_requests();
@@ -837,4 +880,5 @@ TEST_GROUP(TagManager, {
   test_tag_manager_answers_which_clients_are_on_screen();
   test_tag_manager_keeps_the_tags_a_remapped_client_has();
   test_tag_manager_starts_with_the_wm();
+  test_tag_manager_init_fails_when_template_is_refused();
 });
