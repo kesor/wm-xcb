@@ -165,7 +165,7 @@ test_config_file_keeps_more_binds_than_the_compiled_set(void)
 
   static const char* const modifiers[] = { "Mod", "Mod+Shift", "Ctrl+Mod", "Mod+Alt" };
   char                     path[256];
-  char                     text[4096];
+  char                     text[8192];
   size_t                   used = 0;
 
   /* Four sets of F1 to F12: 48 chords, of which the first 40 are used. */
@@ -190,6 +190,32 @@ test_config_file_keeps_more_binds_than_the_compiled_set(void)
   assert(cf->binds[39].line == 40);
   assert(cf->binds[39].modifiers == (XCB_MOD_MASK_4 | XCB_MOD_MASK_1));
   assert(cf->binds[39].keysym == XK_F4);
+
+  config_file_free(cf);
+  unlink(path);
+
+  /* One line past what the parser keeps is refused with its number, which is
+   * what keeps a file of any length from loading more lines than the table can
+   * hold. The count of the lines it keeps is the assert above, at the limit. */
+  used = 0;
+  for (int i = 0; i < CONFIG_FILE_MAX_BINDS + 1; i++) {
+    int written = snprintf(text + used, sizeof text - used,
+                           "bind Mod+F1 tag-manager.view 2\n");
+
+    assert(written > 0 && (size_t) written < sizeof text - used);
+    used += (size_t) written;
+  }
+
+  if (!write_config(path, sizeof path, text)) {
+    assert(0 && "cannot write a temporary config file");
+    return;
+  }
+
+  cf = config_file_load(path);
+  assert(cf != NULL && cf->bind_count == CONFIG_FILE_MAX_BINDS);
+  assert(cf->error_count == 1);
+  assert(cf->errors[0].line == CONFIG_FILE_MAX_BINDS + 1);
+  assert(strstr(cf->errors[0].text, "bindings") != NULL);
 
   config_file_free(cf);
   unlink(path);
