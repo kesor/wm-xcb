@@ -15,13 +15,15 @@ code disagree, the code is wrong and the rule stands.*
 ## 1. What a user should be able to count on
 
 These are the promises. Each is testable, and each has a current status, because
-a promise the code does not keep is a defect list, not marketing.
+a promise the code does not keep is a defect list, not marketing. A date in a
+status cell is the day that row was last checked. The rows are not all checked
+on the same day, so a date stays in its cell instead of the header.
 
-| Promise | What it means for the person using the WM | Status 2026-11-01 |
+| Promise | What it means for the person using the WM | Status |
 |---------|-------------------------------------------|-------------------|
 | **Windows appear where the WM said they would** | a new window is mapped, sized, and placed by the WM, not left invisible | kept for new windows: mapped, tiled, and placed on `MapRequest` |
 | **The WM never freezes while an application is slow** | a hanging client, a slow `dmenu`, a busy X server does not stop the loop from running | kept (2026-11-04): the loop keeps running while dmenu is open, and no handler or action waits for the server (2.3). While the prompt is up, dmenu holds the keyboard grab itself, so the keys go to it |
-| **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | not kept: no key grabs exist (4.5) |
+| **A key means the same thing everywhere** | `MOD+1` shows tag 1 whether the focused window is a terminal, a browser, or nothing | kept (2026-11-12): the bindings the table holds come from the config file when it names one this keyboard can use, and from `src/config/config.wm.def.h` otherwise. Each is grabbed on the root window with the CapsLock and NumLock variants of its mask, and grabbed again on `MappingNotify`, so a press reaches its action whatever window has focus. `tests/x/test-50-tag-switch-keybinding.sh` and `tests/x/test-45-key-grab.sh` press a grabbed key against a live WM. A binding whose action nobody registered is reported once at startup and the key does nothing |
 | **What worked yesterday still works after an update** | behaviour is pinned by tests, so an unrelated feature cannot silently change the tiling or the focus rule | partly kept: the unit suite covers the model, `make test-x` covers the X seam and still fails there |
 | **The WM can explain itself** | current state and recent transitions can be dumped and read | not kept: `LOG_DEBUG` only, no state dump or event trace |
 
@@ -42,7 +44,7 @@ registered is reported once at startup with its key and the action name. The
 float rules and the tag names are read and kept, and nothing consults them yet.
 So this is a goal with a status column, not a claim.
 
-| Goal | Status 2026-11-04 |
+| Goal | Status |
 |------|-------------------|
 | No config file needed: defaults that work out of the box | kept (2026-11-06) for the terminal: `terminal.spawn` runs the first of `$TERMINAL`, `x-terminal-emulator`, `alacritty`, `kitty`, `foot`, `urxvt`, `st` and `xterm` that is installed, so `MOD+Return` starts a terminal on a machine that has one, and a start with no config file and a terminal installed prints no `ERROR` line |
 | Change keybindings, rules, and tag names in a text file, no rebuild | partly kept: a `bind` line changes which action a key invokes without a rebuild; `float` and `tags` lines are read, but the manage path never asks the float rules and nothing creates the tag list at startup |
