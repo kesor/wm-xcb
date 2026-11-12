@@ -35,7 +35,7 @@ for _ in $(seq 1 100); do
   sleep 0.02
 done
 if [ ! -e "$WM_FAKE_STARTED_DIR/dmenu" ]; then
-  fail "MOD+p did not start dmenu, so nothing is holding the loop (STATUS 4.5)"
+  fail "MOD+p did not start dmenu, so the prompt this test keys into is not there"
   finish
   exit 1
 fi

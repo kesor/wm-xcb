@@ -14,7 +14,7 @@ after=$(count_viewable)
 if [ "$after" = "0" ]; then
   pass "MOD+2 hid the tag-1 window"
 else
-  fail "MOD+2 changed nothing: no key grab exists, so KEY_PRESS never reaches the WM (STATUS 4.5)"
+  fail "MOD+2 changed nothing: the tag-1 window is still viewable, so the press did not reach the keybinding action"
 fi
 
 press super+1
