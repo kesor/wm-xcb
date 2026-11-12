@@ -331,6 +331,12 @@ beads in your final message. This is how the traps below stop being traps.
   `xvfb-run -a -s "-screen 0 1280x800x24" <command>`.
 - **`make DEBUG=1` is the only way to read the event log**, and `-pedantic`
   there is what caught a zero-length array. Keep that build green.
+- **`make 2>&1 | grep -E 'error|warning'` matches every compile line.** Each
+  `gcc` line carries `-I…-libxcb-errors-1.0.1-dev…`, so the pattern matches the
+  command and not a diagnostic, and a `head` after it cuts the `make: *** …
+  Error 1` that says the build failed: five calls went into greps that printed
+  nothing, and the error surfaced only from `make | grep -v '^gcc\|^cc'`. Grep
+  `: error:` or `: warning:`, or run `make -s`.
 - **`xdotool search --onlyvisible`** is the quickest "did the WM map it" check.
 - **`pkill -f <pattern>` kills the shell that runs it** when the pattern appears
   in its own command line: two self-kills, exit code 143, on one branch, and one
