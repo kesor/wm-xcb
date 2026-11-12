@@ -39,15 +39,15 @@ modifier is `Mod`, Super/Windows.
 | `Mod+p` | `app.launch` | opens dmenu, runs the line you pick |
 | `Mod+1` … `Mod+9` | `tag-manager.view` | shows tag 1 to 9 |
 | `Mod+Shift+1` … `Mod+Shift+9` | `tag-manager.toggle` | adds or removes a tag from the view |
-| `Mod+Shift+Mod5+1` … `…+9` | `tag-manager.client-move` | adds a tag to the focused client's set, so it stays on the tag it was on |
+| `Mod+Shift+Mod5+1` … `…+9` | `tag-manager.client-move` | moves the focused client onto tag 1 to 9, replacing the tags it was on |
 | `Mod+f` | `fullscreen.toggle` | fullscreen for the focused client, and back |
 | `Mod+Shift+space` | `floating.toggle` | takes the focused client out of the layout, and back |
 | `Mod+i` | `monitor.tile` | tiles the monitor again |
 
-`tag-manager.client-move` toggles the client's membership of the named tag rather
-than moving it: pressing the chord again takes that tag away, and the client
-never leaves the tag it was on. The seam assertion that expects a move is a
-known failure in `tests/quality/seam-baseline.txt`.
+`tag-manager.client-move` replaces the client's tag set with the named tag, the
+way dwm's tag function does. Moving a client to another tag takes it off the
+view it was on; moving it again leaves it on the new tag only. A binding that
+adds a tag without removing the others is not wired.
 
 A command set with `terminal_set_command()` is used as given, and is not looked
 up on `$PATH`. Otherwise `terminal.spawn` runs the first of these that this

@@ -5,7 +5,6 @@
 # known and does not fail the run; a failure missing from here is new.
 # Removing an entry is how a fixed assertion stops being excused: the run
 # reports stale entries, and the list is meant to shrink.
-test-53-tag-move-client.sh|the moved client left the visible tag set
 test-55-randr-relayout.sh|the WM re-laid the clients out for the new screen size
 test-75-pointer-drag.sh|MOD+button1 drag moves the client
 test-75-pointer-drag.sh|MOD+button3 drag on the corner resizes the client
