@@ -127,6 +127,64 @@ test_monitor_set_sm_null_removes_entry(void)
   hub_shutdown();
 }
 
+/* Destructor the machine in the test below is given, so the count it increments
+ * says whether the machine was destroyed. */
+static void
+count_owned_data_free(void* data)
+{
+  int* counter = data;
+  if (counter != NULL)
+    (*counter)++;
+}
+
+/*
+ * Test: a NULL machine destroys the machine the monitor held, data and all.
+ *
+ * The header says a successful call takes ownership of the machine, so a caller
+ * that hands one over and later removes it frees nothing else. The destructor
+ * the machine installed with sm_set_owned_data() is what shows the machine was
+ * destroyed and not only dropped from the table.
+ */
+void
+test_monitor_set_sm_null_destroys_stored_machine(void)
+{
+  LOG_CLEAN("== Testing monitor_set_sm destroys the machine it removes");
+
+  hub_init();
+  monitor_list_init();
+
+  Monitor* m = monitor_create(122);
+  assert_or_abort(m != NULL);
+
+  uint32_t     states[] = { 0, 1 };
+  SMTransition trans[]  = {
+    { .from_state = 0, .to_state = 1 },
+  };
+  SMTemplate* tmpl = sm_template_create("owned", states, 2, trans, 1, 0);
+  assert_or_abort(tmpl != NULL);
+
+  StateMachine* sm = sm_create(m, tmpl, NULL, NULL);
+  assert_or_abort(sm != NULL);
+
+  int counter = 0;
+  sm_set_owned_data(sm, &counter, count_owned_data_free);
+
+  assert(monitor_set_sm(m, "owned", sm) == true);
+  assert(monitor_get_sm(m, "owned") == sm);
+
+  assert(monitor_set_sm(m, "owned", NULL) == true);
+  assert(monitor_get_sm(m, "owned") == NULL);
+  assert(counter == 1);
+
+  /* The machine is gone, so destroying the monitor finds nothing to free. */
+  monitor_destroy(m);
+  assert(counter == 1);
+
+  monitor_list_shutdown();
+  sm_template_destroy(tmpl);
+  hub_shutdown();
+}
+
 void
 test_monitor_create_destroy(void)
 {
@@ -491,5 +549,6 @@ TEST_GROUP(Monitor, {
   test_monitor_null_destroy();
   test_monitor_with_hub_integration();
   test_monitor_set_sm_null_removes_entry();
+  test_monitor_set_sm_null_destroys_stored_machine();
   test_monitor_destroy_unadopts_before_freeing_machines();
 });
