@@ -54,16 +54,16 @@ test_monitor_manager_handler_registration(void)
   hub_init();
   xcb_handler_init();
   monitor_list_init();
-
   monitor_manager_init();
 
-  /* Verify RandR handler is registered */
-  XCBHandler* handlers = xcb_handler_lookup(XCB_RANDR_NOTIFY);
-  if (handlers == NULL) {
-    abort();
-  }
+  /* A server whose RandR extension starts at 89, which is what the nested test
+   * server reports: RRNotify then arrives as response_type 90, and that is the
+   * bucket the handler has to sit in. */
+  assert_or_abort(monitor_manager_register_notify_handler_for_tests(89) == 0);
 
-  /* Should be able to find our handler */
+  XCBHandler* handlers = xcb_handler_lookup(89 + XCB_RANDR_NOTIFY);
+  assert_or_abort(handlers != NULL);
+
   bool        found = false;
   XCBHandler* h;
   for (h = handlers; h != NULL; h = xcb_handler_next(h)) {
@@ -72,9 +72,12 @@ test_monitor_manager_handler_registration(void)
       break;
     }
   }
-  if (!found) {
-    abort();
-  }
+  assert(found);
+
+  /* XCB_RANDR_NOTIFY names the event's number inside the extension, not a
+   * response_type: a handler registered there receives nothing, which is how
+   * every RandR event was dropped before this was fixed. */
+  assert(xcb_handler_count_for_type(XCB_RANDR_NOTIFY) == 0);
 
   /* Shutdown */
   monitor_manager_shutdown();
@@ -239,6 +242,123 @@ test_monitor_manager_with_monitors(void)
 }
 
 /*
+ * The tile request a geometry change sends. The stub stands in for the tiling
+ * component, which is the one that answers REQ_MONITOR_TILE in the WM.
+ */
+static TargetID tile_request_target = TARGET_ID_NONE;
+static int      tile_request_count  = 0;
+
+static void
+tile_request_stub_executor(struct HubRequest* req)
+{
+  tile_request_target = req->target;
+  tile_request_count++;
+}
+
+static HubComponent tile_request_stub = {
+  .name     = "tile-request-stub",
+  .requests = (RequestType[]) { REQ_MONITOR_TILE, 0 },
+  .executor = tile_request_stub_executor,
+};
+
+/*
+ * A CRTC change moves the monitor and asks tiling to lay it out again.
+ *
+ * The geometry write alone leaves every client at the size and position the old
+ * screen gave it, which is what an xrandr mode change looked like: the root
+ * window shrank and both clients stayed wider than it.
+ */
+void
+test_monitor_manager_crtc_change_requests_a_tile(void)
+{
+  LOG_CLEAN("== Testing a CRTC change asks tiling for a new layout");
+
+  hub_init();
+  xcb_handler_init();
+  monitor_list_init();
+  monitor_manager_init();
+  assert_or_abort(hub_register_component(&tile_request_stub) == 0);
+
+  Monitor* m = monitor_create(7);
+  assert_or_abort(m != NULL);
+  m->crtc = 42;
+  monitor_set_geometry(m, 0, 0, 1280, 800);
+
+  tile_request_target = TARGET_ID_NONE;
+  tile_request_count  = 0;
+
+  xcb_randr_notify_event_t event;
+  memset(&event, 0, sizeof event);
+  event.response_type = XCB_RANDR_NOTIFY;
+  event.subCode       = XCB_RANDR_NOTIFY_CRTC_CHANGE;
+  event.u.cc.crtc     = 42;
+  event.u.cc.x        = 0;
+  event.u.cc.y        = 0;
+  event.u.cc.width    = 1024;
+  event.u.cc.height   = 768;
+
+  monitor_manager_handle_randr_notify(&event);
+
+  assert(m->width == 1024);
+  assert(m->height == 768);
+  assert(tile_request_count == 1);
+  assert(tile_request_target == m->target.id);
+
+  hub_unregister_component(tile_request_stub.name);
+  monitor_destroy(m);
+  monitor_manager_shutdown();
+  xcb_handler_shutdown();
+  monitor_list_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * A CRTC the server switched off carries 0x0, which is not an area to lay
+ * clients out into: the monitor keeps the geometry it had, and no layout is
+ * asked for until the CRTC comes back with a mode.
+ */
+void
+test_monitor_manager_crtc_without_a_mode_keeps_its_geometry(void)
+{
+  LOG_CLEAN("== Testing a CRTC change with no mode leaves the layout alone");
+
+  hub_init();
+  xcb_handler_init();
+  monitor_list_init();
+  monitor_manager_init();
+  assert_or_abort(hub_register_component(&tile_request_stub) == 0);
+
+  Monitor* m = monitor_create(7);
+  assert_or_abort(m != NULL);
+  m->crtc = 42;
+  monitor_set_geometry(m, 0, 0, 1280, 800);
+
+  tile_request_target = TARGET_ID_NONE;
+  tile_request_count  = 0;
+
+  xcb_randr_notify_event_t event;
+  memset(&event, 0, sizeof event);
+  event.response_type = XCB_RANDR_NOTIFY;
+  event.subCode       = XCB_RANDR_NOTIFY_CRTC_CHANGE;
+  event.u.cc.crtc     = 42;
+  event.u.cc.width    = 0;
+  event.u.cc.height   = 0;
+
+  monitor_manager_handle_randr_notify(&event);
+
+  assert(m->width == 1280);
+  assert(m->height == 800);
+  assert(tile_request_count == 0);
+
+  hub_unregister_component(tile_request_stub.name);
+  monitor_destroy(m);
+  monitor_manager_shutdown();
+  xcb_handler_shutdown();
+  monitor_list_shutdown();
+  hub_shutdown();
+}
+
+/*
  * A CRTC change event carries the new geometry, so the synchronous fallback
  * applies it without asking the server.
  *
@@ -345,6 +465,8 @@ TEST_GROUP(MonitorManager, {
   test_monitor_manager_no_requests();
   test_monitor_manager_accepts_monitor_target();
   test_monitor_manager_with_monitors();
+  test_monitor_manager_crtc_change_requests_a_tile();
+  test_monitor_manager_crtc_without_a_mode_keeps_its_geometry();
   test_monitor_manager_crtc_change_uses_the_event_geometry_sync_fallback();
   test_monitor_manager_disconnect_destroys_the_monitor_sync_fallback();
 });

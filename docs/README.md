@@ -162,7 +162,11 @@ Short version:
   an idle WM costs no CPU, and SIGTERM ends it. A reply is read the same way: a
   client's size hints and `_NET_WM_STATE`, and the RandR output list and CRTC
   geometry, are requested without waiting and picked up from a poll callback
-  when the server answers, so none of them stops the loop. `MOD+p` forks a shell that runs
+  when the server answers, so none of them stops the loop. A RandR change the
+  server reports arrives too: switching the nested output to another mode moves
+  the monitor to the new size and the clients on it are laid out again inside
+  it, instead of keeping the size and position the old screen gave them.
+  `MOD+p` forks a shell that runs
   `dmenu_path | dmenu` and registers the read end of the pipeline's stdout as
   one of those sources: the chosen line is read when it arrives and the WM runs
   it, and a cancelled prompt emits a failure event instead of blocking. dmenu

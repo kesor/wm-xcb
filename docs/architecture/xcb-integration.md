@@ -93,6 +93,17 @@ typedef struct XCBHandler {
 } XCBHandler;
 ```
 
+### Extension events
+
+An extension's events are numbered relative to that extension: `response_type`
+is the extension's `first_event` plus the event's own number, so the constant
+XCB names it by is not a bucket any event reaches. RandR delivers `RRNotify` at
+`first_event + XCB_RANDR_NOTIFY` (90 on a server whose RandR starts at 89), and
+the `subCode` inside the event says which change it is. The registry keys on the
+raw `response_type`, so a component that handles an extension event registers
+under the number `xcb_get_extension_data()` reports for its connection, and one
+registration covers every subCode.
+
 ---
 
 ## Handler → Component Decision
@@ -177,7 +188,7 @@ void monitor_manager_randr_handler(void* event) {
 | `XCB_UNMAP_NOTIFY` | client-list | Unmanage client, unless the WM asked for the unmap itself |
 | `XCB_CONFIGURE_REQUEST` | floating, tiling | May `hub_send_request()` |
 | `XCB_EXPOSE` | bar | `hub_emit(EVT_BAR_DRAW)` |
-| `XCB_RANDR_NOTIFY` | monitor-manager | `sm_raw_write()` to ConnectionSM |
+| `XCB_RANDR_NOTIFY` | monitor-manager | Applies the geometry the event carries, then `hub_send_request(REQ_MONITOR_TILE)` |
 | `XCB_CLIENT_MESSAGE` | ewmh-desktop | `_NET_CURRENT_DESKTOP` becomes `REQ_TAG_VIEW` |
 
 ## EWMH atoms
