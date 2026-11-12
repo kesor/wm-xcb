@@ -16,6 +16,7 @@
 #include "src/actions/action-registry.h"
 #include "src/components/client-list.h"
 #include "src/components/tag-manager.h"
+#include "src/config/config.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/sm/sm-instance.h"
@@ -795,6 +796,45 @@ tag_manager_on_client_managed(Event e)
 }
 
 /*
+ * Give every tag target the name the configuration holds for its index, and
+ * clear the ones it no longer names.
+ *
+ * A Tag copies its name when it is created, and a reload replaces the strings
+ * config_get_tag_name() answers from, so the tags would otherwise keep the
+ * names of the configuration the WM started with.
+ */
+static void
+tag_manager_name_tags(void)
+{
+  for (int i = 0; i < TAG_NUM_TAGS; i++) {
+    Tag* t = tag_get_by_index(i);
+    if (t == NULL)
+      continue;
+
+    const char* name = config_get_tag_name(i);
+    char*       copy = name != NULL ? strdup(name) : NULL;
+
+    /* A name that cannot be copied leaves the tag as it was: losing the name a
+     * reload kept is worse than answering with the one before the edit. */
+    if (name != NULL && copy == NULL)
+      continue;
+
+    tag_set_name(t, copy);
+  }
+}
+
+/*
+ * A reload replaced the tag names. tag_list_init() is not the answer: it
+ * destroys and recreates the targets, and a reload changes no tag's identity.
+ */
+static void
+tag_manager_on_config_reloaded(Event e)
+{
+  (void) e;
+  tag_manager_name_tags();
+}
+
+/*
  * Listener callback - subscribes to relevant events
  */
 void
@@ -930,6 +970,13 @@ tag_manager_component_init(void)
     return false;
   }
 
+  /* Nothing else creates the tag targets, and a WM that starts without them
+   * answers NULL to every tag lookup: the config file's tag names would have
+   * nowhere to go and a bar would have nothing to show. They come from the
+   * configuration loaded before the components start. */
+  tag_list_init();
+  hub_subscribe(EVT_CONFIG_RELOADED, tag_manager_on_config_reloaded, NULL);
+
   tag_manager_component_instance.initialized = true;
   LOG_DEBUG("Tag manager component initialized successfully");
 
@@ -950,6 +997,10 @@ tag_manager_component_shutdown(void)
 
   /* Unsubscribe from events */
   hub_unsubscribe(EVT_CLIENT_MANAGED, tag_manager_listener);
+  hub_unsubscribe(EVT_CONFIG_RELOADED, tag_manager_on_config_reloaded);
+
+  /* The tags are this component's targets, so they go with it. */
+  tag_list_shutdown();
 
   /* Unregister from hub */
   hub_unregister_component(TAG_MANAGER_COMPONENT_NAME);

@@ -83,8 +83,9 @@ void config_shutdown(void);
 
 /*
  * The name the config file gave tag `index` (0-based), or NULL when the file
- * named that tag nothing. tag_list_init() gives the name to the tag it creates,
- * and tag_get_name() returns "1" to "9" for the ones left unnamed.
+ * named that tag nothing. The tag-manager component creates the tags and gives
+ * each the name this answers, and a reload renames them; tag_get_name() returns
+ * "1" to "9" for the ones left unnamed.
  */
 const char* config_get_tag_name(int index);
 

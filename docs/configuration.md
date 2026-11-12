@@ -129,10 +129,11 @@ A tag with no name keeps the number the user types. Quoted names may contain
 spaces. A second `tags` line replaces the first and warns about it.
 
 The names reach a panel through `_NET_DESKTOP_NAMES`: a tag with no name is
-published as the number the user types. `tag_get_name()` still returns a name
-only for a tag that exists, and nothing creates the tag list at startup today
-(`tag_list_init()` is called only from the tests); there is no bar to show a
-name on either.
+published as the number the user types. The nine tags exist from startup: the
+tag-manager component creates them, `tag_get_name()` answers the name the file
+gave that tag and the number for one it left unnamed, and a reload renames them
+where they stand, so a tag keeps its identity and only its name changes. There
+is still no bar to show a name on.
 
 ## What the file does not decide yet
 

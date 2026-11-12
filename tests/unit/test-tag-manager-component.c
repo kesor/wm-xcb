@@ -7,18 +7,23 @@
 
 #include "tests/unit/test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "src/actions/action-registry.h"
 #include "src/components/client-list.h"
 #include "src/components/focus.h"
+#include "src/components/keybinding.h"
 #include "src/components/tag-manager.h"
+#include "src/config/config.h"
 #include "src/core/wm-components.h"
 #include "src/core/wm-hub.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
+#include "src/xcb/xcb-handler.h"
 #include "tests/unit/test-wm.h"
 
 /*
@@ -643,7 +648,6 @@ test_tag_manager_starts_with_the_wm(void)
   hub_init();
   sm_registry_init();
   xcb_handler_init();
-  tag_list_init();
   monitor_list_init();
 
   wm_components_init();
@@ -651,6 +655,7 @@ test_tag_manager_starts_with_the_wm(void)
   assert(tag_manager_component_is_initialized() == true);
   assert(hub_get_component_by_name(TAG_MANAGER_COMPONENT_NAME) != NULL);
   assert(action_exists("tag-manager.view") == true);
+  assert(tag_get_by_index(0) != NULL);
 
   Monitor* m = monitor_create(700);
   assert_or_abort(m != NULL);
@@ -668,7 +673,7 @@ test_tag_manager_starts_with_the_wm(void)
   assert(hub_get_component_by_name(TAG_MANAGER_COMPONENT_NAME) == NULL);
 
   monitor_list_shutdown();
-  tag_list_shutdown();
+  assert(tag_get_by_index(0) == NULL);
   xcb_handler_shutdown();
   sm_registry_shutdown();
   hub_shutdown();
@@ -821,6 +826,129 @@ test_tag_manager_keeps_the_tags_a_remapped_client_has(void)
 }
 
 /*
+ * Nothing in the WM creates the tags except this component, so a startup that
+ * skips it leaves every tag lookup answering NULL and the config file's tag
+ * names with nowhere to go.
+ */
+void
+test_tag_manager_creates_the_tags(void)
+{
+  LOG_CLEAN("== Testing the tag manager creates the tags");
+
+  hub_init();
+  monitor_list_init();
+  action_registry_init();
+
+  assert(tag_get_by_index(0) == NULL);
+  assert(tag_manager_component_init() == true);
+
+  for (int i = 0; i < TAG_NUM_TAGS; i++) {
+    Tag* t = tag_get_by_index(i);
+    assert_or_abort(t != NULL);
+    assert(t->target.registered == true);
+    /* The hub routes to the same target the list holds, not only the list. */
+    assert(tag_get_by_id(tag_get_id_by_index(i)) == t);
+  }
+
+  tag_manager_component_shutdown();
+  assert(tag_get_by_index(0) == NULL);
+
+  action_registry_shutdown();
+  monitor_list_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Write `text` to a fresh file and put its path in `path`. The caller unlinks
+ * it. Returns false when the temporary file cannot be made.
+ */
+static bool
+write_tag_config(char* path, size_t size, const char* text)
+{
+  const char* dir = getenv("TMPDIR");
+  int         fd  = -1;
+  FILE*       file;
+
+  if (dir == NULL || dir[0] == '\0')
+    dir = "/tmp";
+  if (snprintf(path, size, "%s/wm-tag-config-test-XXXXXX", dir) >= (int) size)
+    return false;
+
+  fd = mkstemp(path);
+  if (fd < 0)
+    return false;
+
+  file = fdopen(fd, "w");
+  if (file == NULL) {
+    close(fd);
+    unlink(path);
+    return false;
+  }
+
+  (void) fputs(text, file);
+  (void) fclose(file);
+  return true;
+}
+
+static bool
+rewrite_tag_config(const char* path, const char* text)
+{
+  FILE* file = fopen(path, "w");
+  if (file == NULL)
+    return false;
+
+  (void) fputs(text, file);
+  return fclose(file) == 0;
+}
+
+/*
+ * A Tag copies its name when it is created, and the reload replaces the strings
+ * config_get_tag_name() answers from. The tag has to be renamed, or it keeps the
+ * name from the configuration the WM started with.
+ */
+void
+test_tag_manager_renames_tags_on_reload(void)
+{
+  LOG_CLEAN("== Testing a reload renames the tags");
+
+  char path[256];
+
+  assert_or_abort(write_tag_config(path, sizeof path, "tags dev chat\n"));
+  assert(config_load_runtime(path) == true);
+
+  hub_init();
+  xcb_handler_init();
+  monitor_list_init();
+  keybinding_init();
+  assert(tag_manager_component_init() == true);
+
+  Tag* first = tag_get_by_index(0);
+  Tag* third = tag_get_by_index(2);
+  assert_or_abort(first != NULL);
+  assert_or_abort(third != NULL);
+  assert(strcmp(tag_get_name(first), "dev") == 0);
+  assert(strcmp(tag_get_name(tag_get_by_index(1)), "chat") == 0);
+  assert(strcmp(tag_get_name(third), "3") == 0);
+
+  assert(rewrite_tag_config(path, "tags work\n"));
+  assert(config_reload() == true);
+
+  /* The same target answers with the new name, and one the edit dropped goes
+   * back to the number the user types. */
+  assert(tag_get_by_index(0) == first);
+  assert(strcmp(tag_get_name(first), "work") == 0);
+  assert(strcmp(tag_get_name(tag_get_by_index(1)), "2") == 0);
+
+  tag_manager_component_shutdown();
+  keybinding_shutdown();
+  monitor_list_shutdown();
+  xcb_handler_shutdown();
+  hub_shutdown();
+  config_shutdown();
+  unlink(path);
+}
+
+/*
  * A creator that returns NULL stands for a table the framework refused. The
  * init has to stop instead of running with no machine for its monitors.
  */
@@ -879,5 +1007,7 @@ TEST_GROUP(TagManager, {
   test_tag_manager_answers_which_clients_are_on_screen();
   test_tag_manager_keeps_the_tags_a_remapped_client_has();
   test_tag_manager_starts_with_the_wm();
+  test_tag_manager_creates_the_tags();
+  test_tag_manager_renames_tags_on_reload();
   test_tag_manager_init_fails_when_template_is_refused();
 });
