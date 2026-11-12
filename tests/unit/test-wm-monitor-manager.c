@@ -5,7 +5,7 @@
  * Requires: hub, xcb-handler, monitor target
  */
 
-#include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
+#include "tests/unit/test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -15,7 +15,7 @@
 #include "src/core/wm-hub.h"
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
-#include "test-wm.h"
+#include "tests/unit/test-wm.h"
 
 void
 test_monitor_manager_component_init_shutdown(void)

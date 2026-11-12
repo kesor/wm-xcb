@@ -16,8 +16,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "sm-instance.h"
-#include "sm-template.h"
+#include "src/sm/sm-instance.h"
+#include "src/sm/sm-template.h"
 
 typedef struct SMHookList SMHookList;
 

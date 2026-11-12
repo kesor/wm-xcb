@@ -7,17 +7,17 @@
  * Usage: make test
  */
 
-#include "test-registry.h"
+#include "tests/unit/test-registry.h"
 
 /*
  * Include all test headers to register their test groups
  */
-#include "test-launcher.h"
-#include "test-terminal.h"
-#include "test-wm-hub.h"
-#include "test-wm-keybinding.h"
-#include "test-wm-monitor.h"
-#include "test-wm-tag.h"
-#include "test-wm-xcb-handler.h"
-#include "test-wm.h"
+#include "tests/unit/test-launcher.h"
+#include "tests/unit/test-terminal.h"
+#include "tests/unit/test-wm-hub.h"
+#include "tests/unit/test-wm-keybinding.h"
+#include "tests/unit/test-wm-monitor.h"
+#include "tests/unit/test-wm-tag.h"
+#include "tests/unit/test-wm-xcb-handler.h"
+#include "tests/unit/test-wm.h"
 /* Add more test headers as needed */

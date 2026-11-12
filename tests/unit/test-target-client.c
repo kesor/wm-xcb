@@ -15,8 +15,8 @@
 #include "src/sm/sm.h"
 #include "src/target/client.h"
 #include "src/target/monitor.h"
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 /* Callback helper for foreach tests */
 static int g_callback_count = 0;

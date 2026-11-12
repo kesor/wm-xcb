@@ -16,9 +16,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "monitor.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
+#include "src/target/monitor.h"
 
 /*
  * Monitor list

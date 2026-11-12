@@ -26,8 +26,8 @@
 #include "src/core/wm-log.h"
 #include "src/sm/sm-registry.h"
 #include "src/xcb/xcb-handler.h"
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Test: keybinding component registers with hub

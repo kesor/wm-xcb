@@ -114,7 +114,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | test-src | `scripts/check-test-src.sh` | every `test-*.c` with a `TEST_GROUP` is in `TEST_SRC`, so its assertions actually run |
 | compiler refusals | `scripts/check-compiler-refusals.sh` | no component can assign a machine-tracked field, and no caller can drop the result of `hub_register_component()`: every fixture under `tests/compile-fail/` is built twice, the version a rule allows has to compile and the version it refuses has to fail, so a refusal is told apart from a broken include path |
 | sources | `scripts/check-orphan-sources.sh` | every tracked `.c` outside `tests/` and `tools/` is in `make -s print-src`, so the compiler and `check-async` see it |
-| includes | `scripts/check-includes.sh` | no tracked `.c` or `.h` includes a header by walking up a directory. The Makefile's `-I.` resolves `#include "src/core/wm-hub.h"` from the repository root, so that form means the same header in every file; one that walks up resolves from wherever the including file sits, compiles until that file moves, and then fails with the moved file named instead of the include line nobody touched. The line is judged as text, so a comment that spells the shape is a finding too |
+| includes | `scripts/check-includes.sh` | every quoted include in a tracked `.c` or `.h` is written from the repository root, and no include of any kind walks up a directory. The Makefile's `-I.` resolves `#include "src/core/wm-hub.h"` from the repository root, so that form means the same header in every file; a path that walks up, or a header named with no directory at all (`#include "tiling.h"` beside `tiling.c`), resolves from wherever the including file sits, compiles until that file moves, and then fails with the moved file named instead of the include line nobody touched. The angle-bracket form is left alone: `<stdio.h>` is how a system header is written and names no repository path. The line is judged as text, so a comment that spells either shape is a finding too |
 | fakes | `scripts/check-fakes.sh` | every stand-in in `tests/fakes/` names, on its second line, the program it models, cites a line of that program on its third, is named after that program, and names one that is installed on `PATH` outside the fake directory. The check resolves that name to a path, requires a regular file, and looks for the cited line in it. A fake answers every assertion a test asks it, so the program it names is the one part of a test the suite cannot falsify |
 | bead refs | `scripts/check-bead-refs.sh` | no source, script, build file or CI config cites a beads id; the reason goes in the code |
 | bead descriptions | `scripts/check-bead-descriptions.sh` | every issue in the tracker carries a description, and none is whitespace only. Skips where there is no database, so it needs no CI job of its own: an inline `--description` with an empty value clears the field and exits 0, and this is the only thing that looks at it. `--update-baseline` refuses to record an id the baseline does not already hold, because that entry would accept the finding |
@@ -509,7 +509,7 @@ scripts/check-bead-descriptions.sh   # every bead description is still there
 scripts/check-bead-create-recipe.sh  # every create recipe a document shows carries --acceptance
 scripts/check-root.sh       # every tracked root entry is on the allowlist
 scripts/check-orphan-sources.sh   # every tracked source is in the build
-scripts/check-includes.sh   # no include walks up a directory
+scripts/check-includes.sh   # no include leaves the repository root
 scripts/check-compiler-refusals.sh   # the compiler refuses a tracked-field write and a dropped registration result
 ```
 
@@ -548,12 +548,6 @@ gate's row in the table above replaces the entry here.
   `scripts/check-docs.sh` reads the shape of a citation — a line number, a
   count, a percentage — and cannot tell whether the sentence around it is still
   true.
-- **An include is written from the repository root.** The `includes` gate above
-  catches the form that walks up a directory. A header named without one,
-  `#include "tiling.h"` beside `tiling.c`, resolves from the including file's
-  own directory by the same mechanism: it breaks on a move, and no command
-  checks it. That form is all over `src/`, so a gate for it needs those lines
-  rewritten first, which is a change of its own.
 
 ## Coverage and fuzzing
 

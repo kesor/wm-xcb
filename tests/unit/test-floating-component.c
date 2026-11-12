@@ -7,7 +7,7 @@
  * leaves a floating client alone.
  */
 
-#include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
+#include "tests/unit/test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
 #include <string.h>
 
@@ -25,7 +25,7 @@
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "src/xcb/xcb-handler.h"
-#include "test-wm.h"
+#include "tests/unit/test-wm.h"
 
 #define TEST_MONITOR_OUTPUT 70
 #define TEST_MONITOR_WIDTH  800

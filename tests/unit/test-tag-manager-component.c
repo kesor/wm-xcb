@@ -5,7 +5,7 @@
  * Requires: hub, monitor, client
  */
 
-#include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
+#include "tests/unit/test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +19,7 @@
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
-#include "test-wm.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Track events received during tests

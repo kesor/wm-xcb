@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "pertag.h"
+#include "src/components/pertag.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/target/monitor.h"

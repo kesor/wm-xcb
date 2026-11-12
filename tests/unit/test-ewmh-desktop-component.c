@@ -26,8 +26,8 @@
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
 #include "src/xcb/xcb-handler.h"
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Test: a client on exactly one tag names that desktop; one on several or on

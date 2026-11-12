@@ -16,7 +16,7 @@
 #include <xcb/randr.h>
 #include <xcb/xcbext.h>
 
-#include "monitor-manager.h"
+#include "src/components/monitor-manager.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb.h"

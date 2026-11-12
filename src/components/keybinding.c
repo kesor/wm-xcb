@@ -26,8 +26,8 @@
 #include <xcb/xcb_keysyms.h>
 #include <X11/keysym.h>
 
-#include "keybinding.h"
 #include "src/actions/keybinding-binding.h"
+#include "src/components/keybinding.h"
 #include "src/config/config.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"

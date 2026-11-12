@@ -30,8 +30,8 @@
 #include "src/actions/terminal.h"
 #include "src/core/wm-log.h"
 
-#include "test-registry.h"
-#include "test-terminal.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-terminal.h"
 
 /*
  * A PATH of this test's own, holding only the programs the test installs.

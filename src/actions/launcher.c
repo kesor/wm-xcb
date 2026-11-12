@@ -25,7 +25,7 @@
 
 #include <xcb/xcb.h>
 
-#include "launcher.h"
+#include "src/actions/launcher.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb.h"

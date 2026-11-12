@@ -5,15 +5,15 @@
  * Requires: hub
  */
 
-#include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
+#include "tests/unit/test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
 #include <assert.h>
 #include <stdlib.h>
 
 #include "src/core/wm-hub.h"
 #include "src/target/monitor.h"
-#include "test-wm-monitor.h"
-#include "test-wm.h"
+#include "tests/unit/test-wm-monitor.h"
+#include "tests/unit/test-wm.h"
 
 /* Set by the observer below when a monitor is unregistered. */
 static StateMachine* g_unadopt_seen_machine;

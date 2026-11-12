@@ -23,8 +23,8 @@
 
 #include "src/core/wm-running.h"
 #include "src/core/wm-signals.h"
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 static void (*previous_sigint)(int);
 static void (*previous_sigterm)(int);

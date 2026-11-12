@@ -22,8 +22,8 @@
 #include "src/config/config.h"
 #include "src/core/wm-hub.h"
 #include "src/event-types.h"
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 typedef struct KnownEventType {
   const char* name;

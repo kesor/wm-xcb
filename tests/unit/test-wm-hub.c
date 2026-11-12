@@ -1,8 +1,8 @@
 #include <inttypes.h>
 #include <string.h>
 #include "src/core/wm-hub.h"
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 /* Test component definitions - use string-based target type names */
 static RequestType fullscreen_requests[]  = { 1, 2, 0 }; /* REQ_FULLSCREEN_ENTER = 1, REQ_FULLSCREEN_EXIT = 2 */

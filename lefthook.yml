@@ -72,13 +72,14 @@ pre-commit:
       fail_text: "A tracked .c file is in no build target, so the compiler and check-async both skip it. Add it to SRC, or delete it."
 
     # The Makefile's -I. makes a header name from the repository root mean the
-    # same thing in every file. One that walks up compiles where the including
-    # file is today and breaks when that file moves, and the failure names the
-    # moved file rather than the include line nobody touched.
+    # same thing in every file. A path that walks up, or a bare header name,
+    # compiles where the including file is today and breaks when that file
+    # moves, and the failure names the moved file rather than the include line
+    # nobody touched.
     includes:
       glob: "*.{c,h}"
       run: ./scripts/check-includes.sh
-      fail_text: "An include walks up a directory. Write it from the repository root: #include \"src/core/wm-hub.h\"."
+      fail_text: "An include is not written from the repository root. Write it by its path in the tree: #include \"src/core/wm-hub.h\"."
 
     # A stand-in answers every assertion a test asks it, so the program it names
     # is the one part of a test the suite cannot falsify. The gate resolves that

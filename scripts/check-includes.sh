@@ -1,24 +1,35 @@
 #!/usr/bin/env bash
 #
-# check-includes.sh - fail when an include walks up a directory.
+# check-includes.sh - fail when an include is not written from the repository root.
 #
 # Usage: scripts/check-includes.sh [--verbose]
 #
 # The Makefile compiles with -I., so `#include "src/core/wm-hub.h"` resolves
-# from the repository root and names the same header in every file. An include
-# that walks up resolves from the directory the including file sits in: it
-# compiles wherever that file is today, and when the file moves the compiler
-# names the moved file, because the include line it did not touch is somewhere
-# else. Nothing failed when the next one landed, so this does.
+# from the repository root and names the same header in every file. Two shapes
+# leave that rule:
+#
+#   `#include "../sm/sm.h"` walks up a directory. It resolves from the directory
+#   the including file sits in, so it compiles wherever that file is today, and
+#   when the file moves the compiler names the moved file, because the include
+#   line it did not touch is somewhere else.
+#
+#   `#include "tiling.h"` beside tiling.c names a header with no directory at
+#   all. It resolves by the same mechanism, from the including file's directory,
+#   and breaks on the same move. The angle-bracket form is left alone: that is
+#   how a system header is written, `#include <stdio.h>` names no repository
+#   path, and there is no root-relative spelling for it to be missing.
+#
+# Nothing failed when the next one landed, so this does.
 #
 # The line is judged as text, the way scripts/check-paths.sh judges a path: a
 # comment that spells the shape is a finding too, and the fix is the same one
 # character cheaper than explaining why the comment needs it.
 #
-# Exit status: 0 when no tracked .c or .h includes a header by walking up a
-# directory, 1 otherwise. `git grep`'s 1 is "no match", which is the answer this
-# gate wants; anything above it is a search that did not run, and an empty
-# result read as a clean tree is the one verdict a gate must never give.
+# Exit status: 0 when every quoted include in the tracked .c and .h files names
+# a header by its path in the tree and no include walks up a directory, 1
+# otherwise. `git grep`'s 1 is "no match", which is the answer this gate wants;
+# anything above it is a search that did not run, and an empty result read as a
+# clean tree is the one verdict a gate must never give.
 
 set -uo pipefail
 
@@ -39,11 +50,16 @@ case "${1:-}" in
     ;;
 esac
 
-# The shape, anywhere in the line: a header path that walks up in the middle
-# leaves the tree the same way one that starts with `../`, as in
+# The walk-up shape, anywhere in the line: a header path that walks up in the
+# middle leaves the tree the same way one that starts with `../`, as in
 # `#include "src/sm/../../core/wm-hub.h"`. The quote or the angle bracket is
 # what tells an include line from prose about one.
-PATTERN='#[[:space:]]*include[[:space:]]*[<"][^">]*\.\./'
+WALKS_UP='#[[:space:]]*include[[:space:]]*[<"][^">]*\.\./'
+
+# The bare-name shape: a quoted include whose name is a header file and nothing
+# else. `[^"/]*` reads up to the closing quote, so a `../` after that quote is
+# not this line's include path and a root-relative path is not a bare name.
+BARE_NAME='#[[:space:]]*include[[:space:]]*"[^"/]*"'
 
 HITS=$(mktemp "${TMPDIR:-/tmp}/include-hits.XXXXXX") || exit 1
 trap 'rm -f "$HITS"' EXIT
@@ -51,9 +67,9 @@ trap 'rm -f "$HITS"' EXIT
 # color.ui forced off so the finding it prints is a line a reader can grep for
 # and paste, not one wrapped in paint codes. -a is required: without it a NUL in
 # the file makes git grep print "Binary file <path> matches" and exit 0. That
-# line does not contain the pattern, so the re-check below counts nothing and
+# line does not contain either pattern, so the re-check below counts nothing and
 # the gate exits 0 over the include it found.
-git -c color.ui=false grep -a -nE "$PATTERN" -- '*.c' '*.h' >"$HITS" 2>/dev/null
+git -c color.ui=false grep -a -nE -e "$WALKS_UP" -e "$BARE_NAME" -- '*.c' '*.h' >"$HITS" 2>/dev/null
 case $? in
   0 | 1) ;;
   *)
@@ -62,15 +78,28 @@ case $? in
     ;;
 esac
 
-FOUND=$(grep -cE "$PATTERN" "$HITS" || true)
-if [ "${FOUND:-0}" -eq 0 ]; then
+FOUND=0
+# shape <pattern> <label> - prints the hits that match one shape, under the
+# label that names it, and adds them to the count. One shape at a time so a
+# pattern that only reads the first fails here instead of at somebody's move.
+shape() {
+  local pattern=$1 label=$2 count
+  count=$(grep -cE -- "$pattern" "$HITS" || true)
+  [ "${count:-0}" -eq 0 ] && return 0
+  grep -E -- "$pattern" "$HITS" | sed "s/^/  $label  /"
+  FOUND=$((FOUND + count))
+}
+
+shape "$WALKS_UP" "WALKS UP"
+shape "$BARE_NAME" "NO DIRECTORY"
+
+if [ "$FOUND" -eq 0 ]; then
   [ "$VERBOSE" -eq 1 ] &&
-    echo "check-includes: no include walks up a directory in $(git ls-files '*.c' '*.h' | wc -l) tracked source file(s)"
+    echo "check-includes: every include in $(git ls-files '*.c' '*.h' | wc -l) tracked source file(s) is written from the repository root"
   exit 0
 fi
 
-sed 's/^/  RELATIVE INCLUDE  /' "$HITS"
 echo
-echo "check-includes: $FOUND include(s) walk up a directory."
-echo "Write the include from the repository root: #include \"src/core/wm-hub.h\"."
+echo "check-includes: $FOUND include(s) are not written from the repository root."
+echo "Write the include by its path in the tree: #include \"src/core/wm-hub.h\""
 exit 1
