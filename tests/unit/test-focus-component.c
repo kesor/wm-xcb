@@ -778,6 +778,52 @@ test_focus_cleared_when_last_client_leaves(void)
 }
 
 /*
+ * A creator that returns NULL stands for a table the framework refused. The
+ * init has to stop instead of running with no machine for its targets.
+ */
+static SMTemplate*
+refuse_template_create(void)
+{
+  return NULL;
+}
+
+void
+test_focus_init_fails_when_template_is_refused(void)
+{
+  LOG_CLEAN("== Testing focus init fails when its template is refused");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  client_list_init();
+  action_registry_init();
+
+  focus_component_set_template_creator_for_tests(refuse_template_create);
+
+  assert(focus_component_init() == false);
+  assert(focus_component_is_initialized() == false);
+  assert(hub_get_component_by_name(FOCUS_COMPONENT_NAME) == NULL);
+  assert(xcb_handler_count_for_type(XCB_ENTER_NOTIFY) == 0);
+  assert(xcb_handler_count_for_type(XCB_LEAVE_NOTIFY) == 0);
+  assert(action_exists("focus.focus-current") == false);
+  assert(action_exists("focus.focus-prev") == false);
+
+  Client* c = client_create(1200);
+  assert_or_abort(c != NULL);
+  assert(focus_get_sm(c) == NULL);
+  assert(client_get_sm(c, FOCUS_COMPONENT_NAME) == NULL);
+
+  focus_component_set_template_creator_for_tests(NULL);
+  client_destroy(c);
+
+  action_registry_shutdown();
+  client_list_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
  * Register test group
  */
 TEST_GROUP(FocusComponent, {
@@ -798,4 +844,5 @@ TEST_GROUP(FocusComponent, {
   test_focus_moves_when_focused_client_unmaps();
   test_focus_moves_when_focused_client_is_destroyed();
   test_focus_cleared_when_last_client_leaves();
+  test_focus_init_fails_when_template_is_refused();
 });

@@ -253,6 +253,14 @@ every reachable state and every way out of it, without reading guard bodies.
     transitions, in text, in the header next to the template. If the diagram is
     hard to write, the machine is wrong.
 
+**A template that cannot be built stops its component.** A component whose init
+builds its template checks the creator's result, unregisters what it already
+registered, and returns false. `wm_components_init()` then refuses to start, so
+a component that has no machine for its targets is a startup failure with a
+message, not a window manager that runs without it.
+`tests/unit/test-focus-component.c` and `tests/unit/test-tag-manager-component.c`
+hand the init a creator that returns NULL and assert the component stays down.
+
 **What this buys the user:** a WM whose focus and layout rules can be stated in a
 few sentences and cannot drift from the code, plus the ability to answer "why is
 this window fullscreen?" by dumping one machine's state and its last transitions.
