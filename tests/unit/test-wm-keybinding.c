@@ -548,9 +548,9 @@ test_keybinding_register_reasons(void)
   assert(keybinding_binding_register(XCB_MOD_MASK_4, 41, "fullscreen.toggle") == KEYBINDING_REGISTERED);
   assert(keybinding_binding_register(XCB_MOD_MASK_4, 41, "monitor.tile") == KEYBINDING_ALREADY_BOUND);
 
-  /* Keycodes past what any keyboard reports, so every slot fills without a
-   * repeat: the table stores them and looks them up, and nothing here asks the
-   * server about them. */
+  /* Nothing here presses these or asks the server about them: the table stores
+   * what it is given. xcb_keycode_t is uint8_t, so 1000+i truncates to 233..255
+   * and 0..39; the values stay distinct and none is keycode 41, bound above. */
   for (uint32_t i = 1; i < KEYBINDING_MAX_BINDINGS; i++) {
     assert(keybinding_binding_register(
                XCB_MOD_MASK_4, (xcb_keycode_t) (1000 + i), "tag-manager.view") == KEYBINDING_REGISTERED);
