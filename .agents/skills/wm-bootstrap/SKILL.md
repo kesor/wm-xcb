@@ -216,6 +216,11 @@ The second form is also a test, which is the bar: a criterion no command can
 check does not say what done looks like. A number the bead sets on purpose stays
 - an exit status, a latency budget, a limit.
 
+A rule the bead names takes the same shape. Name the section that holds it and
+do not restate it: a paraphrase is a second definition, and the first place the
+two are read together is the review, after the worker has implemented the
+bead's version.
+
 The criterion is part of the create, not something a later reader adds:
 `bd create ... --acceptance "..."`. `scripts/check-bead-acceptance.sh` fails the
 next commit on a live bead with none that
