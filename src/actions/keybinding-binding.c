@@ -134,86 +134,38 @@ keybinding_binding_clear(void)
   binding_count = 0;
 }
 
-bool
-keybinding_binding_register(uint32_t modifiers, xcb_keycode_t keycode, const char* action)
+/*
+ * The one place a binding enters the table, so the two entry points below
+ * cannot disagree about what a refusal means.
+ */
+static KeybindingRegisterResult
+register_binding(uint32_t      modifiers,
+                 xcb_keycode_t keycode,
+                 const char*   action,
+                 uint32_t      arg,
+                 bool          has_arg)
 {
   if (!initialized) {
     LOG_ERROR("Keybinding binding system not initialized");
-    return false;
+    return KEYBINDING_REFUSED;
   }
 
   if (action == NULL || action[0] == '\0') {
     LOG_ERROR("Cannot register binding with empty action");
-    return false;
+    return KEYBINDING_REFUSED;
   }
 
-  /* Check for duplicate */
-  if (find_binding_index(modifiers, keycode) >= 0) {
-    LOG_WARN("Binding already exists for keycode=%d modifiers=0x%x",
-             keycode, modifiers);
-    return false;
-  }
+  if (find_binding_index(modifiers, keycode) >= 0)
+    return KEYBINDING_ALREADY_BOUND;
 
-  if (binding_count >= KEYBINDING_MAX_BINDINGS) {
-    LOG_ERROR("Maximum number of keybindings reached (%d)", KEYBINDING_MAX_BINDINGS);
-    return false;
-  }
+  if (binding_count >= KEYBINDING_MAX_BINDINGS)
+    return KEYBINDING_TABLE_FULL;
 
   /* Allocate and store binding */
   KeyBinding* b = malloc(sizeof(KeyBinding));
   if (b == NULL) {
     LOG_ERROR("Failed to allocate keybinding");
-    return false;
-  }
-
-  b->modifiers = modifiers;
-  b->keycode   = keycode;
-  b->action    = action;
-  b->arg       = 0;
-  b->userdata  = NULL;
-  b->has_arg   = false;
-
-  bindings[binding_count++] = b;
-
-  LOG_DEBUG("Registered keybinding: mod=0x%x keycode=%d action=%s",
-            modifiers, keycode, action);
-
-  return true;
-}
-
-bool
-keybinding_binding_register_with_arg(uint32_t      modifiers,
-                                     xcb_keycode_t keycode,
-                                     const char*   action,
-                                     uint32_t      arg)
-{
-  if (!initialized) {
-    LOG_ERROR("Keybinding binding system not initialized");
-    return false;
-  }
-
-  if (action == NULL || action[0] == '\0') {
-    LOG_ERROR("Cannot register binding with empty action");
-    return false;
-  }
-
-  /* Check for duplicate */
-  if (find_binding_index(modifiers, keycode) >= 0) {
-    LOG_WARN("Binding already exists for keycode=%d modifiers=0x%x",
-             keycode, modifiers);
-    return false;
-  }
-
-  if (binding_count >= KEYBINDING_MAX_BINDINGS) {
-    LOG_ERROR("Maximum number of keybindings reached (%d)", KEYBINDING_MAX_BINDINGS);
-    return false;
-  }
-
-  /* Allocate and store binding */
-  KeyBinding* b = malloc(sizeof(KeyBinding));
-  if (b == NULL) {
-    LOG_ERROR("Failed to allocate keybinding");
-    return false;
+    return KEYBINDING_REFUSED;
   }
 
   b->modifiers = modifiers;
@@ -221,15 +173,36 @@ keybinding_binding_register_with_arg(uint32_t      modifiers,
   b->action    = action;
   b->arg       = arg;
   b->userdata  = NULL;
-  b->has_arg   = true;
+  b->has_arg   = has_arg;
 
   bindings[binding_count++] = b;
 
-  LOG_DEBUG("Registered keybinding: mod=0x%x keycode=%d action=%s arg=%" PRIu32,
-            modifiers, keycode, action, arg);
+  if (has_arg) {
+    LOG_DEBUG("Registered keybinding: mod=0x%x keycode=%d action=%s arg=%" PRIu32,
+              modifiers, keycode, action, arg);
+  } else {
+    LOG_DEBUG("Registered keybinding: mod=0x%x keycode=%d action=%s",
+              modifiers, keycode, action);
+  }
 
-  return true;
+  return KEYBINDING_REGISTERED;
 }
+
+KeybindingRegisterResult
+keybinding_binding_register(uint32_t modifiers, xcb_keycode_t keycode, const char* action)
+{
+  return register_binding(modifiers, keycode, action, 0, false);
+}
+
+KeybindingRegisterResult
+keybinding_binding_register_with_arg(uint32_t      modifiers,
+                                     xcb_keycode_t keycode,
+                                     const char*   action,
+                                     uint32_t      arg)
+{
+  return register_binding(modifiers, keycode, action, arg, true);
+}
+
 
 bool
 keybinding_binding_unregister(uint32_t modifiers, xcb_keycode_t keycode)

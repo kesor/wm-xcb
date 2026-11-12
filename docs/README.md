@@ -130,8 +130,12 @@ Short version:
   masks a press can carry, and grabbed again on `MappingNotify`, so a press
   reaches the component that owns it. `docs/configuration.md` has the file
   format; a line the parser cannot read is reported once, with its line
-  number, and the compiled bindings stay in place when the file names none.
-  `kill -HUP` rereads that file in the running WM: the binding table, the float
+  number, and the compiled bindings stay in place when the file names none. A
+  `bind` line the binding table refuses instead is reported with its line and
+  which of the two causes it was, a chord the file binds twice or a table with
+  no slot left, and a file may name more bindings than
+  `src/config/config.wm.def.h` wires and have all of them bound. `kill -HUP`
+  rereads that file in the running WM: the binding table, the float
   rules and the tag names come from the edit, the keys are grabbed again, and
   every client keeps its tags, focus and geometry. A file with a line the parser
   rejects changes nothing and prints one error naming that line.
