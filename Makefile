@@ -9,7 +9,7 @@ DEBUG ?= 0
 CC = gcc
 
 # Required pkg-config packages
-PKGLIST = xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms
+PKGLIST = xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-keysyms
 
 PKG_CFLAGS := $(shell pkg-config --cflags $(PKGLIST))
 PKG_LDFLAGS := $(shell pkg-config --libs $(PKGLIST))

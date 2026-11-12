@@ -39,7 +39,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR" || exit 1
 
 CC="${CC:-cc}"
-PKGLIST=(xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-xinput xcb-keysyms)
+PKGLIST=(xcb xcb-util xcb-randr xcb-errors xcb-ewmh xcb-keysyms)
 
 if ! command -v "$CC" >/dev/null 2>&1; then
   echo "check-compiler-refusals: $CC is not on PATH" >&2
