@@ -42,6 +42,7 @@ static bool monitor_manager_pass_begin(void);
 static void monitor_manager_pass_abort(void);
 static void monitor_manager_pass_poll(void* userdata);
 static void monitor_manager_apply_crtc_geometry(xcb_randr_crtc_t crtc, int16_t x, int16_t y, uint16_t width, uint16_t height);
+static void monitor_manager_request_tile(Monitor* m);
 
 /* Internal helper functions */
 static void                monitor_manager_discover_outputs_blocking(void);
@@ -97,6 +98,41 @@ monitor_manager_get_component(void)
 }
 
 /*
+ * Register the notify handler for the event number this connection delivers
+ * RandR events at.
+ *
+ * The response_type of an extension event is relative to the extension, not the
+ * constant XCB names it by: RRNotify arrives at first_event + XCB_RANDR_NOTIFY,
+ * which is 90 on a server whose RandR extension starts at 89, and the subCode
+ * inside the event says which change it is. Registering XCB_RANDR_NOTIFY itself
+ * puts the handler in bucket 1, which no RandR event reaches, so the dispatcher
+ * drops every one of them.
+ */
+static int
+monitor_manager_register_notify_handler(uint8_t first_event)
+{
+  XCBEventType event_type = (XCBEventType) (first_event + XCB_RANDR_NOTIFY);
+
+  if (xcb_handler_register(event_type, &monitor_manager_component, monitor_manager_xcb_handler) != 0)
+    return -1;
+
+  LOG_DEBUG("Monitor manager: RandR notify events arrive as event type %u", event_type);
+  return 0;
+}
+
+#ifdef WM_HUB_TESTING
+/*
+ * Register as init does, for a first_event a test names. A unit test has no X
+ * connection, so it cannot ask the server which number RandR starts at.
+ */
+int
+monitor_manager_register_notify_handler_for_tests(uint8_t first_event)
+{
+  return monitor_manager_register_notify_handler(first_event);
+}
+#endif
+
+/*
  * Initialize the monitor manager.
  * - Registers XCB handler for RANDR events
  *
@@ -116,19 +152,25 @@ monitor_manager_init(void)
     return;
   }
 
-  /* Register XCB handler for RandR notify events.
+  /* Register XCB handler for RandR notify events, under the number this
+   * connection delivers them at. Without a connection nothing asks the server
+   * for an event number and nothing arrives.
    *
-   * RandR events are extension events. The response_type sent by the X
-   * server for RandR events is XCB_RANDR_NOTIFY (value 1).
-   */
-  int result = xcb_handler_register(
-      XCB_RANDR_NOTIFY,
-      &monitor_manager_component,
-      monitor_manager_xcb_handler);
+   * xcb_get_extension_data() waits for its QueryExtension reply when the
+   * extension was not prefetched, and this is where that happens: one round trip
+   * at startup, before the event loop exists. */
+  if (dpy != NULL) {
+    const xcb_query_extension_reply_t* randr = xcb_get_extension_data(dpy, &xcb_randr_id);
 
-  if (result != 0) {
-    LOG_ERROR("Failed to register RandR handler");
-    return;
+    if (randr == NULL || !randr->present) {
+      LOG_ERROR("Monitor manager: the server has no RandR extension, so the "
+                "display is discovered once at startup and never again");
+    } else if (monitor_manager_register_notify_handler(randr->first_event) != 0) {
+      LOG_ERROR("Failed to register RandR handler");
+      return;
+    }
+  } else {
+    LOG_DEBUG("Monitor manager: no X connection, so no RandR event is delivered");
   }
 
   /* Select RandR notify events on the root window so we receive them.
@@ -204,6 +246,47 @@ monitor_manager_executor(struct HubRequest* req)
 }
 
 /*
+ * Ask tiling to lay the monitor out again. Sent as a request: monitor-manager
+ * does not call the tiling component.
+ */
+static void
+monitor_manager_request_tile(Monitor* m)
+{
+  if (m == NULL)
+    return;
+
+  hub_send_request(REQ_MONITOR_TILE, m->target.id);
+}
+
+/*
+ * Apply a CRTC geometry to a monitor, and ask tiling for a new layout: the area
+ * every client on that monitor is given changed with it.
+ *
+ * A CRTC with no mode drives no area, and the 0x0 the server reports there is
+ * not a screen: laying clients out into it would size them to nothing. The next
+ * CRTC change carries the size the output comes back with, so the geometry is
+ * left as it was in the meantime.
+ */
+static void
+monitor_manager_apply_geometry(Monitor* m, int16_t x, int16_t y, uint16_t width, uint16_t height)
+{
+  if (m == NULL)
+    return;
+
+  if (width == 0 || height == 0) {
+    LOG_DEBUG("Monitor manager: output %u drives no area, so its geometry is left as it was",
+              m->output);
+    return;
+  }
+
+  monitor_set_geometry(m, x, y, width, height);
+  LOG_DEBUG("Monitor manager: output %u is now %ux%u+%d+%d",
+            m->output, (unsigned int) width, (unsigned int) height, x, y);
+
+  monitor_manager_request_tile(m);
+}
+
+/*
  * What an output-info reply says about an output.
  *
  * An output that is connected and has a CRTC is a monitor the WM can place
@@ -244,10 +327,7 @@ monitor_manager_apply_crtc_info(xcb_randr_output_t output, const xcb_randr_get_c
   if (m == NULL)
     return;
 
-  monitor_set_geometry(m, reply->x, reply->y, reply->width, reply->height);
-  LOG_DEBUG("Monitor manager: Updated output %u geometry to %ux%u+%d+%d",
-            output, (unsigned int) reply->width, (unsigned int) reply->height,
-            reply->x, reply->y);
+  monitor_manager_apply_geometry(m, reply->x, reply->y, reply->width, reply->height);
 }
 
 /*
@@ -263,9 +343,7 @@ monitor_manager_apply_crtc_geometry(xcb_randr_crtc_t crtc, int16_t x, int16_t y,
     if (m->crtc != crtc)
       continue;
 
-    monitor_set_geometry(m, x, y, width, height);
-    LOG_DEBUG("Monitor manager: CRTC %u is now %ux%u+%d+%d on output %u",
-              crtc, (unsigned int) width, (unsigned int) height, x, y, m->output);
+    monitor_manager_apply_geometry(m, x, y, width, height);
   }
 }
 
