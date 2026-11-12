@@ -836,16 +836,57 @@ test_sm_owned_data_is_freed_on_destroy(void)
   sm_destroy(borrowed);
   assert(g_data_freed == 0);
 
-  /* Replacing owned data with borrowed data drops the destructor. Destroy
-   * must not run it on the borrowed pointer. */
+  /* Replacing owned data with borrowed data runs the destructor the owned data
+   * was installed with, and the borrowed pointer carries none, so destroying
+   * the machine leaves it alone. */
   StateMachine* switched      = make_sm(&owner, t);
   int           owned         = 0;
   int           borrowed_flag = 0;
   sm_set_owned_data(switched, &owned, count_data_free);
   sm_set_data(switched, &borrowed_flag);
+  assert(owned == 1);
+  assert(sm_get_data(switched) == &borrowed_flag);
   sm_destroy(switched);
-  assert(owned == 0);
+  assert(owned == 1);
   assert(borrowed_flag == 0);
+
+  sm_template_destroy(t);
+}
+
+/*
+ * Test: installing data over data the machine already owns frees the old one.
+ *
+ * A machine holds one datum. Writing the new destructor over the old one
+ * without running it leaked whatever the first call handed over.
+ */
+void
+test_sm_set_owned_data_frees_the_data_it_replaces(void)
+{
+  LOG_CLEAN("== sm_set_owned_data frees the data it replaces");
+  uint32_t     states[] = { S0, S1 };
+  SMTransition trans[]  = {
+    { S0, S1, NULL, NULL, 10 }
+  };
+  SMTemplate*   t     = make_tmpl("owned-replace", states, 2, trans, 1, S0);
+  int           owner = 0;
+  StateMachine* sm    = make_sm(&owner, t);
+
+  int first  = 0;
+  int second = 0;
+  sm_set_owned_data(sm, &first, count_data_free);
+  sm_set_owned_data(sm, &second, count_data_free);
+  assert(first == 1);
+  assert(second == 0);
+  assert(sm_get_data(sm) == &second);
+
+  /* Re-installing the pointer the machine already holds only sets the
+   * destructor, so the data is not freed twice. */
+  sm_set_owned_data(sm, &second, count_data_free);
+  assert(second == 0);
+
+  sm_destroy(sm);
+  assert(first == 1);
+  assert(second == 1);
 
   sm_template_destroy(t);
 }
@@ -858,6 +899,7 @@ main(void)
   test_sm_create_requires_params();
   test_sm_set_emitter();
   test_sm_owned_data_is_freed_on_destroy();
+  test_sm_set_owned_data_frees_the_data_it_replaces();
   test_raw_write();
   test_raw_write_emits_via_hub();
   test_raw_write_with_custom_emitter();

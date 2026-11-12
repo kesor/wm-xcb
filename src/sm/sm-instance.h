@@ -157,9 +157,15 @@ SMTemplate* sm_get_template(StateMachine* sm);
 const char* sm_get_name(StateMachine* sm);
 
 /*
- * Set instance-specific data.
+ * Set instance-specific data that somebody else frees.
  * This is supported public API for setting sm->data. The data stays owned by
  * the caller, which must free it before the machine is destroyed.
+ *
+ * A machine holds one datum: whatever a previous sm_set_data() or
+ * sm_set_owned_data() installed is replaced. When that previous datum was
+ * installed with a destructor, the destructor runs here, before the new data is
+ * stored. Passing the pointer the machine already holds only changes the
+ * destructor, so the data is not freed.
  */
 void sm_set_data(StateMachine* sm, void* data);
 
@@ -170,6 +176,10 @@ void sm_set_data(StateMachine* sm, void* data);
  * registered any more for the data to be freed. Pass NULL to make the machine
  * own the data without a way to free it, or use sm_set_data() for data somebody
  * else frees.
+ *
+ * Replacing data that an earlier call installed with a destructor runs that
+ * destructor first, the same way sm_set_data() does. Passing the pointer the
+ * machine already holds only changes `free_fn`.
  */
 void sm_set_owned_data(StateMachine* sm, void* data, SMDataFree free_fn);
 
