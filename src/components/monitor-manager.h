@@ -2,7 +2,8 @@
  * Monitor Manager Component
  *
  * Handles display detection via RandR.
- * - Registers XCB handler for RANDR_NOTIFY events
+ * - Registers XCB handler for RandR notify events, under the event number the
+ *   connection reports for them
  * - Creates/destroys Monitor targets based on output connect/disconnect
  * - Manages Monitor lifecycle and Hub registration
  * - Performs initial RandR output discovery on startup
@@ -18,7 +19,7 @@
  * Monitor Manager Component
  *
  * Handles display detection via RandR.
- * Listens to XCB_RANDR_NOTIFY events and manages Monitor targets.
+ * Listens to RandR notify events and manages Monitor targets.
  */
 #define MONITOR_MANAGER_COMPONENT_NAME "monitor-manager"
 
@@ -68,6 +69,12 @@ HubComponent* monitor_manager_get_component(void);
  * branch it actually entered instead of letting it read a fallback as coverage.
  */
 bool monitor_manager_pass_running_for_tests(void);
+
+/*
+ * Register the notify handler for a first_event a test names, as init does with
+ * the number the connection reports. Returns 0 when the registry accepted it.
+ */
+int monitor_manager_register_notify_handler_for_tests(uint8_t first_event);
 #endif
 
 #endif /* _MONITOR_MANAGER_H_ */
