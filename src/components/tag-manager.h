@@ -11,11 +11,11 @@
  *
  * Keybindings that trigger these requests:
  * - Mod+1-9: REQ_TAG_VIEW (show specific tag)
- * - Mod+Shift+1-9: REQ_TAG_CLIENT_TOGGLE (move client to tag)
+ * - Mod+Shift+Mod5+1-9: REQ_TAG_CLIENT_MOVE (move client to tag)
  *
  * Acceptance criteria:
  * - [x] Mod+1-9 shows specific tag
- * - [x] Mod+Shift+1-9 moves client to tag
+ * - [x] Mod+Shift+Mod5+1-9 moves client to tag
  * - [x] Clients on hidden tags are not visible
  * - [x] Event is emitted on tag change
  *
@@ -47,9 +47,9 @@ typedef struct SMTemplate   SMTemplate;
  * Tag Manager request types
  */
 enum TagManagerRequestType {
-  REQ_TAG_VIEW          = 7, /* View specific tag (1-9) */
-  REQ_TAG_TOGGLE        = 8, /* Toggle tag visibility */
-  REQ_TAG_CLIENT_TOGGLE = 9, /* Move current client to/from tag */
+  REQ_TAG_VIEW        = 7, /* View specific tag (1-9) */
+  REQ_TAG_TOGGLE      = 8, /* Toggle tag visibility */
+  REQ_TAG_CLIENT_MOVE = 9, /* Move the focused client to one tag (1-9) */
 };
 
 /*
@@ -135,7 +135,7 @@ void tag_manager_update_visibility(Monitor* m);
  */
 void tag_manager_handle_view_request(RequestType type, TargetID target, void* data);
 void tag_manager_handle_toggle_request(RequestType type, TargetID target, void* data);
-void tag_manager_handle_client_tag_toggle(RequestType type, TargetID target, void* data);
+void tag_manager_handle_client_move(RequestType type, TargetID target, void* data);
 
 /*
  * Tag Manager listener callback

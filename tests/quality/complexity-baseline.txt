@@ -14,7 +14,6 @@ src/components/focus.c focus_on_enter_notify 21
 src/components/focus.c focus_set_state 14
 src/components/keybinding.c keybinding_numlock_mask 19
 src/components/monitor-manager.c monitor_manager_handle_randr_notify 13
-src/components/tag-manager.c tag_manager_handle_client_tag_toggle 12
 src/components/tag-manager.c tag_manager_update_visibility 12
 src/config/config-file.c config_file_load 12
 src/config/config-file.c parse_chord 17
