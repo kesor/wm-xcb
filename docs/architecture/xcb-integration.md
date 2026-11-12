@@ -188,7 +188,7 @@ void monitor_manager_randr_handler(void* event) {
 | `XCB_UNMAP_NOTIFY` | client-list | Unmanage client, unless the WM asked for the unmap itself |
 | `XCB_CONFIGURE_REQUEST` | floating, tiling | May `hub_send_request()` |
 | `XCB_EXPOSE` | bar | `hub_emit(EVT_BAR_DRAW)` |
-| `XCB_RANDR_NOTIFY` | monitor-manager | Applies the geometry the event carries, then `hub_send_request(REQ_MONITOR_TILE)` |
+| `first_event + XCB_RANDR_NOTIFY` | monitor-manager | A CRTC change applies the geometry the event carries, then `hub_send_request(REQ_MONITOR_TILE)` |
 | `XCB_CLIENT_MESSAGE` | ewmh-desktop | `_NET_CURRENT_DESKTOP` becomes `REQ_TAG_VIEW` |
 
 ## EWMH atoms
