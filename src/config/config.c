@@ -39,6 +39,13 @@
  * `tags` line would name a tag the WM does not have. */
 _Static_assert(CONFIG_FILE_MAX_TAGS == CONFIG_TAG_NUM_TAGS, "tag counts differ");
 
+/* Every bind line the parser keeps has to fit the table it is registered into,
+ * or a file can name a binding that is parsed and then dropped. The parser
+ * bounds its own storage and knows nothing about the binding table, so this is
+ * the only place the two numbers meet. */
+_Static_assert(CONFIG_FILE_MAX_BINDS <= KEYBINDING_MAX_BINDINGS,
+               "the parser accepts more bind lines than the binding table holds");
+
 static ConfigFile* runtime_config = NULL;
 static char        runtime_path[PATH_MAX];
 
@@ -211,7 +218,7 @@ config_reload(void)
   config_release_file();
   runtime_config = fresh;
   config_apply_runtime();
-  config_init();
+  uint32_t wired = config_init();
 
   /* The subscribers take the new chords and the new tag names before the line
    * that says the reload applied, so a user who acts on that line does not
@@ -222,7 +229,7 @@ config_reload(void)
     LOG_INFO("config %s: no readable file; the compiled configuration applies", runtime_path);
   } else {
     LOG_INFO("config %s: reloaded %u binding(s), %u float rule(s)%s",
-             runtime_path, fresh->bind_count, fresh->float_rule_count,
+             runtime_path, wired, fresh->float_rule_count,
              fresh->tags_set ? ", tag names" : "");
   }
 
@@ -279,17 +286,23 @@ binding_keycode(xcb_key_symbols_t* symbols, const ConfigBind* bind)
  * compiled bindings in place, so adding one float rule does not take every key
  * away; the same happens when none of the file's bindings can be used, so a
  * file full of typos cannot leave the WM without keys.
+ *
+ * The table says why it refused a line and this says where the line is: the two
+ * causes need different fixes, and a user reading a page of startup output
+ * cannot tell them apart from one sentence.
+ *
+ * Returns how many of the file's lines reached the table.
  */
-static void
+static uint32_t
 config_wire_file_bindings(void)
 {
   xcb_key_symbols_t* symbols = config_key_symbols();
   uint32_t           bound   = 0;
 
   for (uint32_t i = 0; i < runtime_config->bind_count; i++) {
-    const ConfigBind* bind    = &runtime_config->binds[i];
-    xcb_keycode_t     keycode = binding_keycode(symbols, bind);
-    bool              ok      = false;
+    const ConfigBind*        bind    = &runtime_config->binds[i];
+    xcb_keycode_t            keycode = binding_keycode(symbols, bind);
+    KeybindingRegisterResult result;
 
     if (keycode == XCB_NO_SYMBOL) {
       LOG_ERROR("config %s:%d: this keyboard has no key for '%s'",
@@ -298,16 +311,30 @@ config_wire_file_bindings(void)
     }
 
     if (bind->has_arg)
-      ok = keybinding_binding_register_with_arg(bind->modifiers, keycode, bind->action, bind->arg);
+      result = keybinding_binding_register_with_arg(bind->modifiers, keycode, bind->action, bind->arg);
     else
-      ok = keybinding_binding_register(bind->modifiers, keycode, bind->action);
+      result = keybinding_binding_register(bind->modifiers, keycode, bind->action);
 
-    if (!ok) {
-      LOG_ERROR("config %s:%d: cannot bind '%s' to '%s': the chord is already bound, or the table is full",
-                runtime_path, bind->line, bind->key, bind->action);
-      continue;
+    switch (result) {
+    case KEYBINDING_REGISTERED:
+      bound++;
+      break;
+    case KEYBINDING_ALREADY_BOUND: {
+      const KeyBinding* taken = keybinding_binding_lookup(bind->modifiers, keycode);
+      LOG_ERROR("config %s:%d: cannot bind '%s' to '%s': the chord is already bound to '%s'",
+                runtime_path, bind->line, bind->key, bind->action,
+                taken != NULL && taken->action != NULL ? taken->action : "(none)");
+      break;
     }
-    bound++;
+    case KEYBINDING_TABLE_FULL:
+      LOG_ERROR("config %s:%d: cannot bind '%s' to '%s': the table holds all %d bindings",
+                runtime_path, bind->line, bind->key, bind->action, KEYBINDING_MAX_BINDINGS);
+      break;
+    case KEYBINDING_REFUSED:
+      LOG_ERROR("config %s:%d: cannot bind '%s' to '%s': the binding was refused",
+                runtime_path, bind->line, bind->key, bind->action);
+      break;
+    }
   }
 
   if (bound == 0) {
@@ -315,24 +342,26 @@ config_wire_file_bindings(void)
               runtime_path);
     config_wire_keybindings();
   }
+
+  return bound;
 }
 
 /*
  * Initialize the configuration system.
  * This wires keybindings from the config file, or from config.wm.def.h when the
- * file named none.
+ * file named none, and answers with how many of the file's lines were used.
  */
-void
+uint32_t
 config_init(void)
 {
   LOG_DEBUG("Initializing configuration");
 
   if (runtime_config == NULL || runtime_config->bind_count == 0) {
     config_wire_keybindings();
-    return;
+    return 0;
   }
 
-  config_wire_file_bindings();
+  return config_wire_file_bindings();
 }
 
 /*

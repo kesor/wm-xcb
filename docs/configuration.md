@@ -161,6 +161,9 @@ A reload that applies says what it took, on stdout:
 INFO:  config $HOME/.config/wm/config: reloaded N binding(s), N float rule(s), tag names
 ```
 
+The binding count is what reached the table, not what the file named: a bind line
+the table refused is reported in its own ERROR and is not counted here.
+
 Removing the file and sending SIGHUP brings the compiled configuration back. A
 file that cannot be read is treated the way it is at startup: the WM logs why
 and the compiled configuration applies.
@@ -189,6 +192,25 @@ Two fallbacks keep a mistake from leaving the WM without keys:
   one `float` rule does not unbind every key
 - a file whose bindings all fail (no modifier, unknown key, a key this keyboard
   cannot produce) also leaves the compiled bindings in place, and says so
+
+A `bind` line the parser accepts can still be refused by the binding table it is
+registered into, and that message names the line and which of the two causes it
+was, because they need different edits:
+
+```
+ERROR: config $HOME/.config/wm/config:33: cannot bind 'F5' to 'tag-manager.view': the chord is already bound to 'fullscreen.toggle'
+```
+
+The second cause reads `the table holds all <n> bindings`. It cannot happen to a
+file: the parser keeps no more bind lines than the table holds, so the line past
+the limit is rejected as `more than <n> bindings` with its number, and
+`src/config/config.c` fails the build when the two numbers disagree. The first
+one is a chord the file binds twice; change or remove one of the two lines.
+
+The table is the table, not the compiled set: a file that names a binding the
+compiled bindings do not have, or more of them than `src/config/config.wm.def.h`
+wires, has all of them, and `tests/x/test-58-bind-table-capacity.sh` starts a WM
+on such a file to prove it.
 
 When the file does name bindings, they **replace** the compiled ones rather than
 adding to them. That is what makes a key removable: `MOD+2` does nothing in a
