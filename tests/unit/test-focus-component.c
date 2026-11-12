@@ -807,6 +807,8 @@ test_focus_init_fails_when_template_is_refused(void)
   assert(xcb_handler_count_for_type(XCB_LEAVE_NOTIFY) == 0);
   assert(action_exists("focus.focus-current") == false);
   assert(action_exists("focus.focus-prev") == false);
+  assert(sm_lookup_guard("focus_guard_can_focus") == NULL);
+  assert(sm_lookup_guard("focus_guard_can_unfocus") == NULL);
 
   Client* c = client_create(1200);
   assert_or_abort(c != NULL);
