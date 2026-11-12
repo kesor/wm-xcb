@@ -18,7 +18,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "action-registry.h"
+#include "src/actions/action-registry.h"
 
 /*
  * Initialize the terminal module.

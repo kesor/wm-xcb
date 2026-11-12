@@ -6,7 +6,7 @@
  *
  * Usage:
  *   // In any test file (e.g., test-wm-window-list.c)
- *   #include "test-registry.h"
+ *   #include "tests/unit/test-registry.h"
  *
  *   TEST_GROUP(WindowList, {
  *     test_add_remove();

@@ -23,7 +23,7 @@
 #include "src/components/keybinding.h"
 
 /* Include action registry for ActionInvocation definition */
-#include "action-registry.h"
+#include "src/actions/action-registry.h"
 
 /*
  * Binding lookup result

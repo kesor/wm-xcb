@@ -13,8 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "client-list.h"
 #include "src/actions/action-registry.h"
+#include "src/components/client-list.h"
+#include "src/components/tag-manager.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/sm/sm-instance.h"
@@ -23,7 +24,6 @@
 #include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
-#include "tag-manager.h"
 
 /*
  * Tag Manager SM template name

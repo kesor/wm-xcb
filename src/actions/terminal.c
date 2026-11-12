@@ -27,10 +27,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "action-registry.h"
+#include "src/actions/action-registry.h"
+#include "src/actions/terminal.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb.h"
-#include "terminal.h"
 
 /*
  * Action definition for terminal.spawn

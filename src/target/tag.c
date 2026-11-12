@@ -21,7 +21,7 @@
 #include "src/config/config.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
-#include "tag.h"
+#include "src/target/tag.h"
 
 /*
  * Global tag list

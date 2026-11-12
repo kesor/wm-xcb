@@ -13,8 +13,8 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_ewmh.h>
 
-#include "ewmh-desktop.h"
 #include "src/components/client-list.h"
+#include "src/components/ewmh-desktop.h"
 #include "src/components/tag-manager.h"
 #include "src/config/config.h"
 #include "src/core/wm-hub.h"

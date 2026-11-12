@@ -11,8 +11,8 @@
 #include <stdbool.h>
 
 #include "src/core/wm-xcb.h"
-#include "test-registry.h"
-#include "test-wm.h"
+#include "tests/unit/test-registry.h"
+#include "tests/unit/test-wm.h"
 
 static int calls_self_removing = 0;
 static int calls_other         = 0;

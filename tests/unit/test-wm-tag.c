@@ -9,7 +9,7 @@
  * and tag_list_shutdown() at the end. Other tests create specific tags.
  */
 
-#include "test-registry.h" /* Must be first - defines TEST_GROUP macro */
+#include "tests/unit/test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -19,8 +19,8 @@
 #include "src/core/wm-hub.h"
 #include "src/target/monitor.h"
 #include "src/target/tag.h"
-#include "test-wm-tag.h"
-#include "test-wm.h"
+#include "tests/unit/test-wm-tag.h"
+#include "tests/unit/test-wm.h"
 
 /*
  * Global callback for tag iteration tests

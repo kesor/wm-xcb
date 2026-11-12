@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "connection-sm.h"
+#include "src/components/connection-sm.h"
 #include "src/core/wm-log.h"
 
 /*

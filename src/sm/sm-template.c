@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sm-instance.h"
-#include "sm-template.h"
 #include "src/core/wm-log.h"
+#include "src/sm/sm-instance.h"
+#include "src/sm/sm-template.h"
 
 SMTemplate*
 sm_template_create(

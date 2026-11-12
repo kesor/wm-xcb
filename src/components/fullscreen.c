@@ -17,8 +17,8 @@
 #include <string.h>
 #include <xcb/xcbext.h>
 
-#include "fullscreen.h"
 #include "src/actions/action-registry.h"
+#include "src/components/fullscreen.h"
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb-ewmh.h"

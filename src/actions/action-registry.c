@@ -4,7 +4,7 @@
  * Implements the action registry for component action exposure.
  */
 
-#include "action-registry.h"
+#include "src/actions/action-registry.h"
 
 #include <stdint.h>
 #include <stdlib.h>
