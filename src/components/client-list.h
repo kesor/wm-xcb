@@ -13,8 +13,8 @@
  *   property change), and map the window when its tags are on the current view;
  *   a client whose tags are not on the view stays managed and unmapped until a
  *   tag it is on is shown. The window's WM_CLASS and WM_NAME decide where it is
- *   placed, and they are read from the server, so the client is managed first
- *   and the map and the placement follow the reply
+ *   placed, and they are read from the server, so the client is marked managed
+ *   first and the map, EVT_CLIENT_MANAGED and the placement follow the reply
  * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
  *   itself to hide the client of a tag that is no longer shown
  * - XCB_PROPERTY_NOTIFY - re-read a managed client's WM_NORMAL_HINTS when the
@@ -23,9 +23,11 @@
  * Events Emitted:
  * - EVT_CLIENT_CREATED - emitted after client creation
  * - EVT_CLIENT_DESTROYED - emitted after client destruction
- * - EVT_CLIENT_MANAGED - emitted when the client becomes managed. The window
- *   may still be unmapped: a client whose tags are not on the view is managed
- *   without a map, and this event still fires
+ * - EVT_CLIENT_MANAGED - emitted once the rules have been matched and the
+ *   window has been mapped when its tags are on the view. A client whose tags
+ *   are not on the view stays unmapped and the event still fires. The event
+ *   waits for the identity reply with the map, so focus (which refuses an
+ *   unmapped client) runs against a window that is on screen
  * - EVT_CLIENT_UNMANAGED - emitted when client is unmanaged
  *
  * Requests Sent:

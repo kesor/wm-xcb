@@ -10,6 +10,7 @@
 #include "src/actions/action-registry.h"
 #include "src/components/client-list.h"
 #include "src/components/floating.h"
+#include "src/components/focus.h"
 #include "src/components/tiling.h"
 #include "src/core/wm-hub.h"
 #include "src/sm/sm-registry.h"
@@ -1158,6 +1159,55 @@ test_map_request_tiles_a_client_no_rule_names(void)
   hub_shutdown();
 }
 
+/*
+ * A managed window receives input focus from the manage path.
+ *
+ * focus_on_client_managed() runs on EVT_CLIENT_MANAGED and refuses a client
+ * that is not mapped. Emitting that event before the map left every new window
+ * unfocused unless an EnterNotify happened to follow. The unit suite has no X
+ * connection, so the map is the client_set_mapped() side of show_if_on_screen;
+ * the event has to follow it the same way it does with a server.
+ */
+void
+test_map_request_focuses_the_managed_client(void)
+{
+  LOG_CLEAN("== Testing manage path focuses the window it mapped");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_component_init();
+  focus_component_init();
+
+  Monitor* m = monitor_create(92);
+  assert_or_abort(m != NULL);
+  monitor_set_geometry(m, 0, 0, 800, 600);
+
+  xcb_map_request_event_t map_event = {
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 1,
+    .parent        = 100,
+    .window        = 700,
+  };
+  xcb_handler_dispatch(&map_event);
+
+  Client* c = client_get_by_window(700);
+  assert_or_abort(c != NULL);
+  assert(client_is_managed(c) == true);
+  assert(client_is_mapped(c) == true);
+  assert(focus_is_focused(c) == true);
+
+  focus_component_shutdown();
+  client_list_component_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(ClientListComponent, {
   test_client_list_component_init();
   test_client_list_component_shutdown();
@@ -1172,6 +1222,7 @@ TEST_GROUP(ClientListComponent, {
   test_map_request_maps_only_a_client_on_screen();
   test_map_request_floats_a_client_a_rule_names();
   test_map_request_tiles_a_client_no_rule_names();
+  test_map_request_focuses_the_managed_client();
   test_unmap_notify_unmanages_client();
   test_unmap_notify_of_a_wm_unmap_keeps_the_client();
   test_unmap_notify_of_a_hide_after_a_show_keeps_the_client();
