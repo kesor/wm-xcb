@@ -891,6 +891,33 @@ test_sm_set_owned_data_frees_the_data_it_replaces(void)
   sm_template_destroy(t);
 }
 
+void
+test_registry_keeps_guards_and_actions_apart(void)
+{
+  LOG_CLEAN("== registry keeps guards and actions apart");
+  sm_registry_init();
+
+  /* One name in both registries: an entry read through the wrong field of the
+   * union would hand back the other function, and a caller calls what it got
+   * without looking. */
+  sm_register_guard("same_name", guard_allow);
+  sm_register_action("same_name", action_fail);
+
+  assert(sm_lookup_guard("same_name") == guard_allow);
+  assert(sm_lookup_action("same_name") == action_fail);
+  assert(sm_lookup_guard("missing") == NULL);
+  assert(sm_lookup_action("missing") == NULL);
+
+  sm_register_guard("no_function", NULL);
+  assert(sm_lookup_guard("no_function") == NULL);
+
+  sm_unregister_guard("same_name");
+  assert(sm_lookup_guard("same_name") == NULL);
+  assert(sm_lookup_action("same_name") == action_fail);
+
+  sm_registry_shutdown();
+}
+
 int
 main(void)
 {
@@ -913,6 +940,7 @@ main(void)
   test_hooks_all_phases();
   test_hooks_userdata();
   test_hooks_removal();
+  test_registry_keeps_guards_and_actions_apart();
 
   LOG_CLEAN("All SM tests passed!");
   return 0;
