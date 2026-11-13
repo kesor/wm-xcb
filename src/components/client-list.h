@@ -12,7 +12,9 @@
  *   mask the focus and fullscreen components read (pointer enter/leave and
  *   property change), and map the window when its tags are on the current view;
  *   a client whose tags are not on the view stays managed and unmapped until a
- *   tag it is on is shown
+ *   tag it is on is shown. The window's WM_CLASS and WM_NAME decide where it is
+ *   placed, and they are read from the server, so the placement waits for the
+ *   reply while the client is managed and mapped
  * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
  *   itself to hide the client of a tag that is no longer shown
  * - XCB_PROPERTY_NOTIFY - re-read a managed client's WM_NORMAL_HINTS when the
@@ -34,6 +36,8 @@
  *   so the monitor's remaining windows are rearranged; and again when a
  *   client's size hints arrive after the first layout, or change while it is
  *   managed
+ * - REQ_CLIENT_FLOAT - when a float rule names the window a map made managed,
+ *   so it starts out of the layout at the rectangle it asked for
  * *
  * Acceptance Criteria:
  * [x] New window appears -> Client created -> added to list
@@ -182,16 +186,17 @@ uint32_t client_list_managed_count(void);
 bool client_list_is_managed(xcb_window_t window);
 
 /*
- * Take the size hints replies that have arrived and re-tile the monitors whose
- * clients they change.
+ * Take the property replies that have arrived for managed clients and act on
+ * them: a changed size hint re-tiles the monitor, and the WM_CLASS and WM_NAME
+ * of a window that just became managed decide where it is placed.
  *
  * A property reply is not an event, so nothing dispatches it: the event loop
  * calls this once per iteration, after it has drained the events. A client is
- * laid out before its hints are known, and this is what corrects that layout -
- * both the first read after a map and a re-read after the client changed the
+ * reachable before its properties are known, and this is what corrects that -
+ * the first read after a map, and a re-read after the client changed the
  * property while it was running.
  */
-void client_list_poll_size_hints(void);
+void client_list_poll_properties(void);
 
 /*
  * The event mask a managed client window selects: the pointer crossings the

@@ -116,6 +116,7 @@ typedef struct Client {
   xcb_window_t window;
   char*        title;
   char*        class_name;
+  char*        instance_name;
 
   /* Geometry */
   int16_t  x;
@@ -130,6 +131,15 @@ typedef struct Client {
   ClientSizeHints           size_hints;
   bool                      size_hints_pending;
   xcb_get_property_cookie_t size_hints_cookie;
+
+  /* WM_CLASS and WM_NAME decide which window rules match, and both arrive
+   * from the server, so a managed client is reachable for a loop iteration
+   * with no class, instance or title. The flags say which reads are still in
+   * flight. */
+  bool                      class_pending;
+  bool                      title_pending;
+  xcb_get_property_cookie_t class_cookie;
+  xcb_get_property_cookie_t title_cookie;
 
   /* Monitor association */
   Monitor* monitor;
@@ -341,6 +351,15 @@ void client_set_title(Client* c, char* title);
 void client_set_class(Client* c, char* class_name);
 
 /*
+ * Instance name
+ *
+ * The first of the two strings in WM_CLASS, which is what a `float
+ * instance=` rule matches. Ownership of `instance_name` is transferred to the
+ * client.
+ */
+void client_set_instance(Client* c, char* instance_name);
+
+/*
  * Geometry
  */
 void client_set_geometry(Client* c, int16_t x, int16_t y, uint16_t width, uint16_t height);
@@ -377,6 +396,63 @@ bool client_poll_size_hints(Client* c);
  * reply that changes nothing from one that invalidates the client's geometry.
  */
 bool client_size_hints_equal(const ClientSizeHints* a, const ClientSizeHints* b);
+
+/*
+ * Window identity
+ */
+
+/*
+ * Ask the X server for the window's WM_CLASS and WM_NAME.
+ *
+ * Returns true when at least one reply is still on its way, so a caller that
+ * has to decide something from the client's class or title knows the answer is
+ * not there yet. The replies are read by client_poll_identity(), so this never
+ * waits: a handler may call it.
+ *
+ * Returns false when there is nothing to wait for: no X connection (unit
+ * tests) or a client whose reads were already taken.
+ */
+bool client_request_identity(Client* c);
+
+/*
+ * Take the WM_CLASS and WM_NAME replies for a client once both have arrived.
+ *
+ * Returns true exactly once per client_request_identity(): on the iteration the
+ * last of the two replies was consumed. The client's class, instance and title
+ * are then what the window said, and a rule can be matched against them.
+ * Returns false while a reply is still missing, and for a client that asked for
+ * nothing.
+ */
+bool client_poll_identity(Client* c);
+
+/*
+ * Whether a read above is still on its way, so the client's class, instance and
+ * title are not the window's own yet.
+ */
+bool client_identity_pending(const Client* c);
+
+/*
+ * Parse the value of a WM_CLASS property: the window's instance name followed
+ * by its class, each NUL-terminated, in one 8-bit property.
+ *
+ * Returns malloc'd copies in `instance_out` and `class_out`. Either one is NULL
+ * when the property held fewer names than that, or ended without a terminator
+ * after the one before it. Returns false only when there is no instance name at
+ * all - an empty property or one with no terminator - in which case nothing is
+ * allocated.
+ */
+#ifdef WM_HUB_TESTING
+/*
+ * Apply a WM_CLASS or WM_NAME reply to a client without an X connection. The
+ * unit suite has no server to answer the reads; the reply's meaning for the
+ * client's names and title is the part worth checking.
+ */
+void client_identity_reply_apply_for_tests(
+    Client* c, bool is_class, xcb_get_property_reply_t* reply);
+#endif
+
+bool client_class_names_from_property(
+    const char* value, uint32_t length, char** instance_out, char** class_out);
 
 /*
  * Whether `atom` is WM_NORMAL_HINTS, the property a client writes its size

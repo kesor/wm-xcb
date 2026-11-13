@@ -112,11 +112,15 @@ Short version:
   layout and removes the atom; `MOD+Shift+space` takes the focused client out
   of the layout, so the clients left in it get the area it gave up, and the
   same key gives it a tiled slot again; while it floats it keeps its size
-  through the tag switches made in between; honouring a client's minimum size from
-  `WM_NORMAL_HINTS` at the ICCCM's fixed offsets, and reading it again when a
-  managed client rewrites the property or removes it, so a window that changes
-  its minimum or maximum while running is laid out with the new constraints
-  instead of the ones it was managed with; and tracking
+  through the tag switches made in between, and a window a `float` rule names
+  opens there instead of in a tiled slot: the rule is matched against the
+  window's `WM_CLASS` and `WM_NAME`, which the WM reads from the server when it
+  manages the window, so the placement waits for the answer rather than taking
+  a slot the window then has to be taken back out of; honouring a client's
+  minimum size from `WM_NORMAL_HINTS` at the ICCCM's fixed offsets, and reading
+  it again when a managed client rewrites the property or removes it, so a
+  window that changes its minimum or maximum while running is laid out with the
+  new constraints instead of the ones it was managed with; and tracking
   which client the pointer is over: a managed window selects pointer enter,
   leave and property change, so the focus component raw-writes `FocusSM` from
   the crossings and the fullscreen component syncs a client's `_NET_WM_STATE`,

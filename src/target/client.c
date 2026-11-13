@@ -51,17 +51,18 @@ static xcb_atom_t wm_normal_hints_atom = XCB_ATOM_NONE;
 static void
 client_properties_init(Client* c)
 {
-  c->title        = NULL;
-  c->class_name   = NULL;
-  c->x            = 0;
-  c->y            = 0;
-  c->width        = 0;
-  c->height       = 0;
-  c->border_width = 0;
-  c->tags         = 0;
-  c->monitor      = NULL;
-  c->focusable    = true;
-  c->stack_mode   = XCB_STACK_MODE_ABOVE;
+  c->title         = NULL;
+  c->class_name    = NULL;
+  c->instance_name = NULL;
+  c->x             = 0;
+  c->y             = 0;
+  c->width         = 0;
+  c->height        = 0;
+  c->border_width  = 0;
+  c->tags          = 0;
+  c->monitor       = NULL;
+  c->focusable     = true;
+  c->stack_mode    = XCB_STACK_MODE_ABOVE;
 
   c->tracked->managed = false;
   c->tracked->urgent  = false;
@@ -73,6 +74,11 @@ client_properties_init(Client* c)
    * unconstrained, not zero-sized. */
   memset(&c->size_hints, 0, sizeof(c->size_hints));
   c->size_hints_pending = false;
+
+  /* Nothing read yet: the class, instance and title stay empty until the
+   * window's WM_CLASS and WM_NAME arrive. */
+  c->class_pending = false;
+  c->title_pending = false;
 
   /* Initialize SM storage */
   c->sms.machines = NULL;
@@ -388,6 +394,23 @@ client_discard_size_hints(Client* c)
   c->size_hints_pending = false;
 }
 
+/*
+ * Drop the WM_CLASS and WM_NAME reads whose replies nobody will consume, for
+ * the same reason as the hints above.
+ */
+static void
+client_discard_identity(Client* c)
+{
+  if (dpy != NULL) {
+    if (c->class_pending)
+      xcb_discard_reply(dpy, c->class_cookie.sequence);
+    if (c->title_pending)
+      xcb_discard_reply(dpy, c->title_cookie.sequence);
+  }
+  c->class_pending = false;
+  c->title_pending = false;
+}
+
 void
 client_destroy(Client* c)
 {
@@ -427,10 +450,15 @@ client_destroy(Client* c)
     free(c->class_name);
     c->class_name = NULL;
   }
+  if (c->instance_name != NULL) {
+    free(c->instance_name);
+    c->instance_name = NULL;
+  }
 
   /* A DestroyNotify can arrive in the same batch as the MapRequest that asked
    * for the hints, so the reply may still be on its way. */
   client_discard_size_hints(c);
+  client_discard_identity(c);
 
   free(c->tracked);
   c->tracked = NULL;
@@ -647,6 +675,20 @@ client_set_class(Client* c, char* class_name)
 }
 
 /*
+ * Set client instance name.
+ * Ownership of `instance_name` is transferred to the client.
+ */
+void
+client_set_instance(Client* c, char* instance_name)
+{
+  if (c == NULL)
+    return;
+  if (c->instance_name != NULL)
+    free(c->instance_name);
+  c->instance_name = instance_name;
+}
+
+/*
  * Set client geometry.
  */
 void
@@ -824,6 +866,226 @@ client_poll_size_hints(Client* c)
   bool changed = !client_size_hints_equal(&c->size_hints, &parsed);
   client_set_size_hints(c, &parsed);
   return changed;
+}
+
+/*
+ * The whole property, not a slice of it: the reply carries as much as the
+ * server will send, so a WM_CLASS or a title is not cut short by a number this
+ * file picked.
+ */
+#define CLIENT_IDENTITY_PROPERTY_LENGTH 0x1FFFFFU
+
+bool
+client_request_identity(Client* c)
+{
+  if (c == NULL || dpy == NULL)
+    return false;
+
+  /* Unchecked for the same reason as the hints: an error belongs to the
+   * caller that reads it, not to the event loop. The type is not fixed here,
+   * because a title is STRING in old clients and COMPOUND_TEXT in others, and
+   * the format of the reply is what says whether it is bytes at all. */
+  c->class_cookie = xcb_get_property_unchecked(
+      dpy, 0, c->window, XCB_ATOM_WM_CLASS, XCB_GET_PROPERTY_TYPE_ANY, 0,
+      CLIENT_IDENTITY_PROPERTY_LENGTH);
+  c->title_cookie = xcb_get_property_unchecked(
+      dpy, 0, c->window, XCB_ATOM_WM_NAME, XCB_GET_PROPERTY_TYPE_ANY, 0,
+      CLIENT_IDENTITY_PROPERTY_LENGTH);
+
+  c->class_pending = true;
+  c->title_pending = true;
+  return true;
+}
+
+/*
+ * The reply to one property read, if it has arrived. Answers true once it was
+ * consumed, with `reply` NULL when the read itself failed; the caller frees
+ * whatever comes back.
+ */
+static bool
+client_poll_property(xcb_get_property_cookie_t cookie, xcb_get_property_reply_t** reply)
+{
+  *reply = NULL;
+
+  void*                raw_reply = NULL;
+  xcb_generic_error_t* error     = NULL;
+
+  /* Not the reply-forcing call: this one reports "not yet" instead of waiting,
+   * so the event loop stays free. */
+  if (!xcb_poll_for_reply(dpy, cookie.sequence, &raw_reply, &error))
+    return false;
+
+  /* An error names no value: the client keeps the name it has. */
+  free(error);
+  *reply = (xcb_get_property_reply_t*) raw_reply;
+  return true;
+}
+
+/*
+ * A reply's 8-bit value as a NUL-terminated copy, or NULL when the reply names
+ * no value or is not bytes at all. `length` is the number of bytes copied,
+ * which is what a property with more than one string in it needs.
+ */
+static char*
+client_property_value_copy(xcb_get_property_reply_t* reply, uint32_t* length)
+{
+  *length = 0;
+
+  if (reply == NULL || reply->format != 8)
+    return NULL;
+
+  int bytes = xcb_get_property_value_length(reply);
+  if (bytes <= 0)
+    return NULL;
+
+  char* copy = malloc((size_t) bytes + 1);
+  if (copy == NULL)
+    return NULL;
+
+  memcpy(copy, xcb_get_property_value(reply), (size_t) bytes);
+  copy[bytes] = '\0';
+  *length     = (uint32_t) bytes;
+  return copy;
+}
+
+/*
+ * Give the client the two names a WM_CLASS reply carries. A property that is
+ * not a WM_CLASS leaves it with none, rather than the one an earlier window of
+ * this id left behind.
+ */
+static void
+client_apply_class_reply(Client* c, xcb_get_property_reply_t* reply)
+{
+  uint32_t length = 0;
+  char*    value  = client_property_value_copy(reply, &length);
+
+  char* instance = NULL;
+  char* klass    = NULL;
+
+  if (client_class_names_from_property(value, length, &instance, &klass)) {
+    client_set_instance(c, instance);
+    client_set_class(c, klass);
+  } else {
+    client_set_instance(c, NULL);
+    client_set_class(c, NULL);
+  }
+
+  free(value);
+}
+
+/*
+ * Give the client the title a WM_NAME reply carries. The copy is what the
+ * client takes ownership of, so a reply that named nothing leaves the title
+ * empty.
+ */
+static void
+client_apply_title_reply(Client* c, xcb_get_property_reply_t* reply)
+{
+  uint32_t length = 0;
+
+  client_set_title(c, client_property_value_copy(reply, &length));
+}
+
+bool
+client_poll_identity(Client* c)
+{
+  if (c == NULL || (!c->class_pending && !c->title_pending))
+    return false;
+
+  if (dpy == NULL) {
+    c->class_pending = false;
+    c->title_pending = false;
+    return false;
+  }
+
+  if (c->class_pending) {
+    xcb_get_property_reply_t* reply = NULL;
+
+    if (client_poll_property(c->class_cookie, &reply)) {
+      client_apply_class_reply(c, reply);
+      free(reply);
+      c->class_pending = false;
+    }
+  }
+
+  if (c->title_pending) {
+    xcb_get_property_reply_t* reply = NULL;
+
+    if (client_poll_property(c->title_cookie, &reply)) {
+      client_apply_title_reply(c, reply);
+      free(reply);
+      c->title_pending = false;
+    }
+  }
+
+  return !c->class_pending && !c->title_pending;
+}
+
+#ifdef WM_HUB_TESTING
+/*
+ * Apply a WM_CLASS or WM_NAME reply without an X connection: the unit suite has
+ * no server to answer the reads, and what a property means for the client's
+ * names and title is the decision in there.
+ */
+void
+client_identity_reply_apply_for_tests(Client* c, bool is_class, xcb_get_property_reply_t* reply)
+{
+  if (c == NULL)
+    return;
+
+  if (is_class)
+    client_apply_class_reply(c, reply);
+  else
+    client_apply_title_reply(c, reply);
+}
+#endif
+
+bool
+client_identity_pending(const Client* c)
+{
+  return c != NULL && (c->class_pending || c->title_pending);
+}
+
+bool
+client_class_names_from_property(
+    const char* value, uint32_t length, char** instance_out, char** class_out)
+{
+  if (instance_out == NULL || class_out == NULL)
+    return false;
+
+  *instance_out = NULL;
+  *class_out    = NULL;
+
+  if (value == NULL || length == 0)
+    return false;
+
+  const char* end      = value + length;
+  const char* instance = memchr(value, '\0', length);
+  if (instance == NULL)
+    return false;
+
+  char* copy = strndup(value, (size_t) (instance - value));
+  if (copy == NULL)
+    return false;
+
+  *instance_out = copy;
+
+  /* The class is the second of the two names. A property that stops after the
+   * first one is a window with no class, not a malformed property. */
+  const char* after     = instance + 1;
+  const char* class_end = after < end ? memchr(after, '\0', (size_t) (end - after)) : NULL;
+
+  if (class_end != NULL) {
+    char* klass = strndup(after, (size_t) (class_end - after));
+    if (klass == NULL) {
+      free(*instance_out);
+      *instance_out = NULL;
+      return false;
+    }
+    *class_out = klass;
+  }
+
+  return true;
 }
 
 /* One dimension against the client's hints. */

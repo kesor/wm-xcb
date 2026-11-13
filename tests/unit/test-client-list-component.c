@@ -5,9 +5,14 @@
  * for client lifecycle management.
  */
 
+#include <string.h>
+
+#include "src/actions/action-registry.h"
 #include "src/components/client-list.h"
+#include "src/components/floating.h"
 #include "src/components/tiling.h"
 #include "src/core/wm-hub.h"
+#include "src/sm/sm-registry.h"
 #include "src/target/monitor.h"
 #include "src/xcb/xcb-handler.h"
 #include "tests/unit/test-registry.h"
@@ -1004,6 +1009,155 @@ test_map_request_maps_only_a_client_on_screen(void)
   hub_shutdown();
 }
 
+/*
+ * A window the float rules name starts out of the layout.
+ *
+ * The rules match the client's WM_CLASS, which the WM reads from the server, so
+ * the manage path asks for it and places the window only after the answer. The
+ * client keeps the rectangle it asked for: a window placed by the layout first
+ * would keep the tiled slot it was given instead, and the rule would take it
+ * back out of the layout with that geometry saved.
+ *
+ * The unit suite has no X connection, so the read is a no-op and the class the
+ * test set is the one the rule sees - which is the state the manage path is in
+ * once the reply has arrived.
+ */
+void
+test_map_request_floats_a_client_a_rule_names(void)
+{
+  LOG_CLEAN("== Testing a float rule decides the placement at manage");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_component_init();
+  floating_component_init();
+
+  Monitor* m = monitor_create(90);
+  assert_or_abort(m != NULL);
+  monitor_set_geometry(m, 0, 0, 800, 600);
+
+  xcb_create_notify_event_t create_event = {
+    .response_type = 16, /* XCB_CREATE_NOTIFY */
+    .window        = 500,
+    .x             = 0,
+    .y             = 0,
+    .width         = 400,
+    .height        = 300,
+  };
+  xcb_handler_dispatch(&create_event);
+
+  Client* c = client_get_by_window(500);
+  assert_or_abort(c != NULL);
+  /* "steam" is one of the compiled rules, which are the ones in force with no
+   * config file. */
+  client_set_class(c, strdup("steam"));
+  assert(c->class_name != NULL);
+
+  xcb_map_request_event_t map_event = {
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 2,
+    .parent        = 100,
+    .window        = 500,
+  };
+  xcb_handler_dispatch(&map_event);
+
+  assert(client_is_managed(c) == true);
+  assert(floating_is_floating(c) == true);
+
+  /* No layout has resized the window: it still covers what it asked for. */
+  assert(c->width == 400);
+  assert(c->height == 300);
+
+  client_list_component_shutdown();
+  floating_component_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * Counts the tile requests the manage path sends for a window no rule names,
+ * and the target each one was sent for.
+ */
+static TargetID tile_stub_target   = TARGET_ID_NONE;
+static int      tile_stub_requests = 0;
+
+static void
+tile_stub_executor(struct HubRequest* req)
+{
+  tile_stub_target = req->target;
+  tile_stub_requests++;
+}
+
+static HubComponent tile_stub = {
+  .name     = "tile-stub",
+  .requests = (RequestType[]) { REQ_MONITOR_TILE, 0 },
+  .executor = tile_stub_executor,
+};
+
+/*
+ * A window the rules do not name takes the tiled slot the manage path has
+ * always given it, so the monitor is asked for a layout.
+ */
+void
+test_map_request_tiles_a_client_no_rule_names(void)
+{
+  LOG_CLEAN("== Testing a window no float rule names is tiled");
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  action_registry_init();
+  monitor_list_init();
+  client_list_component_init();
+  floating_component_init();
+  assert(hub_register_component(&tile_stub) == 0);
+
+  Monitor* m = monitor_create(91);
+  assert_or_abort(m != NULL);
+  monitor_set_geometry(m, 0, 0, 800, 600);
+
+  xcb_create_notify_event_t create_event = {
+    .response_type = 16, /* XCB_CREATE_NOTIFY */
+    .window        = 600,
+  };
+  xcb_handler_dispatch(&create_event);
+
+  Client* c = client_get_by_window(600);
+  assert_or_abort(c != NULL);
+  client_set_class(c, strdup("no-rule-names-this"));
+
+  tile_stub_requests = 0;
+  tile_stub_target   = TARGET_ID_NONE;
+
+  xcb_map_request_event_t map_event = {
+    .response_type = 20, /* XCB_MAP_REQUEST */
+    .sequence      = 2,
+    .parent        = 100,
+    .window        = 600,
+  };
+  xcb_handler_dispatch(&map_event);
+
+  assert(client_is_managed(c) == true);
+  assert(floating_is_floating(c) == false);
+  assert(tile_stub_requests == 1);
+  assert(tile_stub_target == m->target.id);
+
+  hub_unregister_component(tile_stub.name);
+  client_list_component_shutdown();
+  floating_component_shutdown();
+  monitor_list_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(ClientListComponent, {
   test_client_list_component_init();
   test_client_list_component_shutdown();
@@ -1016,6 +1170,8 @@ TEST_GROUP(ClientListComponent, {
   test_map_request_sets_border_width();
   test_map_request_creates_client_if_not_exists();
   test_map_request_maps_only_a_client_on_screen();
+  test_map_request_floats_a_client_a_rule_names();
+  test_map_request_tiles_a_client_no_rule_names();
   test_unmap_notify_unmanages_client();
   test_unmap_notify_of_a_wm_unmap_keeps_the_client();
   test_unmap_notify_of_a_hide_after_a_show_keeps_the_client();

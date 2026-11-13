@@ -89,4 +89,14 @@ void config_shutdown(void);
  */
 const char* config_get_tag_name(int index);
 
+/*
+ * Whether a window matches a float rule, so it starts out of the layout.
+ *
+ * `class_name` and `instance_name` are the two strings of the window's
+ * WM_CLASS, and `title` is WM_NAME; any of them may be NULL, which is a window
+ * that never set that property. The answer comes from the file's `float`
+ * lines, or from the compiled rules when it named none.
+ */
+bool config_should_float(const char* class_name, const char* instance_name, const char* title);
+
 #endif /* CONFIG_H */
