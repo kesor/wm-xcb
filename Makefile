@@ -195,9 +195,17 @@ $(BUILD_DIR)/test: $(TEST_OBJ) $(filter-out $(MAIN_OBJ),$(OBJ))
 # printed a count from an older tree that looked like a real count. The suite
 # runs the variant's own binary instead, and `make test` is the only way to run
 # it. Removing ./test here covers a `make test` that did not also build wm.
+# A test that waits on a forked child never returns, and without a bound here the
+# only thing that ends it is whatever killed the command that ran `make test`:
+# one hung suite cost a worker two tool timeouts in one turn and its whole
+# deadline in the turn before, and a killed `make` prints nothing at all. The
+# three variants take 0.9s (release), 8.4s (debug) and 8.3s (sanitize), so this
+# is 35x the slowest: a hang ends as `Error 124` with the run's own log above it.
+TEST_TIMEOUT ?= 300
+
 test: $(BUILD_DIR)/test FORCE
 	@rm -f test
-	$(BUILD_DIR)/test
+	timeout $(TEST_TIMEOUT) $(BUILD_DIR)/test
 
 clean:
 	rm -rf build $(NAME) $(NAME).tmp test compile_commands.json compile_flags.txt tools/xclient tools/xcb-ewmh-delay.so

@@ -129,6 +129,12 @@ The commit and push gates run the same suite through `scripts/check-unit.sh`,
 which keeps the log to itself and prints it only when the run fails. Run
 `make test` by hand when you want the log of a passing run.
 
+`TEST_TIMEOUT` bounds the run at 300s (`make test TEST_TIMEOUT=900` widens it).
+A test that waits on a forked child never returns, and a suite killed by whatever
+started it prints nothing; the timeout turns that into `Error 124` with the log
+up to the last assertion. The three variants take 0.9s, 8.4s and 8.3s, so the
+bound is 35x the slowest.
+
 The gate reads `DEBUG` and `SANITIZE` the way `make` does, and the pass line
 names the variant it built. The debug gate runs it as
 `DEBUG=1 scripts/check-unit.sh`, so a failing assertion in the `-pedantic`
