@@ -881,6 +881,10 @@ client_request_identity(Client* c)
   if (c == NULL || dpy == NULL)
     return false;
 
+  /* A window that withdraws and is mapped again before its names arrived would
+   * otherwise leave the earlier reads behind, with replies nobody reads. */
+  client_discard_identity(c);
+
   /* Unchecked for the same reason as the hints: an error belongs to the
    * caller that reads it, not to the event loop. The type is not fixed here,
    * because a title is STRING in old clients and COMPOUND_TEXT in others, and

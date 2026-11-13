@@ -13,8 +13,8 @@
  *   property change), and map the window when its tags are on the current view;
  *   a client whose tags are not on the view stays managed and unmapped until a
  *   tag it is on is shown. The window's WM_CLASS and WM_NAME decide where it is
- *   placed, and they are read from the server, so the placement waits for the
- *   reply while the client is managed and mapped
+ *   placed, and they are read from the server, so the client is managed first
+ *   and the map and the placement follow the reply
  * - XCB_UNMAP_NOTIFY - unmanage Client, unless the WM asked for the unmap
  *   itself to hide the client of a tag that is no longer shown
  * - XCB_PROPERTY_NOTIFY - re-read a managed client's WM_NORMAL_HINTS when the

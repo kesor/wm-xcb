@@ -386,9 +386,31 @@ client_list_belongs_on_screen(Client* c)
 }
 
 /*
+ * Put a window on screen when the tags it belongs to are the ones the view is
+ * on.
+ *
+ * A window whose tags are not on the current view is managed but not mapped,
+ * and the tag manager maps it when a tag it is on is shown. Mapping it here and
+ * letting the next view change hide it puts a window on screen on a tag its own
+ * tags say it is not on, and nothing takes it off screen until someone switches
+ * the view.
+ */
+static void
+client_list_show_if_on_screen(Client* c)
+{
+  if (!client_list_belongs_on_screen(c))
+    return;
+
+  client_show(c->window);
+  client_set_mapped(c, true);
+  LOG_DEBUG("Mapped client %u", c->window);
+}
+
+/*
  * Handle XCB_MAP_REQUEST event.
- * Manages the window (adds it to the client list), and maps it when its tags are
- * on screen.
+ * Manages the window (adds it to the client list), then maps it when its tags
+ * are on screen and places it where the window rules say it belongs. The two
+ * follow the WM_CLASS and WM_NAME reply, which is read in the loop.
  */
 void
 client_list_on_map_request(void* event)
@@ -415,35 +437,23 @@ client_list_on_map_request(void* event)
     client_set_managed(c, true);
     client_list_prepare_client(c);
 
-    /* A window whose tags are not on the current view is managed but not
-     * mapped, and the tag manager maps it when a tag it is on is shown. Mapping
-     * it here and letting the next view change hide it puts a window on screen
-     * on a tag its own tags say it is not on, and nothing takes it off screen
-     * until someone switches the view. */
-    if (client_list_belongs_on_screen(c)) {
-      client_show(c->window);
-      client_set_mapped(c, true);
-      LOG_DEBUG("Mapped client %u", c->window);
-    }
-
-    /* Ask for the size hints before the tile request. The reply is read one
-     * loop iteration later, and the layout it triggers then is the one that
-     * respects what the window asked for. */
+    /* Ask for the properties before the window is mapped or placed. Both
+     * replies are read one loop iteration later: the size hints are what the
+     * layout has to respect, and WM_CLASS with WM_NAME are what the rules
+     * match. A window shown before the answers arrive is drawn at a rectangle
+     * the WM is about to replace, so the map waits with the placement. */
     client_request_size_hints(c);
-
-    /* WM_CLASS and WM_NAME decide which rules match the window, and they come
-     * from the server too. A window placed before the answer arrives would be
-     * given a tiled slot that a rule then has to take it out of, with the
-     * rectangle the layout chose instead of the one the client asked for, so
-     * the first placement waits for the read the manage path started. */
     bool identity_on_its_way = client_request_identity(c);
 
     client_list_emit_event(EVT_CLIENT_MANAGED, c);
 
-    /* The poll places the clients whose identity is still on its way, once
-     * their rules have been applied. */
-    if (!identity_on_its_way)
-      client_list_place_by_rules(c);
+    /* The poll finishes the manage of a client whose identity is still on its
+     * way: it maps and places it once its rules have been applied. */
+    if (identity_on_its_way)
+      return;
+
+    client_list_show_if_on_screen(c);
+    client_list_place_by_rules(c);
   }
 
   LOG_DEBUG("Client managed: window=%u", e->window);
@@ -576,12 +586,14 @@ client_list_poll_properties(void)
      * request that does would leave this loop on a freed client. */
     Client* next = c->next;
 
-    /* The identity read is taken first: it is what decides where the client
-     * goes. A layout run for its size hints before that decision would give
-     * the window a slot a float rule then takes it back out of, with the slot's
-     * rectangle saved as the one to float at. */
-    if (client_poll_identity(c) && client_is_managed(c))
+    /* The identity read is taken first: the manage path held this client's
+     * map and placement for it. A layout run for its size hints before that
+     * decision would give the window a slot a float rule then takes it back out
+     * of, with the slot's rectangle saved as the one to float at. */
+    if (client_poll_identity(c) && client_is_managed(c)) {
+      client_list_show_if_on_screen(c);
       client_list_place_by_rules(c);
+    }
 
     /* A client still waiting for its own names has no placement to correct:
      * the layout that respects these hints is the one the decision above asks
