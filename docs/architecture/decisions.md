@@ -369,12 +369,13 @@ modules read. `docs/configuration.md` is the format.
   sources of truth for one chord, and no way to unbind a key.
 
 **Known limit:** gaps, borders and per-application tag rules are still compiled
-in. A `float` line is parsed and kept, and the manage path does not ask the
-float rules, so it changes nothing the user sees yet. A `tags` line names the
+in. A `tags` line names the
 nine Tag targets the tag-manager component creates at startup, and nothing draws
-a tag name yet. A SIGHUP rereads the file and replaces the bindings, float rules
-and tag names, renaming the tags where they stand, without a restart; a file the
-parser rejects leaves the running configuration in place.
+a tag name yet. A `float` line decides where the next window the WM manages is
+placed: the rule is matched against the WM_CLASS and WM_NAME read from the
+server for that window. A SIGHUP rereads the file and replaces the bindings,
+float rules and tag names, renaming the tags where they stand, without a
+restart; a file the parser rejects leaves the running configuration in place.
 
 ---
 

@@ -159,7 +159,6 @@ const GapConfig*    config_get_gaps(void);
 const BorderConfig* config_get_borders(void);
 uint32_t            config_get_tag_count(void);
 
-bool     config_should_float(const char* class_name, const char* instance_name, const char* title);
 uint32_t config_get_tags(const char* class_name, const char* instance_name, const char* title);
 
 #endif /* _CONFIG_H_ */

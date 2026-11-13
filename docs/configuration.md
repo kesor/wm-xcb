@@ -3,8 +3,9 @@
 *Written 2026-11-03.*
 
 The window manager reads one text file at startup. A `bind` line changes which
-keys are bound, without a rebuild. `float` and `tags` lines are read too; what
-they do not yet change is under each directive below.
+keys are bound, and a `float` line changes which windows start out of the
+tiled layout, without a rebuild. `tags` lines are read too; what they do not
+yet change is under that directive below.
 
 The compiled configuration (`src/config/config.def.h`, `src/config/config.wm.def.h`) stays in place
 for a directive the file does not use. A machine with no file at all runs the
@@ -118,9 +119,14 @@ A file with any `float` line replaces the compiled float rules, including the
 one for class `steam` and the ones whose title contains ` - Preferences` or
 ` - Settings`. A file with none leaves those compiled rules in place.
 
-These rules are what `config_should_float()` answers with. Nothing in the
-manage path asks the question yet, so a `float` line currently changes no
-window's placement; it is read, checked, and kept for the code that will.
+The rule is matched once, when the window is managed, against the WM_CLASS and
+WM_NAME the WM reads from the server for that window. A window it names never
+enters the layout: it keeps the size and the position it asked for, and keeps
+that rectangle while tags are switched. Every other window is tiled as before.
+
+A window the WM adopted at startup goes through the same manage path, so a
+rule names it too. Moving a window that is already managed is what
+`MOD+Shift+space` is for; a reload does not re-decide it.
 
 ### `tags <name> ...`
 
@@ -170,8 +176,7 @@ file that cannot be read is treated the way it is at startup: the WM logs why
 and the compiled configuration applies.
 
 A reload does not move a window that is already managed. The new float rules are
-what `config_should_float()` answers for the next window; nothing on the manage
-path asks that question yet, so no window floats before or after a reload.
+what the next window the WM manages is matched against.
 
 ## When the file says something wrong
 
