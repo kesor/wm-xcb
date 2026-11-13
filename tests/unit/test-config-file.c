@@ -251,7 +251,9 @@ test_config_file_reports_the_line(void)
   assert(cf->errors[0].line == 2);
   assert(strstr(cf->errors[0].text, "bogus") != NULL);
   assert(cf->errors[1].line == 3);
-  assert(strstr(cf->errors[1].text, "Hyper") != NULL);
+  assert(strcmp(cf->errors[1].text,
+                "unknown modifier 'Hyper' in 'Hyper+1': use Mod, Mod4, Super, Win, Shift, Ctrl, "
+                "Control, Alt, Mod1, Mod3 or Mod5") == 0);
   assert(cf->errors[2].line == 4);
   assert(strstr(cf->errors[2].text, "Nope") != NULL);
   assert(cf->errors[3].line == 5);
@@ -261,6 +263,57 @@ test_config_file_reports_the_line(void)
    * has to name a modifier. */
   assert(cf->errors[5].line == 7);
   assert(strstr(cf->errors[5].text, "modifier") != NULL);
+
+  config_file_free(cf);
+  unlink(path);
+}
+
+/*
+ * NumLock is Mod2 on a standard keymap and the binding lookup masks that bit
+ * out of both sides, so a chord naming Mod2 as a modifier would register as
+ * the same chord without it. The last segment is the key, so these three
+ * lines are the modifier positions: alone, beside Shift, and after Mod.
+ */
+void
+test_config_file_rejects_mod2(void)
+{
+  LOG_CLEAN("== Testing Mod2 is refused instead of silently dropped");
+
+  char       path[256];
+  const char text[] =
+      "bind Mod2+1 tag-manager.view 2\n"
+      "bind Mod2+Shift+1 tag-manager.toggle 1\n"
+      "bind Mod+Mod2+1 tag-manager.view 3\n"
+      "bind Shift+1 tag-manager.toggle 1\n";
+  const char* expect[] = {
+    "Mod2 is NumLock on this keymap, so 'Mod2+1' cannot be told apart from the "
+    "same chord without it: write the chord without Mod2",
+    "Mod2 is NumLock on this keymap, so 'Mod2+Shift+1' cannot be told apart from the "
+    "same chord without it: write the chord without Mod2",
+    "Mod2 is NumLock on this keymap, so 'Mod+Mod2+1' cannot be told apart from the "
+    "same chord without it: write the chord without Mod2",
+  };
+
+  if (!write_config(path, sizeof path, text)) {
+    assert(0 && "cannot write a temporary config file");
+    return;
+  }
+
+  ConfigFile* cf = config_file_load(path);
+
+  assert(cf != NULL && cf->found);
+  /* The line that does not name Mod2 survives, so the refusal costs the lines
+   * that name it and nothing else. */
+  assert(cf->bind_count == 1);
+  assert(cf->error_count == 3);
+
+  for (int i = 0; i < 3; i++) {
+    assert(cf->errors[i].line == i + 1);
+    assert(strcmp(cf->errors[i].text, expect[i]) == 0);
+  }
+
+  assert(cf->binds[0].modifiers == XCB_MOD_MASK_SHIFT);
+  assert(cf->binds[0].line == 4);
 
   config_file_free(cf);
   unlink(path);
@@ -726,6 +779,7 @@ TEST_GROUP(ConfigFile, {
   test_config_file_parses_bindings();
   test_config_file_keeps_more_binds_than_the_compiled_set();
   test_config_file_reports_the_line();
+  test_config_file_rejects_mod2();
   test_config_file_parses_float_rules();
   test_config_file_splits_fields();
   test_config_file_rejects_a_broken_field();

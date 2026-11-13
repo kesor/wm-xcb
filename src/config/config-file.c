@@ -34,6 +34,12 @@
  * Modifier names a chord may use, and the XCB mask each one means. `mod` is
  * the primary modifier of the compiled configuration, so a file that says
  * `Mod+1` binds what the defaults bind.
+ *
+ * Mod2 is not here. NumLock is Mod2 on a standard keymap, and the binding
+ * lookup masks that bit out of both sides of the comparison, so a chord naming
+ * it would register as the same chord without it: `bind Mod2+Shift+1` is
+ * `bind Shift+1`. parse_chord() refuses the name so the user reads why instead
+ * of getting a chord they did not write.
  */
 typedef struct ModifierName {
   const char* name;
@@ -50,7 +56,6 @@ static const ModifierName modifier_names[] = {
   { "control", XCB_MOD_MASK_CONTROL },
   { "alt",     XCB_MOD_MASK_1       },
   { "mod1",    XCB_MOD_MASK_1       },
-  { "mod2",    XCB_MOD_MASK_2       },
   { "mod3",    XCB_MOD_MASK_3       },
   { "mod5",    XCB_MOD_MASK_5       },
 };
@@ -261,6 +266,36 @@ parse_arg(const char* text, uint32_t* out)
 }
 
 /*
+ * Resolve one modifier of a chord into its mask. A name that is not in the
+ * table is recorded as the reason it cannot be used, which is one message for
+ * Mod2 and another for a name nobody knows.
+ */
+static bool
+chord_modifier(ConfigFile* cf, int line, const char* part, const char* chord, uint32_t* mask)
+{
+  *mask = modifier_mask(part);
+  if (*mask != 0)
+    return true;
+
+  if (strcasecmp(part, "mod2") == 0) {
+    record_error(cf, line,
+                 "Mod2 is NumLock on this keymap, so '%s' cannot be told apart from the "
+                 "same chord without it: write the chord without Mod2",
+                 chord);
+    return false;
+  }
+
+  /* Every name in modifier_names[], in that order, including the aliases.
+   * This string is a second copy of that table. A shorter hint omits a name
+   * the parser accepts and the docs list. */
+  record_error(cf, line,
+               "unknown modifier '%s' in '%s': use Mod, Mod4, Super, Win, Shift, Ctrl, Control, Alt, "
+               "Mod1, Mod3 or Mod5",
+               part, chord);
+  return false;
+}
+
+/*
  * Parse a chord such as `Mod+Shift+1` into a modifier mask and a keysym.
  *
  * A chord has to name at least one modifier. A grab on a bare key takes that
@@ -308,12 +343,10 @@ parse_chord(ConfigFile* cf, int line, const char* chord, ConfigBind* bind)
       break;
     }
 
-    uint32_t mask = modifier_mask(part);
-    if (mask == 0) {
-      record_error(cf, line, "unknown modifier '%s' in '%s': use Mod, Shift, Ctrl, Alt or Mod2-Mod5",
-                   part, chord);
+    uint32_t mask = 0;
+    if (!chord_modifier(cf, line, part, chord, &mask))
       return false;
-    }
+
     modifiers |= mask;
     part = plus + 1;
   }
