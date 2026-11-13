@@ -95,7 +95,11 @@ The chord is a key plus at least one modifier, joined with `+`:
 | `Shift` | Shift |
 | `Ctrl`, `Control` | Control |
 | `Alt`, `Mod1` | Alt |
-| `Mod2`, `Mod3`, `Mod5` | the other modifier bits |
+| `Mod3`, `Mod5` | the other modifier bits |
+
+`Mod2` is not a modifier you can bind. NumLock is Mod2 on a standard keymap and
+the binding lookup ignores that bit, so `bind Mod2+Shift+1` would be the same
+chord as `bind Shift+1`. A chord naming it is rejected with its line number.
 
 A key is a single printable character (`1`, `f`, `/`) or one of the names
 `Return`, `Enter`, `space`, `Tab`, `Escape`, `BackSpace`, `Delete`, `Insert`,
@@ -186,6 +190,13 @@ A line the parser cannot read is reported once, at startup, on stderr:
 ERROR: config $HOME/.config/wm/config:4: unknown directive 'bogus': use bind, float or tags
 ```
 
+A chord that names `Mod2` is refused the same way, because that bit is NumLock
+and the binding lookup ignores it:
+
+```
+ERROR: config $HOME/.config/wm/config:7: Mod2 is NumLock on this keymap, so 'Mod2+1' cannot be told apart from the same chord without it: write the chord without Mod2
+```
+
 Past the errors the parser keeps, one more line says how many further lines
 were rejected, without their numbers.
 
@@ -196,8 +207,9 @@ Two fallbacks keep a mistake from leaving the WM without keys:
 
 - a file with no `bind` line leaves every compiled binding in place, so adding
   one `float` rule does not unbind every key
-- a file whose bindings all fail (no modifier, unknown key, a key this keyboard
-  cannot produce) also leaves the compiled bindings in place, and says so
+- a file whose bindings all fail (no modifier, unknown key, Mod2, a key this
+  keyboard cannot produce) also leaves the compiled bindings in place, and says
+  so
 
 A `bind` line the parser accepts can still be refused by the binding table it is
 registered into, and that message names the line and which of the two causes it

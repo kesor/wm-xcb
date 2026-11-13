@@ -266,6 +266,51 @@ test_config_file_reports_the_line(void)
   unlink(path);
 }
 
+/*
+ * NumLock is Mod2 on a standard keymap and the binding lookup masks that bit
+ * out of both sides, so a chord naming Mod2 would register as the same chord
+ * without it. The parser refuses the name rather than binding a chord the user
+ * did not write; every position it can appear in is refused, not just a chord
+ * whose only modifier is Mod2.
+ */
+void
+test_config_file_rejects_mod2(void)
+{
+  LOG_CLEAN("== Testing Mod2 is refused instead of silently dropped");
+
+  char       path[256];
+  const char text[] =
+      "bind Mod2+1 tag-manager.view 2\n"
+      "bind Mod2+Shift+1 tag-manager.toggle 1\n"
+      "bind Mod+Mod2+1 tag-manager.view 3\n"
+      "bind Shift+1 tag-manager.toggle 1\n";
+
+  if (!write_config(path, sizeof path, text)) {
+    assert(0 && "cannot write a temporary config file");
+    return;
+  }
+
+  ConfigFile* cf = config_file_load(path);
+
+  assert(cf != NULL && cf->found);
+  /* The line that does not name Mod2 survives, so the refusal costs the lines
+   * that name it and nothing else. */
+  assert(cf->bind_count == 1);
+  assert(cf->error_count == 3);
+
+  for (int i = 0; i < 3; i++) {
+    assert(cf->errors[i].line == i + 1);
+    assert(strstr(cf->errors[i].text, "Mod2") != NULL);
+    assert(strstr(cf->errors[i].text, "NumLock") != NULL);
+  }
+
+  assert(cf->binds[0].modifiers == XCB_MOD_MASK_SHIFT);
+  assert(cf->binds[0].line == 4);
+
+  config_file_free(cf);
+  unlink(path);
+}
+
 void
 test_config_file_parses_float_rules(void)
 {
@@ -726,6 +771,7 @@ TEST_GROUP(ConfigFile, {
   test_config_file_parses_bindings();
   test_config_file_keeps_more_binds_than_the_compiled_set();
   test_config_file_reports_the_line();
+  test_config_file_rejects_mod2();
   test_config_file_parses_float_rules();
   test_config_file_splits_fields();
   test_config_file_rejects_a_broken_field();
