@@ -90,9 +90,17 @@ fi
 BUILD=.cache/coverage
 MEASURED="$ROOT_DIR/$BUILD/measured.tsv"
 mkdir -p "$BUILD"
-# Incremental: the object files are valid until their source changes, and the
-# counters reset by deleting the .gcda. A full rebuild took 7s every time, which
-# is the expensive part of a gate that runs on every push.
+# Incremental: an object is valid until its source or any header changes, and
+# the counters reset by deleting the .gcda. Comparing only the .c left a stale
+# object behind a header change: the suite segfaulted on one tree while a fresh
+# build of the same commit passed. A full rebuild took 7s every time, which is
+# the expensive part of a gate that runs on every push.
+newest_header=""
+while IFS= read -r header; do
+  if [ -z "$newest_header" ] || [ "$header" -nt "$newest_header" ]; then
+    newest_header="$header"
+  fi
+done < <(find . \( -path ./.git -o -path ./build -o -path ./.cache \) -prune -o -name '*.h' -print)
 find "$BUILD" -name '*.gcda' -delete 2>/dev/null || true
 
 # The same sources the suite links, with the same flags plus instrumentation.
@@ -118,7 +126,7 @@ objects=()
 for src in $SOURCES; do
   case $src in wm.c|*/wm.c) continue ;; esac
   obj="$BUILD/${src//\//_}.o"
-  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ] || { [ -n "$newest_header" ] && [ "$newest_header" -nt "$obj" ]; }; then
     ${CC:-gcc} "${CFLAGS[@]}" -w -c "$src" -o "$obj" || {
       echo "check-coverage: cannot compile $src" >&2
       exit 1
@@ -128,7 +136,7 @@ for src in $SOURCES; do
 done
 for src in $TEST_SOURCES; do
   obj="$BUILD/tests_${src//\//_}.o"
-  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ] || { [ -n "$newest_header" ] && [ "$newest_header" -nt "$obj" ]; }; then
     ${CC:-gcc} "${CFLAGS[@]}" -w -c "$src" -o "$obj" || {
       echo "check-coverage: cannot compile $src" >&2
       exit 1
