@@ -251,7 +251,9 @@ test_config_file_reports_the_line(void)
   assert(cf->errors[0].line == 2);
   assert(strstr(cf->errors[0].text, "bogus") != NULL);
   assert(cf->errors[1].line == 3);
-  assert(strstr(cf->errors[1].text, "Hyper") != NULL);
+  assert(strcmp(cf->errors[1].text,
+                "unknown modifier 'Hyper' in 'Hyper+1': use Mod, Mod4, Super, Win, Shift, Ctrl, "
+                "Control, Alt, Mod1, Mod3 or Mod5") == 0);
   assert(cf->errors[2].line == 4);
   assert(strstr(cf->errors[2].text, "Nope") != NULL);
   assert(cf->errors[3].line == 5);
@@ -268,10 +270,9 @@ test_config_file_reports_the_line(void)
 
 /*
  * NumLock is Mod2 on a standard keymap and the binding lookup masks that bit
- * out of both sides, so a chord naming Mod2 would register as the same chord
- * without it. The parser refuses the name rather than binding a chord the user
- * did not write; every position it can appear in is refused, not just a chord
- * whose only modifier is Mod2.
+ * out of both sides, so a chord naming Mod2 as a modifier would register as
+ * the same chord without it. The last segment is the key, so these three
+ * lines are the modifier positions: alone, beside Shift, and after Mod.
  */
 void
 test_config_file_rejects_mod2(void)
@@ -284,6 +285,14 @@ test_config_file_rejects_mod2(void)
       "bind Mod2+Shift+1 tag-manager.toggle 1\n"
       "bind Mod+Mod2+1 tag-manager.view 3\n"
       "bind Shift+1 tag-manager.toggle 1\n";
+  const char* expect[] = {
+    "Mod2 is NumLock on this keymap, so 'Mod2+1' cannot be told apart from the "
+    "same chord without it: write the chord without Mod2",
+    "Mod2 is NumLock on this keymap, so 'Mod2+Shift+1' cannot be told apart from the "
+    "same chord without it: write the chord without Mod2",
+    "Mod2 is NumLock on this keymap, so 'Mod+Mod2+1' cannot be told apart from the "
+    "same chord without it: write the chord without Mod2",
+  };
 
   if (!write_config(path, sizeof path, text)) {
     assert(0 && "cannot write a temporary config file");
@@ -300,8 +309,7 @@ test_config_file_rejects_mod2(void)
 
   for (int i = 0; i < 3; i++) {
     assert(cf->errors[i].line == i + 1);
-    assert(strstr(cf->errors[i].text, "Mod2") != NULL);
-    assert(strstr(cf->errors[i].text, "NumLock") != NULL);
+    assert(strcmp(cf->errors[i].text, expect[i]) == 0);
   }
 
   assert(cf->binds[0].modifiers == XCB_MOD_MASK_SHIFT);

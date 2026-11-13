@@ -285,8 +285,13 @@ chord_modifier(ConfigFile* cf, int line, const char* part, const char* chord, ui
     return false;
   }
 
-  record_error(cf, line, "unknown modifier '%s' in '%s': use Mod, Shift, Ctrl, Alt, Mod3 or Mod5", part,
-               chord);
+  /* Every name in modifier_names[], in that order, including the aliases.
+   * This string is a second copy of that table. A shorter hint omits a name
+   * the parser accepts and the docs list. */
+  record_error(cf, line,
+               "unknown modifier '%s' in '%s': use Mod, Mod4, Super, Win, Shift, Ctrl, Control, Alt, "
+               "Mod1, Mod3 or Mod5",
+               part, chord);
   return false;
 }
 
