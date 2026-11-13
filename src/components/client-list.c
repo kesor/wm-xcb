@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 #include "src/components/client-list.h"
+#include "src/config/config.h"
 #include "src/core/wm-log.h"
 #include "src/core/wm-xcb.h"
 #include "src/target/monitor.h"
@@ -258,6 +259,26 @@ client_list_request_tile(Monitor* m)
 }
 
 /*
+ * Put a client where the window rules say it belongs.
+ *
+ * The rules answer whether the client starts out of the layout; the floating
+ * state machine is the floating component's, so this sends the request a
+ * keybinding sends and lets the transition ask for the re-tile. A client no
+ * rule names takes the tiled slot the manage path has always given it.
+ */
+static void
+client_list_place_by_rules(Client* c)
+{
+  if (config_should_float(c->class_name, c->instance_name, c->title)) {
+    LOG_DEBUG("A float rule matches window=%u, it starts out of the layout", c->window);
+    hub_send_request(REQ_CLIENT_FLOAT, c->target.id);
+    return;
+  }
+
+  client_list_request_tile(client_get_monitor(c));
+}
+
+/*
  * Handle XCB_DESTROY_NOTIFY event.
  * Destroys the Client for the window.
  */
@@ -365,9 +386,52 @@ client_list_belongs_on_screen(Client* c)
 }
 
 /*
+ * Put a window on screen when the tags it belongs to are the ones the view is
+ * on.
+ *
+ * A window whose tags are not on the current view is managed but not mapped,
+ * and the tag manager maps it when a tag it is on is shown. Mapping it here and
+ * letting the next view change hide it puts a window on screen on a tag its own
+ * tags say it is not on, and nothing takes it off screen until someone switches
+ * the view.
+ */
+static void
+client_list_show_if_on_screen(Client* c)
+{
+  if (!client_list_belongs_on_screen(c))
+    return;
+
+  client_show(c->window);
+  client_set_mapped(c, true);
+  LOG_DEBUG("Mapped client %u", c->window);
+}
+
+/*
+ * Finish managing a client whose rules can be matched: map it when its tags
+ * are on screen, tell subscribers it is managed, then place it.
+ *
+ * The map has to land before EVT_CLIENT_MANAGED. focus_on_client_managed()
+ * refuses a client that is not mapped, and nothing else asks focus to take a
+ * window the manage path just brought on screen. Emitting the event first left
+ * every new window unfocused unless an EnterNotify happened to follow.
+ *
+ * The placement follows the event so a subscriber that assigns tags (the tag
+ * manager) has already run when a later rule needs them, and so a float still
+ * saves the rectangle the client asked for rather than a tiled slot.
+ */
+static void
+client_list_finish_manage(Client* c)
+{
+  client_list_show_if_on_screen(c);
+  client_list_emit_event(EVT_CLIENT_MANAGED, c);
+  client_list_place_by_rules(c);
+}
+
+/*
  * Handle XCB_MAP_REQUEST event.
- * Manages the window (adds it to the client list), and maps it when its tags are
- * on screen.
+ * Manages the window (adds it to the client list), then maps it when its tags
+ * are on screen and places it where the window rules say it belongs. The two
+ * follow the WM_CLASS and WM_NAME reply, which is read in the loop.
  */
 void
 client_list_on_map_request(void* event)
@@ -394,24 +458,18 @@ client_list_on_map_request(void* event)
     client_set_managed(c, true);
     client_list_prepare_client(c);
 
-    /* A window whose tags are not on the current view is managed but not
-     * mapped, and the tag manager maps it when a tag it is on is shown. Mapping
-     * it here and letting the next view change hide it puts a window on screen
-     * on a tag its own tags say it is not on, and nothing takes it off screen
-     * until someone switches the view. */
-    if (client_list_belongs_on_screen(c)) {
-      client_show(c->window);
-      client_set_mapped(c, true);
-      LOG_DEBUG("Mapped client %u", c->window);
-    }
-
-    /* Ask for the size hints before the tile request. The reply is read one
-     * loop iteration later, and the layout it triggers then is the one that
-     * respects what the window asked for. */
+    /* Ask for the properties before the window is mapped or placed. Both
+     * replies are read one loop iteration later: the size hints are what the
+     * layout has to respect, and WM_CLASS with WM_NAME are what the rules
+     * match. A window shown before the answers arrive is drawn at a rectangle
+     * the WM is about to replace, so the map waits with the placement, and
+     * EVT_CLIENT_MANAGED waits with them: subscribers that need the window on
+     * screen (focus) or placed (nothing today) run only once that is true. */
     client_request_size_hints(c);
+    if (client_request_identity(c))
+      return;
 
-    client_list_emit_event(EVT_CLIENT_MANAGED, c);
-    client_list_request_tile(client_get_monitor(c));
+    client_list_finish_manage(c);
   }
 
   LOG_DEBUG("Client managed: window=%u", e->window);
@@ -477,7 +535,7 @@ client_list_on_unmap_notify(void* event)
  * A client that changes its minimum or maximum size while running writes
  * WM_NORMAL_HINTS again, and that is the only notice the WM gets of it. The
  * read is deferred: a handler may not wait on a reply, so this sends the
- * request and client_list_poll_size_hints() lays the window out again when the
+ * request and client_list_poll_properties() lays the window out again when the
  * answer arrives and the constraints are not the ones it was tiled to.
  */
 void
@@ -527,10 +585,15 @@ client_list_is_managed(xcb_window_t window)
 }
 
 /*
- * Take the size hints replies that have arrived.
+ * Take the replies that have arrived for the properties a managed window
+ * carries: its size hints, and the WM_CLASS and WM_NAME a window rule matches.
+ *
+ * The size hints re-tile the monitor they change. The identity read is the
+ * manage path's, which held a window's placement until its own names were
+ * known, so the client is placed here instead.
  */
 void
-client_list_poll_size_hints(void)
+client_list_poll_properties(void)
 {
   Client* c = client_list_sentinel()->next;
 
@@ -539,7 +602,20 @@ client_list_poll_size_hints(void)
      * request that does would leave this loop on a freed client. */
     Client* next = c->next;
 
-    if (client_poll_size_hints(c) && client_is_managed(c))
+    /* The identity read is taken first: the manage path held this client's
+     * map, the managed event and the placement for it. A layout run for its
+     * size hints before that decision would give the window a slot a float rule
+     * then takes it back out of, with the slot's rectangle saved as the one to
+     * float at. */
+    if (client_poll_identity(c) && client_is_managed(c))
+      client_list_finish_manage(c);
+
+    /* A client still waiting for its own names has no placement to correct:
+     * the layout that respects these hints is the one the decision above asks
+     * for, and it reads them from the client. */
+    bool hints_changed = client_poll_size_hints(c);
+
+    if (hints_changed && !client_identity_pending(c) && client_is_managed(c))
       client_list_request_tile(client_get_monitor(c));
 
     c = next;

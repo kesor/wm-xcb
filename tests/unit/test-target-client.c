@@ -935,6 +935,181 @@ test_client_monitor_selection_and_fallback(void)
   sm_registry_shutdown();
 }
 
+/*
+ * The WM_CLASS property is two NUL-terminated names in one 8-bit value.
+ *
+ * The bytes come from the client, so the reader is given what the client
+ * chose: a name with no terminator, a property cut short, a NUL in the middle.
+ * Everything it accepts is a name a rule can be matched against, and everything
+ * it refuses is a property that is not a WM_CLASS.
+ */
+void
+test_client_class_names_from_property(void)
+{
+  LOG_CLEAN("== Testing the WM_CLASS property parser");
+
+  char* instance = NULL;
+  char* klass    = NULL;
+
+  /* "urxvt" then "URxvt", each with its terminator. */
+  const char both[] = "urxvt\0URxvt\0";
+  assert(client_class_names_from_property(both, sizeof both - 1, &instance, &klass) == true);
+  assert(instance != NULL && strcmp(instance, "urxvt") == 0);
+  assert(klass != NULL && strcmp(klass, "URxvt") == 0);
+  free(instance);
+  free(klass);
+
+  /* A property that stops after the instance: the class is absent, and the
+   * reader says so instead of reading the bytes after the value. */
+  const char only_instance[] = "urxvt\0";
+  instance                   = NULL;
+  klass                      = NULL;
+  assert(client_class_names_from_property(only_instance, sizeof only_instance - 1, &instance, &klass) ==
+         true);
+  assert(instance != NULL && strcmp(instance, "urxvt") == 0);
+  assert(klass == NULL);
+  free(instance);
+
+  /* An instance whose terminator is the last byte: no class follows. */
+  const char terminated[] = "x\0";
+  instance                = NULL;
+  klass                   = NULL;
+  assert(client_class_names_from_property(terminated, sizeof terminated - 1, &instance, &klass) == true);
+  assert(instance != NULL && strcmp(instance, "x") == 0);
+  assert(klass == NULL);
+  free(instance);
+
+  /* No terminator at all: this is not a WM_CLASS, and returning a string would
+   * read past the property. */
+  const char unterminated[] = "urxvt";
+  instance                  = NULL;
+  klass                     = NULL;
+  assert(client_class_names_from_property(unterminated, sizeof unterminated - 1, &instance, &klass) ==
+         false);
+  assert(instance == NULL);
+  assert(klass == NULL);
+
+  assert(client_class_names_from_property(NULL, 0, &instance, &klass) == false);
+  assert(client_class_names_from_property("a\0", 0, &instance, &klass) == false);
+  assert(client_class_names_from_property("a\0", 2, NULL, NULL) == false);
+}
+
+/*
+ * Without an X connection there is no reply to wait for, so a read is not
+ * started and nothing is left pending: a client that kept a pending read would
+ * never be placed.
+ */
+void
+test_client_identity_without_connection(void)
+{
+  LOG_CLEAN("== Testing the identity read is skipped without an X connection");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+
+  Client* c = client_create(502);
+  assert_or_abort(c != NULL);
+
+  assert(client_request_identity(c) == false);
+  assert(client_identity_pending(c) == false);
+  assert(client_poll_identity(c) == false);
+
+  client_set_instance(c, strdup("instance"));
+  client_set_class(c, strdup("Class"));
+  assert(strcmp(c->instance_name, "instance") == 0);
+  assert(strcmp(c->class_name, "Class") == 0);
+
+  client_destroy(c);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
+/*
+ * A fake property reply: libxcb reads a reply's value from the bytes right
+ * after the header, and value_len is how many of them there are for format 8.
+ */
+static xcb_get_property_reply_t*
+fake_property_reply(const char* value, uint32_t length, uint8_t format)
+{
+  size_t size = sizeof(xcb_get_property_reply_t) + length;
+
+  xcb_get_property_reply_t* reply = calloc(1, size);
+  assert_or_abort(reply != NULL);
+
+  reply->format    = format;
+  reply->value_len = format == 8 ? length : 1;
+
+  if (length > 0)
+    memcpy((char*) reply + sizeof *reply, value, length);
+
+  return reply;
+}
+
+/*
+ * What the WM takes from a WM_CLASS and WM_NAME reply.
+ *
+ * The two names a WM_CLASS carries are what a `float class=` and a
+ * `float instance=` rule match, and a reply that does not hold them has to
+ * leave the client with no name rather than one read past the value.
+ */
+void
+test_client_identity_replies(void)
+{
+  LOG_CLEAN("== Testing what a WM_CLASS and WM_NAME reply give the client");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+
+  Client* c = client_create(503);
+  assert_or_abort(c != NULL);
+
+  const char                both[] = "urxvt\0URxvt\0";
+  xcb_get_property_reply_t* reply  = fake_property_reply(both, sizeof both - 1, 8);
+  client_identity_reply_apply_for_tests(c, true, reply);
+  free(reply);
+
+  assert(c->instance_name != NULL && strcmp(c->instance_name, "urxvt") == 0);
+  assert(c->class_name != NULL && strcmp(c->class_name, "URxvt") == 0);
+
+  /* A property that is not a WM_CLASS takes the names away again: a rule must
+   * not match a name the window does not have. */
+  const char unterminated[] = "urxvt";
+  reply                     = fake_property_reply(unterminated, sizeof unterminated - 1, 8);
+  client_identity_reply_apply_for_tests(c, true, reply);
+  free(reply);
+  assert(c->instance_name == NULL);
+  assert(c->class_name == NULL);
+
+  client_set_instance(c, strdup("held"));
+  reply = fake_property_reply(NULL, 0, 0); /* the property is not there */
+  client_identity_reply_apply_for_tests(c, true, reply);
+  free(reply);
+  assert(c->instance_name == NULL);
+
+  const char title[] = "a title";
+  reply              = fake_property_reply(title, sizeof title - 1, 8);
+  client_identity_reply_apply_for_tests(c, false, reply);
+  free(reply);
+  assert(c->title != NULL && strcmp(c->title, "a title") == 0);
+
+  reply = fake_property_reply(NULL, 0, 0);
+  client_identity_reply_apply_for_tests(c, false, reply);
+  free(reply);
+  assert(c->title == NULL);
+
+  /* A read that failed has no reply at all. */
+  client_identity_reply_apply_for_tests(c, true, NULL);
+  client_identity_reply_apply_for_tests(c, false, NULL);
+  assert(c->class_name == NULL);
+  assert(c->title == NULL);
+
+  client_destroy(c);
+  hub_shutdown();
+  sm_registry_shutdown();
+}
+
 TEST_GROUP(ClientTarget, {
   test_client_list_init();
   test_client_create();
@@ -953,6 +1128,9 @@ TEST_GROUP(ClientTarget, {
   test_client_apply_size_hints();
   test_client_size_hints_without_connection();
   test_client_size_hints_equal();
+  test_client_class_names_from_property();
+  test_client_identity_without_connection();
+  test_client_identity_replies();
   test_client_normal_hints_atom_without_connection();
   test_client_without_monitor();
   test_client_monitor_association();

@@ -589,9 +589,10 @@ handle_xcb_events()
   }
 
   /* A property reply is not an event: libxcb keeps it in its queue until
-   * somebody asks for it. Client size hints arrive that way, and a window
-   * laid out before they were known has to be laid out again. */
-  client_list_poll_size_hints();
+   * somebody asks for it. A client's size hints and its WM_CLASS and WM_NAME
+   * arrive that way, and a window laid out, or managed, before they were known
+   * has to be acted on again. */
+  client_list_poll_properties();
 
   /* The other descriptors the wait covered. A handler reads what is there and
      starts work; it never waits, which is why this is here and not in the
