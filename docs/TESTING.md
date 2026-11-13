@@ -152,7 +152,9 @@ output. This is the build to use when you need to see what the WM decided.
 `-pedantic` rejects GNU-only constructs; a zero-length array initializer in
 `tiling.c` used to break this build and was fixed on 2026-11-01. If the debug
 build stops compiling, treat that as a bug: it is the only way to read the
-event log.
+event log. It must also print no warning: `scripts/check-debug-build.sh` fails
+when the build prints one, so a warning in your own build is a finding rather
+than a line in a standing list.
 
 The nested-server scripts run the variant you name, so the debug log is one
 command away:

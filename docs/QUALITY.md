@@ -125,7 +125,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
 | commit-msg | `scripts/check-commit-msg.sh` | no `Co-Authored-By`, no "generated with", no robot footer |
-| debug build | `scripts/check-debug-build.sh` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c`, and its suite: a pass prints one line, a failure prints the whole log, because 13 standing warnings on every push buried the one that mattered |
+| debug build | `scripts/check-debug-build.sh` | the `-pedantic` build, which is what caught the zero-length array in `tiling.c`, and its suite: a pass prints one line, a failure prints the whole log. The build must print no diagnostic, so the warning a failure shows is the one to read |
 | standalone | `scripts/check-standalone.sh` | the link-and-run targets with no X connection, one line on a pass instead of 215 |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh`, `tests/x/run.sh`, `tests/x/probe.sh` and `scripts/perf-test.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
