@@ -209,6 +209,13 @@ running it would print a count from the tree that produced it. Run the suite
 through `make test`, or name the variant binary directly when you want to put
 it under `valgrind`.
 
+Naming it directly is current only when `make test` built it in the same turn.
+`make` links `wm` and stops, so `./build/<variant>/test` beside it runs the
+previous build: a check proved by removing the behaviour then reports the pass
+from before the removal. Run `make test`, and name the assertion that failed
+rather than counting them, because a count is wrong as soon as the test gains
+one.
+
 The suite installs the WM's own signal handlers and raises `SIGTERM` (and
 `SIGUSR1`, for the state dump) against itself, so a debugger stops there first
 and reports a signal that is not a crash. Pass them through:
