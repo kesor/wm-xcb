@@ -115,6 +115,12 @@ make test       # builds and runs test/, prints "Total: N passed, M failed"
 
 `make test` links every non-`main` object plus the `tests/unit/test-*.c` files and runs
 them. The runner prints the current count and must report zero failures.
+
+`main()` in `tests/unit/test-registry.c` takes no arguments and the Makefile passes
+none, so there is no filter: one test file or one group cannot be run on its own,
+and the whole suite is the run. It is 0.9s in the release build and 8.4s with
+`DEBUG=1`, so running all of it is what the suite is for.
+
 Components are tested
 without an X server by calling their handlers with fabricated events and
 inspecting hub events; that is the pattern to copy for new components.
