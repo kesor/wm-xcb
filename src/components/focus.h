@@ -9,6 +9,14 @@
  *   focus and client-list events
  * - on_adopt(): create SM instance for client
  * - listener: raw-write to SM on XCB events, apply the result to X
+ * - executor: handle REQ_CLIENT_FOCUS by moving the client's machine to the
+ *   same state a pointer crossing puts it in, through the guard. An unmapped
+ *   client is refused first: X rejects input focus on a window that is not
+ *   viewable, and the transition would unfocus the visible client
+ *
+ * Requests Handled:
+ * - REQ_CLIENT_FOCUS - focus a client another component names, such as one that
+ *   just became urgent or a scratchpad that was just shown
  *
  * XCB Events Handled:
  * - XCB_ENTER_NOTIFY - mouse entered client window (focus gained)
@@ -17,6 +25,8 @@
  * Events Emitted:
  * - EVT_CLIENT_FOCUSED - client gained focus
  * - EVT_CLIENT_UNFOCUSED - client lost focus
+ * - EVT_CLIENT_FOCUS_FAILED - a request named a client that cannot take focus,
+ *   including one that is not mapped, so nothing moved
  *
  * Events Subscribed:
  * - EVT_CLIENT_FOCUSED, EVT_CLIENT_UNFOCUSED - applied with
@@ -66,8 +76,9 @@ typedef enum FocusState {
  * Focus events emitted on state transitions
  */
 typedef enum FocusEvent {
-  EVT_CLIENT_UNFOCUSED = EVT_FOCUS_BASE + 0, /* Client lost focus */
-  EVT_CLIENT_FOCUSED   = EVT_FOCUS_BASE + 1, /* Client gained focus */
+  EVT_CLIENT_UNFOCUSED    = EVT_FOCUS_BASE + 0, /* Client lost focus */
+  EVT_CLIENT_FOCUSED      = EVT_FOCUS_BASE + 1, /* Client gained focus */
+  EVT_CLIENT_FOCUS_FAILED = EVT_FOCUS_BASE + 2, /* A request named a client that cannot take focus */
 } FocusEvent;
 
 /*

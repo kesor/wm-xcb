@@ -9,6 +9,8 @@
  * - XCB listener for ENTER_NOTIFY and LEAVE_NOTIFY
  * - raw_write to SM on mouse enter/leave events
  * - Guards for transition validation
+ * - a REQ_CLIENT_FOCUS executor, so a component that has no pointer event can
+ *   ask for focus and learns from EVT_CLIENT_FOCUS_FAILED when it was refused
  * - the X input focus: it subscribes to its own FOCUSED and UNFOCUSED events
  *   and follows them with xcb_set_input_focus, gives focus to a client when it
  *   is managed, and hands it to the newest remaining client when the focused
@@ -37,6 +39,9 @@
  */
 static SMTemplate* cached_focus_template = NULL;
 
+static void focus_executor(struct HubRequest* req);
+static bool focus_can_take_focus(const Client* c);
+
 /*
  * The init and the on-demand accessor build through this pointer, so a test can
  * hand them a creator that returns NULL and prove what a refused table does.
@@ -58,10 +63,10 @@ focus_component_set_template_creator_for_tests(SMTemplate* (*creator)(void) )
 static FocusComponent focus_component = {
   .base = {
            .name                  = FOCUS_COMPONENT_NAME,
-           .requests              = NULL, /* Focus is driven by XCB events, not requests */
-      .accepted_target_names = (const char*[]) { "client", NULL },
+           .requests              = (RequestType[]) { REQ_CLIENT_FOCUS, 0 },
+           .accepted_target_names = (const char*[]) { "client", NULL },
            .accepted_targets      = NULL,
-           .executor              = NULL,
+           .executor              = focus_executor,
            .registered            = false,
            },
   .initialized    = false,
@@ -401,6 +406,38 @@ focus_focus_client(Client* c)
 
   focus_component.focused_window = c->window;
   return true;
+}
+
+/*
+ * Executor: handle REQ_CLIENT_FOCUS.
+ *
+ * The guard refuses a client that is not managed or not focusable. It does not
+ * look at mapped: a pointer crossing cannot name an unmapped window, so that
+ * path never needed the check. A request can, and accepting it unfocuses the
+ * visible client and asks X for input focus on a window that is not viewable,
+ * which is a BadMatch. Refuse with the same predicate the actions use, then
+ * let the transition and its guard run. The transition emits
+ * EVT_CLIENT_FOCUSED; a refusal emits EVT_CLIENT_FOCUS_FAILED.
+ */
+static void
+focus_executor(struct HubRequest* req)
+{
+  if (req == NULL)
+    return;
+
+  LOG_DEBUG("focus_executor: type=%u target=%" PRIu64, req->type, req->target);
+
+  Client* c = (Client*) hub_get_target_by_id(req->target);
+  if (c == NULL || c->target.type_id != hub_get_target_type_id_by_name("client")) {
+    LOG_DEBUG("focus_executor: no client found for target");
+    hub_emit(EVT_CLIENT_FOCUS_FAILED, req->target, NULL);
+    return;
+  }
+
+  if (!focus_can_take_focus(c) || !focus_focus_client(c)) {
+    LOG_DEBUG("focus_executor: focus refused for window=%u", c->window);
+    hub_emit(EVT_CLIENT_FOCUS_FAILED, req->target, NULL);
+  }
 }
 
 /*
