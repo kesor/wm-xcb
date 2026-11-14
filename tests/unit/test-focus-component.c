@@ -21,8 +21,11 @@
 static struct {
   bool     focused_received;
   bool     unfocused_received;
+  bool     failed_received;
   TargetID focused_target;
   TargetID unfocused_target;
+  TargetID failed_target;
+  int      focused_count;
 } focus_test_events;
 
 /*
@@ -34,9 +37,13 @@ focus_test_event_handler(Event e)
   if (e.type == EVT_CLIENT_FOCUSED) {
     focus_test_events.focused_received = true;
     focus_test_events.focused_target   = e.target;
+    focus_test_events.focused_count++;
   } else if (e.type == EVT_CLIENT_UNFOCUSED) {
     focus_test_events.unfocused_received = true;
     focus_test_events.unfocused_target   = e.target;
+  } else if (e.type == EVT_CLIENT_FOCUS_FAILED) {
+    focus_test_events.failed_received = true;
+    focus_test_events.failed_target   = e.target;
   }
 }
 
@@ -72,6 +79,7 @@ test_focus_component_init(void)
   /* Should have registered with hub */
   HubComponent* comp = hub_get_component_by_name(FOCUS_COMPONENT_NAME);
   assert(comp != NULL);
+  assert(hub_get_component_by_request_type(REQ_CLIENT_FOCUS) == comp);
 
   /* Cleanup */
   focus_component_shutdown();
@@ -826,6 +834,90 @@ test_focus_init_fails_when_template_is_refused(void)
 }
 
 /*
+ * A request from another component moves FocusSM and emits the event once.
+ */
+void
+test_focus_request_focuses_client(void)
+{
+  LOG_CLEAN("== Testing REQ_CLIENT_FOCUS focuses the client");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+
+  memset(&focus_test_events, 0, sizeof(focus_test_events));
+  hub_subscribe(EVT_CLIENT_FOCUSED, focus_test_event_handler, NULL);
+  hub_subscribe(EVT_CLIENT_FOCUS_FAILED, focus_test_event_handler, NULL);
+
+  Client* c = client_create(100);
+  assert_or_abort(c != NULL);
+  client_set_managed(c, true);
+  client_set_mapped(c, true);
+
+  assert(focus_is_focused(c) == false);
+
+  hub_send_request(REQ_CLIENT_FOCUS, c->target.id);
+
+  assert(focus_is_focused(c) == true);
+  assert(focus_get_focused_window() == 100);
+  assert(focus_test_events.focused_received == true);
+  assert(focus_test_events.focused_target == c->target.id);
+  assert(focus_test_events.focused_count == 1);
+  assert(focus_test_events.failed_received == false);
+
+  hub_unsubscribe(EVT_CLIENT_FOCUSED, focus_test_event_handler);
+  hub_unsubscribe(EVT_CLIENT_FOCUS_FAILED, focus_test_event_handler);
+
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * A request naming a client that cannot take focus changes nothing and says so.
+ */
+void
+test_focus_request_refused_for_unfocusable_client(void)
+{
+  LOG_CLEAN("== Testing REQ_CLIENT_FOCUS is refused for an unfocusable client");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+
+  memset(&focus_test_events, 0, sizeof(focus_test_events));
+  hub_subscribe(EVT_CLIENT_FOCUSED, focus_test_event_handler, NULL);
+  hub_subscribe(EVT_CLIENT_FOCUS_FAILED, focus_test_event_handler, NULL);
+
+  Client* c = client_create(100);
+  assert_or_abort(c != NULL);
+  client_set_managed(c, false);
+
+  hub_send_request(REQ_CLIENT_FOCUS, c->target.id);
+
+  assert(focus_is_focused(c) == false);
+  assert(focus_get_focused_window() == 0);
+  assert(focus_test_events.focused_received == false);
+  assert(focus_test_events.failed_received == true);
+  assert(focus_test_events.failed_target == c->target.id);
+
+  hub_unsubscribe(EVT_CLIENT_FOCUSED, focus_test_event_handler);
+  hub_unsubscribe(EVT_CLIENT_FOCUS_FAILED, focus_test_event_handler);
+
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
  * Register test group
  */
 TEST_GROUP(FocusComponent, {
@@ -846,5 +938,7 @@ TEST_GROUP(FocusComponent, {
   test_focus_moves_when_focused_client_unmaps();
   test_focus_moves_when_focused_client_is_destroyed();
   test_focus_cleared_when_last_client_leaves();
+  test_focus_request_focuses_client();
+  test_focus_request_refused_for_unfocusable_client();
   test_focus_init_fails_when_template_is_refused();
 });
