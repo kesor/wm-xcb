@@ -11,6 +11,7 @@
 #include <stdlib.h>
 
 #include "src/core/wm-hub.h"
+#include "src/target/client.h"
 #include "src/target/monitor.h"
 #include "tests/unit/test-wm-monitor.h"
 #include "tests/unit/test-wm.h"
@@ -536,6 +537,66 @@ test_monitor_with_hub_integration(void)
   hub_shutdown();
 }
 
+/*
+ * Test: destroying a monitor leaves none of its clients holding it.
+ *
+ * A client keeps its Monitor* for its whole life, and nothing else clears it,
+ * so a freed monitor is a use-after-free one request later: the tile request
+ * reads the monitor's target id. Every client the destroyed monitor held has
+ * to be on a monitor that is still in the list when monitor_destroy() returns.
+ */
+void
+test_monitor_destroy_rehomes_its_clients(void)
+{
+  LOG_CLEAN("== Testing monitor destroy re-homes the clients it held");
+
+  hub_init();
+  monitor_list_init();
+  client_list_init();
+
+  Monitor* stays = monitor_create(130);
+  Monitor* gone  = monitor_create(131);
+  assert_or_abort(stays != NULL && gone != NULL);
+
+  /* client_create() attaches a client to the selected monitor, which is the
+   * last one created. */
+  assert(monitor_get_selected() == gone);
+
+  Client* first  = client_create(0x400001);
+  Client* second = client_create(0x400002);
+  assert_or_abort(first != NULL && second != NULL);
+  assert(client_get_monitor(first) == gone);
+  assert(client_get_monitor(second) == gone);
+
+  monitor_destroy(gone);
+
+  Monitor* first_monitor  = client_get_monitor(first);
+  Monitor* second_monitor = client_get_monitor(second);
+
+  assert(first_monitor != NULL && second_monitor != NULL);
+  assert(first_monitor == stays);
+  assert(second_monitor == stays);
+
+  /* The criterion in the bead is list membership, not the identity of the
+   * monitor: what a client must not hold is memory the list has dropped. */
+  bool first_listed  = false;
+  bool second_listed = false;
+  for (Monitor* m = monitor_list_get_first(); m != NULL; m = monitor_list_get_next(m)) {
+    if (m == first_monitor)
+      first_listed = true;
+    if (m == second_monitor)
+      second_listed = true;
+  }
+  assert(first_listed && second_listed);
+
+  client_destroy(first);
+  client_destroy(second);
+  monitor_destroy(stays);
+  monitor_list_shutdown();
+  client_list_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(Monitor, {
   test_monitor_create_destroy();
   test_monitor_list_init_shutdown();
@@ -551,4 +612,5 @@ TEST_GROUP(Monitor, {
   test_monitor_set_sm_null_removes_entry();
   test_monitor_set_sm_null_destroys_stored_machine();
   test_monitor_destroy_unadopts_before_freeing_machines();
+  test_monitor_destroy_rehomes_its_clients();
 });

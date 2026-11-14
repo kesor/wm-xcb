@@ -335,6 +335,23 @@ void     client_set_monitor(Client* c, Monitor* m);
 Monitor* client_get_monitor(const Client* c);
 
 /*
+ * Move every client on `gone` to the monitor a client created now would get:
+ * the selected one, else the first in the list, else none when the display is
+ * left with no monitor.
+ *
+ * A client keeps its Monitor* for its whole life, so a monitor that is freed
+ * leaves every client it held pointing at freed memory, and the next tile
+ * request reads the monitor's target id from it. monitor_destroy() calls this
+ * before the free, and it is where the rule lives because the default monitor
+ * for a new client is decided in this file too.
+ *
+ * `gone` has to be off the monitor list already, which is what
+ * monitor_destroy() makes true before it asks: otherwise a client could be
+ * moved back onto the monitor being freed.
+ */
+void client_rehome_from_monitor(const Monitor* gone);
+
+/*
  * Title
  *
  * Ownership of `title` is transferred to the client.

@@ -14,8 +14,9 @@
  * keeps that mask in the monitor's tag-view state machine, so the machine and
  * the monitor cannot disagree about which tags are visible.
  *
- * Features like tiling, bar display, and client associations are implemented
- * as separate components that query monitors via the Hub.
+ * Features like tiling and bar display are implemented as separate components
+ * that query monitors via the Hub. A client keeps a pointer to its monitor, so
+ * monitor_destroy() moves the clients it held to a monitor that stays.
  */
 
 #ifndef _MONITOR_H_

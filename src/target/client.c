@@ -646,6 +646,26 @@ client_get_monitor(const Client* c)
   return c ? c->monitor : NULL;
 }
 
+void
+client_rehome_from_monitor(const Monitor* gone)
+{
+  if (gone == NULL)
+    return;
+
+  /* No client list yet: this runs before the client list is started, in a
+   * process or a unit test that only ever created monitors, and nothing can
+   * hold a monitor then. The sentinel points at itself once the list is up. */
+  if (client_sentinel.next == NULL)
+    return;
+
+  Monitor* replacement = client_default_monitor();
+
+  for (Client* c = client_sentinel.next; c != &client_sentinel; c = c->next) {
+    if (c->monitor == gone)
+      client_set_monitor(c, replacement);
+  }
+}
+
 /*
  * Set client title.
  * Ownership of `title` is transferred to the client.
