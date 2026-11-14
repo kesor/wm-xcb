@@ -14,7 +14,7 @@ src/components/pertag.c 33.7
 src/sm/sm-instance.c 41.8
 src/components/ewmh-desktop.c 43.7
 src/components/keybinding.c 47.0
-src/config/config.c 47.8
+src/config/config.c 66.7
 src/actions/terminal.c 51.4
 src/actions/keybinding-binding.c 53.7
 src/components/fullscreen.c 54.2
