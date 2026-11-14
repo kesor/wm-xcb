@@ -97,6 +97,7 @@ TEST_SRC = \
 	tests/unit/test-floating-component.c \
 	tests/unit/test-wm-keybinding.c \
 	tests/unit/test-config-file.c \
+	tests/unit/test-config.c \
 	tests/unit/test-wm-monitor-manager.c \
 	tests/unit/test-launcher.c \
 	tests/unit/test-terminal.c \
