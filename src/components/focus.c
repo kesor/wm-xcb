@@ -40,6 +40,7 @@
 static SMTemplate* cached_focus_template = NULL;
 
 static void focus_executor(struct HubRequest* req);
+static bool focus_can_take_focus(const Client* c);
 
 /*
  * The init and the on-demand accessor build through this pointer, so a test can
@@ -410,11 +411,13 @@ focus_focus_client(Client* c)
 /*
  * Executor: handle REQ_CLIENT_FOCUS.
  *
- * A request is intent, so it goes through the guard the transition declares and
- * a client that cannot take focus is refused instead of being focused the way
- * an X report would be. The transition emits EVT_CLIENT_FOCUSED itself; a
- * refusal emits EVT_CLIENT_FOCUS_FAILED, so the component that asked learns
- * that the window did not move.
+ * The guard refuses a client that is not managed or not focusable. It does not
+ * look at mapped: a pointer crossing cannot name an unmapped window, so that
+ * path never needed the check. A request can, and accepting it unfocuses the
+ * visible client and asks X for input focus on a window that is not viewable,
+ * which is a BadMatch. Refuse with the same predicate the actions use, then
+ * let the transition and its guard run. The transition emits
+ * EVT_CLIENT_FOCUSED; a refusal emits EVT_CLIENT_FOCUS_FAILED.
  */
 static void
 focus_executor(struct HubRequest* req)
@@ -431,7 +434,7 @@ focus_executor(struct HubRequest* req)
     return;
   }
 
-  if (!focus_focus_client(c)) {
+  if (!focus_can_take_focus(c) || !focus_focus_client(c)) {
     LOG_DEBUG("focus_executor: focus refused for window=%u", c->window);
     hub_emit(EVT_CLIENT_FOCUS_FAILED, req->target, NULL);
   }

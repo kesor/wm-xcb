@@ -918,6 +918,60 @@ test_focus_request_refused_for_unfocusable_client(void)
 }
 
 /*
+ * A hidden client is managed and focusable, so the guard allows the transition.
+ * The request must still refuse it: moving focus there unfocuses the visible
+ * client, and X rejects input focus on a window that is not viewable.
+ */
+void
+test_focus_request_refused_for_unmapped_client(void)
+{
+  LOG_CLEAN("== Testing REQ_CLIENT_FOCUS is refused for an unmapped client");
+
+  hub_init();
+  sm_registry_init();
+  client_list_init();
+  action_registry_init();
+  focus_component_init();
+
+  memset(&focus_test_events, 0, sizeof(focus_test_events));
+  hub_subscribe(EVT_CLIENT_FOCUSED, focus_test_event_handler, NULL);
+  hub_subscribe(EVT_CLIENT_FOCUS_FAILED, focus_test_event_handler, NULL);
+
+  Client* visible = client_create(100);
+  assert_or_abort(visible != NULL);
+  client_set_managed(visible, true);
+  client_set_mapped(visible, true);
+  hub_send_request(REQ_CLIENT_FOCUS, visible->target.id);
+  assert(focus_is_focused(visible) == true);
+
+  memset(&focus_test_events, 0, sizeof(focus_test_events));
+
+  Client* hidden = client_create(200);
+  assert_or_abort(hidden != NULL);
+  client_set_managed(hidden, true);
+  client_set_focusable(hidden, true);
+  client_set_mapped(hidden, false);
+
+  hub_send_request(REQ_CLIENT_FOCUS, hidden->target.id);
+
+  assert(focus_is_focused(hidden) == false);
+  assert(focus_is_focused(visible) == true);
+  assert(focus_get_focused_window() == 100);
+  assert(focus_test_events.focused_received == false);
+  assert(focus_test_events.failed_received == true);
+  assert(focus_test_events.failed_target == hidden->target.id);
+
+  hub_unsubscribe(EVT_CLIENT_FOCUSED, focus_test_event_handler);
+  hub_unsubscribe(EVT_CLIENT_FOCUS_FAILED, focus_test_event_handler);
+
+  focus_component_shutdown();
+  action_registry_shutdown();
+  client_list_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
+/*
  * Register test group
  */
 TEST_GROUP(FocusComponent, {
@@ -940,5 +994,6 @@ TEST_GROUP(FocusComponent, {
   test_focus_cleared_when_last_client_leaves();
   test_focus_request_focuses_client();
   test_focus_request_refused_for_unfocusable_client();
+  test_focus_request_refused_for_unmapped_client();
   test_focus_init_fails_when_template_is_refused();
 });
