@@ -51,7 +51,9 @@ per gate, and a number written here is stale the next time a gate gets slower.
 No CI job is advisory any more. The seam job could only become required once
 `tests/x/run.sh` could tell a known failure from a new one; the baseline in
 `tests/quality/seam-baseline.txt` is what makes its verdict mean something.
-`lefthook.yml` runs the same suite before every push, in the `seam` job.
+`lefthook.yml` runs the same suite before every push, in the `seam` job. The
+complexity step was the last one carrying `--advisory`; what made its numbers
+differ between a runner and a laptop is under "Coverage and fuzzing" below.
 
 The two nested-server jobs upload their logs as artifacts, both from under
 `/tmp`. `nix develop` points `TMPDIR` at a private per-shell directory and the
@@ -590,8 +592,8 @@ the Makefile compiles, the tools included. `make -s print-src` is not that list,
 and the hook hands the gate the files a commit stages. Neither one holds a file
 nobody touched, so a function that has been over the floor since before the gate
 learned it failed the first commit that edited its file, reading as that commit's
-doing. `tools/xclient.c`'s `main` is at 33 and has an entry: a copy with the
-getopt loop taken out measures `main` at 24, still over the floor, so the entry
+doing. `tools/xclient.c`'s `main` is at 35 and has an entry: a copy with the
+getopt loop taken out measures `main` at 26, still over the floor, so the entry
 is needed either way. clang-tidy charges a `switch` once and a `case` label
 nothing, so a table of flags is not what makes that number.
 
@@ -618,11 +620,45 @@ measured again and fell below the floor. A baseline still carrying the old
 have no number and leave the file, which is the silent wipe the merge exists to
 prevent. Key them by file first.
 
-In CI the job runs it with `--advisory`, and the reason is in wm-9n0.30: the same
-commit and the same clang-tidy reported `mod_key_name` at 14 on the author's
-machine and 38 on a runner, so the gate cannot fail a merge on the difference
-until that is explained. The hook gates still fail, on the machine where the
-baseline was measured.
+In CI the job runs it with no arguments: over every source, against the same
+baseline the hook uses.
+
+**What made the number different on two machines.** clang-tidy keeps counting a
+file it could not compile, over the decisions it could see, and the gate never
+looked for that. What it handed clang-tidy were the flags in `compile_flags.txt`,
+the flags the Makefile writes for editors; they name the project's own headers and
+not the C library, which reaches a compile through the compiler wrapper, so
+nothing this tree writes names it. A machine with `/usr/include` — a CI runner —
+read every file against Ubuntu's C library. A machine without one, which is every
+NixOS box, read them with no C library at all, and the number followed the
+declarations that were missing: `keybinding_numlock_mask` 6 there and 19 with the
+headers, `wm_loop_dispatch_poll_handlers` 2 and 12, `monitor_sm_set_internal` 14
+and 19. Most read lower, and a number too low is under its baseline entry, so the
+runner failed the gate and the machine that wrote the baseline passed it, on the
+same commit.
+
+The runner's numbers were the complete ones: with the tree's own headers in
+reach, this measurement reproduces its `monitor_sm_set_internal` at 19,
+`sm_transition` at 11, and both `wm_loop_dispatch_*_handlers` at 13 and 12.
+
+Three things now keep the two sides together. The gate asks the compiler it
+builds with for its include search path and passes that along, and
+`-nostdlibinc` refuses every other system directory, so the headers are the ones
+the tree is compiled against on both machines. The compile database it builds
+goes to a directory of its own, because clang-tidy reads a `compile_flags.txt`
+from the directory it is pointed at in place of the `compile_commands.json`
+beside it, and with the two in one tree the database was never read at all. And
+a `: error:` in clang-tidy's output fails the gate: a number measured over a
+file that did not compile is a number about different code, and the gate says so
+instead of comparing it.
+
+The baseline moved with that change, in the commit that made it. Entries the
+truncated parse could never have reached appeared (`sm_transition`, both
+`wm_loop_dispatch_*_handlers`, `hub_get_components_for_target_type`), numbers
+counted over part of a file rose to what the whole file is
+(`monitor_sm_set_internal` 17 to 19), and one fell below the floor and left with
+the declarations that had charged it more than the file holds
+(`config_should_float` 14 to 6).
 
 **Coverage.** `scripts/check-coverage.sh` builds the unit suite with gcov
 instrumentation, runs it, and prints line and branch coverage per file. A file

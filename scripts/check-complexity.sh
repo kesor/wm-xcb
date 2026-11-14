@@ -44,13 +44,11 @@ cd "$ROOT_DIR" || exit 1
 BASELINE="tests/quality/complexity-baseline.txt"
 FLOOR=11
 UPDATE=0
-ADVISORY=0
 files=()
 for arg in "$@"; do
   case $arg in
     --update-baseline) UPDATE=1 ;;
     --floor=*) FLOOR=${arg#--floor=} ;;
-    --advisory) ADVISORY=1 ;;
     -*) echo "check-complexity: unknown argument '$arg'" >&2; exit 1 ;;
     *) files+=("$arg") ;;
   esac
@@ -95,24 +93,55 @@ fi
 
 # clang-tidy wants a compile database. `make compile-commands` uses bear, which
 # does a full clean build; that is minutes, and this gate runs on every commit.
-# One entry per source with the flags the Makefile already writes to
-# compile_flags.txt is the same information in under a second.
-if [ ! -f compile_flags.txt ]; then
-  make -s compile_flags.txt >/dev/null 2>&1 || true
-fi
+# One entry per source with the flags the Makefile writes to compile_flags.txt is
+# the same information in under a second. The file is written on every run rather
+# than only when it is missing: it is generated output, and a copy left from an
+# older Makefile measured flags this tree does not compile with.
+make -s compile_flags.txt >/dev/null 2>&1 || true
 if [ ! -f compile_flags.txt ]; then
   echo "check-complexity: no compile_flags.txt; run 'make' once so the flags exist" >&2
   exit 1
 fi
-python3 - "$ROOT_DIR" "${files[@]}" <<'PY'
+
+# The C library headers are not in compile_flags.txt: they reach the compiler
+# through its wrapper, so nothing this tree writes names them. clang-tidy does not
+# go through that wrapper, and it keeps counting a file it could not compile,
+# over the decisions it could see. The number then follows the declarations that
+# were missing: a function read 2 without them and 13 with them. Mostly it reads
+# lower, and a number too low is under its baseline entry, so the machine that
+# cannot see fails nothing. Ask the compiler that builds the tree where its own
+# headers are, and refuse every other system directory with -nostdlibinc, so both
+# machines measure the same translation unit.
+system_includes=$("${CC:-cc}" -E -Wp,-v -x c /dev/null 2>&1 |
+  sed -n '/^#include <...> search starts here:/,/^End of search list/p' |
+  sed '1d;$d' | sed 's/^ //' | sed 's/^/-isystem /' | tr '\n' ' ')
+if [ -z "$system_includes" ]; then
+  echo "check-complexity: '${CC:-cc}' reported no include search path, so the" >&2
+  echo "check-complexity: files cannot be measured as they are compiled" >&2
+  exit 1
+fi
+
+# The database lives in a directory of its own. clang-tidy reads
+# `compile_flags.txt` out of the directory it is pointed at in place of the
+# `compile_commands.json` beside it, and with the two in the same tree the
+# database this builds was never read: the numbers came from the project flags
+# alone, which are the truncated ones above.
+db_dir=$(mktemp -d)
+trap 'rm -rf "$db_dir"' EXIT
+python3 - "$ROOT_DIR" "$db_dir" "$system_includes" "${files[@]}" <<'PY'
 import json, os, sys
-root, files = sys.argv[1], sys.argv[2:]
+root, db_dir, system_includes = sys.argv[1], sys.argv[2], sys.argv[3]
+files = sys.argv[4:]
 flags = open(os.path.join(root, "compile_flags.txt")).read().strip()
 entries = [
-    {"directory": root, "file": os.path.join(root, f), "command": f"clang {flags} -c {f}"}
+    {
+        "directory": root,
+        "file": os.path.join(root, f),
+        "command": f"clang {flags} -nostdlibinc {system_includes} -c {f}",
+    }
     for f in files
 ]
-with open(os.path.join(root, "compile_commands.json"), "w") as fh:
+with open(os.path.join(db_dir, "compile_commands.json"), "w") as fh:
     json.dump(entries, fh)
 PY
 
@@ -122,11 +151,27 @@ PY
 # LC_ALL=C, because the order the entries are written in is committed: a
 # locale-aware sort puts `config.c` before `config-file.c` on one machine and
 # after it on another, so the same update produces a reordered diff.
-measured=$(clang-tidy -p . \
+report="$db_dir/clang-tidy.txt"
+clang-tidy -p "$db_dir" \
   --checks="-*,readability-function-cognitive-complexity" \
   --config="{CheckOptions: {readability-function-cognitive-complexity.Threshold: 1}}" \
-  "${files[@]}" 2>/dev/null |
-  sed -nE "s|^(.*):[0-9]+:[0-9]+: warning: function '([^']+)' has cognitive complexity of ([0-9]+).*|\1\t\2\t\3|p" |
+  "${files[@]}" >"$report" 2>&1
+
+# clang-tidy still reports a function whose file failed to compile, over the part
+# of it that parsed, so the number it prints is not the number for the code the
+# compiler builds. That is how two machines came to disagree about one function
+# and neither of them failed: a missing header is the gate being unable to see,
+# and it has to say so instead of measuring the visible part.
+if grep -q ': error:' "$report"; then
+  grep ': error:' "$report" | head -5 >&2
+  echo "check-complexity: clang-tidy could not compile the files above, so the" >&2
+  echo "check-complexity: numbers it reported are for part of each file. Fix the" >&2
+  echo "check-complexity: flags in compile_flags.txt or the include path this gate" >&2
+  echo "check-complexity: asked ${CC:-cc} for; run clang-tidy by hand to see the rest." >&2
+  exit 1
+fi
+
+measured=$(sed -nE "s|^(.*):[0-9]+:[0-9]+: warning: function '([^']+)' has cognitive complexity of ([0-9]+).*|\1\t\2\t\3|p" "$report" |
   awk -F'\t' -v root="$ROOT_DIR/" '{
     path = $1
     if (index(path, root) == 1)
@@ -216,15 +261,6 @@ done <<<"$measured"
 
 if [ "$problems" -gt 0 ]; then
   echo "check-complexity: $problems function(s) above the baseline (clang-tidy $TOOL). Split the function along a decision that already exists, or run --update-baseline <the files this commit changes> and say why in the commit." >&2
-  if [ "$ADVISORY" -eq 1 ]; then
-    # The number is a heuristic and it differs between environments: the same
-    # tree and the same clang-tidy reported mod_key_name at 14 here and 38 on a
-    # CI runner, which is not a difference of one condition. Until that is
-    # understood, CI prints this and does not fail on it, while the hook gates
-    # fail on the machine where the baseline was measured.
-    echo "check-complexity: --advisory, so this does not fail the run" >&2
-    exit 0
-  fi
   exit 1
 fi
 echo "check-complexity: every function at or above $FLOOR is within its baseline entry"
