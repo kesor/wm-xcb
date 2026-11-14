@@ -9,9 +9,13 @@
 # measured for the first time by the commit that edited it, so a number that had
 # been over the floor all along read as that commit's doing. An entry is keyed by
 # the file the function was measured in as well as by its name, because keyed by
-# name alone a tool's main inherits whatever number the WM's main recorded. All of
-# it is pinned here against a stand-in clang-tidy, so the gate is judged without
-# the tool, a compile database, or the tree.
+# name alone a tool's main inherits whatever number the WM's main recorded. A
+# number measured over a file clang-tidy could not compile is a number for
+# different code, which is how one function came to read 14 on one machine and 38
+# on another: the gate refuses it, and refuses a compiler that cannot say where its
+# own headers are. All of it is pinned here against a stand-in clang-tidy and a
+# stand-in compiler, so the gate is judged without the tools, a compile database,
+# or the tree.
 source "$(dirname "$0")/lib.sh"
 
 DIR="$TMPDIR_SEAM/complexity"
@@ -19,6 +23,28 @@ rm -rf "$DIR"
 mkdir -p "$DIR/bin" "$DIR/scripts" "$DIR/tests/quality"
 cp "$ROOT_DIR/scripts/check-complexity.sh" "$DIR/scripts/"
 printf -- '-I.\n' >"$DIR/compile_flags.txt"
+
+# The gate asks the compiler that builds the tree where its C library headers
+# are, because they are not in compile_flags.txt and clang-tidy does not go
+# through the wrapper that supplies them. The stand-in answers with one directory
+# so the test needs no compiler, and an empty answer is the case the gate has to
+# refuse: the files could only be measured up to their first system include.
+cat >"$DIR/bin/cc" <<'STUB'
+#!/usr/bin/env bash
+if [ "$1" = "-E" ]; then
+  echo "#include <...> search starts here:"
+  echo " /stand-in-include"
+  echo "End of search list."
+  exit 0
+fi
+exit 1
+STUB
+cat >"$DIR/bin/cc-no-search-path" <<'STUB'
+#!/usr/bin/env bash
+exit 0
+STUB
+chmod +x "$DIR/bin/cc" "$DIR/bin/cc-no-search-path"
+export CC="$DIR/bin/cc"
 
 # The gate asks clang-tidy for two things: its version, and one line per function
 # at or above the threshold. The stand-in answers both from a table keyed by the
@@ -181,5 +207,38 @@ check_eq "and gives the test source in it no entry" 0 \
   "$(grep -c '^tests/unit/skip.c test_many_assertions 40$' "$BASELINE")"
 check_eq "and keeps the entry for a file it did not measure" 1 \
   "$(grep -c '^nine.c kept 14$' "$BASELINE")"
+
+# clang-tidy reports a function whose file it could not compile, over the part
+# above the include it could not open. One machine counted that part and another
+# counted the whole function, and neither run failed, so the gate compared a
+# number about different code. The error is refused, and the header is named.
+cat >"$DIR/bin/clang-tidy" <<'STUB'
+#!/usr/bin/env bash
+if [ "$1" = "--version" ]; then
+  echo "LLVM version 0.0.0-test"
+  exit 0
+fi
+for arg in "$@"; do
+  case $arg in
+    broken.c)
+      echo "$(pwd)/broken.c:1:10: error: 'stdlib.h' file not found [clang-diagnostic-error]"
+      echo "$(pwd)/broken.c:2:1: warning: function 'partly_read' has cognitive complexity of 40 [a]"
+      ;;
+  esac
+done
+STUB
+out=$(gate broken.c)
+check_eq "a file clang-tidy could not compile fails the gate" 1 "$?"
+check_eq "and names the header it could not open" 1 \
+  "$(echo "$out" | grep -c "'stdlib.h' file not found")"
+check_eq "and says the numbers it reported are for part of the file" 1 \
+  "$(echo "$out" | grep -c 'numbers it reported are for part of each file')"
+check_eq "and does not compare that number with the baseline" 0 \
+  "$(echo "$out" | grep -c 'partly_read')"
+
+out=$(CC="$DIR/bin/cc-no-search-path" gate one.c)
+check_eq "a compiler that reports no include search path fails the gate" 1 "$?"
+check_eq "and says the files cannot be measured as they are compiled" 1 \
+  "$(echo "$out" | grep -c 'reported no include search path')"
 
 finish

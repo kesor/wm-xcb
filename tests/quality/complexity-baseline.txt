@@ -8,21 +8,33 @@
 #
 # A file under tests/ is not measured: a test body's number is its assertion
 # count, and no split of a test keeps the assertions.
-src/actions/launcher.c launcher_pipe_readable 11
-src/actions/launcher.c launcher_run_dmenu 14
-src/components/focus.c focus_on_enter_notify 21
-src/components/focus.c focus_set_state 14
+src/actions/launcher.c launcher_pipe_readable 14
+src/actions/launcher.c launcher_run_dmenu 15
+src/actions/terminal.c terminal_installed 11
+src/components/focus.c focus_on_enter_notify 24
+src/components/focus.c focus_set_state 15
 src/components/keybinding.c keybinding_numlock_mask 19
+src/components/monitor-manager.c monitor_manager_discover_outputs_blocking 11
 src/components/monitor-manager.c monitor_manager_handle_randr_notify 13
+src/components/monitor-manager.c monitor_manager_init 11
 src/components/tag-manager.c tag_manager_update_visibility 12
-src/config/config-file.c config_file_load 12
+src/components/tiling.c tiling_collect_clients 11
+src/config/config-file.c config_file_key_keysym 12
+src/config/config-file.c config_file_load 13
 src/config/config-file.c parse_chord 17
 src/config/config-file.c parse_tags 15
 src/config/config-file.c tokenize 12
-src/config/config.c config_should_float 14
-src/config/config.c config_wire_file_bindings 11
-src/core/wm-xcb.c wm_xcb_adopt_existing_windows 12
-src/target/client.c client_sm_set_internal 11
-src/target/monitor.c monitor_sm_set_internal 17
-src/target/tag.c tag_create 12
-tools/xclient.c main 33
+src/config/config.c config_wire_file_bindings 13
+src/core/wm-hub.c hub_get_components_for_target_type 21
+src/core/wm-hub.c hub_register_component 19
+src/core/wm-xcb.c wm_loop_dispatch_fd_handlers 13
+src/core/wm-xcb.c wm_loop_dispatch_poll_handlers 12
+src/core/wm-xcb.c wm_xcb_adopt_existing_windows 13
+src/sm/sm-instance.c sm_transition 11
+src/target/client.c client_destroy 11
+src/target/client.c client_poll_identity 11
+src/target/client.c client_poll_size_hints 11
+src/target/client.c client_sm_set_internal 14
+src/target/monitor.c monitor_sm_set_internal 19
+src/target/tag.c tag_create 13
+tools/xclient.c main 35
