@@ -173,7 +173,12 @@ Short version:
   when the server answers, so none of them stops the loop. The RandR change the
   server reports arrives as well: switching the nested output to another mode
   moves the monitor to the new size and the clients on it are laid out again
-  inside it. `MOD+p` forks a shell that runs
+  inside it. A monitor that is destroyed, because its output went away, takes
+  its clients off itself first: they move to the selected monitor, or to the
+  first one still in the list when nothing is selected, or to none when no
+  monitor is. A later request then reads that monitor, or no monitor, instead
+  of freed memory.
+  `MOD+p` forks a shell that runs
   `dmenu_path | dmenu` and registers the read end of the pipeline's stdout as
   one of those sources: the chosen line is read when it arrives and the WM runs
   it, and a cancelled prompt emits a failure event instead of blocking. dmenu
