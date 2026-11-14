@@ -9,7 +9,6 @@
 #include "src/config/config.h"
 #include "src/core/wm-components.h"
 #include "src/core/wm-hub.h"
-#include "src/core/wm-states.h"
 #include "src/core/wm-xcb-ewmh.h"
 #include "src/core/wm-xcb.h"
 
@@ -22,7 +21,6 @@ main(int argc, char** argv)
   setup_signals();
   setup_xcb();
   setup_ewmh();
-  setup_state_machine();
 
   /* Initialize hub first */
   hub_init();
@@ -35,7 +33,6 @@ main(int argc, char** argv)
     LOG_ERROR("The window manager did not start: a component failed to initialize");
     wm_components_shutdown();
     config_shutdown();
-    destruct_state_machine();
     destruct_ewmh();
     destruct_xcb();
     return 1;
@@ -67,7 +64,6 @@ main(int argc, char** argv)
   config_shutdown();
 
   /* Cleanup core systems */
-  destruct_state_machine();
   destruct_ewmh();
   destruct_xcb();
   return 0;

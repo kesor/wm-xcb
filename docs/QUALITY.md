@@ -665,11 +665,8 @@ size, and that failed a merge whose unit suite passed.
 
 A file at 0% is the useful number. One source file is still never executed by
 any unit test: `src/components/connection-sm.c` (the state machine with no
-instance). `src/core/wm-states.c` was another until `tests/unit/test-wm-states.c` drove
-key, button and enter events through it; the transition table it consults still
-matches no row, for the reason `docs/architecture/state-machine.md` records. A
-branch percentage in single digits on the monitor manager is the same signal:
-the code is there, and nothing proves it runs.
+instance). A branch percentage in single digits on the monitor manager is the
+same signal: the code is there, and nothing proves it runs.
 
 **Fuzzing.** `scripts/fuzz.sh` builds `tests/fuzz/fuzz-*.c` with clang, ASan and
 UBSan, and runs each for the seconds given. The two harnesses feed the X event

@@ -306,7 +306,7 @@ static void config_wire_keybindings(void) {
 ### Problem (RESOLVED)
 
 Configuration has been decoupled from components:
-- `src/config/config.def.h` provides generic config (rules, gaps, borders, transitions)
+- `src/config/config.def.h` provides generic config (rules, gaps, borders)
 - `src/config/config.wm.def.h` wires keybindings to action names
 - Neither config nor keybinding component hardcodes the wiring
 
@@ -314,7 +314,6 @@ Configuration has been decoupled from components:
 
 **Generic config system (`src/config/config.def.h`):**
 - Provides `FloatRule`, `TagRule`, `GapConfig`, `BorderConfig`
-- State machine transitions for mouse/keyboard interactions
 - No knowledge of keybindings or specific action types
 
 **WM-specific wiring (`src/config/config.wm.def.h`):**

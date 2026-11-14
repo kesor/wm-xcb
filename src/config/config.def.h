@@ -5,8 +5,6 @@
 #include <stdint.h>
 #include <xcb/xcb.h>
 
-#include "src/core/wm-states.h"
-
 /* Forward declarations */
 typedef struct KeyBinding KeyBinding;
 
@@ -21,32 +19,6 @@ typedef struct KeyBinding KeyBinding;
  * lines, and config.wm.def.h registers the compiled fallback, both through
  * keybinding_binding_register(). This header stays free of that wiring.
  */
-
-/*
- * ============================================================================
- * STATE MACHINE TRANSITIONS
- * ============================================================================
- *
- * State machine transitions for mouse/keyboard interactions.
- * This defines how the window manager reacts to user input.
- *
- * Read by src/core/wm-states.c. config.c includes this header for the window
- * rules and never walks this table, so the definition is marked unused: without
- * that, the debug build reports it as a dead variable in config.c's translation
- * unit.
- */
-
-static struct StateTransition transitions[] __attribute__((unused)) = {
-  /* hover window type , combination of buttons and keys , event type , state to move from , state to move into */
-  { WndTypeClient, EventTypeBtnPress,   KeyShift, 1, 0,    STATE_IDLE,          STATE_WINDOW_MOVE   },
-  { WndTypeClient, EventTypeBtnRelease, KeyNone,  1, 0,    STATE_WINDOW_MOVE,   STATE_IDLE          },
-
-  { WndTypeClient, EventTypeBtnPress,   KeyShift, 3, 0,    STATE_IDLE,          STATE_WINDOW_RESIZE },
-  { WndTypeClient, EventTypeBtnRelease, 0,        3, 0,    STATE_WINDOW_RESIZE, STATE_IDLE          },
-
-  { WndTypeRoot,   EventTypeBtnPress,   KeyMod1,  1, 0,    STATE_IDLE,          STATE_WINDOW_MOVE   },
-  { WndTypeRoot,   EventTypeKeyPress,   KeyShift, 0, XK_A, STATE_IDLE,          STATE_IDLE          },
-};
 
 /*
  * ============================================================================

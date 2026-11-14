@@ -6,9 +6,8 @@
  * docs/configuration.md is the file a user edits instead of this header.
  *
  * This file:
- * 1. Includes wm-states.h for StateTransition types
- * 2. Includes keybinding-binding.h for binding registration API
- * 3. Defines config_wire_keybindings() to register default keybindings
+ * 1. Includes keybinding-binding.h for binding registration API
+ * 2. Defines config_wire_keybindings() to register default keybindings
  *
  * The config system is decoupled - config.def.h provides generic config
  * (rules, gaps, borders) while this file handles WM-specific wiring.
@@ -17,12 +16,6 @@
 
 #ifndef CONFIG_WM_H
 #define CONFIG_WM_H
-
-/*
- * Base configuration types
- * wm-states.h defines StateTransition used in config.def.h
- */
-#include "src/core/wm-states.h"
 
 /*
  * Keybinding registration API

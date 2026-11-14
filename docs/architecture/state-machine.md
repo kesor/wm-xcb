@@ -108,10 +108,6 @@ a fixture, so neither is what the gate refuses.
 
 The tracked values that are still public, and why:
 
-- **`struct Context.state`** in `src/core/wm-states.h` is the pre-hub transition table's
-  state. Only `src/core/wm-states.c` and its test write it, and the table is due for
-  removal in favour of the component that owns pointer input, so it does not earn
-  an accessor layer first. wm-46k.15 tracks that subsystem.
 - **`Client.tags`** is the set of tags the client is assigned to, not exclusive
   state, and it is written through `client_set_tags()`, `client_add_tag()` and
   `client_remove_tag()`.
@@ -491,23 +487,23 @@ const char* sm_get_state_name(StateMachine* sm, uint32_t state);
 
 ---
 
-## The pre-hub state machine in `src/core/wm-states.c`
+## Pointer move and resize
 
-`src/core/wm-states.c` predates this framework and is still linked into the WM. It keeps
-one global `struct Context` for the whole display. `dispatch_event()` in
-`src/core/wm-xcb.c` calls `handle_state_event()` after the handler registry for every
-event that is not an X error. A key or button event is matched against
-`transitions[]` in `src/config/config.def.h`, and the function of the current state is
-called.
-
-No row matches. `window_target_type` is set only from `EnterNotify`, and that
-event returns before the table is consulted, so a button or key event has
-`WndTypeNone` and every row requires a client or the root. The `Shift+Button1`
-and `Alt+Button1` rows therefore do not change state. The actions are stubs
-either way: `state_window_move()` and `state_window_resize()` log and return.
-Pointer move and resize are not implemented. Behaviour belongs in a component's
-state machine, not in that table; the table stays until the component that owns
-pointer input exists.
+Dragging a window does not move or resize it, and no code does that today. The
+pre-hub input state machine that used to live in `src/core/wm-states.c`, with its
+`transitions[]` table in `src/config/config.def.h`, was removed instead of fixed:
+no event could reach a row, so it changed nothing. `window_target_type` came from
+`EnterNotify`, which returned before the table was read, so a key or button event
+reached the matcher with `WndTypeNone` while every row asked for a client or the
+root. A press on the root does reach the WM. `check_no_running_wm()` selects only
+`SUBSTRUCTURE_REDIRECT` to claim the display, and `setup_xcb()` then replaces that
+mask with `0x00ffffff`, the first 24 core event bits, which includes `ButtonPress`.
+A managed client selects enter, leave and property change. The button rows still
+matched nothing, because the type was cleared before the lookup. The one key row
+stored `XK_A` where the matcher compares a keycode. The actions logged and
+returned in any case. Moving and resizing belong to the pointer component, which
+owns pointer input and places the button grab itself: `docs/extensions/resizecorners.md`
+describes the shape for the corner case, and wm-rh6.3 tracks that component.
 
 ---
 

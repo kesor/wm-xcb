@@ -7,20 +7,28 @@
 # has gained criteria fails until --update-baseline moves the id into the
 # protected list: deleting the line by hand leaves that text unprotected,
 # so a wipe of it can be recorded here as debt and the gate will pass.
+wm-y3e.3.1
+wm-y3e.1.3
+wm-y3e.1.2
+wm-y3e.1.1
+wm-6iz.2.2
+wm-6iz.2.1
+wm-6iz.1.2
+wm-6iz.1.1
 wm-lwj.3
 wm-lwj.1
 wm-opa.2
-wm-lwj
 wm-opa.1
 wm-dfg.241
-wm-opa
 wm-y3e.3
 wm-y3e.2
 wm-y3e.1
-wm-y3e
 wm-6iz.3
 wm-6iz.2
 wm-6iz.1
+wm-lwj
+wm-opa
+wm-y3e
 wm-6iz
 wm-jpo.7
 wm-dfg.221
@@ -69,13 +77,9 @@ wm-dfg.163
 wm-9n0.30
 wm-9n0.29
 wm-9n0.25
-wm-46k.15
 wm-4f6.22
-wm-46k.14
 wm-dfg.109
 wm-dfg.100
-wm-lle.7
-wm-rh6.8
 wm-dfg.95
 wm-dfg.84
 wm-dfg.83
