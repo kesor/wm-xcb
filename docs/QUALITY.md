@@ -592,8 +592,8 @@ the Makefile compiles, the tools included. `make -s print-src` is not that list,
 and the hook hands the gate the files a commit stages. Neither one holds a file
 nobody touched, so a function that has been over the floor since before the gate
 learned it failed the first commit that edited its file, reading as that commit's
-doing. `tools/xclient.c`'s `main` is at 33 and has an entry: a copy with the
-getopt loop taken out measures `main` at 24, still over the floor, so the entry
+doing. `tools/xclient.c`'s `main` is at 35 and has an entry: a copy with the
+getopt loop taken out measures `main` at 26, still over the floor, so the entry
 is needed either way. clang-tidy charges a `switch` once and a `case` label
 nothing, so a table of flags is not what makes that number.
 
