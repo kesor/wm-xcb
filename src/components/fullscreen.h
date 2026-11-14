@@ -12,6 +12,8 @@
  *
  * XCB Events Handled:
  * - XCB_PROPERTY_NOTIFY - listen for _NET_WM_STATE changes
+ * - XCB_CLIENT_MESSAGE - a client asks for a _NET_WM_STATE change, and a
+ *   request naming _NET_WM_STATE_FULLSCREEN goes through the state machine
  *
  * Events Emitted:
  * - EVT_FULLSCREEN_ENTERED - client entered fullscreen mode
@@ -173,6 +175,20 @@ void fullscreen_update_x_property(Client* c, bool fullscreen);
  * Called by xcb_handler_dispatch() when a property changes on a client window.
  */
 void fullscreen_on_property_notify(void* event);
+
+/*
+ * ClientMessage handler for a client's _NET_WM_STATE request.
+ *
+ * EWMH gives the property to the WM, so a client asks for a change with a
+ * ClientMessage to the root window: data.data32[0] is 0 remove, 1 add or 2
+ * toggle, and data.data32[1] and data32[2] hold up to two atoms. A message
+ * naming _NET_WM_STATE_FULLSCREEN whose requested state differs from the
+ * client's machine sends REQ_CLIENT_FULLSCREEN; a message that asks for the
+ * state the machine is already in is dropped, because that request is a toggle.
+ * Every other message - another atom, another type, a window this WM does not
+ * manage, a format other than 32 - is ignored.
+ */
+void fullscreen_on_client_message(void* event);
 
 /*
  * The queue of _NET_WM_STATE reads in flight, walked by the loop's poll

@@ -198,7 +198,7 @@ void monitor_manager_randr_handler(void* event) {
 | `XCB_CONFIGURE_REQUEST` | floating, tiling | May `hub_send_request()` |
 | `XCB_EXPOSE` | bar | `hub_emit(EVT_BAR_DRAW)` |
 | `first_event + XCB_RANDR_NOTIFY` | monitor-manager | A CRTC change applies the geometry the event carries, then `hub_send_request(REQ_MONITOR_TILE)` |
-| `XCB_CLIENT_MESSAGE` | ewmh-desktop | `_NET_CURRENT_DESKTOP` becomes `REQ_TAG_VIEW` |
+| `XCB_CLIENT_MESSAGE` | ewmh-desktop, fullscreen | `_NET_CURRENT_DESKTOP` becomes `REQ_TAG_VIEW`; a `_NET_WM_STATE` request naming `_NET_WM_STATE_FULLSCREEN` becomes `REQ_CLIENT_FULLSCREEN` when it disagrees with the client's machine |
 
 ## EWMH atoms
 
@@ -220,10 +220,18 @@ one-atom list holding `_NET_WM_STATE_FULLSCREEN`, or to an empty list, with
 `_NET_WM_STATE_FULLSCREEN` is the only flag the WM sets, so the list it writes
 holds that atom or nothing.
 
-The other half of that protocol is not implemented: a client asking for a state
-change sends a `_NET_WM_STATE` ClientMessage to the root window. The
-ClientMessage handler only answers `_NET_CURRENT_DESKTOP`, so a state request
-is ignored.
+The other half of that protocol is a client asking for a state change with a
+`_NET_WM_STATE` ClientMessage to the root window: `data.data32[0]` is 0 remove,
+1 add or 2 toggle, and `data.data32[1]` and `data.data32[2]` hold up to two
+atoms. The fullscreen component registers its own ClientMessage handler beside
+the desktop one - the handler registry takes more than one handler per event
+type - and answers the message when it names `_NET_WM_STATE_FULLSCREEN`. It
+compares the state requested with the client's fullscreen machine and sends
+`REQ_CLIENT_FULLSCREEN` only when they differ, because that request is a
+toggle: a repeated ADD for a window that is already fullscreen changes nothing.
+A message in a format other than 32, naming another atom, of another type, or
+about a window this WM does not manage is dropped, and `_NET_WM_STATE_FULLSCREEN`
+is the only flag the WM acts on.
 
 ---
 
