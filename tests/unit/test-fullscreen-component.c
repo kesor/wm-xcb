@@ -571,12 +571,156 @@ test_fullscreen_reply_apply_does_not_bump_generation(void)
   fullscreen_reply_test_shutdown(saved);
 }
 
+/*
+ * A fake EWMH connection for the client-message handler. Nothing is sent: the
+ * handler only compares a message's type and atoms with these values.
+ */
+#define TEST_WM_STATE_ATOM        5151u
+#define TEST_UNRELATED_STATE_ATOM 5152u
+
+static void
+wm_state_message(xcb_client_message_event_t* message,
+                 xcb_window_t                window,
+                 uint32_t                    action,
+                 xcb_atom_t                  first,
+                 xcb_atom_t                  second)
+{
+  memset(message, 0, sizeof *message);
+  message->type           = TEST_WM_STATE_ATOM;
+  message->format         = 32;
+  message->window         = window;
+  message->data.data32[0] = action;
+  message->data.data32[1] = first;
+  message->data.data32[2] = second;
+}
+
+/*
+ * A client's own _NET_WM_STATE request is the only way it can make itself
+ * fullscreen: EWMH gives the property to the WM. The request asks for a state,
+ * and the request it sends to the fullscreen machine is a toggle, so the
+ * comparison before the request is what keeps a repeated ADD from unfullscreening
+ * the window.
+ */
+void
+test_fullscreen_client_message_request(void)
+{
+  LOG_CLEAN("== Testing a client's _NET_WM_STATE request moves the fullscreen machine");
+
+  xcb_ewmh_connection_t* saved = ewmh;
+  xcb_ewmh_connection_t  fake_ewmh;
+  memset(&fake_ewmh, 0, sizeof fake_ewmh);
+  fake_ewmh._NET_WM_STATE            = TEST_WM_STATE_ATOM;
+  fake_ewmh._NET_WM_STATE_FULLSCREEN = TEST_FULLSCREEN_ATOM;
+  ewmh                               = &fake_ewmh;
+
+  hub_init();
+  sm_registry_init();
+  xcb_handler_init();
+  client_list_init();
+  action_registry_init();
+  fullscreen_component_init();
+
+  /* The template's actions write the property, and this fake connection is not
+     one to send on. The counters answer the same question: did the request
+     reach the row the template declares? */
+  fake_enter_calls = 0;
+  fake_exit_calls  = 0;
+  sm_unregister_action("fs_action_enter_fullscreen");
+  sm_register_action("fs_action_enter_fullscreen", fake_enter_fullscreen);
+  sm_unregister_action("fs_action_exit_fullscreen");
+  sm_register_action("fs_action_exit_fullscreen", fake_exit_fullscreen);
+
+  Client* c = client_create(705);
+  assert_or_abort(c != NULL);
+  client_set_managed(c, true);
+
+  xcb_client_message_event_t message;
+
+  /* ADD, with the fullscreen atom in the first of the two slots. */
+  wm_state_message(&message, c->window, 1, TEST_FULLSCREEN_ATOM, 0);
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+  assert(fake_enter_calls == 1);
+
+  /* The same ADD again: the window is already fullscreen, so nothing moves. */
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+  assert(fake_enter_calls == 1);
+  assert(fake_exit_calls == 0);
+
+  /* REMOVE twice: only the first is a change. */
+  wm_state_message(&message, c->window, 0, TEST_FULLSCREEN_ATOM, 0);
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+  assert(fake_exit_calls == 1);
+
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+  assert(fake_exit_calls == 1);
+
+  /* TOGGLE follows the machine, whichever state it is in. */
+  wm_state_message(&message, c->window, 2, TEST_FULLSCREEN_ATOM, 0);
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_WINDOWED);
+
+  /* _NET_WM_STATE names two atoms; the fullscreen one can be in the second. */
+  wm_state_message(&message, c->window, 1, TEST_UNRELATED_STATE_ATOM,
+                   TEST_FULLSCREEN_ATOM);
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  /* Everything a request is not: another atom, another format, another type,
+     an unmanaged window, an action EWMH does not number, and no message at all.
+     None of them moves the machine. */
+  wm_state_message(&message, c->window, 0, TEST_UNRELATED_STATE_ATOM, 0);
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  wm_state_message(&message, c->window, 0, TEST_FULLSCREEN_ATOM, 0);
+  message.format = 8;
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  wm_state_message(&message, c->window, 0, TEST_FULLSCREEN_ATOM, 0);
+  message.type = TEST_UNRELATED_STATE_ATOM;
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  wm_state_message(&message, 9999, 0, TEST_FULLSCREEN_ATOM, 0);
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  wm_state_message(&message, c->window, 3, TEST_FULLSCREEN_ATOM, 0);
+  fullscreen_on_client_message(&message);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  fullscreen_on_client_message(NULL);
+  assert(fullscreen_get_state(c) == FULLSCREEN_STATE_FULLSCREEN);
+
+  sm_unregister_action("fs_action_enter_fullscreen");
+  sm_register_action("fs_action_enter_fullscreen", fullscreen_action_enter_fullscreen);
+  sm_unregister_action("fs_action_exit_fullscreen");
+  sm_register_action("fs_action_exit_fullscreen", fullscreen_action_exit_fullscreen);
+
+  ewmh = saved;
+  client_list_shutdown();
+  fullscreen_component_shutdown();
+  action_registry_shutdown();
+  xcb_handler_shutdown();
+  sm_registry_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(FullscreenComponent, {
   test_fullscreen_action_registered();
   test_fullscreen_toggle_action();
   test_fullscreen_init_requires_action_registry();
   test_fullscreen_request_refused_for_unmanaged_client();
   test_fullscreen_request_runs_the_template_action();
+  test_fullscreen_client_message_request();
   test_fullscreen_state_read_applies_oldest_first();
   test_fullscreen_state_read_stops_at_unarrived_head();
   test_fullscreen_stale_reply_does_not_overwrite_local_write();

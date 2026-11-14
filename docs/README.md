@@ -109,7 +109,13 @@ Short version:
   its border inside it, `_NET_WM_STATE` on the window lists
   `_NET_WM_STATE_FULLSCREEN`, another window on that monitor is tiled as if the
   fullscreen one were not there, and the same key puts the window back into the
-  layout and removes the atom; `MOD+Shift+space` takes the focused client out
+  layout and removes the atom; a client asking for the same thing with a
+  `_NET_WM_STATE` ClientMessage to the root window gets it, so a video player or
+  a browser pressing F11 and not MOD+f is fullscreen by the same definition, and
+  a repeated ADD of a state the window already has changes nothing
+  (`tests/x/test-21-fullscreen-client-message.sh` pins that against a live
+  server);
+  `MOD+Shift+space` takes the focused client out
   of the layout, so the clients left in it get the area it gave up, and the
   same key gives it a tiled slot again; while it floats it keeps its size
   through the tag switches made in between, and a window a `float` rule names

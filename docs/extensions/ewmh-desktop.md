@@ -71,8 +71,10 @@ file (`docs/configuration.md`).
 
 - `_NET_WM_DESKTOP` as a client message: a pager can ask to switch desktops, not
   to move a window between them.
-- `_NET_ACTIVE_WINDOW`, `_NET_CLOSE_WINDOW`, `_NET_WM_STATE` messages from a
-  panel.
+- `_NET_ACTIVE_WINDOW` and `_NET_CLOSE_WINDOW` messages from a panel.
+- A `_NET_WM_STATE` request for a flag other than `_NET_WM_STATE_FULLSCREEN`:
+  the fullscreen component answers the fullscreen one, and this component
+  ignores the rest.
 - A tag name changed at runtime does not rewrite `_NET_DESKTOP_NAMES`.
 - `_NET_DESKTOP_VIEWPORT` is written but never anything other than zero.
 

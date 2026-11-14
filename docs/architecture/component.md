@@ -136,6 +136,7 @@ void handle_xcb_events() {
 | XCB_ENTER_NOTIFY | focus_handler |
 | XCB_FOCUS_IN | focus_handler |
 | XCB_PROPERTY_NOTIFY | fullscreen_handler, urgency_handler |
+| XCB_CLIENT_MESSAGE | ewmh_desktop_on_client_message, fullscreen_on_client_message |
 | XCB_CREATE_NOTIFY | client_list_handler |
 | XCB_DESTROY_NOTIFY | client_list_handler |
 | XCB_MAP_REQUEST | client_list_handler |
