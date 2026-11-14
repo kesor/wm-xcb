@@ -9,6 +9,8 @@
  * - Executor that handles REQ_CLIENT_FULLSCREEN by transitioning the client's
  *   machine, whose action issues the X property change
  * - Listener for PROPERTY_NOTIFY to sync external _NET_WM_STATE changes
+ * - Handler for CLIENT_MESSAGE, turning a client's _NET_WM_STATE request into
+ *   the same request a keybinding sends
  * - Guards and actions registered with SM registry
  */
 
@@ -438,9 +440,10 @@ fullscreen_set_state(Client* c, FullscreenState state)
  * Update the _NET_WM_STATE X property to reflect fullscreen state.
  *
  * EWMH gives the window manager this property: a client asks for a change with
- * a ClientMessage to the root window, and the WM writes the list. Asking for
- * the change with a ClientMessage addressed to the WM itself reached nobody -
- * no component handles ClientMessage - so the property was never written.
+ * a ClientMessage to the root window, and the WM writes the list. The action on
+ * each transition is the only caller, so every path into the machine - a
+ * keybinding, or a client's own request through fullscreen_on_client_message()
+ * - writes the same property, and a refused transition writes nothing.
  *
  * _NET_WM_STATE_FULLSCREEN is the only flag this WM sets, so the list holds
  * that atom or nothing. A second flag (hidden, demands-attention) has to be
@@ -805,6 +808,86 @@ fullscreen_on_property_notify(void* event)
 }
 
 /*
+ * The three actions EWMH numbers in data.data32[0] of a _NET_WM_STATE
+ * ClientMessage. Any other value is not a request this protocol defines.
+ */
+#define EWMH_STATE_REMOVE 0
+#define EWMH_STATE_ADD    1
+#define EWMH_STATE_TOGGLE 2
+
+/*
+ * The state a request asks for, given the state the machine is in.
+ */
+static bool
+fullscreen_requested_state(uint32_t action, bool current)
+{
+  switch (action) {
+  case EWMH_STATE_ADD:
+    return true;
+  case EWMH_STATE_REMOVE:
+    return false;
+  default:
+    return !current;
+  }
+}
+
+/*
+ * A client asked for a _NET_WM_STATE change with a ClientMessage to the root
+ * window. EWMH gives the property to the WM, so the request is the only way a
+ * client can make itself fullscreen; without this handler a video player or a
+ * browser pressing F11 changed nothing.
+ *
+ * The message is a request, not a state: it goes through the same
+ * REQ_CLIENT_FULLSCREEN a keybinding sends, and the executor decides. That
+ * request asks for the other state of the machine, so the state the message
+ * asks for is compared with the client's first: a repeated ADD with the window
+ * already fullscreen must not come back as a toggle that unfullscreens it.
+ */
+void
+fullscreen_on_client_message(void* event)
+{
+  xcb_client_message_event_t* message = (xcb_client_message_event_t*) event;
+
+  if (message == NULL || ewmh == NULL || message->type != ewmh->_NET_WM_STATE)
+    return;
+
+  /* The request changes the client's state, so a message whose data is not the
+     CARD32 list EWMH defines is dropped instead of read as one. */
+  if (message->format != 32) {
+    LOG_DEBUG("fullscreen: ignoring a _NET_WM_STATE message in format %u",
+              (unsigned) message->format);
+    return;
+  }
+
+  /* _NET_WM_STATE names up to two atoms and either can be the fullscreen one.
+     A message that names neither is about a flag this component does not set. */
+  if (message->data.data32[1] != ewmh->_NET_WM_STATE_FULLSCREEN &&
+      message->data.data32[2] != ewmh->_NET_WM_STATE_FULLSCREEN)
+    return;
+
+  uint32_t action = message->data.data32[0];
+  if (action > EWMH_STATE_TOGGLE) {
+    LOG_DEBUG("fullscreen: ignoring _NET_WM_STATE action %u", action);
+    return;
+  }
+
+  Client* c = client_get_by_window(message->window);
+  if (c == NULL) {
+    LOG_DEBUG("fullscreen: _NET_WM_STATE request names window %u, which is not managed",
+              message->window);
+    return;
+  }
+
+  bool current = fullscreen_is_fullscreen(c);
+  if (fullscreen_requested_state(action, current) == current)
+    return;
+
+  LOG_DEBUG("fullscreen: window %u asked for action %u of _NET_WM_STATE_FULLSCREEN",
+            c->window, action);
+  hub_send_request(REQ_CLIENT_FULLSCREEN, c->target.id);
+}
+
+/*
  * Component initialization
  */
 bool
@@ -868,6 +951,26 @@ fullscreen_component_init(void)
   if (result != 0) {
     LOG_ERROR("Failed to register PROPERTY_NOTIFY handler for fullscreen component");
     /* Unregister from hub since we're not fully initialized */
+    hub_unregister_component(FULLSCREEN_COMPONENT_NAME);
+    sm_unregister_guard("fs_guard_can_fullscreen");
+    sm_unregister_guard("fs_guard_can_unfullscreen");
+    sm_unregister_action("fs_action_enter_fullscreen");
+    sm_unregister_action("fs_action_exit_fullscreen");
+    action_unregister(fullscreen_action.name);
+    fullscreen_component_reset();
+    return false;
+  }
+
+  /* A second handler on CLIENT_MESSAGE is what the registry is for: the
+     ewmh-desktop component answers _NET_CURRENT_DESKTOP on the same event. */
+  result = xcb_handler_register(
+      XCB_CLIENT_MESSAGE,
+      &fullscreen_component.base,
+      fullscreen_on_client_message);
+
+  if (result != 0) {
+    LOG_ERROR("Failed to register CLIENT_MESSAGE handler for fullscreen component");
+    xcb_handler_unregister_component(&fullscreen_component.base);
     hub_unregister_component(FULLSCREEN_COMPONENT_NAME);
     sm_unregister_guard("fs_guard_can_fullscreen");
     sm_unregister_guard("fs_guard_can_unfullscreen");
