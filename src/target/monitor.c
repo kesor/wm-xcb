@@ -9,8 +9,10 @@
  * - Hub registration
  * - State machine storage for components
  *
- * Features like tiling, bar display, and client associations are
- * implemented as separate components that query monitors via the Hub.
+ * Features like tiling and bar display are implemented as separate
+ * components that query monitors via the Hub. A client keeps a pointer to the
+ * monitor it is on, so destroying one moves the clients it held onto the
+ * monitor a new client would get, or onto none when it was the last.
  */
 
 #include <stdlib.h>
@@ -18,6 +20,7 @@
 
 #include "src/core/wm-hub.h"
 #include "src/core/wm-log.h"
+#include "src/target/client.h"
 #include "src/target/monitor.h"
 
 /*
@@ -324,6 +327,13 @@ monitor_destroy(Monitor* m)
   if (selected_monitor == m) {
     selected_monitor = monitor_list_get_first();
   }
+
+  /*
+   * Before the free and after the list lost this monitor: a client holds a
+   * Monitor* for its whole life, and nothing else clears it, so every client
+   * this monitor held would read a freed target id in its next tile request.
+   */
+  client_rehome_from_monitor(m);
 
   /*
    * Unregister first: the components' unadopt hooks run here, and they reach
