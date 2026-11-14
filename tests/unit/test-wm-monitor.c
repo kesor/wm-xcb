@@ -577,8 +577,8 @@ test_monitor_destroy_rehomes_its_clients(void)
   assert(first_monitor == stays);
   assert(second_monitor == stays);
 
-  /* The criterion in the bead is list membership, not the identity of the
-   * monitor: what a client must not hold is memory the list has dropped. */
+  /* List membership, not only which monitor survived: what a client must not
+   * hold is memory the list has dropped. */
   bool first_listed  = false;
   bool second_listed = false;
   for (Monitor* m = monitor_list_get_first(); m != NULL; m = monitor_list_get_next(m)) {
@@ -592,6 +592,98 @@ test_monitor_destroy_rehomes_its_clients(void)
   client_destroy(first);
   client_destroy(second);
   monitor_destroy(stays);
+  monitor_list_shutdown();
+  client_list_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * The survivor in the test above is both the selected monitor and the list
+ * head, so it cannot tell those apart. A client on the destroyed monitor goes
+ * to the selected one. A client already on another monitor stays there.
+ */
+void
+test_monitor_destroy_rehomes_to_the_selected_monitor(void)
+{
+  LOG_CLEAN("== Testing monitor destroy re-homes to the selected monitor");
+
+  hub_init();
+  monitor_list_init();
+  client_list_init();
+
+  Monitor* kept = monitor_create(140);
+  Monitor* head = monitor_create(141);
+  assert_or_abort(kept != NULL && head != NULL);
+  assert(monitor_list_get_first() == head);
+
+  monitor_set_selected(head);
+  Client* on_head = client_create(0x400003);
+  assert_or_abort(on_head != NULL);
+  assert(client_get_monitor(on_head) == head);
+
+  monitor_set_selected(kept);
+  Client* on_kept = client_create(0x400004);
+  assert_or_abort(on_kept != NULL);
+  assert(client_get_monitor(on_kept) == kept);
+
+  Monitor* gone = monitor_create(142);
+  assert_or_abort(gone != NULL);
+  assert(monitor_get_selected() == gone);
+  assert(monitor_list_get_first() == gone);
+
+  Client* moved = client_create(0x400005);
+  assert_or_abort(moved != NULL);
+  assert(client_get_monitor(moved) == gone);
+
+  monitor_set_selected(kept);
+  monitor_destroy(gone);
+
+  assert(client_get_monitor(moved) == kept);
+  assert(client_get_monitor(on_head) == head);
+  assert(client_get_monitor(on_kept) == kept);
+  assert(monitor_list_get_first() == head);
+
+  client_destroy(moved);
+  client_destroy(on_head);
+  client_destroy(on_kept);
+  monitor_destroy(head);
+  monitor_destroy(kept);
+  monitor_list_shutdown();
+  client_list_shutdown();
+  hub_shutdown();
+}
+
+/*
+ * No monitor left is not a member of the list walk. The pointer has to be
+ * cleared: leaving it would be the freed monitor.
+ */
+void
+test_monitor_destroy_clears_clients_when_it_was_the_last(void)
+{
+  LOG_CLEAN("== Testing monitor destroy with no monitor left clears the clients");
+
+  hub_init();
+  monitor_list_init();
+  client_list_init();
+
+  Monitor* only = monitor_create(132);
+  assert_or_abort(only != NULL);
+
+  Client* first  = client_create(0x400006);
+  Client* second = client_create(0x400007);
+  assert_or_abort(first != NULL && second != NULL);
+  assert(client_get_monitor(first) == only);
+  assert(client_get_monitor(second) == only);
+
+  monitor_destroy(only);
+
+  assert(client_get_monitor(first) == NULL);
+  assert(client_get_monitor(second) == NULL);
+  assert(monitor_list_get_first() == NULL);
+  assert(monitor_get_selected() == NULL);
+
+  client_destroy(first);
+  client_destroy(second);
   monitor_list_shutdown();
   client_list_shutdown();
   hub_shutdown();
@@ -613,4 +705,6 @@ TEST_GROUP(Monitor, {
   test_monitor_set_sm_null_destroys_stored_machine();
   test_monitor_destroy_unadopts_before_freeing_machines();
   test_monitor_destroy_rehomes_its_clients();
+  test_monitor_destroy_rehomes_to_the_selected_monitor();
+  test_monitor_destroy_clears_clients_when_it_was_the_last();
 });

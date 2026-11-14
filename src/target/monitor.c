@@ -11,8 +11,8 @@
  *
  * Features like tiling and bar display are implemented as separate
  * components that query monitors via the Hub. A client keeps a pointer to the
- * monitor it is on, so destroying one also moves the clients it held to a
- * monitor that stays.
+ * monitor it is on, so destroying one moves the clients it held onto the
+ * monitor a new client would get, or onto none when it was the last.
  */
 
 #include <stdlib.h>

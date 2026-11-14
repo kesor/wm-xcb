@@ -23,5 +23,7 @@ void test_monitor_set_sm_null_removes_entry(void);
 void test_monitor_set_sm_null_destroys_stored_machine(void);
 void test_monitor_destroy_unadopts_before_freeing_machines(void);
 void test_monitor_destroy_rehomes_its_clients(void);
+void test_monitor_destroy_rehomes_to_the_selected_monitor(void);
+void test_monitor_destroy_clears_clients_when_it_was_the_last(void);
 
 #endif /* _TEST_WM_MONITOR_H_ */

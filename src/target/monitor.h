@@ -16,7 +16,8 @@
  *
  * Features like tiling and bar display are implemented as separate components
  * that query monitors via the Hub. A client keeps a pointer to its monitor, so
- * monitor_destroy() moves the clients it held to a monitor that stays.
+ * monitor_destroy() moves the clients it held onto the monitor a new client
+ * would get, or onto none when it was the last.
  */
 
 #ifndef _MONITOR_H_
