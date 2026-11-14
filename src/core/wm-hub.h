@@ -56,6 +56,7 @@ enum {
   REQ_CLIENT_FLOAT      = 30,
   REQ_CLIENT_TILE       = 40,
   REQ_CLIENT_VISIBLE    = 50,
+  REQ_CLIENT_FOCUS      = 60,
 };
 
 /*

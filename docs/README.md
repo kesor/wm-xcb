@@ -134,6 +134,9 @@ Short version:
   the focus component points the X input focus at the focused window with
   `xcb_set_input_focus`, a newly managed client takes focus, and the newest
   remaining client takes it back when the focused one is unmanaged or destroyed.
+  Another component can ask for focus with `REQ_CLIENT_FOCUS`, which moves the
+  same machine a pointer crossing moves and emits `EVT_CLIENT_FOCUS_FAILED`
+  instead of focusing a window that cannot take it.
   The keys come from the user's config file when it names a binding this keyboard
   can use, and from `src/config/config.wm.def.h` otherwise, and are grabbed on the root
   window when the keybinding component starts, with the CapsLock and NumLock

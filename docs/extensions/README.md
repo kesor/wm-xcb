@@ -1,6 +1,6 @@
 # Extension Registry
 
-*Last updated: 2026-11-06*
+*Last updated: 2026-11-14*
 
 This directory contains design documents for all planned extensions for the `./wm/` window manager. Each extension is designed as a **Component** that registers with the Hub. The audit below records which designs can be built that way today and which cannot.
 
@@ -55,8 +55,8 @@ A design is recorded under the strictest verdict it needs:
 | [gap](gap.md) | core edit | an inset on every side of each tiled area, and the gap size per monitor | tiling computes its areas from the monitor rectangle and reads no inset, so the arrange pass has to learn about it. The work area (wm-46k.18) lets a component supply the rectangle; GapSM on the monitor is new state, and additive once the work area exists. |
 | [pertag](pertag.md) | core edit | per-tag layout, mfact, nmaster, focused client, and bar state | `tiling_get_mfact()` and `tiling_get_nmaster()` return component defaults and discard the monitor, so a restored value has nowhere to land. Layout parameters on the monitor (wm-46k.20). `src/components/pertag.c` already keeps the per-tag arrays. |
 | [floatpos](floatpos.md) | additive | a matching rule on manage and on float, then a geometry write | the rules are readable (`config_get_float_rules()`, `config_should_float()`), the floating request and the managed and floated events exist, and `client_configure()` writes the rectangle. A per-client rule override would add a Client machine. |
-| [urgency](urgency.md) | core edit | urgency state on the client, a bar indicator, and focus of a visible urgent client | focus has no request at all, so auto-focus would edit the focus component (wm-46k.22). `Client.urgent` is a plain field today (wm-46k.17), and the indicator needs the bar component (wm-rh6.4). |
-| [scratchpad](scratchpad.md) | core edit | a scratch key per client, a tag mask the tag manager applies, and focus when shown | `REQ_TAG_CLIENT_MOVE` replaces the client's tags with one tag bit, so it cannot clear the set or apply a whole view that shows several tags; a request carrying an arbitrary mask is wm-46k.21. Focus: wm-46k.22. |
+| [urgency](urgency.md) | new state | urgency state on the client, a bar indicator, and focus of a visible urgent client | focus now takes a `REQ_CLIENT_FOCUS` (wm-46k.22), so auto-focus is a request. `Client.urgent` is a plain field today (wm-46k.17) and becomes a machine on the client, and the indicator needs the bar component (wm-rh6.4). No core edit remains. |
+| [scratchpad](scratchpad.md) | core edit | a scratch key per client, a tag mask the tag manager applies, and focus when shown | `REQ_TAG_CLIENT_MOVE` replaces the client's tags with one tag bit, so it cannot clear the set or apply a whole view that shows several tags; a request carrying an arbitrary mask is wm-46k.21. Focus goes through `REQ_CLIENT_FOCUS` (wm-46k.22). |
 | [bstack](bstack.md) | core edit | a second arrange algorithm the monitor can select | the layout machine has one value, `LAYOUT_STATE_TILE`, and the arrange pass is a fixed call in the tiling component: layout registry (wm-46k.19). |
 | [cfact](cfact.md) | core edit | a per-client factor the arrange pass reads | the arrange pass is a fixed function in the tiling component, so cfact has to edit it: layout registry (wm-46k.19), plus a Client machine for the factor. |
 | [actualfullscreen](actualfullscreen.md) | core edit | a fullscreen rectangle that differs from the layout area, and a decision about the bar | `tiling_place_fullscreen_clients()` gives every fullscreen client the monitor rectangle and asks no machine for it: work area (wm-46k.18). Depends on the bar (wm-rh6.4). |
@@ -66,7 +66,7 @@ A design is recorded under the strictest verdict it needs:
 | [bar-style](bar-style.md) | core edit | a bar window per monitor and a strip tiling leaves to it | no bar component exists (wm-rh6.4), and tiling arranges over the whole monitor rectangle: work area (wm-46k.18). |
 | [attach-policy](attach-policy.md) | core edit | an insertion position decided before the client is attached | `client_list_add()` always inserts at the head, and it runs inside client creation before `EVT_CLIENT_MANAGED` is emitted, so a subscriber can only rewrite the client's neighbours: insertion policy (wm-46k.23). |
 
-Totals: 3 additive, 1 new state, 9 core edit.
+Totals: 3 additive, 2 new state, 8 core edit.
 
 ### The extension points to build
 
@@ -75,7 +75,6 @@ Totals: 3 additive, 1 new state, 9 core edit.
 | A work area on the monitor: the rectangle tiling arranges in, and the full rectangle a fullscreen client covers | gap, bar-style, actualfullscreen | wm-46k.18 |
 | A layout registry: a layout is a registered name, symbol and arrange function | bstack, cfact | wm-46k.19 |
 | Layout parameters on the monitor: mfact, nmaster, and the selected layout | pertag | wm-46k.20 |
-| `REQ_CLIENT_FOCUS`, handled by the focus component | urgency, scratchpad | wm-46k.22 |
 | A tag-manager request carrying a client's tag mask | scratchpad | wm-46k.21 |
 | A registered client-list insertion policy | attach-policy | wm-46k.23 |
 
@@ -134,7 +133,7 @@ attach-policy ──→ (standalone, minimal deps)
 
 ## Implementation Order Suggestion
 
-Build the six extension points in the table above (and the bar component,
+Build the five extension points in the table above (and the bar component,
 wm-rh6.4) before any design the audit marked core edit. Without them those
 designs edit shared files, which is the collision section 4 exists to avoid.
 
@@ -145,7 +144,7 @@ Once the points exist, the order among additive designs is preference:
 3. **gap**, **bar-style**, **actualfullscreen** — after the work area (wm-46k.18) and the bar
 4. **bstack**, **cfact** — after the layout registry (wm-46k.19)
 5. **pertag** — after layout parameters on the monitor (wm-46k.20)
-6. **scratchpad**, **urgency** — after the tag-mask request (wm-46k.21) and `REQ_CLIENT_FOCUS` (wm-46k.22); urgency also wants the urgency machine (wm-46k.17) and the bar
+6. **scratchpad**, **urgency** — after the tag-mask request (wm-46k.21); urgency also wants the urgency machine (wm-46k.17) and the bar
 7. **attach-policy** — after the insertion policy (wm-46k.23)
 
 ## Event Coverage
@@ -170,5 +169,5 @@ Each extension uses specific events. Here's the coverage:
 
 ---
 
-*Last updated: 2026-11-06*
+*Last updated: 2026-11-14*
 *Total extensions: 13*
