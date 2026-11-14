@@ -11,7 +11,6 @@
 #include "src/core/wm-log.h"
 #include "src/core/wm-running.h"
 #include "src/core/wm-signals.h"
-#include "src/core/wm-states.h"
 #include "src/core/wm-xcb.h"
 #include "src/target/client.h"
 #include "src/xcb/xcb-handler.h"
@@ -563,9 +562,6 @@ dispatch_event(xcb_generic_event_t* event)
 
   /* Dispatch to registered handlers */
   xcb_handler_dispatch(event);
-
-  /* Handle state events (e.g., running flag changes) */
-  handle_state_event(event);
 }
 
 void

@@ -21,7 +21,6 @@ src/config/config-file.c parse_tags 15
 src/config/config-file.c tokenize 12
 src/config/config.c config_should_float 14
 src/config/config.c config_wire_file_bindings 11
-src/core/wm-states.c mod_key_name 14
 src/core/wm-xcb.c wm_xcb_adopt_existing_windows 12
 src/target/client.c client_sm_set_internal 11
 src/target/monitor.c monitor_sm_set_internal 17
