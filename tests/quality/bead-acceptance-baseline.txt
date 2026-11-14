@@ -11,6 +11,8 @@
 # An id that still exists with no text is a wipe: the command refuses to
 # regenerate until the text is back, so this list only shrinks when an id
 # leaves the tracker.
+wm-y3e.2.2
+wm-y3e.2.1
 wm-46k.33
 wm-46k.32
 wm-46k.31
@@ -41,6 +43,8 @@ wm-4f6.3
 wm-4f6.2
 wm-4f6.1
 wm-4f6
+wm-dfg.245
+wm-dfg.244
 wm-4f6.27
 wm-dfg.240
 wm-dfg.238
@@ -119,6 +123,8 @@ wm-9n0.2
 wm-9n0
 wm-4f6.8
 wm-4f6.7
+wm-9n0.38
+wm-dfg.243
 wm-dfg.242
 wm-lle.10
 wm-9n0.37
