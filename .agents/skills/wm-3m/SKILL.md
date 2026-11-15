@@ -190,7 +190,11 @@ Then decide per finding. One that is a single edit made after the run gets fixed
 now, and needs no bead, gate or rule behind it. Everything else goes through the
 two questions in `DESIGN.md` section 10a, in the harness directory — can a
 command catch it, and if not, would a general statement have caught the class? —
-and the answers give a finding one of three homes, never a fourth:
+and the answers give a finding one of three homes, never a fourth. `DESIGN.md`
+section 0 is the reason the order matters: a team running agents at volume reports
+0.5% of merge requests cancelled, and their answer is that a fix to the agent
+becomes a machine check or a structural elimination, never a new sentence in the
+rules. A rule file is the smallest investment we make, not the default:
 
 1. **A deterministic check** when a command can catch it. A finding that comes
    back is a missing gate, not a careless worker. Two refinements, from
