@@ -19,6 +19,10 @@ A file under tests/ carries no floor here, in the check or in the update. Its
 missed lines are the guards inside the tests' own helpers, and no passing test
 reaches one without breaking its environment.
 
+The check refuses a floor that sits too far below its measurement as well as one
+that sits above it: a row the tests have outgrown would pass a regression the
+size of the gap. The update is what raises it.
+
 Exit status: 0 when the run meets or merges into the baseline, 1 otherwise.
 """
 
@@ -33,6 +37,15 @@ PREFIX = "check-coverage: "
 # path is covered depending on scheduling. One file moved 0.9 points between two
 # runs here and 2.6 points on a CI runner.
 DEFAULT_MARGIN = 3.0
+
+# A floor exists to catch a drop, not to record history. Measured well above its
+# floor, a row passes a regression of that size, so the check refuses one that
+# is further behind than this. The writer puts a fresh floor DEFAULT_MARGIN below
+# its measurement, and the launcher tests move their measurement by up to 2.6
+# points between two runs of the same tree on a CI runner, so a row a run moved
+# up sits 5.6 points behind at most: 6.0 fires on a file that gained tests, and
+# not on one that ran again.
+STALE_LIMIT = 6.0
 
 HEADER = [
     "# Line-coverage floors for the unit suite, per production source file.",
@@ -140,6 +153,11 @@ def check(args):
             )
         elif pct + 0.05 < floor:
             problems.append(f"{name}: {pct:.1f}% lines, below its floor of {floor:.1f}%")
+        elif pct - floor > STALE_LIMIT:
+            problems.append(
+                f"{name}: {pct:.1f}% lines, its floor of {floor:.1f}% is"
+                f" {pct - floor:.1f} points behind; --update-baseline raises it"
+            )
 
     if problems:
         for problem in problems:

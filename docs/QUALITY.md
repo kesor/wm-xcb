@@ -109,7 +109,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | build | `make -j$(nproc)` | the tree compiles |
 | flake | `scripts/check-flake.sh` | the dev shell in `flake.nix` evaluates for this system, so a syntax error, a moved attribute or a package that no longer exists fails here and not at the next `direnv allow` |
 | unit | `scripts/check-unit.sh` | the unit suite across hub, state machines, targets, components. The gate captures the run and prints its log only when it fails: a passing suite is a single summary line and lefthook prints the verdict and the duration as its own summary, so attaching the log to every commit spends the reader's attention on a step that passed. A run whose summary line is missing, or whose summary counts a failure, fails the gate whatever make exited with. `DEBUG` and `SANITIZE` select the variant, and the pass line names the one make built, so the debug gate's suite cannot pass as release |
-| coverage | `scripts/check-coverage.sh` | no production source file is below its line floor in `tests/quality/coverage-baseline.txt`, and no production source file is missing one. Files under `tests/` are printed and carry no floor: a helper's error return is only reachable by breaking the environment |
+| coverage | `scripts/check-coverage.sh` | no production source file is below its line floor in `tests/quality/coverage-baseline.txt`, no production source file is missing one, and none has a floor more than 6.0 points behind its measurement: a row the tests have outgrown passes a regression the size of the gap, and `--update-baseline` is what raises it. Files under `tests/` are printed and carry no floor: a helper's error return is only reachable by breaking the environment |
 | paths | `scripts/check-paths.sh` | no committed file names a home directory or a personal source tree |
 | root | `scripts/check-root.sh` | every tracked root entry is on the allowlist in `scripts/lib/root-report.sh`: the build files, the documentation entry points and the directories that group the code. A source file at the top level belongs to no group, and the next one would have to guess; it fails the commit and the push instead. The list comes from git's index, so an untracked scratch file is not a finding and a file being committed is a finding. |
 | workflow | `scripts/check-workflow.sh` | every file under `.github/workflows/` parses and passes actionlint. It cannot be a CI job: the run that would report a broken workflow is the run the broken workflow removed, so it runs before the push |
@@ -676,6 +676,15 @@ path relative to the repository root works too, and so does a suffix of one,
 so `tiling.c` and `src/components/tiling.c` both name `src/components/tiling.c`.
 Without file arguments every file the run measured is merged; the rest keep
 their floors.
+
+A floor the tests have outgrown fails the comparison too. A row more than 6.0
+points behind its measurement passes a regression the size of the gap, so the
+run names that file and the two numbers and does not call the tree covered. The
+number is the writer's 3.0 margin plus the 2.6 points a run moves the launcher
+tests by, so a row a run moved up passes and a file that gained tests does not.
+The way out is the merge above, named for the file it reported; the merge holds
+a floor the run measured under, so a floor can drift in this direction only and
+the comparison is what catches it.
 
 A floor does not follow the measurement down. A run that measures below a
 recorded floor holds that floor and says so, because a point or two between two

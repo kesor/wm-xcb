@@ -46,7 +46,13 @@
 # deleted on purpose, is --allow-lower, and the commit that uses it says why:
 # lowering a floor to make a red run green is the same as deleting a test.
 #
-# Exit status: 0 when every file meets its floor, 1 otherwise.
+# A floor the tests have outgrown fails as well as one the code has fallen below:
+# a row more than 6.0 points behind its measurement passes a regression the size
+# of the gap, so the comparison names it and the fix is --update-baseline for
+# that file. The merge holds a floor the run measured under, so a floor can drift
+# in one direction only, and this is the direction the comparison catches.
+#
+# Exit status: 0 when every file meets its floor and none is stale, 1 otherwise.
 
 set -uo pipefail
 
