@@ -371,6 +371,12 @@ out=$(PATH="$SHELL_DIR/bin:$old_path" CC="$SHELL_DIR/bin/cc" \
   "$SHELL_DIR/scripts/check-coverage.sh" foo.c 2>&1)
 check_eq "and the refreshed row passes the script" 0 "$?"
 
+# The hook prints its own sentence after the script's. The script names the
+# update; a sentence that only says coverage fell tells the reader to add
+# tests, which widens the gap the check just refused.
+check_eq "the coverage hook names a floor the tests outgrew" 1 \
+  "$(grep -c 'a floor is more than 6.0 points behind its measurement' "$ROOT_DIR/lefthook.yml")"
+
 # Stale numbers that meet the floor. A fall-through exits 0 and rewrites.
 printf 'src/foo.c\t90.0000\n' >"$SHELL_DIR/.cache/coverage/measured.tsv"
 cat >"$SHELL_BASE" <<'SEED'
