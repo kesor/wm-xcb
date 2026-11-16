@@ -201,6 +201,54 @@ check_eq "and the note names the flag" 1 \
 check_eq "and does not call the drop inside the margin" 0 \
   "$(echo "$out" | grep -c 'inside the margin')"
 
+# A floor exists to catch a drop, not to record history. A row far below its
+# measurement passes every regression short of the whole file, so the check
+# refuses it and names the update that raises it.
+seed
+cat >"$MEASURED" <<'MEASURED'
+src/components/monitor-manager.c	52.0
+wm-states.c	36.2
+config-file.c	87.7
+src/components/tiling.c	68.0
+wm-hub.c	90.0
+tests/unit/test-wm-hub.c	55.0
+MEASURED
+out=$(gate check --pattern monitor-manager.c)
+check_eq "a floor far behind the measurement fails" 1 "$?"
+check_eq "and names the file and both numbers" 1 \
+  "$(echo "$out" | grep -c 'src/components/monitor-manager.c: 52.0% lines, its floor of 22.7% is 29.3 points behind')"
+check_eq "and names the update that raises it" 1 \
+  "$(echo "$out" | grep -c -- '--update-baseline raises it')"
+check_eq "and does not call it below its floor" 0 \
+  "$(echo "$out" | grep -c 'below its floor')"
+
+# The margin the writer leaves plus what a run moves is a row that ran again,
+# not a file the tests outgrew: 22.7 recorded, 28.3 measured is the 3.0 margin
+# plus the 2.6 points the launcher tests move on a CI runner.
+seed
+cat >"$MEASURED" <<'MEASURED'
+src/components/monitor-manager.c	28.3
+wm-states.c	36.2
+config-file.c	87.7
+src/components/tiling.c	68.0
+wm-hub.c	90.0
+tests/unit/test-wm-hub.c	55.0
+MEASURED
+out=$(gate check --pattern monitor-manager.c)
+check_eq "a floor behind by what a run moves still passes" 0 "$?"
+check_eq "and says the file meets its floor" 1 \
+  "$(echo "$out" | grep -c 'every file meets its recorded floor')"
+
+# The refresh the failure names clears it, and the refreshed row is a row the
+# next run passes.
+seed
+out=$(gate update --pattern monitor-manager.c)
+check_eq "the update the failure names succeeds" 0 "$?"
+check_eq "and raises the floor to the measurement less the margin" 1 \
+  "$(grep -c '^src/components/monitor-manager.c 25.3$' "$BASELINE")"
+out=$(gate check --pattern monitor-manager.c)
+check_eq "and the refreshed row passes" 0 "$?"
+
 # The comparison is a second process. If the measurement step exits 1 and the
 # shell continues, that process reads the previous run's measured.tsv and can
 # pass the gate on it. The stand-ins answer make, gcov and the compiler so the
@@ -302,6 +350,32 @@ out=$(PATH="$SHELL_DIR/bin:$old_path" CC="$SHELL_DIR/bin/cc" \
   "$SHELL_DIR/scripts/check-coverage.sh" --update-baseline --allow-lower foo.c 2>&1)
 check_eq "the shell passes --allow-lower through" 0 "$?"
 check_eq "and the named floor drops" 1 "$(grep -c '^src/foo.c 37.0$' "$SHELL_BASE")"
+
+# A floor 45.9 points behind its measurement, through the script the hook runs:
+# it fails, and the update the message names both raises the row and clears it.
+printf 'src/foo.c\t50.8000\n' >"$MEASURED_SRC"
+cat >"$SHELL_BASE" <<'SEED'
+src/foo.c 4.9
+SEED
+out=$(PATH="$SHELL_DIR/bin:$old_path" CC="$SHELL_DIR/bin/cc" \
+  "$SHELL_DIR/scripts/check-coverage.sh" foo.c 2>&1)
+check_eq "a stale floor fails the script" 1 "$?"
+check_eq "and the message names the file and its measurement" 1 \
+  "$(echo "$out" | grep -c 'src/foo.c: 50.8% lines')"
+out=$(PATH="$SHELL_DIR/bin:$old_path" CC="$SHELL_DIR/bin/cc" \
+  "$SHELL_DIR/scripts/check-coverage.sh" --update-baseline foo.c 2>&1)
+check_eq "the update it names succeeds" 0 "$?"
+check_eq "and writes the measurement less the margin" 1 \
+  "$(grep -c '^src/foo.c 47.8$' "$SHELL_BASE")"
+out=$(PATH="$SHELL_DIR/bin:$old_path" CC="$SHELL_DIR/bin/cc" \
+  "$SHELL_DIR/scripts/check-coverage.sh" foo.c 2>&1)
+check_eq "and the refreshed row passes the script" 0 "$?"
+
+# The hook prints its own sentence after the script's. The script names the
+# update; a sentence that only says coverage fell tells the reader to add
+# tests, which widens the gap the check just refused.
+check_eq "the coverage hook names a floor the tests outgrew" 1 \
+  "$(grep -c 'a floor is more than 6.0 points behind its measurement' "$ROOT_DIR/lefthook.yml")"
 
 # Stale numbers that meet the floor. A fall-through exits 0 and rewrites.
 printf 'src/foo.c\t90.0000\n' >"$SHELL_DIR/.cache/coverage/measured.tsv"
