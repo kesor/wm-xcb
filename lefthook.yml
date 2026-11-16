@@ -284,7 +284,7 @@ pre-push:
     coverage:
       glob: ["*.{c,h}", "tests/quality/**", "scripts/**"]
       run: ./scripts/check-coverage.sh
-      fail_text: "Coverage fell below a floor in tests/quality/coverage-baseline.txt, or a file has no floor. Add the floor deliberately, or test what the change added."
+      fail_text: "Coverage fell below a floor in tests/quality/coverage-baseline.txt, a file has no floor, or a floor is more than 6.0 points behind its measurement. Add the floor deliberately, test what the change added, or run scripts/check-coverage.sh --update-baseline on the file the output names."
 
     fuzz:
       glob: ["*.{c,h}", "tests/fuzz/**", "scripts/**"]
