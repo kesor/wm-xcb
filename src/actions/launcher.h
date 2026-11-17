@@ -7,6 +7,7 @@
  *
  * Design:
  * - Action: "app.launch" (no target required)
+ * - Resolves dmenu_path and dmenu on $PATH before forking
  * - Forks dmenu, returns without waiting for the selection
  * - Reads the selection from a pipe registered with the event loop
  * - Executes the selected command via fork+exec
@@ -82,6 +83,15 @@ bool launcher_action_launch(ActionInvocation* inv);
  *          prompt that is already open is a refusal rather than a failure.
  */
 bool launcher_run_dmenu(void);
+
+/*
+ * One line naming the programs the launcher needs that are not on $PATH, so
+ * startup and the key press say what is missing. Logged at startup and
+ * when a press asks for a prompt that cannot be started.
+ *
+ * @return  the report, owned by this module and valid until the next call
+ */
+const char* launcher_missing_report(void);
 
 /*
  * Default dmenu command arguments.

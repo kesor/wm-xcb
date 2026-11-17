@@ -116,6 +116,21 @@ FAKE
   chmod 0755 "$DIR/bin/$1"
 }
 
+# install_prompt <bin-dir> - dmenu and its list source, doing nothing.
+#
+# The WM's other default action reports a machine without them, and this test
+# is about the terminal: its PATH has to hold every program the compiled keys
+# need except the terminal, or the launcher's report is read as an ERROR this
+# test caused.
+install_prompt() { # install_prompt <bin-dir>
+  local program
+
+  for program in dmenu_path dmenu; do
+    printf '#!/bin/sh\nexit 0\n' >"$1/$program"
+    chmod 0755 "$1/$program"
+  done
+}
+
 start_wm() { # start_wm <bin-dir> <log-file>
   local bin=$1 log=$2
 
@@ -167,6 +182,7 @@ count_started() { # count_started <program>
 # answer to "which terminal does this machine want", and it must win.
 install_terminal xterm
 install_terminal x-terminal-emulator
+install_prompt "$DIR/bin"
 
 LOG1="$DIR/wm-both.log"
 if ! start_wm "$DIR/bin" "$LOG1"; then
@@ -202,6 +218,7 @@ stop_wm
 # a press that reports rather than forking a shell.
 EMPTY_DIR="$DIR/empty-bin"
 mkdir -p "$EMPTY_DIR"
+install_prompt "$EMPTY_DIR"
 rm -f "$DIR/started"/*
 LOG3="$DIR/wm-none.log"
 if ! start_wm "$EMPTY_DIR" "$LOG3"; then

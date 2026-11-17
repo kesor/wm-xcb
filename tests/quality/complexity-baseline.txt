@@ -9,7 +9,7 @@
 # A file under tests/ is not measured: a test body's number is its assertion
 # count, and no split of a test keeps the assertions.
 src/actions/launcher.c launcher_pipe_readable 14
-src/actions/launcher.c launcher_run_dmenu 15
+src/actions/launcher.c launcher_run_dmenu 16
 src/actions/terminal.c terminal_installed 11
 src/components/focus.c focus_on_enter_notify 24
 src/components/focus.c focus_set_state 15
