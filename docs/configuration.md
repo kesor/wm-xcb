@@ -59,6 +59,11 @@ and skipped when it is not. With none of them installed the WM
 prints one line at startup naming every name it tried, and `Mod+Return` reports
 the same line instead of forking a shell.
 
+`app.launch` runs `dmenu_path | dmenu`, and both programs must be on `$PATH`.
+With either missing, the WM prints one line at startup naming what is missing,
+and `Mod+p` reports that line instead of forking a shell that prints
+`not found`. `tests/x/test-56-launcher-default.sh` pins the startup report.
+
 ## Format
 
 One directive per line. A line starting with `#` is a comment, and so is

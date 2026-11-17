@@ -6,6 +6,8 @@
  *
  * Design:
  * - Action: "app.launch" with ACTION_TARGET_NONE (no target needed)
+ * - Resolves dmenu_path and dmenu on $PATH before forking, so a machine
+ *   without them is reported instead of forked into a shell that says so
  * - Forks dmenu, then returns: the selection is read by the event loop
  * - Executes the selected command via fork+exec
  * - No XCB keyboard grab: dmenu grabs the keyboard itself
@@ -16,11 +18,13 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <xcb/xcb.h>
@@ -66,6 +70,100 @@ static bool initialized = false;
 #define DMENU_DEFAULT_PROMPT "Run: "
 
 /*
+ * The two programs the launcher's pipeline needs. Both are checked before the
+ * fork: the child runs them through `sh -c`, and a missing one leaves the
+ * shell's own "not found" line as the only thing the user sees.
+ */
+static const char* const launcher_programs[] = { "dmenu_path", "dmenu" };
+
+static bool
+launcher_is_executable(const char* path)
+{
+  struct stat st;
+
+  return stat(path, &st) == 0 && S_ISREG(st.st_mode) && access(path, X_OK) == 0;
+}
+
+static bool
+launcher_in_directory(const char* dir, size_t dir_len, const char* program)
+{
+  char path[PATH_MAX];
+  int  written;
+
+  if (dir_len == 0) /* an empty PATH component is the current directory */
+    written = snprintf(path, sizeof(path), "%s", program);
+  else
+    written = snprintf(path, sizeof(path), "%.*s/%s", (int) dir_len, dir, program);
+
+  return written > 0 && (size_t) written < sizeof(path) && launcher_is_executable(path);
+}
+
+/*
+ * Whether a bare program name resolves on $PATH, which is the lookup execlp()
+ * does in the child.
+ */
+static bool
+launcher_program_installed(const char* program)
+{
+  const char* path = getenv("PATH");
+
+  if (path == NULL)
+    return false;
+
+  for (;;) {
+    const char* colon   = strchr(path, ':');
+    size_t      dir_len = colon != NULL ? (size_t) (colon - path) : strlen(path);
+
+    if (launcher_in_directory(path, dir_len, program))
+      return true;
+    if (colon == NULL)
+      return false;
+    path = colon + 1;
+  }
+}
+
+/*
+ * Both stages are required: dmenu would read an empty list if only it were
+ * installed, and dmenu_path alone has nothing to draw the prompt.
+ */
+static bool
+launcher_prompt_installed(void)
+{
+  for (size_t i = 0; i < sizeof(launcher_programs) / sizeof(launcher_programs[0]); i++) {
+    if (!launcher_program_installed(launcher_programs[i]))
+      return false;
+  }
+  return true;
+}
+
+/*
+ * One line naming the programs the launcher needs that are not on $PATH, so
+ * startup and the key press say what is missing.
+ *
+ * @return  the report, owned by this module and valid until the next call
+ */
+const char*
+launcher_missing_report(void)
+{
+  static char report[256];
+  bool        list_source_missing = !launcher_program_installed(launcher_programs[0]);
+  bool        dmenu_missing       = !launcher_program_installed(launcher_programs[1]);
+
+  if (list_source_missing && dmenu_missing) {
+    snprintf(report, sizeof(report), "app.launch: missing %s and %s on $PATH",
+             launcher_programs[0], launcher_programs[1]);
+  } else if (list_source_missing) {
+    snprintf(report, sizeof(report), "app.launch: missing %s on $PATH", launcher_programs[0]);
+  } else if (dmenu_missing) {
+    snprintf(report, sizeof(report), "app.launch: missing %s on $PATH", launcher_programs[1]);
+  } else {
+    report[0] = '\0';
+  }
+
+  return report;
+}
+
+/*
  * The dmenu that is open, if any.
  *
  * One at a time: a second MOD+p while the prompt is up is a no-op, because two
@@ -106,7 +204,14 @@ launcher_init(void)
   }
 
   initialized = true;
-  LOG_DEBUG("Launcher module initialized");
+
+  /* Resolve once here so a machine without the prompt says so at startup,
+   * before the key is pressed, instead of only when the key does nothing. */
+  if (launcher_prompt_installed()) {
+    LOG_DEBUG("Launcher module initialized (using: dmenu_path | dmenu)");
+  } else {
+    LOG_ERROR("%s", launcher_missing_report());
+  }
 }
 
 /*
@@ -326,6 +431,14 @@ launcher_run_dmenu(void)
 {
   if (selection.active) {
     LOG_DEBUG("dmenu is already open: ignoring the second launch");
+    return false;
+  }
+
+  /* Forking a shell to run a name that is not installed only adds its own
+     "not found" line to the report, so the WM does not fork at all and says
+     what it looked for. */
+  if (!launcher_prompt_installed()) {
+    LOG_ERROR("%s", launcher_missing_report());
     return false;
   }
 
