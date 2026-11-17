@@ -25,7 +25,7 @@ src/components/tiling.c 65.1
 src/sm/sm-template.c 68.4
 src/target/tag.c 76.6
 src/target/monitor.c 68.0
-src/actions/launcher.c 69.1
+src/actions/launcher.c 74.9
 src/components/client-list.c 71.2
 src/sm/sm-registry.c 74.4
 src/components/focus.c 74.4

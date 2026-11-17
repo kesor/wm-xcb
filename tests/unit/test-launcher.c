@@ -3,9 +3,12 @@
  *
  * The launcher forks dmenu and hands the pipe to the event loop. These tests
  * replace dmenu with a script, so they can say what dmenu does without a
- * display: stay open, print a selection, or print nothing.
+ * display: stay open, print a selection, or print nothing. The cases that
+ * expect no prompt at all point PATH at a directory with nothing in it, so a
+ * dmenu the machine happens to have cannot stand in for the missing one.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -326,6 +329,25 @@ restore_real_path(void)
 {
   if (saved_path != NULL)
     setenv("PATH", saved_path, 1);
+}
+
+/*
+ * Points PATH at a directory with nothing in it, so the launcher's lookup has
+ * something to answer "not installed" about without consulting the machine.
+ */
+static bool
+use_empty_path(void)
+{
+  char dir[620];
+
+  if (!fake_bin_ready())
+    return false;
+
+  snprintf(dir, sizeof dir, "%s/no-programs", fake_bin);
+  if (mkdir(dir, 0700) != 0 && errno != EEXIST)
+    return false;
+
+  return setenv("PATH", dir, 1) == 0;
 }
 
 /* Runs the loop's descriptor callbacks until the launcher is done with dmenu. */
@@ -667,6 +689,84 @@ test_launcher_no_selection_emits_failure(void)
 }
 
 /*
+ * Test: a machine without dmenu gets a report naming both programs, and the
+ * key is a failed launch rather than a shell started to fail
+ */
+static void
+test_launcher_reports_missing_dmenu(void)
+{
+  action_registry_init();
+  hub_init();
+  ASSERT(use_empty_path(), "an empty PATH should be in place");
+  launcher_init();
+
+  launcher_failures = 0;
+  hub_subscribe(EVT_LAUNCHER_FAILED, count_launcher_failure, NULL);
+
+  const char* report = launcher_missing_report();
+  ASSERT(report != NULL, "the missing-dmenu report should exist");
+  ASSERT(strstr(report, "dmenu") != NULL, "the report should name dmenu");
+  ASSERT(strstr(report, "dmenu_path") != NULL, "the report should name dmenu_path");
+
+  ASSERT(!launcher_action_launch(NULL), "the action should report that dmenu could not start");
+  ASSERT(!launcher_is_running(), "no prompt is open when dmenu is missing");
+  ASSERT(launcher_failures == 1, "a missing dmenu should emit exactly one failure event");
+
+  launcher_shutdown();
+  hub_unsubscribe(EVT_LAUNCHER_FAILED, count_launcher_failure);
+  hub_shutdown();
+  action_registry_shutdown();
+  restore_real_path();
+}
+
+/*
+ * Test: dmenu without dmenu_path is not started
+ *
+ * The launcher runs `dmenu_path | dmenu`. A dmenu that can be exec'd from a
+ * machine with no list source reads nothing and draws an empty prompt, so the
+ * two stages are checked together and neither alone is enough.
+ */
+static void
+test_launcher_needs_both_stages(void)
+{
+  char marker[600];
+  char body[700];
+  char list_source[700];
+  char only_dmenu[620];
+
+  ASSERT(fake_bin_ready(), "fake bin directory should exist");
+
+  snprintf(marker, sizeof marker, "%s/dmenu-without-list-source", fake_bin);
+  unlink(marker);
+  snprintf(body, sizeof body, "echo ran >> %s\n", marker);
+  ASSERT(install_fake_dmenu(body), "a dmenu without a list source should be installed");
+
+  snprintf(only_dmenu, sizeof only_dmenu, "%s", dmenu_install_dir);
+  snprintf(list_source, sizeof list_source, "%s/dmenu_path", dmenu_install_dir);
+  ASSERT(unlink(list_source) == 0, "the list source should be gone from the fake directory");
+  ASSERT(setenv("PATH", only_dmenu, 1) == 0, "PATH should hold only the directory with dmenu");
+
+  action_registry_init();
+  hub_init();
+  launcher_init();
+
+  launcher_failures = 0;
+  hub_subscribe(EVT_LAUNCHER_FAILED, count_launcher_failure, NULL);
+
+  ASSERT(!launcher_action_launch(NULL), "the action should refuse a pipeline with no list source");
+  ASSERT(access(marker, F_OK) != 0, "dmenu should not run without the list source it reads");
+  ASSERT(!launcher_is_running(), "no prompt is open when the list source is missing");
+  ASSERT(launcher_failures == 1, "a pipeline missing a stage should emit one failure event");
+
+  launcher_shutdown();
+  hub_unsubscribe(EVT_LAUNCHER_FAILED, count_launcher_failure);
+  hub_shutdown();
+  action_registry_shutdown();
+  restore_real_path();
+  unlink(marker);
+}
+
+/*
  * Test: the fake dmenu names the program it stands in for, cites a line of it,
  * and that program is on PATH
  *
@@ -824,6 +924,8 @@ run_launcher_tests(void)
   RUN_TEST(test_launcher_returns_before_dmenu_exits);
   RUN_TEST(test_launcher_selection_starts_the_command);
   RUN_TEST(test_launcher_no_selection_emits_failure);
+  RUN_TEST(test_launcher_reports_missing_dmenu);
+  RUN_TEST(test_launcher_needs_both_stages);
   RUN_TEST(test_launcher_dmenu_uses_the_wm_display);
   RUN_TEST(test_launcher_fake_names_the_program_it_models);
   RUN_TEST(test_launcher_runs_the_real_list_source);

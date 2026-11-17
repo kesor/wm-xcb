@@ -1,6 +1,6 @@
 # wm/ Project Documentation
 
-*Last updated: 2026-11-07*
+*Last updated: 2026-11-17*
 
 ---
 
@@ -187,15 +187,19 @@ Short version:
   first one still in the list when nothing is selected, or to none when no
   monitor is. A later request then reads that monitor, or no monitor, instead
   of freed memory.
-  `MOD+p` forks a shell that runs
-  `dmenu_path | dmenu` and registers the read end of the pipeline's stdout as
-  one of those sources: the chosen line is read when it arrives and the WM runs
-  it, and a cancelled prompt emits a failure event instead of blocking. dmenu
-  itself holds the keyboard grab while it is up, so the keys a user presses then
-  belong to it; what stays free is the WM's loop, which still handles X events
-  and the other registered pipes. `MOD+Return` starts the first terminal
-  emulator this machine has installed among `$TERMINAL`, `x-terminal-emulator`,
-  `alacritty`, `kitty`, `foot`, `urxvt`, `st` and `xterm`, looked up on `$PATH`;
+  `MOD+p` looks up `dmenu_path` and `dmenu` on `$PATH` before forking, then
+  runs `dmenu_path | dmenu` and registers the read end of the pipeline's stdout
+  as one of those sources: the chosen line is read when it arrives and the WM
+  runs it, and a cancelled prompt emits a failure event instead of blocking. A
+  machine with either program missing gets one `ERROR` line at startup naming
+  both, and the key reports that line and emits the failure event instead of
+  forking a shell that prints `not found`; `tests/x/test-56-launcher-default.sh`
+  pins it. dmenu itself holds the keyboard grab while it is up, so the keys a
+  user presses then belong to it; what stays free is the WM's loop, which still
+  handles X events and the other registered pipes.
+  `MOD+Return` starts the first terminal emulator this machine has installed
+  among `$TERMINAL`, `x-terminal-emulator`, `alacritty`, `kitty`, `foot`,
+  `urxvt`, `st` and `xterm`, looked up on `$PATH`;
   with none of them installed, startup prints one `ERROR` line naming every name
   it tried, and the key reports that line instead of forking a shell to fail on
   a missing binary. A start with no config file and a terminal installed prints
