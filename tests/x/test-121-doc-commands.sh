@@ -147,7 +147,39 @@ rg -n 'REQUEST_CHECKED\.nope' "$LIBXCB_SRC/src/xcb_out.c"
 EOF
 "$GATE" "$DIR/quoted-bs.md" >"$DIR/quoted-bs.txt" 2>&1
 status=$?
-check_eq "a backslash inside the pattern is not an escape the gate eats" 1 "$status"
+check_eq "a backslash inside single quotes is not an escape the gate eats" 1 "$status"
+
+# Bash double quotes only escape $, `, ", \ and newline. "foo\.bar" must reach
+# rg as foo\.bar; eating the backslash made the gate pass a pattern the reader
+# fails (foo.bar matches fooXbar, foo\.bar does not).
+DQ_DOT="$DIR/dq-dot"
+printf 'fooXbar\n' >"$DQ_DOT"
+cat >"$DIR/dq-bs.md" <<EOF
+\`\`\`bash
+rg -n "foo\\.bar" "$DQ_DOT"
+\`\`\`
+EOF
+"$GATE" "$DIR/dq-bs.md" >"$DIR/dq-bs.txt" 2>&1
+status=$?
+check_eq "a double-quoted \\. reaches rg as a literal dot pattern" 1 "$status"
+check_eq "and the failure is a miss, not a skip" 1 \
+  "$(grep -c 'printed nothing' "$DIR/dq-bs.txt")"
+
+# A backtick inside double quotes is command substitution in bash. The gate
+# must not run a different command and call that a pass.
+BT_STAMP="$DIR/bt-stamp"
+cat >"$DIR/bt.md" <<EOF
+\`\`\`bash
+rg -n "\`touch $BT_STAMP\`" /dev/null
+\`\`\`
+EOF
+"$GATE" "$DIR/bt.md" >"$DIR/bt.txt" 2>&1
+status=$?
+check_eq "a double-quoted backtick is not run" 0 "$status"
+check_eq "and it is printed as not run" 1 \
+  "$(grep -c 'NOT RUN' "$DIR/bt.txt")"
+check_eq "and the substitution did not run" 0 \
+  "$([ -e "$BT_STAMP" ] && echo 1 || echo 0)"
 
 # An unquoted pipe is two commands, and the gate runs neither.
 PIPE_STAMP="$DIR/pipe-stamp"
@@ -297,15 +329,30 @@ git grep --open-files-in-page{r,}=$DIR/wrapper pattern
 \`\`\`
 EOF
 
-# git --ext-diff runs GIT_EXTERNAL_DIFF, so this case sets it: with the gate
-# skipping the flag, the stamp stays absent because git never ran the wrapper.
-unrun_case ext-diff <<'EOF'
+# git --ext-diff runs GIT_EXTERNAL_DIFF. Setting it is what makes "stamp absent"
+# mean the flag was skipped: without the env, git would not call the wrapper
+# even if it ran the flag, and the assertion would pass for the wrong reason.
+unrun_case_env() {
+  local name=$1
+  shift
+  local doc="$DIR/$name.md" status
+  cat >"$doc"
+  env "$@" "$GATE" "$doc" >"$DIR/$name.txt" 2>&1
+  status=$?
+  check_eq "$name: the check passes" 0 "$status"
+  check_eq "$name: the line is printed as not run" 1 \
+    "$(grep -c 'NOT RUN' "$DIR/$name.txt")"
+  check_eq "$name: the program it named did not run" 0 \
+    "$([ -e "$PROG_STAMP" ] && echo 1 || echo 0)"
+}
+
+unrun_case_env ext-diff GIT_EXTERNAL_DIFF="$DIR/wrapper" <<'EOF'
 ```bash
 git log -p -1 --ext-diff
 ```
 EOF
 
-unrun_case ext-diff-ansi <<'EOF'
+unrun_case_env ext-diff-ansi GIT_EXTERNAL_DIFF="$DIR/wrapper" <<'EOF'
 ```bash
 git log -p -1 $'--ext-diff'
 ```

@@ -261,9 +261,26 @@ split_cmd() {
     if [ -n "$quote" ]; then
       if [ "$c" = "$quote" ]; then
         quote=""
+      elif [ "$quote" = '"' ] && [ "$c" = '`' ]; then
+        # Bash runs a backtick command substitution inside double quotes. This
+        # gate will not model it, same as unquoted ` and $(...).
+        SPLIT_REASON="a command substitution this gate does not model"
+        return 1
       elif [ "$quote" = '"' ] && [ "$c" = "\\" ]; then
+        # Bash double quotes only escape $, `, ", \ and newline. Any other
+        # \X keeps both characters. Eating the backslash always was how
+        # "foo\.bar" became foo.bar and the gate passed a pattern the reader
+        # fails.
         i=$((i + 1))
-        w+=${s:i:1}
+        if [ "$i" -ge "$n" ]; then
+          SPLIT_REASON="a backslash with nothing after it"
+          return 1
+        fi
+        c=${s:i:1}
+        case "$c" in
+          [\$\`\"\\]) w+=$c ;;
+          *) w+="\\$c" ;;
+        esac
       elif [ "$quote" = '"' ] && [ "$c" = '$' ]; then
         expand_ref "$s" "$i" || {
           SPLIT_REASON=$REF_ERR
