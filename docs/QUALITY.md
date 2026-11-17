@@ -720,6 +720,17 @@ client controls: a client sends the event fields and it chooses `WM_CLASS` and
 `WM_NAME`. A crash prints its input, and dropping that file into
 `tests/fuzz/corpus/<target>/` makes it a case every later run re-tests.
 
+The event harness runs every input in one process, so the hub's target registry
+(256 slots) is shared between them. A RandR notify event creates a monitor;
+the harness destroys what an input created and fails when the registry does not
+come back to where it started. A run that leaves a target behind fills the
+registry after 256 creations, and every later input takes the registry-full
+error path instead of the handler the fuzzer is meant to reach, while the run
+still exits 0. `scripts/fuzz.sh` fails on that shape too: on a registry that did
+not come back, and on a run whose output logs `Maximum number of targets
+reached`. The run's own output goes to `.cache/fuzz/<target>.log` and is printed
+only on failure, so a passing gate log stays small enough to read.
+
 ## Globs are a list, not an alternation
 
 `glob: "*.{c,h}|Makefile"` matches nothing in lefthook 2.1: the string is read as
