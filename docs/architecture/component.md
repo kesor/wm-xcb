@@ -206,18 +206,17 @@ bus. Reading a state machine another component stored on the same target is not
 a violation: tiling reads the fullscreen and floating machines by name, and
 `docs/PHILOSOPHY.md` §2.1 says why that stays inside the rule.
 
-No gate reads the include lines under `src/components/` today, so review is the
-check. Another component's header is written two ways, and a search for only
-the first misses the second:
+No gate reads the include lines under `src/components/` for a component
+crossing today, so review is the check. A header is included by its path from
+the repository root, because `scripts/check-includes.sh` refuses both spellings
+that resolve from the including file's own directory instead:
 
 ```bash
 rg -n '#include "[^"]*components/' src/components/
-rg -n '#include "[a-z0-9-]+\.h"' src/components/
 ```
 
 A hit is a finding when the header belongs to another component. The including
-file's own header, and another file of the same component, are not. The first
-command does not match a bare name.
+file's own header, and another file of the same component, are not.
 
 ### A header says what a function does and who owns what it allocates
 

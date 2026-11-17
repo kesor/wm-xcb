@@ -123,6 +123,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | bead acceptance criteria | `scripts/check-bead-acceptance.sh` | every issue the baseline in `tests/quality/bead-acceptance-baseline.txt` lists still carries acceptance criteria, and every one of those ids is still in the tracker list the gate read. `bd` writes no key for an empty acceptance field, so a wipe and a bead that never had criteria are the same output; the baseline records which had text. The other half reads `tests/quality/bead-acceptance-missing-baseline.txt`: a live issue with no criteria that no baseline records fails the commit, so a bead written without them is named where it is made instead of leaving the worker to plan from the description, and a recorded issue that has gained criteria fails until it is protected too. `--update-baseline` refuses to regenerate over a protected id that still exists with no text. Writing a bead and writing its criteria are one subject, size included: a criterion names what one sitting can finish, and a bead that is more than that is split before it is picked up, as `.agents/skills/wm-bootstrap/SKILL.md` says under "Writing one bead" |
 | bead create recipe | `scripts/check-bead-create-recipe.sh` | every `bd create` a tracked document shows carries `--acceptance` as the option, not as the word in a description or a comment, read the way the shell reads it: a trailing backslash continues the command, unless that backslash is escaped, and so does a quoted argument left open. A recipe is a command that starts a line, or follows a backtick, with a flag or a quoted title after the name; a sentence about the command is not one, and neither is a reference to its help text. The acceptance gate refuses the bead a recipe files, and `.agents/skills/beads/SKILL.md` is written by `bd setup codex` from a template that has no flag |
 | docs | `scripts/check-docs.sh` | documents name symbols and beads ids; no line references, no counts a command already prints, no completion percentage |
+| document commands | `scripts/check-doc-commands.sh` | every read-only command a document prints in a fenced `bash`, `sh` or `shell` block exits 0: `rg`, `grep`, `man -w` and the read-only git subverbs the script lists. The gate builds the argument list itself and hands it to the program, never to a shell, and it runs a program only with flags on its own list, so a line whose words a shell would manufacture or whose flag nobody has checked is printed as not run. A command naming a variable this shell does not set is printed with the command beside it, and a placeholder or an unlabelled fence is not read at all |
 | format | `scripts/format-check.sh` | every C file and header, tracked or about to be, matches `.clang-format`; `--fix` and `--list` use the same list (`make format`) |
 | shellcheck | `scripts/check-shellcheck.sh` | every shell file with a shebang or a `.sh` name, tracked or about to be, has no finding missing from `tests/quality/shellcheck-baseline.txt`. A finding the baseline records with a count does not fail; an extra occurrence of it does |
 | async | `scripts/check-async.sh` | no new blocking call in the event loop |
@@ -223,6 +224,79 @@ The search is in the library too. Color is forced off, and binaries are read as
 text: a painted `file:line:` prefix makes the exemption miss, and git's
 binary-match line does not contain the pattern, so the re-check would call a
 hit a clean tree.
+
+## The document-command gate
+
+`scripts/check-doc-commands.sh` runs the commands the documents print, so one
+that answers nothing fails the commit that carries it. `docs/TESTING.md`
+pointed `rg` at `src/xcb_out.c` for a macro defined in `src/xcbext.h`: the
+command exited 1, printed nothing, and the document named a file that holds
+nothing of the kind. It stood until a reviewer read the libxcb headers by hand.
+The author had counted lines in the two files instead of running the command it
+wrote.
+
+Only a line inside a fenced `bash`, `sh` or `shell` block is read: an
+unlabelled fence in this tree holds program output and C. A line is run when it
+carries no `<placeholder>` and starts with a program that reads and exits: `rg`,
+`grep`, `man -w`, or one of the git subverbs the script lists. The rest of what
+this tree documents starts a session, builds, mutates the tree or takes
+minutes (`make format`, `--update-baseline`, `scripts/perf-test.sh`), and this
+gate runs on every commit. Those lines are not reported: the program allowlist
+is what keeps them out, and `make test && make test-x` is an ordinary line here.
+
+The gate never hands a document's line to a shell. It splits the line itself,
+with the quoting rules a shell would apply, so the words it checks are the
+words the program receives. That is the first half of the cap: a shell is what
+turns `$'--pre=/tmp/x'`, `--open-files-in-page{r,}=/tmp/x`, `-nO/tmp/x` or
+`${1:+--pre=/tmp/x}` into words a text match never saw, and one of those words
+running a program is how a document gets a command into every commit. A line
+using anything the gate does not model - a glob, a brace, a pipe, a
+redirection, a command substitution, an ANSI-C quote, an expansion other than
+`$name` and `${name}` - is printed as not run.
+
+The second half is the flag list, in the header of the script, one list per
+program. A word starting with `-` must be on it, or the line is printed as not
+run; `--` ends the flags, and `--flag=value` is checked on the name. This is
+why the list is short and why it is a list: the set of ways a program can be
+told to run another one is open, each program spells its own flags its own way,
+and git accepts an abbreviation of a long option and packs short ones into a
+cluster. `rg --pre`, `git grep -O` and `git grep --open-files-in-pager` run a
+program a document names, and `git --ext-diff` runs `$GIT_EXTERNAL_DIFF`; none
+of them is on the list, and neither is any flag a document invents. A flag the
+list does not hold is printed with the reason, so the author either drops it or
+adds it here deliberately.
+
+`$LIBXCB_SRC` is the dev shell's, so a run started outside that shell re-enters
+it the way `scripts/run-hook.sh` does. A command naming a variable nothing sets
+is printed with the command it left unrun, and does not fail the check: the gate
+says what it did not run rather than running it against a path that collapsed to
+`/src/...`.
+
+`$1` and the other parameters belong to the gate's own command line, not to the
+document's reader. The hook runs the gate with no arguments; a by-hand run
+passes a document. A line naming one is printed as not run, like a variable
+this shell lacks.
+
+The command's standard input is closed, so a command that reads it cannot
+consume the list of lines still to check. A scanner that fails leaves the
+document unchecked, so the gate exits 1 and says the run is not a pass. A gate
+whose awk fails and whose verdict is "no command printed anything wrong" is the
+defect it exists to catch, one level down.
+
+Both directions are pinned by `tests/x/test-121-doc-commands.sh`, on documents
+written for the occasion. A command that exits non-zero fails the check and is
+printed with its document and line; deleting that line makes the same document
+pass. A wrapper that touches a stamp when it runs is the witness for the cap:
+it is run by hand, the stamp appears, and after every case below the stamp is
+absent. The cases are the spellings a reviewer writes when told a flag is
+skipped - the literal one, the one in an ANSI-C quote, the one in a
+short-option cluster, the one git accepts as an abbreviation, and the one a
+brace would build - plus an unknown flag, a variable whose value is a flag, a
+line naming the gate's own `$1`, and `git log --ext-diff` with
+`GIT_EXTERNAL_DIFF` set to the wrapper. A command outside the program allowlist
+and an unlabelled fence are not reported at all; a scanner stubbed to fail makes
+the gate exit 1. A `|` inside the pattern is still run, and a command that reads
+standard input does not consume the next line.
 
 ## The async baseline
 
@@ -509,6 +583,7 @@ scripts/check-harness-variant.sh  # the harnesses run the variant they report
 scripts/check-fakes.sh      # every stand-in names an installed program and cites a line of it
 scripts/check-bead-descriptions.sh   # every bead description is still there
 scripts/check-bead-create-recipe.sh  # every create recipe a document shows carries --acceptance
+scripts/check-doc-commands.sh   # the commands the documents print, run for real
 scripts/check-root.sh       # every tracked root entry is on the allowlist
 scripts/check-orphan-sources.sh   # every tracked source is in the build
 scripts/check-includes.sh   # no project include leaves the repository root
