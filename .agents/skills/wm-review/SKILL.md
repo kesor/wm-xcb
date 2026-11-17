@@ -130,8 +130,10 @@ did not mention.
 | `make test` green, `scripts/xephyr-test.sh` no worse | a failing assertion, or a new seam failure missing from `tests/quality/seam-baseline.txt` | `make test`, `make test-x`, and `scripts/xephyr-test.sh` when the diff touches map, tile, focus, or a property |
 | No AI attribution | `Co-Authored-By`, a "generated with" footer, or a robot signature in a commit, comment, doc, or PR body | read the commit messages with `git log` |
 
-Run every command a row names, and say in the verdict that it ran. A row with
-no command is what the read of the diff is for.
+Run every command a row names, unless the review brief says the gates are left
+to `land`. The brief overrides this table: judge the rule against the diff, and
+say in the verdict that the command was left to the gate. A row with no command
+is what the read of the diff is for.
 
 ## The two allowed outcomes
 
