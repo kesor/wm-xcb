@@ -220,6 +220,16 @@ The second form is also a test, which is the bar: a criterion no command can
 check does not say what done looks like. A number the bead sets on purpose stays
 - an exit status, a latency budget, a limit.
 
+A criterion that names text the program prints names the condition that selects
+it, once per variant:
+
+- not: `a machine without dmenu gets one line naming dmenu and dmenu_path`
+- instead: `the line names whichever of dmenu and dmenu_path is missing, and
+  both when neither is on $PATH`
+
+The first form is one sentence, so it is implemented as one string, and that
+string is false on a machine that has one of the two.
+
 A rule the bead names takes the same shape. Name the section that holds it and
 do not restate it: a paraphrase is a second definition, and the first place the
 two are read together is the review, after the worker has implemented the
