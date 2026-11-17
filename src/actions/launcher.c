@@ -137,15 +137,30 @@ launcher_prompt_installed(void)
 }
 
 /*
- * One line naming the programs the launcher needs, so startup and the key press
- * say the same thing about a machine that has neither.
+ * One line naming the programs the launcher needs that are not on $PATH, so
+ * startup and the key press say what is missing.
  *
  * @return  the report, owned by this module and valid until the next call
  */
 const char*
 launcher_missing_report(void)
 {
-  return "app.launch: no dmenu installed; needs dmenu and dmenu_path on $PATH";
+  static char report[256];
+  bool        list_source_missing = !launcher_program_installed(launcher_programs[0]);
+  bool        dmenu_missing       = !launcher_program_installed(launcher_programs[1]);
+
+  if (list_source_missing && dmenu_missing) {
+    snprintf(report, sizeof(report), "app.launch: missing %s and %s on $PATH",
+             launcher_programs[0], launcher_programs[1]);
+  } else if (list_source_missing) {
+    snprintf(report, sizeof(report), "app.launch: missing %s on $PATH", launcher_programs[0]);
+  } else if (dmenu_missing) {
+    snprintf(report, sizeof(report), "app.launch: missing %s on $PATH", launcher_programs[1]);
+  } else {
+    report[0] = '\0';
+  }
+
+  return report;
 }
 
 /*

@@ -95,6 +95,7 @@ if [ -z "$SH" ]; then
 fi
 ln -s "$SH" "$DIR/bin/sh"
 
+REPORT="missing dmenu_path and dmenu on \$PATH"
 LOG="$DIR/wm.log"
 WM_CONFIG="$DIR/no-such-config" \
   PATH="$DIR/bin" \
@@ -110,11 +111,11 @@ fi
 pass "the WM is running with a PATH that holds only sh"
 
 check_eq "a machine without dmenu is reported once at startup" "1" \
-  "$(grep -c 'no dmenu installed' "$LOG" 2>/dev/null || true)"
+  "$(grep -cF "$REPORT" "$LOG" 2>/dev/null || true)"
 check_eq "the report names dmenu and dmenu_path" "1" \
-  "$(grep -cE 'no dmenu installed.*dmenu_path' "$LOG" 2>/dev/null || true)"
+  "$(grep -cF "$REPORT" "$LOG" 2>/dev/null || true)"
 
-reported_at_startup=$(grep -c 'no dmenu installed' "$LOG" 2>/dev/null || true)
+reported_at_startup=$(grep -cF "$REPORT" "$LOG" 2>/dev/null || true)
 
 # Nothing this test installed can answer for dmenu, so a press that still forked
 # would leave the shell's own "not found" line in the log.
@@ -126,7 +127,7 @@ done
 check_eq "MOD+p adds no shell's 'not found' line" "0" \
   "$(grep -ci 'not found' "$LOG" 2>/dev/null || true)"
 check_eq "each MOD+p reports the missing prompt" "3" \
-  "$(( $(grep -c 'no dmenu installed' "$LOG" 2>/dev/null || true) - reported_at_startup ))"
+  "$(( $(grep -cF "$REPORT" "$LOG" 2>/dev/null || true) - reported_at_startup ))"
 
 if kill -0 "$AWM_PID" 2>/dev/null; then
   pass "the WM still runs after a press with no dmenu installed"

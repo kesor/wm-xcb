@@ -85,11 +85,11 @@ bool launcher_action_launch(ActionInvocation* inv);
 bool launcher_run_dmenu(void);
 
 /*
- * One line naming what a machine without dmenu was looked for: dmenu_path and
- * dmenu on $PATH. Logged at startup and when a press asks for a prompt that
- * cannot be started.
+ * One line naming the programs the launcher needs that are not on $PATH, so
+ * startup and the key press say what is missing. Logged at startup and
+ * when a press asks for a prompt that cannot be started.
  *
- * @return  the report, a string constant owned by this module
+ * @return  the report, owned by this module and valid until the next call
  */
 const char* launcher_missing_report(void);
 

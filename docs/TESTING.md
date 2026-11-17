@@ -384,7 +384,7 @@ naming what was tried and no shell's `not found` line on top of it.
 `test-56-launcher-default.sh` does the same for `MOD+p`, and its `PATH` holds
 only `sh`: a launcher without the lookup still reaches a shell, so the shell's
 own `not found` line is there for the test to look for. It asserts one `ERROR`
-line at startup naming `dmenu` and `dmenu_path`, one report per press, and no
+line at startup naming both programs as missing, one report per press, and no
 `not found` in the log.
 
 `run.sh` points `WM_CONFIG` at a path that does not exist, so the suite always
