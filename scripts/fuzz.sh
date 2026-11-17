@@ -4,15 +4,18 @@
 #
 # Usage: scripts/fuzz.sh [seconds-per-target] [target...]
 #
-# Each target is a libFuzzer binary in build/fuzz/. libFuzzer keeps the inputs
+# Each target is a libFuzzer binary in .cache/fuzz/. libFuzzer keeps the inputs
 # that reach new code, so a crash comes with the bytes that produced it, and the
 # corpus in tests/fuzz/corpus/<target>/ is what later runs start from.
 #
 # Why clang and not the gcc the build uses: -fsanitize=fuzzer is clang's, and the
 # coverage feedback that makes fuzzing more than random input is clang's too.
 #
-# Exit status: 0 when every target ran without a crash, 1 otherwise. A crash
-# writes its reproducer to build/fuzz/<target>-crash-<sha1>.
+# Exit status: 0 when every target ran without a crash and left the hub's target
+# registry as it found it, 1 otherwise. A crash writes its reproducer to
+# .cache/fuzz/<target>-crash-<sha1>. The run's own output is kept in
+# .cache/fuzz/<target>.log and printed only when it fails, so a passing gate log
+# carries the summary and not megabytes of libFuzzer stats.
 
 set -uo pipefail
 
@@ -95,11 +98,20 @@ for harness in tests/fuzz/fuzz-*.c; do
   # tree is dirty; commit or stash first".
   seeds="tests/fuzz/corpus/${name#fuzz-}"
   corpus="$OUT/corpus/${name#fuzz-}"
+  log="$OUT/$name.log"
   mkdir -p "$corpus" "$seeds"
   echo "--- $name for ${SECONDS_PER_TARGET}s (corpus $corpus)"
   if ! "$bin" -max_total_time="$SECONDS_PER_TARGET" -print_final_stats=1 \
-      -artifact_prefix="$OUT/$name-crash-" "$corpus" "$seeds"; then
-    echo "fuzz: $name found a crash; the input is in $OUT" >&2
+      -artifact_prefix="$OUT/$name-crash-" "$corpus" "$seeds" >"$log" 2>&1; then
+    echo "fuzz: $name found a crash; the input is in $OUT, the run's output in $log" >&2
+    tail -n 100 "$log" >&2
+    status=1
+  elif grep -q "Maximum number of targets reached" "$log"; then
+    # The hub has 256 target slots and every input runs in this one process. A
+    # registry that fills means later inputs stopped reaching the handlers and
+    # took the registry-full error path instead, which still exits 0.
+    echo "fuzz: $name filled the hub's target registry:" >&2
+    grep -m 3 "Maximum number of targets reached" "$log" >&2
     status=1
   fi
 done

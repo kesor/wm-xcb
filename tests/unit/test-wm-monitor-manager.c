@@ -8,6 +8,8 @@
 #include "tests/unit/test-registry.h" /* Must be first - defines TEST_GROUP macro */
 
 #include <assert.h>
+#include <dirent.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -458,6 +460,114 @@ test_monitor_manager_disconnect_destroys_the_monitor_sync_fallback(void)
   hub_shutdown();
 }
 
+/*
+ * The fuzz harness dispatches every corpus file into one process, and the hub's
+ * target registry outlives each input. A monitor an input creates has to be gone
+ * before the next one, or the 257th creation is refused and every later input
+ * takes the registry-full error path instead of the handler the fuzzer is meant
+ * to reach.
+ *
+ * This replays the tracked corpus the way the harness does, tearing the targets
+ * down after each input, and then dispatches one connected output: with the
+ * registry back where it started, that output registers. The run fails here
+ * when the teardown stops working, which is the state that logs "Maximum number
+ * of targets reached" over and over and still exits 0.
+ */
+void
+test_monitor_manager_fuzz_replay_leaves_room_for_the_next_output(void)
+{
+  LOG_CLEAN("== Testing a fuzz replay leaves room for the next connected output");
+
+  hub_init();
+  xcb_handler_init();
+  monitor_list_init();
+  monitor_manager_init();
+
+  /* The number the nested test server reports: RandR starts at 89, so RRNotify
+   * arrives as response type 90. */
+  assert_or_abort(monitor_manager_register_notify_handler_for_tests(89) == 0);
+
+  uint32_t baseline = hub_target_count();
+
+  DIR* corpus = opendir("tests/fuzz/corpus/xcb-event");
+  assert_or_abort(corpus != NULL);
+
+  bool           restored = true;
+  uint32_t       replayed = 0;
+  struct dirent* entry;
+
+  while ((entry = readdir(corpus)) != NULL) {
+    if (entry->d_name[0] == '.')
+      continue;
+
+    char path[512];
+    int  length = snprintf(path, sizeof path, "tests/fuzz/corpus/xcb-event/%s", entry->d_name);
+    assert_or_abort(length > 0 && (size_t) length < sizeof path);
+
+    FILE* file = fopen(path, "rb");
+    assert_or_abort(file != NULL);
+
+    uint8_t event[32];
+    memset(event, 0, sizeof event);
+    (void) fread(event, 1, sizeof event, file);
+    fclose(file);
+
+    xcb_handler_dispatch(event);
+
+    /* What the harness does after every input. */
+    monitor_list_shutdown();
+    if (hub_target_count() != baseline)
+      restored = false;
+    replayed++;
+  }
+  closedir(corpus);
+
+  assert(replayed > 0);
+  assert(restored);
+
+  /* More connected outputs than the hub's registry holds, each torn down before
+   * the next: this is the sequence that filled it when nothing was torn down. */
+  xcb_randr_notify_event_t event;
+  bool                     every_one_registered = true;
+
+  for (xcb_randr_output_t i = 0; i < 300; i++) {
+    xcb_randr_output_t output = 7000 + i;
+
+    memset(&event, 0, sizeof event);
+    event.response_type   = 89 + XCB_RANDR_NOTIFY;
+    event.subCode         = XCB_RANDR_NOTIFY_OUTPUT_CHANGE;
+    event.u.oc.output     = output;
+    event.u.oc.connection = XCB_RANDR_CONNECTION_CONNECTED;
+
+    xcb_handler_dispatch(&event);
+
+    if (monitor_get_by_output(output) == NULL || hub_target_count() != baseline + 1)
+      every_one_registered = false;
+
+    monitor_list_shutdown();
+    if (hub_target_count() != baseline)
+      every_one_registered = false;
+  }
+  assert(every_one_registered);
+
+  /* One connected output after the replay: it still creates a monitor. */
+  memset(&event, 0, sizeof event);
+  event.response_type   = 89 + XCB_RANDR_NOTIFY;
+  event.subCode         = XCB_RANDR_NOTIFY_OUTPUT_CHANGE;
+  event.u.oc.output     = 9000;
+  event.u.oc.connection = XCB_RANDR_CONNECTION_CONNECTED;
+
+  xcb_handler_dispatch(&event);
+
+  assert(hub_target_count() == baseline + 1);
+  assert(monitor_get_by_output(9000) != NULL);
+
+  monitor_manager_shutdown();
+  xcb_handler_shutdown();
+  monitor_list_shutdown();
+  hub_shutdown();
+}
+
 TEST_GROUP(MonitorManager, {
   test_monitor_manager_component_init_shutdown();
   test_monitor_manager_handler_registration();
@@ -469,4 +579,5 @@ TEST_GROUP(MonitorManager, {
   test_monitor_manager_crtc_without_a_mode_keeps_its_geometry();
   test_monitor_manager_crtc_change_uses_the_event_geometry_sync_fallback();
   test_monitor_manager_disconnect_destroys_the_monitor_sync_fallback();
+  test_monitor_manager_fuzz_replay_leaves_room_for_the_next_output();
 });
