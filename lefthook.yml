@@ -289,7 +289,7 @@ pre-push:
     fuzz:
       glob: ["*.{c,h}", "tests/fuzz/**", "scripts/**"]
       run: ./scripts/fuzz.sh 5
-      fail_text: "A fuzz harness crashed, or would not build. The crashing input is in build/fuzz/."
+      fail_text: "A fuzz harness crashed, would not build, or left the hub's target registry full. The crashing input is in .cache/fuzz/, and the run's output is in .cache/fuzz/<target>.log."
 
     standalone:
       glob: ["*.{c,h}", "Makefile"]
