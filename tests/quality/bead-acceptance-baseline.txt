@@ -11,6 +11,8 @@
 # An id that still exists with no text is a wipe: the command refuses to
 # regenerate until the text is back, so this list only shrinks when an id
 # leaves the tracker.
+wm-lwj.6
+wm-lwj.5
 wm-y3e.2.2
 wm-y3e.2.1
 wm-46k.33
@@ -43,6 +45,16 @@ wm-4f6.3
 wm-4f6.2
 wm-4f6.1
 wm-4f6
+wm-dfg.252
+wm-y3e.5
+wm-dfg.251
+wm-dfg.250
+wm-dfg.249
+wm-dfg.248
+wm-oku
+wm-dfg.247
+wm-dfg.246
+wm-lwj.4
 wm-dfg.245
 wm-dfg.244
 wm-4f6.27
@@ -123,6 +135,26 @@ wm-9n0.2
 wm-9n0
 wm-4f6.8
 wm-4f6.7
+wm-46k.41
+wm-xk6.11
+wm-xk6.10
+wm-xk6.9
+wm-xk6.8
+wm-xk6.7
+wm-xk6.6
+wm-xk6.5
+wm-xk6.4
+wm-xk6.3
+wm-xk6.2
+wm-6e4
+wm-9n0.39
+wm-utz.34
+wm-7zw.5
+wm-7zw.4
+wm-7zw.3
+wm-7zw.2
+wm-46k.40
+wm-4f6.28
 wm-9n0.38
 wm-dfg.243
 wm-dfg.242
@@ -191,6 +223,7 @@ wm-9n0.1
 wm-4f6.11
 wm-4f6.10
 wm-4f6.9
+wm-m9n.8
 wm-lle.11
 wm-utz.33
 wm-dfg.231
@@ -201,6 +234,7 @@ wm-utz.23
 wm-dfg.158
 wm-dfg.153
 wm-dfg.151
+wm-dfg.146
 wm-46k.8
 wm-9n0.15
 wm-utz.9
