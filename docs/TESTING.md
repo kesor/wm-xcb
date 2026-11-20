@@ -351,9 +351,10 @@ because a stale count printed without that scope reads as a statement about
 the whole baseline. `scripts/lib/seam-baseline.sh` holds the merge, the stale
 set, the exit status and that summary, and
 `tests/x/test-109-seam-baseline-filter.sh` pins them. A stale entry in a
-started file, and one whose test file is gone, both exit non-zero; the scope
-line says which entries were judged, so the failure always names a set the run
-measured.
+started file, and one whose test file is gone, both exit non-zero. The run
+prints each stale entry. A filtered run also prints the scope line, which
+names the files it judged, so that failure is not a statement about entries
+it did not start.
 The one entry an update drops without measuring it is the one whose test file no
 longer exists.
 

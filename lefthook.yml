@@ -282,7 +282,7 @@ pre-push:
     seam:
       glob: ["*.{c,h}", "tests/x/**", "scripts/**", "config*.h"]
       run: ./scripts/check-seam.sh
-      fail_text: "A new seam failure: something X should see is not there. Run 'make test-x TEST_X_ARGS=--verbose', and baseline a known failure deliberately or fix it."
+      fail_text: "The seam run failed: a new failure, or a baseline entry that matched no failure. The run names which. Fix a new failure or baseline it deliberately; drop a stale entry with --update-baseline."
 
     # A passing run printed 215 lines: a gcc link line, a format warning and 113
     # assertion lines. The gate prints the summary now, and the log on failure.

@@ -48,7 +48,8 @@
 # What lives in the server rather than in the WM - the lock modifiers, a RandR
 # mode - is still shared, and a test that changes it puts it back.
 #
-# Exit status: 0 if every test passed, 1 otherwise.
+# Exit status: 0 when the suite has no new failure and no stale entry, 1
+# otherwise.
 #
 # The suite asserts what the X server sees. Assertions that still fail on
 # purpose are listed in tests/quality/seam-baseline.txt; a failure missing

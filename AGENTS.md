@@ -322,8 +322,10 @@ If the hook is missing, run `make hooks` once.
 2. If the change touches windows, focus, keys, or X properties, run the seam
    tests too: `make test-x`. They assert what X sees. A
    failure listed in `tests/quality/seam-baseline.txt` is known and does not
-   fail the run; a failure missing from that file is new, exits non-zero, and
-   is yours to fix or to baseline deliberately.
+   fail the run. A failure missing from that file is new, and an entry that
+   matched no failure is stale; both exit non-zero. Fix the new one, or
+   baseline it deliberately. Drop the stale one in the commit that fixed the
+   assertion.
 3. Run the static async check: `make check-async`. It must report zero new
    violations; a waiver (`allow-blocking: <reason>`) needs a real reason.
 4. Format code: `make format`

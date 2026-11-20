@@ -199,5 +199,9 @@ seam_baseline_verdict 2 3
 check_eq "and both kinds together fail it" 1 "$?"
 check_eq "the runner takes its exit status from that function" 1 \
   "$(grep -c 'seam_baseline_verdict .*exit 1' "$ROOT_DIR/tests/x/run.sh")"
+check_eq "the runner's exit contract fails a stale entry" 1 \
+  "$(grep -c 'no new failure and no stale entry' "$ROOT_DIR/tests/x/run.sh")"
+check_eq "and does not call a run green because every test passed" 0 \
+  "$(grep -c '0 if every test passed' "$ROOT_DIR/tests/x/run.sh")"
 
 finish
