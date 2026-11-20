@@ -20,10 +20,12 @@
 # missing, because a gate whose silence reads as a pass is worse than no gate.
 #
 # The baseline in tests/quality/seam-baseline.txt keeps the verdict meaningful:
-# a failure listed there is known and does not fail the run, and a failure that
-# is not listed does.
+# a failure listed there is known and does not fail the run, a failure that is
+# not listed does, and so does an entry that matched no failure - an entry whose
+# defect is fixed and whose line was left behind.
 #
-# Exit status: 0 when the suite has no new failure, 1 otherwise.
+# Exit status: 0 when the suite has no new failure and no stale entry, 1
+# otherwise.
 
 set -uo pipefail
 

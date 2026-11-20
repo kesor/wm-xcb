@@ -127,7 +127,7 @@ did not mention.
 | Every request has a failure event | an executor that returns on a refused guard and emits nothing, so a subscriber cannot tell refusal from success | read the executor and its event table against `EVT_FULLSCREEN_FAILED` in `src/components/fullscreen.h` and `EVT_FLOATING_FAILED` in `src/components/floating.h` |
 | New behaviour is a registration, not an edit | a feature that edits a component it does not own instead of adding a request, an event, a subscriber, an SM template, or an action | run the extension point test (section 4): name the file and the missing extension point. New per-target state belongs in the target that owns it, and that is not a collision |
 | Event ids come from the shared registry | a fresh integer in a local `enum`, or a base that overlaps another component's range | `src/event-types.h` for the range, `tests/unit/test-event-types.c` for a collision |
-| `make test` green, `scripts/xephyr-test.sh` no worse | a failing assertion, or a new seam failure missing from `tests/quality/seam-baseline.txt` | `make test`, `make test-x`, and `scripts/xephyr-test.sh` when the diff touches map, tile, focus, or a property |
+| `make test` green, `scripts/xephyr-test.sh` no worse | a failing assertion, a new seam failure missing from `tests/quality/seam-baseline.txt`, or a baseline entry that matched no failure | `make test`, `make test-x`, and `scripts/xephyr-test.sh` when the diff touches map, tile, focus, or a property |
 | No AI attribution | `Co-Authored-By`, a "generated with" footer, or a robot signature in a commit, comment, doc, or PR body | read the commit messages with `git log` |
 
 Run every command a row names, unless the review brief says the gates are left
