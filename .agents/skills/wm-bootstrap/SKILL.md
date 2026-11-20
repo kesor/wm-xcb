@@ -194,7 +194,11 @@ Then work through the list:
    transition rather than a field write; add a request rather than a direct
    call.
 4. Run the gates: `make test`, `make test-x`, `make check-async`,
-   `scripts/format-check.sh`. Fix causes, not symptoms.
+   `scripts/check-coverage.sh`, `scripts/format-check.sh`. Fix causes, not
+   symptoms. Coverage is the gate a change to a production source file most
+   often drops: the new branch has no unit test, the file falls below its
+   floor, and the merge refuses it after a review has been paid for. The
+   command takes about 8s warm, and it exits 1 naming the file and the floor.
 5. Commit one topic: subject says what changed, body says why. Before you do,
    `rg` the sentence you changed: it is often printed by the script's own header
    (`--help`), repeated in the skill step that teaches it, and pinned by a test.
@@ -419,7 +423,8 @@ beads in your final message. This is how the traps below stop being traps.
 
 - Acceptance criteria from `bd show` are met, not approximated.
 - `make test` green; `make check-async` shows no new violations;
-  `make test-x` no worse than before; formatting clean.
+  `make test-x` no worse than before; `scripts/check-coverage.sh` reports every
+  production file at or above its floor; formatting clean.
 - The worker leaves the bead in_progress and says in its final message what is
   done and what is not. The bead is closed, and the tracker synced, by the
   merge: it happens after the review, and neither is a worker's step.
