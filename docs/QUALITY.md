@@ -42,7 +42,7 @@ no staged or pushed files to match, so everything skips and the summary is green
 | `commit-msg` | every commit | `scripts/gate-list.sh commit-msg` |
 | `pre-push` | every push | `scripts/gate-list.sh pre-push` |
 | CI `gates` | every push and PR | `lefthook run pre-push --force --no-auto-install` with the beads job excluded |
-| CI `seam` | every push and PR | `scripts/check-seam.sh`: known failures are baselined, a new one fails |
+| CI `seam` | every push and PR | `scripts/check-seam.sh`: known failures are baselined, a new one fails, and so does an entry that matched no failure |
 | CI `sanitize-x` | every push and PR | `scripts/check-sanitize-x.sh`: the WM in a nested server under ASan and UBSan |
 
 Runtimes are not in this table. The hook prints its own summary with a duration
@@ -132,7 +132,7 @@ keeps only what the nested-server gate has on its own: the harness line.
 | standalone | `scripts/check-standalone.sh` | the link-and-run targets with no X connection, one line on a pass instead of 215 |
 | build variants | `scripts/check-build-variants.sh` | `make`, `make SANITIZE=1` and `make DEBUG=1` build in one tree without a clean, and each leaves its own binary in `./wm` |
 | harness variant | `scripts/check-harness-variant.sh` | `scripts/xephyr-test.sh`, `tests/x/run.sh`, `tests/x/probe.sh` and `scripts/perf-test.sh` build the variant named by `DEBUG` and `SANITIZE`, print the variant, the binary and the log before they start, and do not replace `./wm` |
-| seam | `scripts/check-seam.sh` (`make test-x`) | X behaviour: mapped, tiled, focused, tags, EWMH, events already read into libxcb's queue, and idle CPU stays under the budget. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run. Runs before every push on a private Xvfb it starts itself (`WM_USE_SESSION_DISPLAY=1` draws on the session instead), and fails rather than skipping when that server cannot start |
+| seam | `scripts/check-seam.sh` (`make test-x`) | X behaviour: mapped, tiled, focused, tags, EWMH, events already read into libxcb's queue, and idle CPU stays under the budget. Known failures come from `tests/quality/seam-baseline.txt`; a new one fails the run, and so does an entry that matched no failure, which is what makes the list shrink as the defects are fixed (`docs/TESTING.md`). Runs before every push on a private Xvfb it starts itself (`WM_USE_SESSION_DISPLAY=1` draws on the session instead), and fails rather than skipping when that server cannot start |
 | sanitize | `scripts/check-sanitize.sh` | no leak site or UBSan report missing from `tests/quality/asan-baseline.txt`, and the suite that produced the log ran under ASan. `detect_leaks` and `leak_check_at_exit` are forced on, and `suppressions=` and `log_path=` are dropped, in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 | sanitize-x | `scripts/check-sanitize-x.sh` | the X path under the sanitizers: the run reports `variant=release-sanitize`, no ASan error, and no leak site or UBSan report missing from `tests/quality/sanitize-x-baseline.txt`. `detect_leaks` and `leak_check_at_exit` are forced on, and `suppressions=` and `log_path=` are dropped, in `ASAN_OPTIONS` and `LSAN_OPTIONS` |
 

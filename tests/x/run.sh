@@ -34,9 +34,11 @@
 #
 # A failure that is listed in tests/quality/seam-baseline.txt is a known failure:
 # it is reported and does not fail the run. A failure that is not listed is new
-# and exits non-zero. The seam suite covers parts of the WM that are deliberately
-# unwired, so without a baseline every run is red and nobody can tell a
-# regression from the standing list.
+# and exits non-zero, and so does an entry that matched no failure: that entry
+# excuses an assertion which passes, so the run asserts less than its count says.
+# The seam suite covers parts of the WM that are deliberately unwired, so without
+# a baseline every run is red and nobody can tell a regression from the standing
+# list.
 #
 # Each test file is tests/x/test-*.sh. It gets DISPLAY, WM_PID, WM_LOG and
 # ROOT_DIR in its environment, sources tests/x/lib.sh, and exits 0 only if all
@@ -50,7 +52,8 @@
 #
 # The suite asserts what the X server sees. Assertions that still fail on
 # purpose are listed in tests/quality/seam-baseline.txt; a failure missing
-# from that file is new.
+# from that file is new, and an entry that matched nothing is stale. Both exit
+# non-zero.
 
 set -uo pipefail
 
@@ -395,6 +398,6 @@ echo "seam tests: $TOTAL_PASS passed, $TOTAL_KNOWN known failed, $TOTAL_NEW new 
 seam_baseline_stale_note "$FILTER" "${#TESTS[@]}" "$STALE"
 if [ "$TOTAL_NEW" -gt 0 ]; then
   echo "new failures: ${FAILED_FILES[*]}"
-  exit 1
 fi
+seam_baseline_verdict "$TOTAL_NEW" "$STALE" || exit 1
 exit 0

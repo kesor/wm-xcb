@@ -311,9 +311,23 @@ reason is the thing to delete.
 
 A failure listed in `tests/quality/seam-baseline.txt` is a **known** failure: it
 is reported and does not fail the run. A failure missing from that file is
-**new** and exits non-zero, which is what the CI seam job watches. The suite
-therefore needs the baseline to be useful: without it, every run is red and a
-regression is invisible next to the standing list of unwired features.
+**new** and exits non-zero, which is what the CI seam job watches. An entry that
+matched no failure is **stale** and exits non-zero too, so the two things a
+baseline can be wrong about both stop the run. The suite therefore needs the
+baseline to be useful: without it, every run is red and a regression is
+invisible next to the standing list of unwired features.
+
+A stale entry fails the run because nothing else makes the list shrink. A
+defect fixed without its entry removed leaves a baseline that excuses an
+assertion which already passes, and the next reader counts that entry with the
+ones whose defects are still open. The run names the entry and the command that
+drops it, and in the normal case the entry comes out in the same commit as the
+fix. This is stricter than the sanitizer, async and shellcheck baselines, where
+a stale entry is reported and does not fail: those record a count a developer
+reaches by editing one file, and every one of them runs on every push, so the
+entry is seen the moment its finding goes. The seam list is the one whose
+entries excuse a missing feature, and it has been carried across whole cycles
+with nothing asking whether its entries were still true.
 
 ```bash
 make test-x TEST_X_ARGS="--update-baseline"   # accept today's failures
@@ -334,8 +348,12 @@ rest" rather than telling you to drop the baseline. Every filtered run also
 says what its stale check covered ("the stale check covered the <count> test
 file(s) --filter '<name>' started, and any entry whose test file is gone"),
 because a stale count printed without that scope reads as a statement about
-the whole baseline. `scripts/lib/seam-baseline.sh` holds the two decisions and
-that summary, and `tests/x/test-109-seam-baseline-filter.sh` pins them.
+the whole baseline. `scripts/lib/seam-baseline.sh` holds the merge, the stale
+set, the exit status and that summary, and
+`tests/x/test-109-seam-baseline-filter.sh` pins them. A stale entry in a
+started file, and one whose test file is gone, both exit non-zero; the scope
+line says which entries were judged, so the failure always names a set the run
+measured.
 The one entry an update drops without measuring it is the one whose test file no
 longer exists.
 

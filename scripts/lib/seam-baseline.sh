@@ -9,6 +9,13 @@
 # A baseline entry is <test file>|<assertion label>, and the entry lines are the
 # ones that are neither blank nor a comment.
 #
+# The list only shrinks if something says when an entry has stopped excusing
+# anything: an assertion fixed without its entry removed leaves a baseline that
+# reads the same as one whose defect is still open, and the next reader counts
+# the two together. seam_baseline_stale finds those entries and
+# seam_baseline_verdict fails the run on them, so the fix and the entry's
+# removal are one commit.
+#
 # Both decisions here take the set of test files the run started, because
 # `--filter` runs part of the suite: such a run knows the failures of the files
 # whose name matched and nothing about the rest. Rewriting the file from what it
@@ -110,7 +117,7 @@ seam_baseline_install() {
     echo "# Each line is <test file>|<assertion label>. A failure listed here is"
     echo "# known and does not fail the run; a failure missing from here is new."
     echo "# Removing an entry is how a fixed assertion stops being excused: the run"
-    echo "# reports stale entries, and the list is meant to shrink."
+    echo "# fails on a stale entry, and the list is meant to shrink."
     seam_baseline_merge "$baseline" "$tests_dir" "$started" <"$measured"
   } >"$tmp"; then
     rm -f "$tmp"
@@ -144,11 +151,26 @@ seam_baseline_stale_note() {
   local filter=$1 count=$2 stale=$3
   if [ "$stale" -gt 0 ]; then
     if [ -n "$filter" ]; then
-      echo "seam tests: stale baseline entries: $stale; --update-baseline with the same --filter drops those and keeps the rest"
+      echo "seam tests: stale baseline entries: $stale, so this run fails; --update-baseline with the same --filter drops those and keeps the rest"
     else
-      echo "seam tests: stale baseline entries: $stale; run --update-baseline to drop them"
+      echo "seam tests: stale baseline entries: $stale, so this run fails; run --update-baseline to drop them"
     fi
   fi
   [ -n "$filter" ] || return 0
   echo "seam tests: the stale check covered the $count test file(s) --filter '$filter' started, and any entry whose test file is gone; an entry of a test file that exists and did not run was not judged"
+}
+
+# seam_baseline_verdict <new-count> <stale-count>
+#
+# Returns 0 when the run may pass. A new failure keeps an assertion out of the
+# baseline; a stale entry keeps a fixed assertion in it, and a baseline that
+# excuses what already passes is a green run that asserts less than it says. Both
+# fail, so removing the entry is part of the fix and not something a later
+# session has to notice.
+#
+# --update-baseline is the way out of the stale half, and it exits before this
+# runs: a refresh measures the entries instead of judging them.
+seam_baseline_verdict() {
+  local new=$1 stale=$2
+  [ "$new" -eq 0 ] && [ "$stale" -eq 0 ]
 }

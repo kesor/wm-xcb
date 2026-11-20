@@ -14,6 +14,12 @@
 # The decisions are in scripts/lib/seam-baseline.sh, so they are judged here on
 # fixture files rather than by a whole seam run: what a run started, what it
 # measured and what the baseline holds are exactly the inputs the library takes.
+#
+# The last decision is the exit status: an entry that matched no failure is
+# stale, and a stale entry fails the run. Nothing else made the list shrink - a
+# defect fixed without its entry removed left a baseline that excused an
+# assertion which already passed, and the stale report alone was a line a reader
+# could scroll past.
 source "$(dirname "$0")/lib.sh"
 # shellcheck source=../../scripts/lib/seam-baseline.sh
 . "$ROOT_DIR/scripts/lib/seam-baseline.sh"
@@ -150,12 +156,12 @@ check_eq "a run with no filter adds no such line" "" "$(seam_baseline_filter_not
 # cannot say the entries were in the files that started: a deleted test's entry
 # is stale on a filtered run, and the summary is not told which kind the count is.
 check_eq "a full run reports a stale count on its own" \
-  "seam tests: stale baseline entries: 2; run --update-baseline to drop them" \
+  "seam tests: stale baseline entries: 2, so this run fails; run --update-baseline to drop them" \
   "$(seam_baseline_stale_note '' 12 2)"
 check_eq "a full run with nothing stale adds no line" "" \
   "$(seam_baseline_stale_note '' 12 0)"
 check_eq "a filtered run qualifies the drop and does not place the entries in the started files" \
-  "seam tests: stale baseline entries: 1; --update-baseline with the same --filter drops those and keeps the rest" \
+  "seam tests: stale baseline entries: 1, so this run fails; --update-baseline with the same --filter drops those and keeps the rest" \
   "$(seam_baseline_stale_note 106 1 1 | sed -n 1p)"
 check_eq "and its scope line names the gone-file entries the count may include" \
   "seam tests: the stale check covered the 1 test file(s) --filter '106' started, and any entry whose test file is gone; an entry of a test file that exists and did not run was not judged" \
@@ -179,5 +185,19 @@ check_eq "the runner replaces the baseline through seam_baseline_install" 1 \
   "$(grep -c 'seam_baseline_install ' "$ROOT_DIR/tests/x/run.sh")"
 check_eq "and does not stage that file under the log directory" 0 \
   "$(grep -c 'LOG_DIR/seam-baseline' "$ROOT_DIR/tests/x/run.sh")"
+
+# The verdict. A stale entry fails the run, so an assertion fixed without its
+# entry removed is caught by the run that proves the fix, and the two land in
+# one commit. A new failure fails it too, and that half was already the rule.
+seam_baseline_verdict 0 0
+check_eq "a run with nothing new and nothing stale passes" 0 "$?"
+seam_baseline_verdict 1 0
+check_eq "a new failure fails the run" 1 "$?"
+seam_baseline_verdict 0 1
+check_eq "a stale entry fails the run" 1 "$?"
+seam_baseline_verdict 2 3
+check_eq "and both kinds together fail it" 1 "$?"
+check_eq "the runner takes its exit status from that function" 1 \
+  "$(grep -c 'seam_baseline_verdict .*exit 1' "$ROOT_DIR/tests/x/run.sh")"
 
 finish
