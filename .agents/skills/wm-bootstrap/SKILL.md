@@ -81,14 +81,12 @@ to `scripts/check-unit.sh`.
 
 
 
-`make test-x` does not fail by design. `tests/x/run.sh` compares the failures it
-saw against `tests/quality/seam-baseline.txt`: an assertion listed there is
-reported as a known failure and does not change the exit status, and an
-assertion missing from there is new and exits non-zero. The summary line says
-`N passed, M known failed, K new failed`, and `K` is the number to act on. Do
-not weaken a test to make it green; fix the defect, or accept today's failures
-with `make test-x TEST_X_ARGS="--update-baseline"` and say in a bead which
-defect the new entry stands for.
+`make test-x` fails on a new failure and on a baseline entry that matched no
+failure. `docs/TESTING.md` says how the baseline decides which. Do not weaken
+a test to make it green. Fix the defect, or accept a new failure with `make test-x
+TEST_X_ARGS="--update-baseline"` and say in a bead which defect the new entry
+stands for. The same command drops a stale entry; that drop belongs in the
+commit that fixed the assertion.
 
 ## Work organisation (beads)
 
